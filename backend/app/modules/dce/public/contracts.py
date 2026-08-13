@@ -82,6 +82,13 @@ class PrepareDceStagingResponse(PublicResponseModel):
     replayed: bool = False
 
 
+class UploadDceStagedObjectResponse(PublicResponseModel):
+    """Safe DCE-UPLOAD-01 success response without storage or scanner internals."""
+
+    storage_object_id: UUID
+    state: Literal["CLEAN"]
+
+
 class RegisterDceVersionResponse(PublicResponseModel):
     """DCE-ADMIT-HTTP-01 success receipt without document or storage metadata."""
 

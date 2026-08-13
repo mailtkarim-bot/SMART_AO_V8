@@ -10,11 +10,14 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.modules.dce.application.commands import (
+    ClaimDceStagedObjectUploadCommand,
     CreateConsultationCommand,
     ExpireDceStagedObjectCommand,
     PrepareDceStagingCommand,
+    RecordDceStagedObjectQuarantineCommand,
     RecordDceStagedObjectScanCommand,
     RegisterDceVersionCommand,
+    RejectDceStagedObjectUploadCommand,
 )
 from app.modules.dce.domain.consultation import BuyerIdentity, Consultation
 from app.modules.dce.domain.dce_version import DceDocument, DceVersion
@@ -153,6 +156,167 @@ class PrepareDceStagingHandler:
         )
         return HandlerOutcome(
             result_code="DCE_STAGING_PREPARED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_STAGED_OBJECT",
+                    "aggregate_id": str(staged_object.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
+class ClaimDceStagedObjectUploadHandler:
+    """Reserve one staged object in a short transaction before receiving its bytes."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: ClaimDceStagedObjectUploadCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        staged_object = session.scalar(
+            sa.select(DceStagedObjectRecord)
+            .where(
+                DceStagedObjectRecord.tenant_id == context.tenant_id,
+                DceStagedObjectRecord.id == command.storage_object_id,
+            )
+            .with_for_update()
+        )
+        if staged_object is None or staged_object.state != "AWAITING_UPLOAD":
+            raise ValueError("DCE_STAGED_OBJECT_NOT_AWAITING_UPLOAD")
+        if staged_object.expires_at <= context.received_at:
+            raise ValueError("DCE_STAGED_OBJECT_EXPIRED")
+
+        staged_object.state = "UPLOADING"
+        staged_object.updated_by_actor_id = context.actor_id
+        event = PendingDomainEvent(
+            aggregate_type="DCE_STAGED_OBJECT",
+            aggregate_id=staged_object.id,
+            aggregate_revision=0,
+            event_type="DCE_STAGING_UPLOAD_CLAIMED",
+            payload={
+                "storage_object_id": str(staged_object.id),
+                "tenant_id": str(context.tenant_id),
+                "consultation_id": str(staged_object.consultation_id),
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_STAGING_UPLOAD_CLAIMED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_STAGED_OBJECT",
+                    "aggregate_id": str(staged_object.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
+class RecordDceStagedObjectQuarantineHandler:
+    """Persist trusted stream facts before a scanner can make an admissibility verdict."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: RecordDceStagedObjectQuarantineCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != "SYSTEM":
+            raise ValueError("DCE_STAGING_SYSTEM_ACTOR_REQUIRED")
+        staged_object = session.scalar(
+            sa.select(DceStagedObjectRecord)
+            .where(
+                DceStagedObjectRecord.tenant_id == context.tenant_id,
+                DceStagedObjectRecord.id == command.storage_object_id,
+            )
+            .with_for_update()
+        )
+        if staged_object is None or staged_object.state != "UPLOADING":
+            raise ValueError("DCE_STAGED_OBJECT_NOT_UPLOADING")
+
+        staged_object.actual_byte_size = command.actual_byte_size
+        staged_object.sha256 = command.sha256.lower()
+        staged_object.media_type = command.media_type
+        staged_object.updated_by_actor_id = context.actor_id
+        if command.actual_byte_size != staged_object.expected_byte_size:
+            staged_object.state = "REJECTED"
+            staged_object.rejection_code = "BYTE_SIZE_MISMATCH"
+        elif not command.content_allowed:
+            staged_object.state = "REJECTED"
+            staged_object.rejection_code = "MEDIA_TYPE_NOT_ALLOWED"
+        else:
+            staged_object.state = "QUARANTINED"
+            staged_object.rejection_code = None
+
+        event = PendingDomainEvent(
+            aggregate_type="DCE_STAGED_OBJECT",
+            aggregate_id=staged_object.id,
+            aggregate_revision=0,
+            event_type="DCE_STAGING_QUARANTINE_RECORDED",
+            payload={
+                "storage_object_id": str(staged_object.id),
+                "tenant_id": str(context.tenant_id),
+                "consultation_id": str(staged_object.consultation_id),
+                "state": staged_object.state,
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_STAGING_QUARANTINE_RECORDED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_STAGED_OBJECT",
+                    "aggregate_id": str(staged_object.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
+class RejectDceStagedObjectUploadHandler:
+    """Fail closed after a trusted upload service detects a terminal stream failure."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: RejectDceStagedObjectUploadCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != "SYSTEM":
+            raise ValueError("DCE_STAGING_SYSTEM_ACTOR_REQUIRED")
+        staged_object = session.scalar(
+            sa.select(DceStagedObjectRecord)
+            .where(
+                DceStagedObjectRecord.tenant_id == context.tenant_id,
+                DceStagedObjectRecord.id == command.storage_object_id,
+            )
+            .with_for_update()
+        )
+        if staged_object is None or staged_object.state != "UPLOADING":
+            raise ValueError("DCE_STAGED_OBJECT_NOT_UPLOADING")
+
+        staged_object.state = "REJECTED"
+        staged_object.rejection_code = command.rejection_code
+        staged_object.updated_by_actor_id = context.actor_id
+        event = PendingDomainEvent(
+            aggregate_type="DCE_STAGED_OBJECT",
+            aggregate_id=staged_object.id,
+            aggregate_revision=0,
+            event_type="DCE_STAGING_UPLOAD_REJECTED",
+            payload={
+                "storage_object_id": str(staged_object.id),
+                "tenant_id": str(context.tenant_id),
+                "consultation_id": str(staged_object.consultation_id),
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_STAGING_UPLOAD_REJECTED",
             aggregate_refs=(
                 {
                     "aggregate_type": "DCE_STAGED_OBJECT",

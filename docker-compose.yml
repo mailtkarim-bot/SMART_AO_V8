@@ -23,11 +23,34 @@ services:
       SMART_AO_ENV: ${SMART_AO_ENV:-development}
       SMART_AO_LOG_LEVEL: ${SMART_AO_LOG_LEVEL:-INFO}
       SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
+      SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
+      SMART_AO_CLAMD_HOST: clamav
+      SMART_AO_CLAMD_PORT: "3310"
+      SMART_AO_CLAMD_TIMEOUT_SECONDS: "30"
     depends_on:
       postgres:
         condition: service_healthy
+      clamav:
+        condition: service_healthy
+    volumes:
+      - dce_quarantine:/var/lib/smart_ao/dce-quarantine
     ports:
       - "8000:8000"
 
+  clamav:
+    image: clamav/clamav:1.4_base
+    environment:
+      CLAMAV_NO_MILTERD: "true"
+    volumes:
+      - clamav_database:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 90s
+
 volumes:
   postgres_data:
+  dce_quarantine:
+  clamav_database:

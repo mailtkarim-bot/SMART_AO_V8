@@ -11,12 +11,14 @@ from alembic import command
 from alembic.config import Config
 from app.bootstrap.application import AppRuntime, create_app
 from app.interfaces.http.routes.authentication import AuthenticationHttpRuntime
+from app.modules.dce.application.upload import DceUploadService, MalwareScanResult
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.models.dce_version import (
     DceDocumentRecord,
     DceVersionRecord,
 )
+from app.modules.dce.infrastructure.quarantine import LocalQuarantineStorageAdapter
 from app.platform.persistence.models import CommandReceiptRecord
 from app.platform.security.authentication import AuthenticationService
 from app.platform.security.models import (
@@ -43,6 +45,21 @@ class FixedClock:
 class UnusedPasswordVerifier:
     def verify(self, *, password_hash: str, password: str) -> bool:
         return False
+
+
+class UploadTestInspector:
+    async def detect_media_type(self, *, storage_key: str) -> str:
+        return "application/pdf"
+
+
+class UploadTestScanner:
+    async def scan(self, *, storage_key: str) -> MalwareScanResult:
+        return MalwareScanResult(
+            verdict="CLEAN",
+            scanner_name="test-clamd",
+            scanner_signature_version="test-signatures",
+            scanned_at=NOW,
+        )
 
 
 class UnusedTokenGenerator:
@@ -181,7 +198,11 @@ def _seed_dce(engine: sa.Engine, *, tenant_id: UUID) -> UUID:
     return dce_version_id
 
 
-def _client(session_factory: sessionmaker[Session]) -> tuple[TestClient, JwtAccessTokenCodec]:
+def _client(
+    session_factory: sessionmaker[Session],
+    *,
+    dce_upload_service_factory=None,
+) -> tuple[TestClient, JwtAccessTokenCodec]:
     clock = FixedClock()
     tokens = JwtAccessTokenCodec(
         signing_key="test-only-signing-key-at-least-32-bytes",
@@ -202,7 +223,10 @@ def _client(session_factory: sessionmaker[Session]) -> tuple[TestClient, JwtAcce
         clock=clock,
     )
     app = create_app(
-        runtime=AppRuntime.create(session_factory=session_factory),
+        runtime=AppRuntime.create(
+            session_factory=session_factory,
+            dce_upload_service_factory=dce_upload_service_factory,
+        ),
         authentication_runtime=auth_runtime,
     )
     return TestClient(app, base_url="https://smart-ao.test"), tokens
@@ -758,3 +782,179 @@ def test_dce_staging_rejects_client_supplied_storage_object_id(
     assert response.status_code == 422
     with Session(database_engine) as session:
         assert session.scalar(sa.select(sa.func.count()).select_from(DceStagedObjectRecord)) == 0
+
+
+
+def _upload_service_factory(root: Path):
+    def factory(dispatcher):
+        storage = LocalQuarantineStorageAdapter(root=root)
+        return DceUploadService(
+            dispatcher=dispatcher,
+            storage=storage,
+            inspector=UploadTestInspector(),
+            scanner=UploadTestScanner(),
+            allowed_media_types=frozenset({"application/pdf"}),
+        )
+
+    return factory
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_dce_upload_requires_bearer_streams_to_quarantine_and_returns_no_storage_facts(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+    tmp_path: Path,
+) -> None:
+    content = b"%PDF-" + (b"A" * 95)
+    tenant_id, identity_id, session_id = _seed_principal(database_engine)
+    consultation_id = _seed_consultation(database_engine, tenant_id=tenant_id)
+    client, tokens = _client(
+        session_factory,
+        dce_upload_service_factory=_upload_service_factory(tmp_path),
+    )
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    staging_payload = _staging_payload(consultation_id=consultation_id)
+    staging_payload["expected_byte_size"] = len(content)
+    prepared = client.post("/api/v1/dce-staged-objects", json=staging_payload, headers=headers)
+    assert prepared.status_code == 201
+    storage_object_id = prepared.json()["staging"]["storage_object_id"]
+
+    assert client.put(
+        f"/api/v1/dce-staged-objects/{storage_object_id}/content",
+        content=content,
+        headers={"Idempotency-Key": str(uuid4())},
+    ).status_code == 401
+
+    response = client.put(
+        f"/api/v1/dce-staged-objects/{storage_object_id}/content",
+        content=content,
+        headers={
+            **headers,
+            "Idempotency-Key": str(uuid4()),
+            "Content-Type": "application/octet-stream",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"storage_object_id": storage_object_id, "state": "CLEAN"}
+    with Session(database_engine) as session:
+        staged_object = session.get(DceStagedObjectRecord, UUID(storage_object_id))
+    assert staged_object is not None
+    assert staged_object.state == "CLEAN"
+    assert staged_object.sha256 == sha256(content).hexdigest()
+    assert staged_object.media_type == "application/pdf"
+    assert (tmp_path / staged_object.storage_key).read_bytes() == content
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_dce_upload_refuses_collaborator_without_case_scope_and_audits(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+    tmp_path: Path,
+) -> None:
+    tenant_id, patron_identity, patron_session = _seed_principal(database_engine)
+    consultation_id = _seed_consultation(database_engine, tenant_id=tenant_id)
+    _, collaborator_identity, collaborator_session = _seed_principal(
+        database_engine,
+        role="COLLABORATEUR",
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(
+        session_factory,
+        dce_upload_service_factory=_upload_service_factory(tmp_path),
+    )
+    prepared = client.post(
+        "/api/v1/dce-staged-objects",
+        json=_staging_payload(consultation_id=consultation_id),
+        headers=_headers(tokens, identity_id=patron_identity, session_id=patron_session),
+    )
+    assert prepared.status_code == 201
+    storage_object_id = prepared.json()["staging"]["storage_object_id"]
+
+    response = client.put(
+        f"/api/v1/dce-staged-objects/{storage_object_id}/content",
+        content=b"%PDF-" + (b"A" * 95),
+        headers={
+            **_headers(
+                tokens,
+                identity_id=collaborator_identity,
+                session_id=collaborator_session,
+            ),
+            "Idempotency-Key": str(uuid4()),
+        },
+    )
+
+    assert response.status_code == 403
+    with Session(database_engine) as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.actor_id == collaborator_identity,
+                SecurityAuditEventRecord.resource_id == consultation_id,
+            )
+        )
+        staged_object = session.get(DceStagedObjectRecord, UUID(storage_object_id))
+    assert audit is not None
+    assert staged_object is not None
+    assert staged_object.state == "AWAITING_UPLOAD"
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_dce_upload_is_neutral_for_other_tenant_and_rejects_json_body(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+    tmp_path: Path,
+) -> None:
+    owner_tenant, owner_identity, owner_session = _seed_principal(database_engine)
+    consultation_id = _seed_consultation(database_engine, tenant_id=owner_tenant)
+    _, other_identity, other_session = _seed_principal(database_engine)
+    client, tokens = _client(
+        session_factory,
+        dce_upload_service_factory=_upload_service_factory(tmp_path),
+    )
+    prepared = client.post(
+        "/api/v1/dce-staged-objects",
+        json=_staging_payload(consultation_id=consultation_id),
+        headers=_headers(tokens, identity_id=owner_identity, session_id=owner_session),
+    )
+    assert prepared.status_code == 201
+    storage_object_id = prepared.json()["staging"]["storage_object_id"]
+
+    other_tenant = client.put(
+        f"/api/v1/dce-staged-objects/{storage_object_id}/content",
+        content=b"%PDF-" + (b"A" * 95),
+        headers={
+            **_headers(tokens, identity_id=other_identity, session_id=other_session),
+            "Idempotency-Key": str(uuid4()),
+        },
+    )
+    assert other_tenant.status_code == 404
+    assert other_tenant.json()["detail"] == "NOT_FOUND_OR_FORBIDDEN"
+
+    json_body = client.put(
+        f"/api/v1/dce-staged-objects/{storage_object_id}/content",
+        json={"not": "binary"},
+        headers={
+            **_headers(tokens, identity_id=owner_identity, session_id=owner_session),
+            "Idempotency-Key": str(uuid4()),
+        },
+    )
+    assert json_body.status_code == 415
+    with Session(database_engine) as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.actor_id == other_identity,
+                SecurityAuditEventRecord.resource_id == consultation_id,
+            )
+        )
+        staged_object = session.get(DceStagedObjectRecord, UUID(storage_object_id))
+    assert audit is not None
+    assert staged_object is not None
+    assert staged_object.state == "AWAITING_UPLOAD"

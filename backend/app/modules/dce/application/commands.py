@@ -65,6 +65,38 @@ class PrepareDceStagingCommand(ApplicationCommand):
     expires_at: datetime
 
 
+class ClaimDceStagedObjectUploadCommand(ApplicationCommand):
+    """Atomically reserve one awaiting staged object for a single binary stream."""
+
+    command_type = "ClaimDceStagedObjectUpload"
+
+    storage_object_id: UUID
+
+
+class RecordDceStagedObjectQuarantineCommand(ApplicationCommand):
+    """Trusted server metadata after streamed private write and MIME inspection."""
+
+    command_type = "RecordDceStagedObjectQuarantine"
+
+    storage_object_id: UUID
+    actual_byte_size: int = Field(gt=0, le=2_000_000_000)
+    sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+    media_type: str = Field(min_length=1, max_length=180)
+    content_allowed: bool
+
+
+class RejectDceStagedObjectUploadCommand(ApplicationCommand):
+    """Trusted server-only terminal rejection of an object claimed for upload."""
+
+    command_type = "RejectDceStagedObjectUpload"
+
+    storage_object_id: UUID
+    rejection_code: str = Field(
+        pattern=r"^(UPLOAD_LIMIT_EXCEEDED|STORAGE_WRITE_FAILED|INSPECTION_ERROR|"
+        r"MEDIA_TYPE_NOT_ALLOWED|UPLOAD_INTERRUPTED)$"
+    )
+
+
 class ExpireDceStagedObjectCommand(ApplicationCommand):
     """Trusted system-only expiry of a non-consumed staged object."""
 

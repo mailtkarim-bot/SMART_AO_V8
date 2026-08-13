@@ -175,6 +175,8 @@ def _move_to_quarantine(session_factory: sessionmaker[Session], *, storage_objec
     with session_factory.begin() as session:
         staged_object = session.get(DceStagedObjectRecord, storage_object_id)
         assert staged_object is not None
+        staged_object.state = "UPLOADING"
+        session.flush()
         staged_object.state = "QUARANTINED"
 
 

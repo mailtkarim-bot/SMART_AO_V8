@@ -47,8 +47,8 @@ class DceStagedObjectRecord(TenantScopedRecord, Base):
             name="sha256_lowercase",
         ),
         sa.CheckConstraint(
-            "state IN ('AWAITING_UPLOAD', 'QUARANTINED', 'CLEAN', 'REJECTED', "
-            "'CONSUMED', 'EXPIRED')",
+            "state IN ('AWAITING_UPLOAD', 'UPLOADING', 'QUARANTINED', 'CLEAN', "
+            "'REJECTED', 'CONSUMED', 'EXPIRED')",
             name="state",
         ),
         sa.CheckConstraint(
