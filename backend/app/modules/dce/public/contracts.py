@@ -43,6 +43,45 @@ class CreateConsultationResponse(PublicResponseModel):
     replayed: bool = False
 
 
+class PrepareDceStagingRequest(BaseModel):
+    """Public intent; the server allocates the opaque storage object identity."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    consultation_id: UUID
+    consultation_revision: int = Field(ge=0)
+    original_filename: str = Field(min_length=1, max_length=500)
+    expected_byte_size: int = Field(gt=0, le=2_000_000_000)
+    source_channel: str = Field(
+        pattern=r"^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$"
+    )
+    expires_at: datetime
+
+
+class DceStagingStatusResponse(PublicResponseModel):
+    """Public staging state; intentionally excludes private storage locator data."""
+
+    storage_object_id: UUID
+    state: Literal["AWAITING_UPLOAD"]
+    expires_at: datetime
+
+
+class PrepareDceStagingResponse(PublicResponseModel):
+    """DCE-STAGING-01 receipt for a server-keyed staging intent."""
+
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal["DCE_STAGING_PREPARED"]
+    aggregate_refs: list[AggregateReferenceResponse]
+    event_ids: list[UUID]
+    staging: DceStagingStatusResponse
+    replayed: bool = False
+
+
 class RegisterDceVersionResponse(PublicResponseModel):
     """DCE-ADMIT-HTTP-01 success receipt without document or storage metadata."""
 

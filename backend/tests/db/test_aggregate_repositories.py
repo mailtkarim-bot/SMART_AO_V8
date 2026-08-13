@@ -117,6 +117,8 @@ def _insert_dce_version(
 ) -> tuple[str, str]:
     dce_version_id = str(uuid4())
     document_id = str(uuid4())
+    storage_object_id = str(uuid4())
+    document_hash = uuid4().hex * 2
     connection.execute(
         sa.text(
             """
@@ -140,6 +142,31 @@ def _insert_dce_version(
     connection.execute(
         sa.text(
             """
+            INSERT INTO dce_staged_objects (
+                id, tenant_id, consultation_id, storage_key, original_filename,
+                expected_byte_size, actual_byte_size, sha256, media_type, source_channel,
+                state, scan_verdict, scanner_name, scanner_signature_version, scanned_at,
+                expires_at, consumed_by_dce_version_id, consumed_at
+            ) VALUES (
+                :storage_object_id, :tenant_id, :consultation_id, :storage_key,
+                'rc.pdf', 42, 42, :sha256, 'application/pdf', 'MANUAL',
+                'CONSUMED', 'CLEAN', 'test-scanner', 'test-signatures', NOW(),
+                NOW() + INTERVAL '1 day', :dce_version_id, NOW()
+            )
+            """
+        ),
+        {
+            "storage_object_id": storage_object_id,
+            "storage_key": f"dce-staging/{tenant_id}/{storage_object_id}",
+            "tenant_id": tenant_id,
+            "consultation_id": consultation_id,
+            "dce_version_id": dce_version_id,
+            "sha256": document_hash,
+        },
+    )
+    connection.execute(
+        sa.text(
+            """
             INSERT INTO dce_documents (
                 id, tenant_id, dce_version_id, storage_object_id, storage_key,
                 original_filename, media_type, byte_size, sha256, received_from
@@ -153,8 +180,8 @@ def _insert_dce_version(
             "id": document_id,
             "tenant_id": tenant_id,
             "dce_version_id": dce_version_id,
-            "storage_object_id": str(uuid4()),
-            "sha256": uuid4().hex * 2,
+            "storage_object_id": storage_object_id,
+            "sha256": document_hash,
         },
     )
     connection.execute(

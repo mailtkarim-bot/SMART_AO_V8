@@ -22,9 +22,13 @@ from app.interfaces.http.routes.consultations import (
     ConsultationSecurityRuntime,
     build_consultation_router,
 )
+from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
 from app.modules.dce.application.handlers import (
     CreateConsultationHandler,
+    ExpireDceStagedObjectHandler,
+    PrepareDceStagingHandler,
+    RecordDceStagedObjectScanHandler,
     RegisterDceVersionHandler,
 )
 from app.modules.dce.application.queries import ConsultationProjection
@@ -53,6 +57,9 @@ class AppRuntime:
                 session_factory=session_factory,
                 handlers={
                     "CreateConsultation": CreateConsultationHandler(),
+                    "ExpireDceStagedObject": ExpireDceStagedObjectHandler(),
+                    "PrepareDceStaging": PrepareDceStagingHandler(),
+                    "RecordDceStagedObjectScan": RecordDceStagedObjectScanHandler(),
                     "RegisterDceVersion": RegisterDceVersionHandler(),
                 },
             ),
@@ -132,6 +139,12 @@ def create_app(
         )
         app.include_router(
             build_consultation_router(
+                runtime=runtime,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_dce_staging_router(
                 runtime=runtime,
                 security_runtime=security_runtime,
             )

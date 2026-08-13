@@ -117,6 +117,12 @@ class DceDocumentRecord(TenantScopedRecord, Base):
             name="fk_dce_documents__dce_versions__tenant_dce_version_id",
             ondelete="RESTRICT",
         ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "storage_object_id"],
+            ["dce_staged_objects.tenant_id", "dce_staged_objects.id"],
+            name="fk_dce_documents__dce_staged_objects__tenant_storage_object_id",
+            ondelete="RESTRICT",
+        ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_dce_documents__tenant_id"),
         sa.UniqueConstraint(
             "tenant_id",

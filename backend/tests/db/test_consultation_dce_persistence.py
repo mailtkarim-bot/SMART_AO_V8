@@ -262,6 +262,32 @@ def test_dce_document_original_fields_are_immutable(connection: sa.Connection) -
         corpus_hash="2" * 64,
     )
     document_id = str(uuid4())
+    storage_object_id = str(uuid4())
+    document_hash = "3" * 64
+    connection.execute(
+        sa.text(
+            """
+            INSERT INTO dce_staged_objects (
+                id, tenant_id, consultation_id, storage_key, original_filename,
+                expected_byte_size, actual_byte_size, sha256, media_type, source_channel,
+                state, scan_verdict, scanner_name, scanner_signature_version, scanned_at,
+                expires_at, consumed_by_dce_version_id, consumed_at
+            ) VALUES (
+                :storage_object_id, :tenant_id, :consultation_id, 'dce-staging/rc.pdf',
+                'RC.pdf', 1234, 1234, :sha256, 'application/pdf', 'BUYER_PLATFORM',
+                'CONSUMED', 'CLEAN', 'test-scanner', 'test-signatures', NOW(),
+                NOW() + INTERVAL '1 day', :dce_version_id, NOW()
+            )
+            """
+        ),
+        {
+            "storage_object_id": storage_object_id,
+            "tenant_id": tenant_id,
+            "consultation_id": consultation_id,
+            "dce_version_id": dce_version_id,
+            "sha256": document_hash,
+        },
+    )
     connection.execute(
         sa.text(
             """
@@ -278,8 +304,8 @@ def test_dce_document_original_fields_are_immutable(connection: sa.Connection) -
             "id": document_id,
             "tenant_id": tenant_id,
             "dce_version_id": dce_version_id,
-            "storage_object_id": str(uuid4()),
-            "sha256": "3" * 64,
+            "storage_object_id": storage_object_id,
+            "sha256": document_hash,
         },
     )
 

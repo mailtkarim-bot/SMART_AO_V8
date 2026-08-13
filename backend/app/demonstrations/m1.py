@@ -21,6 +21,7 @@ from app.modules.case.infrastructure.models.case import (
 )
 from app.modules.dce.application.commands import CreateConsultationCommand
 from app.modules.dce.application.handlers import CreateConsultationHandler
+from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.models.dce_version import (
     DceDocumentRecord,
     DceVersionRecord,
@@ -221,17 +222,45 @@ class M1ScenarioRunner:
             )
         )
         session.flush()
+        storage_object_id = uuid4()
+        document_hash = _sha256(storage_key)
+        session.add(
+            DceStagedObjectRecord(
+                id=storage_object_id,
+                tenant_id=tenant_id,
+                consultation_id=consultation_id,
+                storage_key=storage_key,
+                original_filename="reglement_consultation.pdf",
+                expected_byte_size=512,
+                actual_byte_size=512,
+                sha256=document_hash,
+                media_type="application/pdf",
+                source_channel=provenance_channel,
+                state="CONSUMED",
+                scan_verdict="CLEAN",
+                scanner_name="m1-test-scanner",
+                scanner_signature_version="m1-test-signatures",
+                scanned_at=source_received_at,
+                rejection_code=None,
+                expires_at=source_received_at + timedelta(days=1),
+                consumed_by_dce_version_id=dce_version_id,
+                consumed_at=source_received_at,
+                created_by_actor_id=actor_id,
+                updated_by_actor_id=actor_id,
+            )
+        )
+        session.flush()
         session.add(
             DceDocumentRecord(
                 id=uuid4(),
                 tenant_id=tenant_id,
                 dce_version_id=dce_version_id,
-                storage_object_id=uuid4(),
+                storage_object_id=storage_object_id,
                 storage_key=storage_key,
                 original_filename="reglement_consultation.pdf",
                 media_type="application/pdf",
                 byte_size=512,
-                sha256=_sha256(storage_key),
+                sha256=document_hash,
                 received_from=provenance_channel,
             )
         )

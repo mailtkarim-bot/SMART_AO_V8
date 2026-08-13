@@ -41,20 +41,51 @@ class CreateConsultationCommand(ApplicationCommand):
 
 
 class DceDocumentAdmissionInput(BaseModel):
-    """Metadata for an original already staged by a future secure storage flow."""
+    """References one server-controlled CLEAN staged object for DCE admission."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     document_id: UUID
     storage_object_id: UUID
-    storage_key: str = Field(min_length=1, max_length=1000)
+
+
+class PrepareDceStagingCommand(ApplicationCommand):
+    """Create the durable, tenant-scoped intent that precedes a binary upload."""
+
+    command_type = "PrepareDceStaging"
+
+    storage_object_id: UUID
+    consultation_id: UUID
+    consultation_revision: int = Field(ge=0)
     original_filename: str = Field(min_length=1, max_length=500)
-    media_type: str = Field(min_length=1, max_length=180)
-    byte_size: int = Field(gt=0, le=2_000_000_000)
-    sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
-    received_from: str = Field(
+    expected_byte_size: int = Field(gt=0, le=2_000_000_000)
+    source_channel: str = Field(
         pattern=r"^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$"
     )
+    expires_at: datetime
+
+
+class ExpireDceStagedObjectCommand(ApplicationCommand):
+    """Trusted system-only expiry of a non-consumed staged object."""
+
+    command_type = "ExpireDceStagedObject"
+
+    storage_object_id: UUID
+
+
+class RecordDceStagedObjectScanCommand(ApplicationCommand):
+    """Trusted system-only scan verdict for a quarantined staged object."""
+
+    command_type = "RecordDceStagedObjectScan"
+
+    storage_object_id: UUID
+    actual_byte_size: int = Field(gt=0, le=2_000_000_000)
+    sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+    media_type: str = Field(min_length=1, max_length=180)
+    scan_verdict: str = Field(pattern=r"^(CLEAN|INFECTED|ERROR)$")
+    scanner_name: str = Field(min_length=1, max_length=120)
+    scanner_signature_version: str = Field(min_length=1, max_length=240)
+    scanned_at: datetime
 
 
 class RegisterDceVersionCommand(ApplicationCommand):

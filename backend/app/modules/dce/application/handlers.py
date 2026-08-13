@@ -11,11 +11,15 @@ from sqlalchemy.orm import Session
 
 from app.modules.dce.application.commands import (
     CreateConsultationCommand,
+    ExpireDceStagedObjectCommand,
+    PrepareDceStagingCommand,
+    RecordDceStagedObjectScanCommand,
     RegisterDceVersionCommand,
 )
 from app.modules.dce.domain.consultation import BuyerIdentity, Consultation
 from app.modules.dce.domain.dce_version import DceDocument, DceVersion
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
+from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.models.dce_version import DceDocumentRecord, DceVersionRecord
 from app.platform.events.dispatcher import CommandContext, HandlerOutcome, PendingDomainEvent
 
@@ -85,6 +89,202 @@ class CreateConsultationHandler:
         )
 
 
+class PrepareDceStagingHandler:
+    """Create a private server-keyed staging intent before binary upload exists."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: PrepareDceStagingCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        consultation = session.scalar(
+            sa.select(ConsultationRecord).where(
+                ConsultationRecord.tenant_id == context.tenant_id,
+                ConsultationRecord.id == command.consultation_id,
+            )
+        )
+        if (
+            consultation is None
+            or consultation.aggregate_revision != command.consultation_revision
+        ):
+            raise ValueError("CONSULTATION_REQUIRED_OR_STALE")
+        if command.expires_at <= context.received_at:
+            raise ValueError("DCE_STAGING_EXPIRY_REQUIRED")
+
+        staged_object = DceStagedObjectRecord(
+            id=command.storage_object_id,
+            tenant_id=context.tenant_id,
+            consultation_id=command.consultation_id,
+            storage_key=_staging_storage_key(
+                tenant_id=UUID(str(context.tenant_id)),
+                storage_object_id=command.storage_object_id,
+            ),
+            original_filename=command.original_filename,
+            expected_byte_size=command.expected_byte_size,
+            actual_byte_size=None,
+            sha256=None,
+            media_type=None,
+            source_channel=command.source_channel,
+            state="AWAITING_UPLOAD",
+            scan_verdict=None,
+            scanner_name=None,
+            scanner_signature_version=None,
+            scanned_at=None,
+            rejection_code=None,
+            expires_at=command.expires_at,
+            consumed_by_dce_version_id=None,
+            consumed_at=None,
+            created_by_actor_id=context.actor_id,
+            updated_by_actor_id=context.actor_id,
+        )
+        session.add(staged_object)
+        event = PendingDomainEvent(
+            aggregate_type="DCE_STAGED_OBJECT",
+            aggregate_id=staged_object.id,
+            aggregate_revision=0,
+            event_type="DCE_STAGING_PREPARED",
+            payload={
+                "storage_object_id": str(staged_object.id),
+                "tenant_id": str(context.tenant_id),
+                "consultation_id": str(staged_object.consultation_id),
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_STAGING_PREPARED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_STAGED_OBJECT",
+                    "aggregate_id": str(staged_object.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
+class ExpireDceStagedObjectHandler:
+    """Expire an unconsumed object before its physical deletion is performed by an outbox worker."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: ExpireDceStagedObjectCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != "SYSTEM":
+            raise ValueError("DCE_STAGING_SYSTEM_ACTOR_REQUIRED")
+        staged_object = session.scalar(
+            sa.select(DceStagedObjectRecord)
+            .where(
+                DceStagedObjectRecord.tenant_id == context.tenant_id,
+                DceStagedObjectRecord.id == command.storage_object_id,
+            )
+            .with_for_update()
+        )
+        if staged_object is None or staged_object.state in {"CONSUMED", "EXPIRED"}:
+            raise ValueError("DCE_STAGED_OBJECT_NOT_EXPIRABLE")
+        if staged_object.expires_at > context.received_at:
+            raise ValueError("DCE_STAGED_OBJECT_NOT_EXPIRED")
+
+        staged_object.state = "EXPIRED"
+        staged_object.updated_by_actor_id = context.actor_id
+        event = PendingDomainEvent(
+            aggregate_type="DCE_STAGED_OBJECT",
+            aggregate_id=staged_object.id,
+            aggregate_revision=0,
+            event_type="DCE_STAGING_EXPIRED",
+            payload={
+                "storage_object_id": str(staged_object.id),
+                "tenant_id": str(context.tenant_id),
+                "consultation_id": str(staged_object.consultation_id),
+            },
+            topic="dce_staging_retention",
+        )
+        return HandlerOutcome(
+            result_code="DCE_STAGING_EXPIRED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_STAGED_OBJECT",
+                    "aggregate_id": str(staged_object.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
+class RecordDceStagedObjectScanHandler:
+    """Record a trusted fail-closed verdict after an upload reached quarantine."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: RecordDceStagedObjectScanCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != "SYSTEM":
+            raise ValueError("DCE_STAGING_SYSTEM_ACTOR_REQUIRED")
+        staged_object = session.scalar(
+            sa.select(DceStagedObjectRecord)
+            .where(
+                DceStagedObjectRecord.tenant_id == context.tenant_id,
+                DceStagedObjectRecord.id == command.storage_object_id,
+            )
+            .with_for_update()
+        )
+        if staged_object is None or staged_object.state != "QUARANTINED":
+            raise ValueError("DCE_STAGED_OBJECT_NOT_QUARANTINED")
+
+        staged_object.actual_byte_size = command.actual_byte_size
+        staged_object.sha256 = command.sha256.lower()
+        staged_object.media_type = command.media_type
+        staged_object.scan_verdict = command.scan_verdict
+        staged_object.scanner_name = command.scanner_name
+        staged_object.scanner_signature_version = command.scanner_signature_version
+        staged_object.scanned_at = command.scanned_at
+        staged_object.updated_by_actor_id = context.actor_id
+        if command.actual_byte_size != staged_object.expected_byte_size:
+            staged_object.state = "REJECTED"
+            staged_object.rejection_code = "BYTE_SIZE_MISMATCH"
+        elif command.scan_verdict == "CLEAN":
+            staged_object.state = "CLEAN"
+            staged_object.rejection_code = None
+        elif command.scan_verdict == "INFECTED":
+            staged_object.state = "REJECTED"
+            staged_object.rejection_code = "MALWARE_DETECTED"
+        else:
+            staged_object.state = "REJECTED"
+            staged_object.rejection_code = "SCAN_ERROR"
+
+        event = PendingDomainEvent(
+            aggregate_type="DCE_STAGED_OBJECT",
+            aggregate_id=staged_object.id,
+            aggregate_revision=0,
+            event_type="DCE_STAGING_SCAN_RECORDED",
+            payload={
+                "storage_object_id": str(staged_object.id),
+                "tenant_id": str(context.tenant_id),
+                "consultation_id": str(staged_object.consultation_id),
+                "state": staged_object.state,
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_STAGING_SCAN_RECORDED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_STAGED_OBJECT",
+                    "aggregate_id": str(staged_object.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
 class RegisterDceVersionHandler:
     """Admit a new immutable DCE root and its originals in one dispatcher transaction."""
 
@@ -107,12 +307,43 @@ class RegisterDceVersionHandler:
         ):
             raise ValueError("CONSULTATION_REQUIRED_OR_STALE")
 
-        document_hashes = [document.sha256.lower() for document in command.documents]
-        if len(document_hashes) != len(set(document_hashes)):
-            raise ValueError("DCE_DOCUMENT_HASH_DUPLICATE")
         document_ids = [document.document_id for document in command.documents]
         if len(document_ids) != len(set(document_ids)):
             raise ValueError("DCE_DOCUMENT_IDENTIFIER_DUPLICATE")
+        storage_object_ids = [document.storage_object_id for document in command.documents]
+        if len(storage_object_ids) != len(set(storage_object_ids)):
+            raise ValueError("DCE_STAGED_OBJECT_DUPLICATE")
+        staged_objects = list(
+            session.scalars(
+                sa.select(DceStagedObjectRecord)
+                .where(
+                    DceStagedObjectRecord.tenant_id == context.tenant_id,
+                    DceStagedObjectRecord.id.in_(storage_object_ids),
+                )
+                .with_for_update()
+            )
+        )
+        staged_by_id = {staged_object.id: staged_object for staged_object in staged_objects}
+        if len(staged_by_id) != len(storage_object_ids):
+            raise ValueError("DCE_STAGED_OBJECT_REQUIRED")
+        ordered_staged_objects = [
+            staged_by_id[storage_object_id] for storage_object_id in storage_object_ids
+        ]
+        for staged_object in ordered_staged_objects:
+            if staged_object.consultation_id != command.consultation_id:
+                raise ValueError("DCE_STAGED_OBJECT_CONSULTATION_REQUIRED")
+            if staged_object.state != "CLEAN":
+                raise ValueError("DCE_STAGED_OBJECT_NOT_CLEAN")
+            if staged_object.expires_at <= context.received_at:
+                raise ValueError("DCE_STAGED_OBJECT_EXPIRED")
+            if (
+                staged_object.sha256 is None
+                or staged_object.media_type is None
+                or staged_object.actual_byte_size is None
+            ):
+                raise ValueError("DCE_STAGED_OBJECT_METADATA_REQUIRED")
+
+        document_hashes = [staged_object.sha256 for staged_object in ordered_staged_objects]
         expected_corpus_hash = _corpus_hash(document_hashes)
         if command.corpus_hash.lower() != expected_corpus_hash:
             raise ValueError("DCE_CORPUS_HASH_REQUIRED")
@@ -120,12 +351,16 @@ class RegisterDceVersionHandler:
         domain_documents = tuple(
             DceDocument(
                 document_id=document.document_id,
-                original_filename=document.original_filename,
-                sha256=document.sha256.lower(),
-                media_type=document.media_type,
-                size_bytes=document.byte_size,
+                original_filename=staged_object.original_filename,
+                sha256=staged_object.sha256,
+                media_type=staged_object.media_type,
+                size_bytes=staged_object.actual_byte_size,
             )
-            for document in command.documents
+            for document, staged_object in zip(
+                command.documents,
+                ordered_staged_objects,
+                strict=True,
+            )
         )
         version = DceVersion.register(
             dce_version_id=command.dce_version_id,
@@ -161,21 +396,25 @@ class RegisterDceVersionHandler:
             )
         )
         session.flush()
-        for document in command.documents:
+        for document, staged_object in zip(command.documents, ordered_staged_objects, strict=True):
             session.add(
                 DceDocumentRecord(
                     id=document.document_id,
                     tenant_id=version.tenant_id,
                     dce_version_id=version.id,
-                    storage_object_id=document.storage_object_id,
-                    storage_key=document.storage_key,
-                    original_filename=document.original_filename,
-                    media_type=document.media_type,
-                    byte_size=document.byte_size,
-                    sha256=document.sha256.lower(),
-                    received_from=document.received_from,
+                    storage_object_id=staged_object.id,
+                    storage_key=staged_object.storage_key,
+                    original_filename=staged_object.original_filename,
+                    media_type=staged_object.media_type,
+                    byte_size=staged_object.actual_byte_size,
+                    sha256=staged_object.sha256,
+                    received_from=staged_object.source_channel,
                 )
             )
+            staged_object.state = "CONSUMED"
+            staged_object.consumed_by_dce_version_id = version.id
+            staged_object.consumed_at = context.received_at
+            staged_object.updated_by_actor_id = context.actor_id
         event = PendingDomainEvent(
             aggregate_type="DCE_VERSION",
             aggregate_id=version.id,
@@ -198,6 +437,12 @@ class RegisterDceVersionHandler:
             ),
             events=(event,),
         )
+
+
+def _staging_storage_key(*, tenant_id: UUID, storage_object_id: UUID) -> str:
+    """Derive a private backend key; a caller never submits or receives this value."""
+
+    return f"dce-staging/{tenant_id}/{storage_object_id}"
 
 
 def _corpus_hash(document_hashes: list[str]) -> str:

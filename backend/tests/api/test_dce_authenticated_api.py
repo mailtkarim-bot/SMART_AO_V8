@@ -12,6 +12,7 @@ from alembic.config import Config
 from app.bootstrap.application import AppRuntime, create_app
 from app.interfaces.http.routes.authentication import AuthenticationHttpRuntime
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
+from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.models.dce_version import (
     DceDocumentRecord,
     DceVersionRecord,
@@ -356,25 +357,64 @@ def _admission_payload(
             {
                 "document_id": str(uuid4()),
                 "storage_object_id": str(uuid4()),
-                "storage_key": "staging/dce/rc.pdf",
-                "original_filename": "Reglement-consultation.pdf",
-                "media_type": "application/pdf",
-                "byte_size": 100,
-                "sha256": document_hashes[0],
-                "received_from": "MANUAL_UPLOAD",
             },
             {
                 "document_id": str(uuid4()),
                 "storage_object_id": str(uuid4()),
-                "storage_key": "staging/dce/cctp.pdf",
-                "original_filename": "CCTP.pdf",
-                "media_type": "application/pdf",
-                "byte_size": 200,
-                "sha256": document_hashes[1],
-                "received_from": "MANUAL_UPLOAD",
             },
         ],
     }
+
+
+def _seed_clean_staged_objects(
+    engine: sa.Engine,
+    *,
+    tenant_id: UUID,
+    consultation_id: UUID,
+    storage_object_ids: list[UUID],
+) -> None:
+    document_metadata = (
+        ("b" * 64, "Reglement-consultation.pdf", 100),
+        ("c" * 64, "CCTP.pdf", 200),
+    )
+    with Session(engine) as session:
+        for storage_object_id, (document_hash, filename, byte_size) in zip(
+            storage_object_ids,
+            document_metadata,
+            strict=True,
+        ):
+            session.add(
+                DceStagedObjectRecord(
+                    id=storage_object_id,
+                    tenant_id=tenant_id,
+                    consultation_id=consultation_id,
+                    storage_key=f"dce-staging/{tenant_id}/{storage_object_id}",
+                    original_filename=filename,
+                    expected_byte_size=byte_size,
+                    actual_byte_size=byte_size,
+                    sha256=document_hash,
+                    media_type="application/pdf",
+                    source_channel="MANUAL_UPLOAD",
+                    state="CLEAN",
+                    scan_verdict="CLEAN",
+                    scanner_name="test-scanner",
+                    scanner_signature_version="test-signatures",
+                    scanned_at=NOW,
+                    rejection_code=None,
+                    expires_at=datetime.now(tz=UTC) + timedelta(hours=1),
+                    consumed_by_dce_version_id=None,
+                    consumed_at=None,
+                    created_by_actor_id=None,
+                    updated_by_actor_id=None,
+                )
+            )
+        session.commit()
+
+
+def _storage_object_ids(payload: dict[str, object]) -> list[UUID]:
+    documents = payload["documents"]
+    assert isinstance(documents, list)
+    return [UUID(str(document["storage_object_id"])) for document in documents]
 
 
 @pytest.mark.api
@@ -387,6 +427,12 @@ def test_dce_admission_requires_bearer_and_returns_a_safe_success_receipt(
     tenant_id, identity_id, session_id = _seed_principal(database_engine)
     consultation_id = _seed_consultation(database_engine, tenant_id=tenant_id)
     payload = _admission_payload(consultation_id=consultation_id)
+    _seed_clean_staged_objects(
+        database_engine,
+        tenant_id=tenant_id,
+        consultation_id=consultation_id,
+        storage_object_ids=_storage_object_ids(payload),
+    )
     client, tokens = _client(session_factory)
 
     assert client.post("/api/v1/dce-versions", json=payload).status_code == 401
@@ -433,6 +479,12 @@ def test_dce_admission_replays_the_saved_receipt_without_duplicate_documents(
     tenant_id, identity_id, session_id = _seed_principal(database_engine)
     consultation_id = _seed_consultation(database_engine, tenant_id=tenant_id)
     payload = _admission_payload(consultation_id=consultation_id)
+    _seed_clean_staged_objects(
+        database_engine,
+        tenant_id=tenant_id,
+        consultation_id=consultation_id,
+        storage_object_ids=_storage_object_ids(payload),
+    )
     client, tokens = _client(session_factory)
     headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
 
@@ -530,6 +582,12 @@ def test_dce_admission_rejected_command_leaves_no_durable_side_effect(
     tenant_id, identity_id, session_id = _seed_principal(database_engine)
     consultation_id = _seed_consultation(database_engine, tenant_id=tenant_id)
     payload = _admission_payload(consultation_id=consultation_id)
+    _seed_clean_staged_objects(
+        database_engine,
+        tenant_id=tenant_id,
+        consultation_id=consultation_id,
+        storage_object_ids=_storage_object_ids(payload),
+    )
     payload["corpus_hash"] = "a" * 64
     client, tokens = _client(session_factory)
 
@@ -545,3 +603,158 @@ def test_dce_admission_rejected_command_leaves_no_durable_side_effect(
         assert session.scalar(sa.select(sa.func.count()).select_from(DceVersionRecord)) == 0
         assert session.scalar(sa.select(sa.func.count()).select_from(DceDocumentRecord)) == 0
         assert session.scalar(sa.select(sa.func.count()).select_from(CommandReceiptRecord)) == 0
+        assert session.scalar(
+            sa.select(sa.func.count()).select_from(DceStagedObjectRecord).where(
+                DceStagedObjectRecord.state == "CLEAN"
+            )
+        ) == 2
+
+
+
+def _staging_payload(*, consultation_id: UUID, consultation_revision: int = 4) -> dict[str, object]:
+    return {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "consultation_id": str(consultation_id),
+        "consultation_revision": consultation_revision,
+        "original_filename": "Reglement-consultation.pdf",
+        "expected_byte_size": 100,
+        "source_channel": "MANUAL_UPLOAD",
+        "expires_at": (datetime.now(tz=UTC) + timedelta(hours=1)).isoformat(),
+    }
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_dce_staging_preparation_requires_bearer_replays_and_never_exposes_storage_key(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, session_id = _seed_principal(database_engine)
+    consultation_id = _seed_consultation(database_engine, tenant_id=tenant_id)
+    payload = _staging_payload(consultation_id=consultation_id)
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+
+    assert client.post("/api/v1/dce-staged-objects", json=payload).status_code == 401
+
+    first = client.post("/api/v1/dce-staged-objects", json=payload, headers=headers)
+    replay = client.post("/api/v1/dce-staged-objects", json=payload, headers=headers)
+
+    assert first.status_code == 201
+    assert replay.status_code == 200
+    body = first.json()
+    assert body["result_code"] == "DCE_STAGING_PREPARED"
+    assert body["staging"]["state"] == "AWAITING_UPLOAD"
+    assert body["staging"]["expires_at"] == str(payload["expires_at"]).replace(
+        "+00:00", "Z"
+    )
+    assert replay.json()["replayed"] is True
+    assert replay.json()["event_ids"] == first.json()["event_ids"]
+    assert "storage_key" not in body
+    with Session(database_engine) as session:
+        staged_object = session.get(
+            DceStagedObjectRecord,
+            UUID(body["staging"]["storage_object_id"]),
+        )
+    assert staged_object is not None
+    assert staged_object.state == "AWAITING_UPLOAD"
+    assert staged_object.storage_key == f"dce-staging/{tenant_id}/{staged_object.id}"
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_dce_staging_refuses_collaborator_without_case_scope_and_audits(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, _, _ = _seed_principal(database_engine)
+    consultation_id = _seed_consultation(database_engine, tenant_id=tenant_id)
+    _, collaborator_identity, collaborator_session = _seed_principal(
+        database_engine,
+        role="COLLABORATEUR",
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+
+    response = client.post(
+        "/api/v1/dce-staged-objects",
+        json=_staging_payload(consultation_id=consultation_id),
+        headers=_headers(
+            tokens,
+            identity_id=collaborator_identity,
+            session_id=collaborator_session,
+        ),
+    )
+
+    assert response.status_code == 403
+    with Session(database_engine) as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.actor_id == collaborator_identity,
+                SecurityAuditEventRecord.resource_id == consultation_id,
+            )
+        )
+        assert session.scalar(sa.select(sa.func.count()).select_from(DceStagedObjectRecord)) == 0
+    assert audit is not None
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_dce_staging_is_neutral_and_audited_for_other_tenant(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    owner_tenant, _, _ = _seed_principal(database_engine)
+    consultation_id = _seed_consultation(database_engine, tenant_id=owner_tenant)
+    _, other_identity, other_session = _seed_principal(database_engine)
+    client, tokens = _client(session_factory)
+
+    response = client.post(
+        "/api/v1/dce-staged-objects",
+        json=_staging_payload(consultation_id=consultation_id),
+        headers=_headers(tokens, identity_id=other_identity, session_id=other_session),
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "NOT_FOUND_OR_FORBIDDEN"
+    with Session(database_engine) as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.actor_id == other_identity,
+                SecurityAuditEventRecord.resource_id == consultation_id,
+            )
+        )
+        assert session.scalar(sa.select(sa.func.count()).select_from(DceStagedObjectRecord)) == 0
+    assert audit is not None
+    assert audit.reason_code == "NOT_FOUND_OR_FORBIDDEN"
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_dce_staging_rejects_client_supplied_storage_object_id(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, session_id = _seed_principal(database_engine)
+    consultation_id = _seed_consultation(database_engine, tenant_id=tenant_id)
+    payload = _staging_payload(consultation_id=consultation_id)
+    payload["storage_object_id"] = str(uuid4())
+    client, tokens = _client(session_factory)
+
+    response = client.post(
+        "/api/v1/dce-staged-objects",
+        json=payload,
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 422
+    with Session(database_engine) as session:
+        assert session.scalar(sa.select(sa.func.count()).select_from(DceStagedObjectRecord)) == 0
