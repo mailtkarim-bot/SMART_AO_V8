@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | Audit append-only : modèle, migration, writer et instrumentation publiés dans le commit courant après validation locale complète. |
+| Commit | Audit append-only : [`8d6aa4e`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/8d6aa4e), modèle, migration, writer et instrumentation d’authentification/policy. |
 | Migration Alembic | `20260813_0009` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **160 tests verts**, dont 7 scénarios d’audit de persistance et d’intégration authentification/autorisation. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider le périmètre d’audit append-only après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub audit append-only](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31713939337) est vert (lint et 160 tests). |
 
 ## Ce qui est terminé
 
