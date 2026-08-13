@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S01-K démonstration M1 : [`a95a9e6`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/a95a9e6), avec runner intégré Consultation → DCE v1 → Case → Decision Go → rectificatif. |
+| Commit | SEC-01 : [`fdf6cc1`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/fdf6cc1), contrat normatif identité, tenant, RBAC/ABAC, sessions et audit. |
 | Migration Alembic | `20260813_0004` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **90 tests verts**, dont le scénario M1 PostgreSQL complet. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert pour S01-K (lint et 90 tests). |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **90 tests verts**, dont le scénario M1 PostgreSQL complet. SEC-01 est documentaire et n’ajoute pas encore de migration ni de test Python. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert pour SEC-01 (lint et smoke tests). |
 
 ## Ce qui est terminé
 
