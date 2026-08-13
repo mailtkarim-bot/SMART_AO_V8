@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Environment and local data
+.env
+.env.*
+!.env.example
+*.sqlite3
+postgres_data/
+minio_data/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store

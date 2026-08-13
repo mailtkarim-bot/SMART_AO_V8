@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smart_ao}
+      POSTGRES_USER: ${POSTGRES_USER:-smart_ao}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smart_ao}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smart_ao} -d ${POSTGRES_DB:-smart_ao}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: .
+      dockerfile: ops/docker/backend.Dockerfile
+    environment:
+      SMART_AO_ENV: ${SMART_AO_ENV:-development}
+      SMART_AO_LOG_LEVEL: ${SMART_AO_LOG_LEVEL:-INFO}
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
