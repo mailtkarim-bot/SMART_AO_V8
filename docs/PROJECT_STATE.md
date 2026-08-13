@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S02-D HTTP : cookies sécurisés, routes auth et contexte serveur, publié dans le commit courant après validation locale complète. |
+| Commit | S02-D HTTP : [`7cf3056`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/7cf3056), cookies sécurisés, routes auth et contexte serveur. |
 | Migration Alembic | `20260813_0007` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **134 tests verts**, dont 5 scénarios API S02-D couvrant cookies, CSRF, JWT, refresh et logout. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider S02-D HTTP après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub S02-D HTTP](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31707943005) est vert (lint et 134 tests). |
 
 ## Ce qui est terminé
 
