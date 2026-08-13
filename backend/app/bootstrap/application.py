@@ -23,7 +23,10 @@ from app.interfaces.http.routes.consultations import (
     build_consultation_router,
 )
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
-from app.modules.dce.application.handlers import CreateConsultationHandler
+from app.modules.dce.application.handlers import (
+    CreateConsultationHandler,
+    RegisterDceVersionHandler,
+)
 from app.modules.dce.application.queries import ConsultationProjection
 from app.modules.dce.infrastructure.consultation_projection_reader import (
     SqlAlchemyConsultationProjectionReader,
@@ -48,7 +51,10 @@ class AppRuntime:
             session_factory=session_factory,
             dispatcher=CommandDispatcher(
                 session_factory=session_factory,
-                handlers={"CreateConsultation": CreateConsultationHandler()},
+                handlers={
+                    "CreateConsultation": CreateConsultationHandler(),
+                    "RegisterDceVersion": RegisterDceVersionHandler(),
+                },
             ),
         )
 
