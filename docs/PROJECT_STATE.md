@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | Bootstrap atomique : tenant, patron, credential et token consommé, publié dans le commit courant après validation locale complète. |
+| Commit | Bootstrap atomique : [`4f40800`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/4f40800), tenant, patron, credential et token consommé. |
 | Migration Alembic | `20260813_0007` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **141 tests verts**, dont 7 scénarios de bootstrap couvrant provisionnement, consommation, expiration, isolation tenant et rollback. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider le bootstrap atomique après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub bootstrap atomique](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31708738182) est vert (lint et 141 tests). |
 
 ## Ce qui est terminé
 
