@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from hashlib import sha256
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -14,6 +14,7 @@ from app.modules.dce.application.commands import (
     CreateConsultationCommand,
     ExpireDceStagedObjectCommand,
     PrepareDceStagingCommand,
+    RecordDceDocumentExtractionCommand,
     RecordDceStagedObjectQuarantineCommand,
     RecordDceStagedObjectScanCommand,
     RegisterDceVersionCommand,
@@ -22,6 +23,10 @@ from app.modules.dce.application.commands import (
 from app.modules.dce.domain.consultation import BuyerIdentity, Consultation
 from app.modules.dce.domain.dce_version import DceDocument, DceVersion
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
+from app.modules.dce.infrastructure.models.dce_extraction import (
+    DceDocumentExtractionFragmentRecord,
+    DceDocumentExtractionRecord,
+)
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.models.dce_version import DceDocumentRecord, DceVersionRecord
 from app.platform.events.dispatcher import CommandContext, HandlerOutcome, PendingDomainEvent
@@ -460,6 +465,115 @@ class RecordDceStagedObjectScanHandler:
         )
 
 
+class RecordDceDocumentExtractionHandler:
+    """Persist a bounded deterministic projection without exposing its source original."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: RecordDceDocumentExtractionCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != "SYSTEM":
+            raise ValueError("DCE_EXTRACTION_SYSTEM_ACTOR_REQUIRED")
+
+        document = session.scalar(
+            sa.select(DceDocumentRecord)
+            .where(
+                DceDocumentRecord.tenant_id == context.tenant_id,
+                DceDocumentRecord.id == command.dce_document_id,
+            )
+            .with_for_update()
+        )
+        if document is None:
+            raise ValueError("DCE_DOCUMENT_REQUIRED")
+        dce_version = session.scalar(
+            sa.select(DceVersionRecord)
+            .where(
+                DceVersionRecord.tenant_id == context.tenant_id,
+                DceVersionRecord.id == document.dce_version_id,
+            )
+            .with_for_update()
+        )
+        staged_object = session.scalar(
+            sa.select(DceStagedObjectRecord)
+            .where(
+                DceStagedObjectRecord.tenant_id == context.tenant_id,
+                DceStagedObjectRecord.id == document.storage_object_id,
+            )
+            .with_for_update()
+        )
+        if dce_version is None or dce_version.lifecycle not in {"ADMITTED", "SUPERSEDED"}:
+            raise ValueError("DCE_VERSION_NOT_ADMITTED")
+        if dce_version.integrity != "VERIFIED":
+            raise ValueError("DCE_VERSION_NOT_VERIFIED")
+        if (
+            staged_object is None
+            or staged_object.state != "CONSUMED"
+            or staged_object.consumed_by_dce_version_id != dce_version.id
+            or staged_object.sha256 is None
+            or staged_object.sha256.lower() != document.sha256.lower()
+        ):
+            raise ValueError("DOCUMENT_STORAGE_NOT_CONSUMED")
+        if command.input_sha256.lower() != document.sha256.lower():
+            raise ValueError("DOCUMENT_INPUT_HASH_REQUIRED")
+        if command.status == "COMPLETED":
+            _validate_extraction_fragments(command=command)
+
+        extraction = DceDocumentExtractionRecord(
+            id=command.extraction_id,
+            tenant_id=context.tenant_id,
+            dce_version_id=dce_version.id,
+            dce_document_id=document.id,
+            input_sha256=command.input_sha256.lower(),
+            extractor_id=command.extractor_id,
+            extractor_version=command.extractor_version,
+            status=command.status,
+            fragment_count=len(command.fragments),
+            extracted_char_count=command.extracted_char_count,
+            failure_code=command.failure_code,
+        )
+        session.add(extraction)
+        session.flush()
+        for fragment in command.fragments:
+            session.add(
+                DceDocumentExtractionFragmentRecord(
+                    id=uuid4(),
+                    tenant_id=context.tenant_id,
+                    extraction_id=extraction.id,
+                    ordinal=fragment.ordinal,
+                    locator_json=fragment.locator_json,
+                    text=fragment.text,
+                    text_sha256=fragment.text_sha256.lower(),
+                )
+            )
+        event = PendingDomainEvent(
+            aggregate_type="DCE_DOCUMENT_EXTRACTION",
+            aggregate_id=extraction.id,
+            aggregate_revision=0,
+            event_type="DCE_DOCUMENT_EXTRACTION_RECORDED",
+            payload={
+                "extraction_id": str(extraction.id),
+                "dce_document_id": str(document.id),
+                "status": extraction.status,
+                "fragment_count": extraction.fragment_count,
+                "extracted_char_count": extraction.extracted_char_count,
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_DOCUMENT_EXTRACTION_RECORDED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_DOCUMENT_EXTRACTION",
+                    "aggregate_id": str(extraction.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
 class RegisterDceVersionHandler:
     """Admit a new immutable DCE root and its originals in one dispatcher transaction."""
 
@@ -612,6 +726,18 @@ class RegisterDceVersionHandler:
             ),
             events=(event,),
         )
+
+
+def _validate_extraction_fragments(*, command: RecordDceDocumentExtractionCommand) -> None:
+    expected_ordinals = list(range(1, len(command.fragments) + 1))
+    if [fragment.ordinal for fragment in command.fragments] != expected_ordinals:
+        raise ValueError("DCE_EXTRACTION_FRAGMENT_ORDINAL_REQUIRED")
+    for fragment in command.fragments:
+        if not isinstance(fragment.locator_json.get("kind"), str):
+            raise ValueError("DCE_EXTRACTION_FRAGMENT_LOCATOR_REQUIRED")
+        calculated_hash = sha256(fragment.text.encode("utf-8")).hexdigest()
+        if fragment.text_sha256.lower() != calculated_hash:
+            raise ValueError("DCE_EXTRACTION_FRAGMENT_HASH_REQUIRED")
 
 
 def _staging_storage_key(*, tenant_id: UUID, storage_object_id: UUID) -> str:

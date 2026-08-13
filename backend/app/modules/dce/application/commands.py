@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import ClassVar
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ApplicationCommand(BaseModel):
@@ -118,6 +118,44 @@ class RecordDceStagedObjectScanCommand(ApplicationCommand):
     scanner_name: str = Field(min_length=1, max_length=120)
     scanner_signature_version: str = Field(min_length=1, max_length=240)
     scanned_at: datetime
+
+
+class DceExtractionFragmentInput(BaseModel):
+    """One bounded, deterministic fragment with a provenance locator."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    ordinal: int = Field(gt=0)
+    locator_json: dict[str, object]
+    text: str = Field(min_length=1, max_length=8_000)
+    text_sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+
+
+class RecordDceDocumentExtractionCommand(ApplicationCommand):
+    """System-only immutable recording of a deterministic document projection."""
+
+    command_type = "RecordDceDocumentExtraction"
+
+    extraction_id: UUID
+    dce_document_id: UUID
+    input_sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+    extractor_id: str = Field(min_length=1, max_length=100)
+    extractor_version: str = Field(min_length=1, max_length=64)
+    status: str = Field(pattern=r"^(COMPLETED|UNSUPPORTED|REJECTED_LIMIT|FAILED_SAFE)$")
+    extracted_char_count: int = Field(ge=0, le=10_000_000)
+    failure_code: str | None = Field(default=None, max_length=120)
+    fragments: list[DceExtractionFragmentInput] = Field(default_factory=list, max_length=500_000)
+
+    @model_validator(mode="after")
+    def validate_terminal_projection(self) -> RecordDceDocumentExtractionCommand:
+        if self.status == "COMPLETED":
+            if self.failure_code is not None or not self.fragments:
+                raise ValueError("completed extraction requires fragments and no failure code")
+            if sum(len(fragment.text) for fragment in self.fragments) != self.extracted_char_count:
+                raise ValueError("completed extraction character count mismatch")
+        elif self.failure_code is None or self.fragments or self.extracted_char_count != 0:
+            raise ValueError("failed extraction requires a code and no fragments")
+        return self
 
 
 class RegisterDceVersionCommand(ApplicationCommand):

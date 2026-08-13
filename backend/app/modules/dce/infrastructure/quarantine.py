@@ -72,6 +72,13 @@ class LocalQuarantineStorageAdapter(DceQuarantineStoragePort):
     async def delete(self, *, storage_key: str) -> None:
         await asyncio.to_thread(_unlink_missing_ok, self._path(storage_key=storage_key))
 
+    async def read_bytes(self, *, storage_key: str, max_bytes: int) -> bytes:
+        path = self._path(storage_key=storage_key)
+        size = await asyncio.to_thread(path.stat)
+        if size.st_size > max_bytes:
+            raise ValueError("private document exceeds extraction limit")
+        return await asyncio.to_thread(path.read_bytes)
+
     async def local_path(self, *, storage_key: str) -> Path:
         return self._path(storage_key=storage_key)
 

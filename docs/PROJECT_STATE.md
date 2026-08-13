@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées ; les fondations SEC-01, les lectures Consultation/DCE, l’admission atomique, le staging, l’upload et la rétention physique DCE sont livrés. La prochaine action est DCE-DOCUMENT-EXTRACTION-01 : registre et extraction déterministe des contenus après admission, sans exposer les originaux.
+`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées. Les fondations SEC-01, les lectures Consultation/DCE, l’admission atomique, le staging, l’upload, la rétention physique et **DCE-DOCUMENT-EXTRACTION-01** sont validés localement. Le registre immuable d’extractions déterministes PDF/DOCX/XLSX/TXT est prêt à être publié sur `main`.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | DCE-RETENTION-01 publié sur `main` : [`576abcb`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/576abcb), contrat, migration `0012`, worker d’outbox, balayage d’orphelins, retry durable et tests. |
-| Migration Alembic | `20260813_0012` validée : upgrade depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **197 tests verts**, dont effacement idempotent, absence de fichier, retry/backoff, protection CLEAN et récupération d’orphelin `UPLOADING`. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow DCE-RETENTION-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31729224213) est vert (lint et smoke tests). Docker n’est pas disponible dans le sandbox : le démarrage réel du worker, la syntaxe Compose et l’exécution contre ClamAV restent à vérifier sur le VPS/Docker cible. |
+| Commit | DCE-DOCUMENT-EXTRACTION-01 validé localement, prêt au commit : contrat, migration `0013`, registre append-only, extraction sourcée et tests dédiés. |
+| Migration Alembic | `20260813_0013` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **202 tests verts**. Les cinq scénarios dédiés couvrent l’extraction TXT, l’immutabilité/replay, le média non supporté, la provenance DOCX/XLSX, la provenance PDF page-sourcée et les limites anti-bombes. |
+| CI | Publication GitHub et CI de DCE-DOCUMENT-EXTRACTION-01 en attente. PostgreSQL 16 est exécuté dans CI ; Docker n’est pas disponible dans le sandbox : l’exécution réelle du worker de rétention et de ClamAV reste à vérifier sur le VPS/Docker cible. |
 
 ## Ce qui est terminé
 
@@ -51,10 +51,11 @@
 - DCE-STAGING-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_STAGING_01_CONTRAT.md`, modèle `DceStagedObject`, migration `20260813_0010`, transitions PostgreSQL et registre tenant-scopé de quarantaine. `POST /api/v1/dce-staged-objects` prépare une intention autorisée par bearer, `dce.prepare` et policy auditée, avec identifiant opaque alloué par le serveur ; aucune clé, URL, hash ou métadonnée de scanner n’est renvoyée. Les commandes système de scan et de rétention sont fail-closed ; l’admission lit seulement les objets `CLEAN`, les verrouille puis les marque `CONSUMED` avec la `DceVersion` dans la transaction atomique. La FK composite interdit tout document DCE sans objet staged du même tenant.
 - DCE-UPLOAD-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_UPLOAD_01_CONTRAT.md`, migration `20260813_0011` ajoutant l’état `UPLOADING` et les transitions PostgreSQL `AWAITING_UPLOAD → UPLOADING → QUARANTINED → CLEAN|REJECTED`. `PUT /api/v1/dce-staged-objects/{id}/content` exige un bearer, `dce.prepare`, une policy auditée et une clé d’idempotence ; il accepte uniquement un flux brut, sans JSON/multipart. Le service écrit par chunks dans une quarantaine privée, calcule SHA-256 et taille réels, détecte le MIME par signature libmagic, soumet le contenu à ClamAV `INSTREAM` interne puis enregistre `CLEAN` ou `REJECTED` fail-closed. Les réponses n’exposent aucune clé, URL, hash, MIME ou signature scanner. Docker Compose prévoit `clamav/clamav:1.4_base` sans publication du port `3310`; son exécution réelle reste à vérifier sur un hôte Docker car le sandbox n’a pas Docker.
 - DCE-RETENTION-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_RETENTION_01_CONTRAT.md`, migration `20260813_0012` et worker Docker sans port public. Le worker balaie les objets non consommés arrivés à expiration, les fait passer de façon transactionnelle à `EXPIRED`, puis consomme `dce_staging_retention` avec `FOR UPDATE SKIP LOCKED`. Il efface seulement les binaires des objets relus `REJECTED` ou `EXPIRED`; `CLEAN` et `CONSUMED` sont bloqués par conception. `FileNotFound` est un succès idempotent, une erreur passe l’outbox en `RETRY` avec backoff borné et `last_error_code` fermé. Le worker partage uniquement PostgreSQL et le volume privé de quarantaine.
+- DCE-DOCUMENT-EXTRACTION-01 validé localement : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_DOCUMENT_EXTRACTION_01_CONTRAT.md`, migration `20260813_0013`, registres `dce_document_extractions` et `dce_document_extraction_fragments` append-only par triggers PostgreSQL, et commande réservée à l’acteur `SYSTEM`. Les projections sont déterministes, bornées et sourcées par page PDF, paragraphe DOCX, cellule XLSX ou ligne TXT. Elles refusent sans analyse métier les formats non pris en charge, les entrées malformées et les dépassements anti-bombes ; elles ne lisent jamais les originaux hors de la quarantaine privée et n’exposent aucun binaire.
 
 ## Prochaine action unique
 
-Démarrer DCE-DOCUMENT-EXTRACTION-01 : figer le registre immuable d’extractions documentaires après admission, les adaptateurs déterministes PDF/DOCX/XLSX/images, la provenance page/fragment et les limites anti-bombes. Les originaux restent privés ; seules des projections minimisées et sourcées pourront alimenter l’analyse DCE future.
+Publier DCE-DOCUMENT-EXTRACTION-01 sur `main`, puis démarrer **DCE-ANALYSIS-01** : classifier les fragments déjà extraits selon les familles documentaires d’un DCE, identifier les exigences opérationnelles et administratives du règlement de consultation, et préparer des projections explicables pour le cockpit patron. Cette frontière reste strictement distincte de l’extraction technique, n’émet aucune décision Go/No-Go, aucun prix et aucun dépôt.
 
 ## Décisions ouvertes
 
@@ -83,6 +84,7 @@ Démarrer DCE-DOCUMENT-EXTRACTION-01 : figer le registre immuable d’extraction
 | Registre de staging sécurisé DCE | Livré | DCE-STAGING-01 : migration `0010`, objets tenant-scopés, clé privée générée serveur, états/quarantaine/scan/rétention, transitions PostgreSQL, préparation HTTP auditée et consommation atomique par admission. |
 | Upload binaire sécurisé DCE | Livré localement | DCE-UPLOAD-01 : migration `0011`, flux privé chunké, limite effective, hash réel, libmagic, client ClamAV `INSTREAM`, contrôles fail-closed, endpoint bearer/policy/audit et Compose ClamAV non exposé. Le test Docker réel reste requis sur VPS, car le sandbox ne possède pas Docker. |
 | Rétention physique DCE | Livrée localement | DCE-RETENTION-01 : migration `0012`, worker d’outbox idempotent sans port, `SKIP LOCKED`, expiration d’orphelins, suppression seulement `REJECTED`/`EXPIRED`, retry/backoff et code d’erreur durable. Le test Docker réel reste requis sur VPS. |
+| Registre d’extraction documentaire DCE | Validé localement, publication CI en attente | DCE-DOCUMENT-EXTRACTION-01 : migration `0013`, extractions déterministes PDF/DOCX/XLSX/TXT, provenance fine, limites anti-bombes, immutabilité PostgreSQL et commande réservée à `SYSTEM`. L’analyse métier, l’OCR, les plans et le LLM restent volontairement hors périmètre. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 
