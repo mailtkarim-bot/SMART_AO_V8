@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S01-J API Consultation : route FastAPI APP-01, réponse idempotente et projection RYOW minimale ; consulter `git log -1` pour le commit courant. |
+| Commit | S01-J API Consultation : [`5d488be`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/5d488be), avec route FastAPI APP-01, réponse idempotente et projection RYOW minimale. |
 | Migration Alembic | `20260813_0004` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **89 tests verts**, dont 3 scénarios API Consultation et un contrôle de frontière HTTP. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; la CI S01-J sera confirmée après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert pour S01-J (lint et 89 tests). |
 
 ## Ce qui est terminé
 
@@ -47,7 +47,7 @@ Commencer `S01-K` : construire le scénario M1 de démonstration, en ajoutant pr
 | Persistance Decision DATA-01 | Livrée | S01-G : migration `20260813_0004`, validée localement et par CI GitHub. |
 | Repositories applicatifs du premier slice | Livrés | S01-H : un adapter par root, filtrage tenant, snapshots neutres, révision optimiste et CI GitHub verte. |
 | Handlers, dispatcher et outbox transactionnelle | Livrés pour le premier chemin | S01-I : `CreateConsultation` démontre la chaîne complète, validée localement et par CI GitHub ; les commandes suivantes se branchent sur le même dispatcher. |
-| Endpoints APP-01 et projections RYOW minimales | Livrés pour Consultation | S01-J : premier chemin HTTP testé ; l’authentification réelle est encore différée. |
+| Endpoints APP-01 et projections RYOW minimales | Livrés pour Consultation | S01-J : premier chemin HTTP testé et validé par CI GitHub ; l’authentification réelle est encore différée. |
 | Démonstration métier M1 de bout en bout | À implémenter | S01-K : Consultation → DCE → Case → Decision → rectificatif. |
 | Authentification réelle et bootstrap du premier patron | Différé | Avant le premier endpoint protégé. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
