@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant et premier patron ; `SEC-01` est livré. La prochaine action imposée est `S02-A` : contrats de contexte serveur et interfaces de policy, avant toute route authentifiée.
+`S02` — identité, tenant et premier patron ; `SEC-01` et `S02-A` sont livrés. La prochaine action imposée est `S02-B` : persistance Identity, PasswordCredential, TenantMembership et bootstrap patron, avant toute session ou route authentifiée.
 
 ## Dernier état vert
 
@@ -36,10 +36,11 @@
 - S01-J livré : route FastAPI `POST/GET /api/v1/consultations`, contrat public Pydantic, replay HTTP 200, lecture RYOW tenant-scoped et interface HTTP sans ORM ni import d’infrastructure métier.
 - S01-K livré : runner de démonstration M1 contre PostgreSQL, prouvant Consultation, DCE v1, Case, Decision Go finalisée, DCE rectificatif v2, DCE historique conservé et marquage Case/Decision à revoir sans suppression.
 - SEC-01 livré : contrat normatif de sécurité préalable à S02, avec modèle de menace, séparation tenant, identité, sessions, MFA, RBAC/ABAC contextuel, audit append-only, secrets et tests de sécurité.
+- S02-A livré : `ActorContext` immuable, classification de données, port de policy, policy baseline par défaut refusante, exigence MFA récente, mapping HTTP neutre et tests de frontière sans ORM/framework.
 
 ## Prochaine action unique
 
-Démarrer `S02-A` : définir les types internes `ActorContext`, les interfaces de policy et les erreurs d’autorisation neutres ; écrire leurs tests d’architecture et de schéma avant toute migration d’identité ou route authentifiée.
+Démarrer `S02-B` : écrire les tests PostgreSQL rouges pour `Identity`, `PasswordCredential`, `TenantMembership` et le bootstrap patron à usage unique ; créer ensuite la migration et les modèles sans session navigateur ni route authentifiée.
 
 ## Décisions ouvertes
 
@@ -52,7 +53,8 @@ Démarrer `S02-A` : définir les types internes `ActorContext`, les interfaces d
 | Endpoints APP-01 et projections RYOW minimales | Livrés pour Consultation | S01-J : premier chemin HTTP testé et validé par CI GitHub ; l’authentification réelle est encore différée. |
 | Démonstration métier M1 de bout en bout | Livrée | S01-K : scénario PostgreSQL vérifié, historique DCE/Case/Decision conservé après rectificatif et CI GitHub verte. |
 | SEC-01 : sécurité, identité, tenant, RBAC et audit | Livré | Contrat normatif validé dans `docs/reference/SMART_AO_V8_SEC_01_CONTRAT_SECURITE_IDENTITE_TENANT_AUDIT.md`. |
-| Identité, tenant, RBAC et bootstrap patron | À implémenter | Démarrage par `S02-A` : `ActorContext`, interfaces de policy et erreurs neutres avant les migrations d’identité. |
+| Contrats de contexte et policy S02-A | Livrés | `ActorContext`, `AuthorizationPolicyPort`, policy baseline et erreurs HTTP neutres validés par 10 nouveaux tests. |
+| Identité, tenant, RBAC et bootstrap patron | À implémenter | `S02-B` : modèles/migration `Identity`, `PasswordCredential`, `TenantMembership` et bootstrap patron avant les sessions. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 
