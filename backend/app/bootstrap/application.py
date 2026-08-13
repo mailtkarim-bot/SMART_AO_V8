@@ -22,12 +22,14 @@ from app.interfaces.http.routes.consultations import (
     ConsultationSecurityRuntime,
     build_consultation_router,
 )
+from app.interfaces.http.routes.dce_versions import build_dce_version_router
 from app.modules.dce.application.handlers import CreateConsultationHandler
 from app.modules.dce.application.queries import ConsultationProjection
 from app.modules.dce.infrastructure.consultation_projection_reader import (
     SqlAlchemyConsultationProjectionReader,
 )
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
+from app.modules.dce.infrastructure.models.dce_version import DceVersionRecord
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
@@ -49,6 +51,30 @@ class AppRuntime:
                 handlers={"CreateConsultation": CreateConsultationHandler()},
             ),
         )
+
+    def get_dce_version_tenant_id(self, *, dce_version_id: UUID) -> UUID | None:
+        """Return only the owning tenant needed to authorize a DceVersion read."""
+
+        with self.session_factory() as session:
+            statement = sa.select(DceVersionRecord.tenant_id).where(
+                DceVersionRecord.id == dce_version_id
+            )
+            return session.scalar(statement)
+
+    def get_dce_version_metadata(
+        self,
+        *,
+        tenant_id: UUID,
+        dce_version_id: UUID,
+    ) -> DceVersionRecord | None:
+        """Return the tenant-filtered root whose approved fields form DCE-READ-01."""
+
+        with self.session_factory() as session:
+            statement = sa.select(DceVersionRecord).where(
+                DceVersionRecord.tenant_id == tenant_id,
+                DceVersionRecord.id == dce_version_id,
+            )
+            return session.scalar(statement)
 
     def get_consultation_tenant_id(self, *, consultation_id: UUID) -> UUID | None:
         """Return only the owner tenant needed to authorize a requested Consultation."""
@@ -90,17 +116,24 @@ def create_app(
     if authentication_runtime is not None:
         app.include_router(build_authentication_router(runtime=authentication_runtime))
     if runtime is not None and authentication_runtime is not None:
+        security_runtime = ConsultationSecurityRuntime(
+            context_resolver=authentication_runtime.context_resolver,
+            policy=AuditedAuthorizationPolicy(
+                policy=AuthorizationPolicy(),
+                session_factory=runtime.session_factory,
+                writer=SecurityAuditWriter(),
+            ),
+        )
         app.include_router(
             build_consultation_router(
                 runtime=runtime,
-                security_runtime=ConsultationSecurityRuntime(
-                    context_resolver=authentication_runtime.context_resolver,
-                    policy=AuditedAuthorizationPolicy(
-                        policy=AuthorizationPolicy(),
-                        session_factory=runtime.session_factory,
-                        writer=SecurityAuditWriter(),
-                    ),
-                ),
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_dce_version_router(
+                runtime=runtime,
+                security_runtime=security_runtime,
             )
         )
     return app

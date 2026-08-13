@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et première route métier authentifiée ; les fondations SEC-01 et l’intégration Consultation sont livrées. La prochaine action impose d’étendre ce même périmètre aux prochaines routes métier, sans réintroduire de contexte de test.
+`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées ; les fondations SEC-01 ainsi que les lectures Consultation/DCE sont livrées. La prochaine action est le premier flux durable DceVersion : son admission atomique et documentée, sans réintroduire de contexte de test.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | Consultation authentifiée : [`7346765`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/7346765), contexte serveur, policy et audit. |
+| Commit | DCE-READ-01 : contrat et route DceVersion sécurisée publiés dans le commit courant après validation locale complète. |
 | Migration Alembic | `20260813_0009` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **161 tests verts**, incluant bearer, capability patron, replay idempotent, isolation inter-tenant et audit du refus Consultation. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub Consultation authentifiée](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31715518276) est vert (lint et 161 tests). |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **164 tests verts**, incluant bearer DCE, réponse métadonnée limitée, refus collaborateur, isolation inter-tenant et audit du refus DCE. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider DCE-READ-01 après publication. |
 
 ## Ce qui est terminé
 
@@ -45,10 +45,11 @@
 - RBAC/ABAC/ReBAC livré : catalogue fermé de capabilities calculées seulement depuis les faits serveur ; policy tenant/classification/MFA/affectation renforcée ; migration `20260813_0008` créant les affectations collaborateur `Case` avec FKs composites tenant-scoped, scope JSONB actions/classifications, dates et unicité de l’affectation active. Le résolveur de contexte authentifié ne lit aucun rôle dans le JWT et injecte seulement les capabilities de la membership et les scopes actifs, filtrés et valides de la base.
 - Audit de sécurité append-only livré : migration `20260813_0009`, vocabulaire d’événements fermé, métadonnées applicatives allow-listées et pseudonymisées, trigger PostgreSQL interdisant `UPDATE` et `DELETE`, writer transactionnel et décorateurs pour login/refresh/logout ainsi que refus de policy. Les tokens, mots de passe, hash Argon2id, cookies, contenu DCE et montants sont refusés par conception du port d’audit.
 - Routes Consultation authentifiées livrées : `POST` et `GET` n’existent dans l’application composée qu’avec un runtime d’authentification réel. Elles résolvent le bearer en `ActorContext`, adaptent ce contexte serveur en `CommandContext` seulement après capability/policy, conservent l’idempotence et retournent `404 NOT_FOUND_OR_FORBIDDEN` pour une Consultation hors tenant. Le refus est journalisé par la policy auditée.
+- DCE-READ-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_READ_01_CONTRAT.md` et route `GET /api/v1/dce-versions/{id}`. La réponse expose seulement les métadonnées de version autorisées (cycle de vie, intégrité, readiness, dates et références), jamais les documents, stockage, hashes, provenance ni extraits. `dce.prepare`, tenant, policy et audit sont contrôlés côté serveur ; un collaborateur sans `Case` affectée est refusé.
 
 ## Prochaine action unique
 
-Choisir puis brancher la prochaine route métier sur le même périmètre sécurisé — en priorité une route DCE ou Case déjà spécifiée — avec bearer, tenant, capability, policy, refus neutre et audit, sans dupliquer la mécanique Consultation.
+Figer puis implémenter le premier flux durable `DceVersion` : admission atomique du corpus et de ses métadonnées, idempotence, contrôle des hash/documents, événements et outbox ; il devra précéder tout upload ou téléchargement de document DCE réel.
 
 ## Décisions ouvertes
 
@@ -71,7 +72,8 @@ Choisir puis brancher la prochaine route métier sur le même périmètre sécur
 | Policy RBAC/ABAC/ReBAC et première affectation | Livré | Catalogue de capabilities calculé côté serveur, policy classification/scope et table `case_assignments` tenant-scoped injectée dans le contexte authentifié. |
 | Audit de sécurité append-only | Livré | Migration `20260813_0009`, vocabulaire fermé, métadonnées minimisées, trigger append-only et instrumentation auth/policy. |
 | Routes Consultation authentifiées | Livrées | Bearer résolu côté serveur, capability `consultation.create/read`, policy auditée, isolation tenant et réemploi idempotent préservés. |
-| Prochaines routes métier authentifiées | À implémenter | Réutiliser le même périmètre pour DCE ou Case, sans voie de contexte de test ni claims JWT d’autorisation. |
+| Lecture DCE sécurisée | Livrée | DCE-READ-01 : route tenant-scoped, `dce.prepare`, réponse de métadonnées minimale et refus audités. |
+| Admission durable DceVersion | À implémenter | Contrat, handler et persistance transactionnelle du corpus/documents, sans exposer d’upload avant les invariants et l’object storage. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 

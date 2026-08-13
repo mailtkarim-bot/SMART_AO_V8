@@ -40,6 +40,20 @@ class CreateConsultationResponse(PublicResponseModel):
     replayed: bool = False
 
 
+class DceVersionMetadataResponse(PublicResponseModel):
+    """DCE-READ-01 metadata only; it deliberately excludes documents and provenance."""
+
+    id: UUID
+    consultation_id: UUID
+    predecessor_dce_version_id: UUID | None
+    source_received_at: datetime
+    lifecycle: str
+    integrity: str
+    classification_readiness: str
+    analysis_readiness: str
+    aggregate_revision: int = Field(ge=0)
+
+
 class ConsultationProjectionResponse(PublicResponseModel):
     id: UUID
     buyer_legal_name: str
