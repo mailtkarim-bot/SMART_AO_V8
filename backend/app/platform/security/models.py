@@ -162,6 +162,74 @@ class TenantBootstrapTokenRecord(TenantScopedRecord, Base):
     consumed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
 
+class SecurityAuditEventRecord(Base):
+    """Append-only SEC-01 security event; tenant is nullable only for anonymous attempts."""
+
+    __tablename__ = "security_audit_events"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_security_audit__tenant", ondelete="RESTRICT"
+        ),
+        sa.CheckConstraint("schema_version >= 1", name="schema_version"),
+        sa.CheckConstraint(
+            "event_type IN ("
+            "'AUTH_LOGIN_SUCCEEDED', 'AUTH_LOGIN_DENIED', "
+            "'AUTH_REFRESH_SUCCEEDED', 'AUTH_REFRESH_DENIED', "
+            "'AUTH_LOGOUT_SUCCEEDED', 'AUTH_SESSION_REJECTED', "
+            "'AUTHZ_DENIED', 'AUTHZ_STEP_UP_REQUIRED'"
+            ")",
+            name="event_type",
+        ),
+        sa.CheckConstraint(
+            "outcome IN ('SUCCEEDED', 'DENIED', 'FAILED', 'SUSPICIOUS')", name="outcome"
+        ),
+        sa.CheckConstraint("severity IN ('INFO', 'WARNING', 'CRITICAL')", name="severity"),
+        sa.CheckConstraint(
+            "actor_kind IS NULL OR actor_kind IN ("
+            "'PATRON_ADMIN', 'PATRON_DELEGATE', 'COLLABORATEUR', "
+            "'PARTENAIRE_EXTERNAL', 'SUPPORT_BREAK_GLASS', 'SYSTEM'"
+            ")",
+            name="actor_kind",
+        ),
+        sa.CheckConstraint(
+            "auth_strength IS NULL OR auth_strength IN ('PASSWORD', 'MFA', 'MFA_STEP_UP')",
+            name="auth_strength",
+        ),
+        sa.CheckConstraint(
+            "source_ip_hash IS NULL OR source_ip_hash ~ '^[a-f0-9]{64}$'",
+            name="source_ip_hash",
+        ),
+        sa.CheckConstraint("jsonb_typeof(metadata_json) = 'object'", name="metadata_object"),
+        sa.Index("ix_security_audit__tenant_occurred", "tenant_id", "occurred_at"),
+        sa.Index("ix_security_audit__event_occurred", "event_type", "occurred_at"),
+        sa.Index("ix_security_audit__correlation", "correlation_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    occurred_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    schema_version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    actor_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    identity_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    session_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    actor_kind: Mapped[str | None] = mapped_column(sa.String(32))
+    auth_strength: Mapped[str | None] = mapped_column(sa.String(16))
+    event_type: Mapped[str] = mapped_column(sa.String(48), nullable=False)
+    outcome: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    severity: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    action: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    resource_type: Mapped[str | None] = mapped_column(sa.String(64))
+    resource_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    case_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    command_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    request_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    source_ip_hash: Mapped[str | None] = mapped_column(sa.CHAR(64))
+    user_agent_family: Mapped[str | None] = mapped_column(sa.String(120))
+    reason_code: Mapped[str | None] = mapped_column(sa.String(64))
+    metadata_json: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+
+
 class CaseAssignmentRecord(TenantScopedRecord, Base):
     """Server-owned ReBAC scope granting one collaborator bounded Case access."""
 

@@ -14,6 +14,13 @@ from argon2 import PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.platform.security.audit import (
+    AuditEventType,
+    AuditOutcome,
+    AuditSeverity,
+    SecurityAuditEntry,
+    SecurityAuditWriter,
+)
 from app.platform.security.models import (
     AuthSessionRecord,
     IdentityRecord,
@@ -117,6 +124,150 @@ class RefreshResult:
     refresh_token: str
     session_expires_at: datetime
     session_absolute_expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AuditedAuthenticationService:
+    """Decorates authentication flows with minimized append-only audit events."""
+
+    core: AuthenticationService
+    session_factory: sessionmaker[Session]
+    writer: SecurityAuditWriter
+    clock: Clock
+
+    def login(self, *, email: str, password: str, tenant_id: UUID) -> LoginResult:
+        try:
+            result = self.core.login(email=email, password=password, tenant_id=tenant_id)
+        except InvalidCredentialsError:
+            self._record(
+                event_type=AuditEventType.AUTH_LOGIN_DENIED,
+                outcome=AuditOutcome.DENIED,
+                severity=AuditSeverity.WARNING,
+                action="auth.login",
+                reason_code="INVALID_CREDENTIALS",
+            )
+            raise
+        self._record_for_session(
+            session_id=result.session_id,
+            event_type=AuditEventType.AUTH_LOGIN_SUCCEEDED,
+            outcome=AuditOutcome.SUCCEEDED,
+            severity=AuditSeverity.INFO,
+            action="auth.login",
+            reason_code=None,
+        )
+        return result
+
+    def logout(self, *, session_id: UUID) -> bool:
+        snapshot = self._snapshot(session_id=session_id)
+        completed = self.core.logout(session_id=session_id)
+        if completed and snapshot is not None:
+            self._record(
+                tenant_id=snapshot.tenant_id,
+                identity_id=snapshot.identity_id,
+                session_id=snapshot.id,
+                event_type=AuditEventType.AUTH_LOGOUT_SUCCEEDED,
+                outcome=AuditOutcome.SUCCEEDED,
+                severity=AuditSeverity.INFO,
+                action="auth.logout",
+                reason_code="LOGOUT",
+            )
+        return completed
+
+    def refresh(self, *, refresh_token: str) -> RefreshResult:
+        try:
+            result = self.core.refresh(refresh_token=refresh_token)
+        except RefreshRejectedError:
+            self._record(
+                event_type=AuditEventType.AUTH_REFRESH_DENIED,
+                outcome=AuditOutcome.DENIED,
+                severity=AuditSeverity.WARNING,
+                action="auth.refresh",
+                reason_code="REFRESH_REJECTED",
+            )
+            raise
+        self._record_for_session(
+            session_id=result.session_id,
+            event_type=AuditEventType.AUTH_REFRESH_SUCCEEDED,
+            outcome=AuditOutcome.SUCCEEDED,
+            severity=AuditSeverity.INFO,
+            action="auth.refresh",
+            reason_code=None,
+        )
+        return result
+
+    def _record_for_session(
+        self,
+        *,
+        session_id: UUID,
+        event_type: AuditEventType,
+        outcome: AuditOutcome,
+        severity: AuditSeverity,
+        action: str,
+        reason_code: str | None,
+    ) -> None:
+        snapshot = self._snapshot(session_id=session_id)
+        if snapshot is None:
+            return
+        self._record(
+            tenant_id=snapshot.tenant_id,
+            identity_id=snapshot.identity_id,
+            session_id=snapshot.id,
+            event_type=event_type,
+            outcome=outcome,
+            severity=severity,
+            action=action,
+            reason_code=reason_code,
+        )
+
+    def _snapshot(self, *, session_id: UUID) -> AuthSessionRecord | None:
+        with self.session_factory() as session:
+            return session.get(AuthSessionRecord, session_id)
+
+    def _record(
+        self,
+        *,
+        event_type: AuditEventType,
+        outcome: AuditOutcome,
+        severity: AuditSeverity,
+        action: str,
+        reason_code: str | None,
+        tenant_id: UUID | None = None,
+        identity_id: UUID | None = None,
+        session_id: UUID | None = None,
+    ) -> None:
+        with self.session_factory.begin() as session:
+            self.writer.record(
+                session=session,
+                entry=SecurityAuditEntry(
+                    occurred_at=self._now(),
+                    tenant_id=tenant_id,
+                    actor_id=identity_id,
+                    identity_id=identity_id,
+                    session_id=session_id,
+                    actor_kind=None,
+                    auth_strength=None,
+                    event_type=event_type,
+                    outcome=outcome,
+                    severity=severity,
+                    action=action,
+                    resource_type="AUTH_SESSION" if session_id is not None else "AUTHENTICATION",
+                    resource_id=session_id,
+                    case_id=None,
+                    correlation_id=None,
+                    command_id=None,
+                    request_id=None,
+                    source_ip_hash=None,
+                    user_agent_family=None,
+                    reason_code=reason_code,
+                    metadata={"channel": "service"},
+                ),
+            )
+
+    def _now(self) -> datetime:
+        current = self.clock.now()
+        if current.tzinfo is None:
+            raise ValueError("audit clock must return a timezone-aware timestamp")
+        return current.astimezone(UTC)
 
 
 class AuthenticationService:

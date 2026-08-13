@@ -13,11 +13,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.platform.security.audit import SecurityAuditWriter
 from app.platform.security.authenticated_context import (
     AuthenticationContextResolver,
     UnauthenticatedError,
 )
 from app.platform.security.authentication import (
+    AuditedAuthenticationService,
     AuthenticationService,
     InvalidCredentialsError,
     RefreshRejectedError,
@@ -45,7 +47,7 @@ class Clock(Protocol):
 class AuthenticationHttpRuntime:
     """Dependencies owned by the authentication HTTP boundary."""
 
-    authentication_service: AuthenticationService
+    authentication_service: AuthenticationService | AuditedAuthenticationService
     session_factory: sessionmaker[Session]
     access_tokens: JwtAccessTokenCodec
     csrf_token_generator: CsrfTokenGenerator
@@ -62,8 +64,18 @@ class AuthenticationHttpRuntime:
         csrf_token_generator: CsrfTokenGenerator,
         clock: Clock,
     ) -> AuthenticationHttpRuntime:
+        audited_service = (
+            authentication_service
+            if isinstance(authentication_service, AuditedAuthenticationService)
+            else AuditedAuthenticationService(
+                core=authentication_service,
+                session_factory=session_factory,
+                writer=SecurityAuditWriter(),
+                clock=clock,
+            )
+        )
         return cls(
-            authentication_service=authentication_service,
+            authentication_service=audited_service,
             session_factory=session_factory,
             access_tokens=access_tokens,
             csrf_token_generator=csrf_token_generator,
