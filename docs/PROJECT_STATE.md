@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions et MFA ; `SEC-01`, `S02-A`, `S02-B`, `S02-C` et `S02-D` sont livrés. La prochaine action imposée est le bootstrap atomique de l’entreprise et du premier patron, avant l’onboarding d’un premier client ou toute exposition d’action métier sensible.
+`S02` — identité, tenant, sessions, MFA et bootstrap patron ; `SEC-01`, `S02-A`, `S02-B`, `S02-C` et les fondations de connexion sont livrés. La prochaine action imposée est le périmètre de policy RBAC/ABAC et la première affectation collaborateur, avant toute ouverture des routes métier au contexte authentifié réel.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S02-D HTTP : [`7cf3056`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/7cf3056), cookies sécurisés, routes auth et contexte serveur. |
+| Commit | Bootstrap atomique : tenant, patron, credential et token consommé, publié dans le commit courant après validation locale complète. |
 | Migration Alembic | `20260813_0007` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **134 tests verts**, dont 5 scénarios API S02-D couvrant cookies, CSRF, JWT, refresh et logout. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub S02-D HTTP](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31707943005) est vert (lint et 134 tests). |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **141 tests verts**, dont 7 scénarios de bootstrap couvrant provisionnement, consommation, expiration, isolation tenant et rollback. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider le bootstrap atomique après publication. |
 
 ## Ce qui est terminé
 
@@ -41,10 +41,11 @@
 - S02-C livré : migration `20260813_0006`, sessions tenant-scoped révocables, familles refresh rotatives, hashes opaques sans token en clair, consommation conditionnelle anti-réemploi, facteurs TOTP chiffrés et recovery codes hashés consommables une seule fois. Les clés composites empêchent les références inter-tenant et les index partiels imposent un seul patron actif, un seul refresh actif par famille et un seul TOTP actif par identité.
 - S02-D transactionnel livré : service sans dépendance HTTP pour login, logout et rotation de refresh ; vérification Argon2id, token opaque généré puis hashé SHA-256, session/famille/premier refresh créés dans une même transaction, réemploi compromettant la famille et révoquant la session, logout idempotent et invalidation après suspension de membership. La migration `20260813_0007` introduit l’expiration absolue des sessions : 8 heures d’inactivité, 24 heures standard et 12 heures pour patron/délégataire.
 - S02-D HTTP livré : access token JWT HS256 de 15 minutes sans rôle, tenant ni permission faisant autorité ; refresh token uniquement en cookie `HttpOnly`/`Secure`/`SameSite=Lax`, CSRF double-submit distinct `Secure`/`SameSite=Strict`, routes login/refresh/logout à refus neutre et résolveur de contexte serveur contrôlant JWT, version de session, identité, membership et expiration avant toute action authentifiée.
+- Bootstrap patron livré : provisionnement local de tenant `ACTIVE` et secret d’amorçage aléatoire uniquement hashé avec expiration d’une heure ; complétion créant dans une transaction unique l’identité patron, son credential Argon2id, sa membership `PATRON_ADMIN ACTIVE` et la consommation définitive du secret. Réemploi, expiration, cross-tenant, slug dupliqué et échec de hash n’exposent aucune création partielle.
 
 ## Prochaine action unique
 
-Démarrer le bootstrap applicatif atomique : créer tenant + identité patron + credential Argon2id + membership `PATRON_ADMIN` + token bootstrap hashé, puis consommer ce token dans une transaction unique. La réponse ne devra jamais exposer le secret durablement ; les routes d’onboarding seront conçues seulement après cette transaction prouvée par tests.
+Démarrer le périmètre de policy RBAC/ABAC/ReBAC : traduire les rôles et les grants serveur en capabilities effectives, définir la première affectation de collaborateur à une affaire et brancher progressivement le résolveur de contexte réel aux routes métier, sans jamais sérialiser les données financières à destination d’un collaborateur.
 
 ## Décisions ouvertes
 
@@ -63,7 +64,8 @@ Démarrer le bootstrap applicatif atomique : créer tenant + identité patron + 
 | Services transactionnels login/logout/refresh | Livrés | `S02-D` : Argon2id, session/famille/refresh atomiques, rotation, détection du réemploi, logout et invalidation après suspension. |
 | Expiration absolue de session | Livrée | Migration `20260813_0007` : borne absolue distincte de l’inactivité, non extensible pendant refresh. |
 | Interfaces HTTP et contexte authentifié | Livrés | `S02-D` : JWT court sans claims d’autorisation, cookies sécurisés, CSRF, routes login/refresh/logout et contrôle serveur de session/membership/identité. |
-| Bootstrap applicatif tenant + patron | À implémenter | Transaction tenant + patron + credential + token bootstrap consommé avant onboarding client. |
+| Bootstrap applicatif tenant + patron | Livré | Service local atomique : tenant + identité + credential Argon2id + membership patron + token consommé, sans secret persistant. |
+| Policy RBAC/ABAC/ReBAC et première affectation | À implémenter | Traduire la membership et les grants en capabilities, puis limiter les collaborateurs aux affaires et données explicitement affectées. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 
