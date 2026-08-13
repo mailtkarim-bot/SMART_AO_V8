@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S02-A : [`afa9dd9`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/afa9dd9), contrats `ActorContext`, policy et mapping HTTP neutre. |
-| Migration Alembic | `20260813_0004` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **100 tests verts**, dont 10 tests S02-A de policy, neutralité et frontières d’architecture. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub est vert pour S02-A (lint et 100 tests). |
+| Commit | S02-B : [`20f79e1`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/20f79e1), migration identité, credentials, memberships et bootstrap. |
+| Migration Alembic | `20260813_0005` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **110 tests verts**, dont 10 tests PostgreSQL S02-B de contraintes identité et membership. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub est vert pour S02-B (lint et 110 tests). |
 
 ## Ce qui est terminé
 
