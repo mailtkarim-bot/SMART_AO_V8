@@ -46,6 +46,15 @@ class DataClassification(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class AssignmentScope:
+    """Trusted active ReBAC scope for one collaborator and one Case."""
+
+    case_id: UUID
+    allowed_actions: frozenset[str]
+    allowed_classifications: frozenset[DataClassification]
+
+
+@dataclass(frozen=True, slots=True)
 class ActorContext:
     """Trusted and immutable authorization facts resolved by the server."""
 
@@ -61,12 +70,18 @@ class ActorContext:
     authenticated_at: datetime
     mfa_verified_at: datetime | None
     correlation_id: UUID
+    assignment_scopes: tuple[AssignmentScope, ...] = ()
 
     @property
     def membership_is_active(self) -> bool:
         """Whether this context can authorize tenant-scoped user operations."""
 
         return self.membership_state is MembershipState.ACTIVE
+
+    def assignment_scope_for(self, *, case_id: UUID) -> AssignmentScope | None:
+        """Return the active server-resolved scope for one Case, if present."""
+
+        return next((scope for scope in self.assignment_scopes if scope.case_id == case_id), None)
 
     def has_recent_mfa(
         self,

@@ -10,8 +10,20 @@ from uuid import uuid4
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.platform.security.context import ActorContext, ActorKind, MembershipState
-from app.platform.security.models import AuthSessionRecord, IdentityRecord, TenantMembershipRecord
+from app.platform.security.capabilities import Capability, capabilities_for
+from app.platform.security.context import (
+    ActorContext,
+    ActorKind,
+    AssignmentScope,
+    DataClassification,
+    MembershipState,
+)
+from app.platform.security.models import (
+    AuthSessionRecord,
+    CaseAssignmentRecord,
+    IdentityRecord,
+    TenantMembershipRecord,
+)
 from app.platform.security.tokens import AccessTokenRejectedError, JwtAccessTokenCodec
 
 _SESSION_IDLE_TIMEOUT = timedelta(hours=8)
@@ -93,6 +105,13 @@ class AuthenticationContextResolver:
                     except ValueError:
                         rejected = True
                     else:
+                        assignment_scopes = self._active_assignment_scopes(
+                            session=session,
+                            tenant_id=membership.tenant_id,
+                            membership_id=membership.id,
+                            actor_kind=actor_kind,
+                            now=now,
+                        )
                         resolved_context = ActorContext(
                             actor_id=identity.id,
                             identity_id=identity.id,
@@ -100,17 +119,65 @@ class AuthenticationContextResolver:
                             membership_id=membership.id,
                             actor_kind=actor_kind,
                             membership_state=MembershipState.ACTIVE,
-                            capabilities=frozenset(),
-                            assigned_case_ids=frozenset(),
+                            capabilities=capabilities_for(actor_kind),
+                            assigned_case_ids=frozenset(
+                                scope.case_id for scope in assignment_scopes
+                            ),
                             session_id=auth_session.id,
                             authenticated_at=auth_session.issued_at,
                             mfa_verified_at=auth_session.mfa_verified_at,
                             correlation_id=uuid4(),
+                            assignment_scopes=assignment_scopes,
                         )
 
         if rejected or resolved_context is None:
             raise UnauthenticatedError()
         return resolved_context
+
+    @staticmethod
+    def _active_assignment_scopes(
+        *,
+        session: Session,
+        tenant_id,
+        membership_id,
+        actor_kind: ActorKind,
+        now: datetime,
+    ) -> tuple[AssignmentScope, ...]:
+        if actor_kind is not ActorKind.COLLABORATEUR:
+            return ()
+        records = session.scalars(
+            sa.select(CaseAssignmentRecord).where(
+                CaseAssignmentRecord.tenant_id == tenant_id,
+                CaseAssignmentRecord.membership_id == membership_id,
+                CaseAssignmentRecord.state == "ACTIVE",
+                CaseAssignmentRecord.starts_at <= now,
+                sa.or_(
+                    CaseAssignmentRecord.ends_at.is_(None),
+                    CaseAssignmentRecord.ends_at > now,
+                ),
+            )
+        )
+        scopes: list[AssignmentScope] = []
+        for record in records:
+            actions = frozenset(
+                action
+                for action in record.scope_actions_json
+                if action in Capability._value2member_map_
+            )
+            classifications = frozenset(
+                DataClassification(value)
+                for value in record.scope_classifications_json
+                if value in DataClassification._value2member_map_
+            )
+            if actions and classifications:
+                scopes.append(
+                    AssignmentScope(
+                        case_id=record.case_id,
+                        allowed_actions=actions,
+                        allowed_classifications=classifications,
+                    )
+                )
+        return tuple(scopes)
 
     def _now(self) -> datetime:
         current = self.clock.now()

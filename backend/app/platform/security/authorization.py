@@ -99,17 +99,30 @@ class AuthorizationPolicy:
             return AuthorizationDecision.denied(reason="membership is not active")
         if request.action not in context.capabilities:
             return AuthorizationDecision.denied(reason="capability is missing")
+        if resource.classification in {
+            DataClassification.SECURITY_RESTRICTED,
+            DataClassification.SUPPORT_RESTRICTED,
+        }:
+            return AuthorizationDecision.denied(
+                reason="restricted classification requires a dedicated flow"
+            )
         if (
             resource.classification is DataClassification.FINANCIAL_PRIVATE
             and context.actor_kind is not ActorKind.PATRON_ADMIN
         ):
             return AuthorizationDecision.denied(reason="financial data requires patron access")
-        if (
-            context.actor_kind is ActorKind.COLLABORATEUR
-            and resource.case_id is not None
-            and resource.case_id not in context.assigned_case_ids
-        ):
-            return AuthorizationDecision.denied(reason="case assignment is missing")
+        if context.actor_kind is ActorKind.COLLABORATEUR:
+            if resource.case_id is None:
+                return AuthorizationDecision.denied(
+                    reason="collaborator resource has no case scope"
+                )
+            assignment_scope = context.assignment_scope_for(case_id=resource.case_id)
+            if assignment_scope is None:
+                return AuthorizationDecision.denied(reason="case assignment is missing")
+            if request.action not in assignment_scope.allowed_actions:
+                return AuthorizationDecision.denied(reason="assignment action is missing")
+            if resource.classification not in assignment_scope.allowed_classifications:
+                return AuthorizationDecision.denied(reason="assignment classification is missing")
         if request.mfa_required and (
             request.evaluated_at is None
             or not context.has_recent_mfa(evaluated_at=request.evaluated_at)

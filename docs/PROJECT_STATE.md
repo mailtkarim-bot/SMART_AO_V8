@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions, MFA et bootstrap patron ; `SEC-01`, `S02-A`, `S02-B`, `S02-C` et les fondations de connexion sont livrés. La prochaine action imposée est le périmètre de policy RBAC/ABAC et la première affectation collaborateur, avant toute ouverture des routes métier au contexte authentifié réel.
+`S02` — identité, tenant, sessions, MFA, bootstrap patron et policy contextualisée ; les fondations SEC-01 sont livrées jusqu’au RBAC/ABAC/ReBAC et à la première affectation collaborateur. La prochaine action imposée est l’audit de sécurité append-only avant l’ouverture progressive des routes métier au contexte authentifié réel.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | Bootstrap atomique : [`4f40800`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/4f40800), tenant, patron, credential et token consommé. |
-| Migration Alembic | `20260813_0007` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **141 tests verts**, dont 7 scénarios de bootstrap couvrant provisionnement, consommation, expiration, isolation tenant et rollback. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub bootstrap atomique](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31708738182) est vert (lint et 141 tests). |
+| Commit | RBAC/ABAC/ReBAC : catalogue de capabilities serveur, affectation Case et contexte authentifié, publié dans le commit courant après validation locale complète. |
+| Migration Alembic | `20260813_0008` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **153 tests verts**, dont 12 scénarios RBAC/ABAC/ReBAC et persistance d’affectation. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider le périmètre RBAC/ABAC/ReBAC après publication. |
 
 ## Ce qui est terminé
 
@@ -42,10 +42,11 @@
 - S02-D transactionnel livré : service sans dépendance HTTP pour login, logout et rotation de refresh ; vérification Argon2id, token opaque généré puis hashé SHA-256, session/famille/premier refresh créés dans une même transaction, réemploi compromettant la famille et révoquant la session, logout idempotent et invalidation après suspension de membership. La migration `20260813_0007` introduit l’expiration absolue des sessions : 8 heures d’inactivité, 24 heures standard et 12 heures pour patron/délégataire.
 - S02-D HTTP livré : access token JWT HS256 de 15 minutes sans rôle, tenant ni permission faisant autorité ; refresh token uniquement en cookie `HttpOnly`/`Secure`/`SameSite=Lax`, CSRF double-submit distinct `Secure`/`SameSite=Strict`, routes login/refresh/logout à refus neutre et résolveur de contexte serveur contrôlant JWT, version de session, identité, membership et expiration avant toute action authentifiée.
 - Bootstrap patron livré : provisionnement local de tenant `ACTIVE` et secret d’amorçage aléatoire uniquement hashé avec expiration d’une heure ; complétion créant dans une transaction unique l’identité patron, son credential Argon2id, sa membership `PATRON_ADMIN ACTIVE` et la consommation définitive du secret. Réemploi, expiration, cross-tenant, slug dupliqué et échec de hash n’exposent aucune création partielle.
+- RBAC/ABAC/ReBAC livré : catalogue fermé de capabilities calculées seulement depuis les faits serveur ; policy tenant/classification/MFA/affectation renforcée ; migration `20260813_0008` créant les affectations collaborateur `Case` avec FKs composites tenant-scoped, scope JSONB actions/classifications, dates et unicité de l’affectation active. Le résolveur de contexte authentifié ne lit aucun rôle dans le JWT et injecte seulement les capabilities de la membership et les scopes actifs, filtrés et valides de la base.
 
 ## Prochaine action unique
 
-Démarrer le périmètre de policy RBAC/ABAC/ReBAC : traduire les rôles et les grants serveur en capabilities effectives, définir la première affectation de collaborateur à une affaire et brancher progressivement le résolveur de contexte réel aux routes métier, sans jamais sérialiser les données financières à destination d’un collaborateur.
+Démarrer l’audit de sécurité append-only : créer les événements de sécurité tenant-scoped avec vocabulaire allow-listé, immutabilité PostgreSQL et métadonnées minimisées, puis instrumenter les événements authentification/autorisation déjà livrés sans journaliser secret, token, password hash, données DCE ou montant.
 
 ## Décisions ouvertes
 
@@ -65,7 +66,8 @@ Démarrer le périmètre de policy RBAC/ABAC/ReBAC : traduire les rôles et les 
 | Expiration absolue de session | Livrée | Migration `20260813_0007` : borne absolue distincte de l’inactivité, non extensible pendant refresh. |
 | Interfaces HTTP et contexte authentifié | Livrés | `S02-D` : JWT court sans claims d’autorisation, cookies sécurisés, CSRF, routes login/refresh/logout et contrôle serveur de session/membership/identité. |
 | Bootstrap applicatif tenant + patron | Livré | Service local atomique : tenant + identité + credential Argon2id + membership patron + token consommé, sans secret persistant. |
-| Policy RBAC/ABAC/ReBAC et première affectation | À implémenter | Traduire la membership et les grants en capabilities, puis limiter les collaborateurs aux affaires et données explicitement affectées. |
+| Policy RBAC/ABAC/ReBAC et première affectation | Livré | Catalogue de capabilities calculé côté serveur, policy classification/scope et table `case_assignments` tenant-scoped injectée dans le contexte authentifié. |
+| Audit de sécurité append-only | À implémenter | Événements de sécurité immuables pour authentification, autorisation, identité et lecture/export sensible, sans secret ni contenu métier excessif. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 

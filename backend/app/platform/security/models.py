@@ -6,6 +6,7 @@ from datetime import datetime
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -99,6 +100,7 @@ class TenantMembershipRecord(TenantScopedRecord, Base):
             ondelete="RESTRICT",
         ),
         sa.UniqueConstraint("tenant_id", "identity_id", name="uq_memberships__tenant_identity"),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_memberships__tenant_id"),
         sa.UniqueConstraint(
             "tenant_id", "id", "identity_id", name="uq_memberships__tenant_id_identity_id"
         ),
@@ -158,6 +160,84 @@ class TenantBootstrapTokenRecord(TenantScopedRecord, Base):
     issued_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     consumed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+
+class CaseAssignmentRecord(TenantScopedRecord, Base):
+    """Server-owned ReBAC scope granting one collaborator bounded Case access."""
+
+    __tablename__ = "case_assignments"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_assignments__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "case_id"],
+            ["cases.tenant_id", "cases.id"],
+            name="fk_assignments__case",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_assignments__membership",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "granted_by_membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_assignments__granted_by",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_assignments__tenant_id"),
+        sa.CheckConstraint(
+            "state IN ('ACTIVE', 'SUSPENDED', 'ENDED', 'EXPIRED')", name="state"
+        ),
+        sa.CheckConstraint(
+            "jsonb_typeof(scope_actions_json) = 'array' "
+            "AND jsonb_array_length(scope_actions_json) > 0",
+            name="actions",
+        ),
+        sa.CheckConstraint(
+            "jsonb_typeof(scope_classifications_json) = 'array' "
+            "AND jsonb_array_length(scope_classifications_json) > 0",
+            name="classifications",
+        ),
+        sa.CheckConstraint("granted_at >= starts_at", name="granted_after_start"),
+        sa.CheckConstraint("ends_at IS NULL OR ends_at > starts_at", name="end_after_start"),
+        sa.CheckConstraint(
+            "(state IN ('ACTIVE', 'SUSPENDED') AND ended_at IS NULL) OR "
+            "(state IN ('ENDED', 'EXPIRED') AND ended_at IS NOT NULL)",
+            name="state_timestamps",
+        ),
+        sa.Index(
+            "ux_assignments__active_member_case",
+            "tenant_id",
+            "membership_id",
+            "case_id",
+            unique=True,
+            postgresql_where=sa.text("state = 'ACTIVE'"),
+        ),
+        sa.Index(
+            "ix_assignments__context_resolution",
+            "tenant_id",
+            "membership_id",
+            "state",
+            "starts_at",
+            "ends_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    scope_actions_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    scope_classifications_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    granted_by_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    granted_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
 
 class AuthSessionRecord(TenantScopedRecord, Base):
