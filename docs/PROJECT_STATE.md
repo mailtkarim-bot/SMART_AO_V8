@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | DCE-RETENTION-01 validé localement et prêt à publier : contrat, migration `0012`, worker d’outbox, balayage d’orphelins, retry durable et tests. |
+| Commit | DCE-RETENTION-01 publié sur `main` : [`576abcb`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/576abcb), contrat, migration `0012`, worker d’outbox, balayage d’orphelins, retry durable et tests. |
 | Migration Alembic | `20260813_0012` validée : upgrade depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **197 tests verts**, dont effacement idempotent, absence de fichier, retry/backoff, protection CLEAN et récupération d’orphelin `UPLOADING`. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7). La CI DCE-RETENTION-01 sera référencée ici après publication sur `main`. Docker n’est pas disponible dans le sandbox : le démarrage réel du worker, la syntaxe Compose et l’exécution contre ClamAV restent à vérifier sur le VPS/Docker cible. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow DCE-RETENTION-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31729224213) est vert (lint et smoke tests). Docker n’est pas disponible dans le sandbox : le démarrage réel du worker, la syntaxe Compose et l’exécution contre ClamAV restent à vérifier sur le VPS/Docker cible. |
 
 ## Ce qui est terminé
 
