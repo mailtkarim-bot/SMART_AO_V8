@@ -1,15 +1,15 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S01-D` — fondation de persistance du premier slice : socle tenant, revisions, événements et outbox avant les repositories Case/DCE/Decision.
+`S01-E` — persistance tenant-scoped de `Consultation` et `DceVersion`, deuxième migration DATA-01, avant les repositories Case et Decision.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S01-C domaine pur de Decision : contexte figé, Go/Go conditionnel/No-Go, conditions, stale context et supersession ; consulter `git log -1` pour le commit courant. |
-| Migration Alembic | Aucune migration appliquée. DATA-01 peut désormais être implémenté : le socle tenant/revisions/events/outbox précède les repositories. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : 39 tests verts. Les trois roots du premier slice et leurs frontières d’architecture sont couverts. |
+| Commit | S01-D socle de durabilité : tenant, receipts d’idempotence, Domain Events, outbox, Process Inbox et migration Alembic 0001 ; consulter `git log -1` pour le commit courant. |
+| Migration Alembic | `20260813_0001` validée : upgrade, downgrade et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : 45 tests verts, dont 6 scénarios PostgreSQL du socle durable. |
 | CI | Workflow backend configuré et publié ; son exécution GitHub doit être surveillée à chaque push. |
 
 ## Ce qui est terminé
@@ -27,16 +27,18 @@
 - S01-A livré : aggregate `Case` pur, `CaseScope`, origine manuelle justifiée, références tenant-scoped, événements minimaux et tests `CASE-01` à `CASE-04`/ownership.
 - S01-B livré : aggregates purs `Consultation` et `DceVersion`, identité acheteur, lots/tranches source, corpus et documents immuables, manques sourcés, retrait, supersession et tests de frontière.
 - S01-C livré : aggregate pur `Decision`, contextes fingerprintés, finalisation patron, Go/Go conditionnel/No-Go, conditions, stale context, revue requise, supersession et tests de frontière.
+- S01-D livré : base SQLAlchemy, tenant minimal, receipts idempotents, Domain Events, outbox, Process Inbox, migration `20260813_0001`, contraintes PostgreSQL et rollback transactionnel prouvés.
 
 ## Prochaine action unique
 
-Commencer `S01-D` : écrire les tests rouges de persistance du socle tenant/revision/domain events/outbox, puis implémenter la première migration Alembic DATA-01 sans repository cross-root.
+Commencer `S01-E` : écrire les tests rouges PostgreSQL de `Consultation` et `DceVersion`, puis implémenter la migration `20260813_0002_consultation_dce` et leurs modèles SQLAlchemy sans relation mutable vers Case ou Decision.
 
 ## Décisions ouvertes
 
 | Sujet | État | Moment de décision |
 |---|---|---|
-| Mise en œuvre précise SQLAlchemy/Alembic DATA-01 | À implémenter | S01-D, maintenant que les trois domaines purs sont verts. |
+| Persistance Consultation/DceVersion DATA-01 | À implémenter | S01-E : migration `20260813_0002` après validation S01-D. |
+| Persistance Case et Decision DATA-01 | Différée | Après S01-E, par migrations séparées `0003` puis `0004`. |
 | Authentification réelle et bootstrap du premier patron | Différé | Avant le premier endpoint protégé. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
