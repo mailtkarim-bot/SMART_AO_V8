@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S02-D transactionnel : login/logout/refresh et expiration absolue, publié dans le commit courant après validation locale complète. |
+| Commit | S02-D transactionnel : [`75906f8`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/75906f8), login/logout/refresh et expiration absolue. |
 | Migration Alembic | `20260813_0007` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **129 tests verts**, dont 8 scénarios S02-D couvrant login, refus neutre, rotation, réemploi, logout, suspension et Argon2id. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider S02-D transactionnel après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub S02-D transactionnel](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31706899241) est vert (lint et 129 tests). |
 
 ## Ce qui est terminé
 
