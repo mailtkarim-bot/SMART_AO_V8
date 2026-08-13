@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées ; les fondations SEC-01, les lectures Consultation/DCE, l’admission atomique, le staging et l’upload binaire DCE en quarantaine sont livrés. La prochaine action est DCE-RETENTION-01 : consommation d’outbox et effacement physique fiable des objets expirés, rejetés ou orphelins.
+`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées ; les fondations SEC-01, les lectures Consultation/DCE, l’admission atomique, le staging, l’upload et la rétention physique DCE sont livrés. La prochaine action est DCE-DOCUMENT-EXTRACTION-01 : registre et extraction déterministe des contenus après admission, sans exposer les originaux.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | DCE-UPLOAD-01 publié sur `main` : [`38cab9d`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/38cab9d), contrat, migration `0011`, service de quarantaine, client ClamAV, endpoint HTTP, Docker Compose et tests. |
-| Migration Alembic | `20260813_0011` validée : upgrade depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **192 tests verts**, dont flux chunké, hash réel, signature MIME, limites, ClamAV fail-closed, policy HTTP et régressions staging/admission. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow DCE-UPLOAD-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31728128331) est vert (lint et smoke tests). Docker n’est pas disponible dans le sandbox : la syntaxe Compose et l’exécution d’un `clamd` réel seront vérifiées sur le VPS/Docker cible. |
+| Commit | DCE-RETENTION-01 validé localement et prêt à publier : contrat, migration `0012`, worker d’outbox, balayage d’orphelins, retry durable et tests. |
+| Migration Alembic | `20260813_0012` validée : upgrade depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **197 tests verts**, dont effacement idempotent, absence de fichier, retry/backoff, protection CLEAN et récupération d’orphelin `UPLOADING`. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7). La CI DCE-RETENTION-01 sera référencée ici après publication sur `main`. Docker n’est pas disponible dans le sandbox : le démarrage réel du worker, la syntaxe Compose et l’exécution contre ClamAV restent à vérifier sur le VPS/Docker cible. |
 
 ## Ce qui est terminé
 
@@ -50,10 +50,11 @@
 - DCE-ADMIT-HTTP-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_ADMIT_HTTP_01_CONTRAT.md` et route `POST /api/v1/dce-versions`. Le bearer est résolu uniquement côté serveur, puis `dce.prepare` et la policy auditée sont appliqués à la Consultation propriétaire avant le dispatcher. Un patron admis reçoit seulement le receipt autorisé ; le replay renvoie `200` sans doublon, un collaborateur sans scope reçoit `403` audité et un autre tenant reçoit `404 NOT_FOUND_OR_FORBIDDEN` audité. Aucun hash, document, provenance, `storage_object_id` ou `storage_key` n’est retourné.
 - DCE-STAGING-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_STAGING_01_CONTRAT.md`, modèle `DceStagedObject`, migration `20260813_0010`, transitions PostgreSQL et registre tenant-scopé de quarantaine. `POST /api/v1/dce-staged-objects` prépare une intention autorisée par bearer, `dce.prepare` et policy auditée, avec identifiant opaque alloué par le serveur ; aucune clé, URL, hash ou métadonnée de scanner n’est renvoyée. Les commandes système de scan et de rétention sont fail-closed ; l’admission lit seulement les objets `CLEAN`, les verrouille puis les marque `CONSUMED` avec la `DceVersion` dans la transaction atomique. La FK composite interdit tout document DCE sans objet staged du même tenant.
 - DCE-UPLOAD-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_UPLOAD_01_CONTRAT.md`, migration `20260813_0011` ajoutant l’état `UPLOADING` et les transitions PostgreSQL `AWAITING_UPLOAD → UPLOADING → QUARANTINED → CLEAN|REJECTED`. `PUT /api/v1/dce-staged-objects/{id}/content` exige un bearer, `dce.prepare`, une policy auditée et une clé d’idempotence ; il accepte uniquement un flux brut, sans JSON/multipart. Le service écrit par chunks dans une quarantaine privée, calcule SHA-256 et taille réels, détecte le MIME par signature libmagic, soumet le contenu à ClamAV `INSTREAM` interne puis enregistre `CLEAN` ou `REJECTED` fail-closed. Les réponses n’exposent aucune clé, URL, hash, MIME ou signature scanner. Docker Compose prévoit `clamav/clamav:1.4_base` sans publication du port `3310`; son exécution réelle reste à vérifier sur un hôte Docker car le sandbox n’a pas Docker.
+- DCE-RETENTION-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_RETENTION_01_CONTRAT.md`, migration `20260813_0012` et worker Docker sans port public. Le worker balaie les objets non consommés arrivés à expiration, les fait passer de façon transactionnelle à `EXPIRED`, puis consomme `dce_staging_retention` avec `FOR UPDATE SKIP LOCKED`. Il efface seulement les binaires des objets relus `REJECTED` ou `EXPIRED`; `CLEAN` et `CONSUMED` sont bloqués par conception. `FileNotFound` est un succès idempotent, une erreur passe l’outbox en `RETRY` avec backoff borné et `last_error_code` fermé. Le worker partage uniquement PostgreSQL et le volume privé de quarantaine.
 
 ## Prochaine action unique
 
-Démarrer DCE-RETENTION-01 : concevoir puis implémenter le worker d’outbox qui efface physiquement, de façon idempotente et journalisée, les objets DCE expirés ou rejetés ainsi que les fichiers orphelins d’un crash en état `UPLOADING`. Le worker ne doit jamais supprimer un objet `CLEAN` ou `CONSUMED` et devra être vérifié sur le VPS Docker avec ClamAV réel.
+Démarrer DCE-DOCUMENT-EXTRACTION-01 : figer le registre immuable d’extractions documentaires après admission, les adaptateurs déterministes PDF/DOCX/XLSX/images, la provenance page/fragment et les limites anti-bombes. Les originaux restent privés ; seules des projections minimisées et sourcées pourront alimenter l’analyse DCE future.
 
 ## Décisions ouvertes
 
@@ -81,6 +82,7 @@ Démarrer DCE-RETENTION-01 : concevoir puis implémenter le worker d’outbox qu
 | Admission DCE par HTTP sécurisée | Livrée | DCE-ADMIT-HTTP-01 : `POST /api/v1/dce-versions`, bearer réel, `dce.prepare`, policy auditée sur Consultation, isolation tenant, receipt minimal et replay HTTP contrôlé. |
 | Registre de staging sécurisé DCE | Livré | DCE-STAGING-01 : migration `0010`, objets tenant-scopés, clé privée générée serveur, états/quarantaine/scan/rétention, transitions PostgreSQL, préparation HTTP auditée et consommation atomique par admission. |
 | Upload binaire sécurisé DCE | Livré localement | DCE-UPLOAD-01 : migration `0011`, flux privé chunké, limite effective, hash réel, libmagic, client ClamAV `INSTREAM`, contrôles fail-closed, endpoint bearer/policy/audit et Compose ClamAV non exposé. Le test Docker réel reste requis sur VPS, car le sandbox ne possède pas Docker. |
+| Rétention physique DCE | Livrée localement | DCE-RETENTION-01 : migration `0012`, worker d’outbox idempotent sans port, `SKIP LOCKED`, expiration d’orphelins, suppression seulement `REJECTED`/`EXPIRED`, retry/backoff et code d’erreur durable. Le test Docker réel reste requis sur VPS. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 

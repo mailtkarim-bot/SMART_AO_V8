@@ -264,6 +264,11 @@ class RecordDceStagedObjectQuarantineHandler:
                 "consultation_id": str(staged_object.consultation_id),
                 "state": staged_object.state,
             },
+            topic=(
+                "dce_staging_retention"
+                if staged_object.state == "REJECTED"
+                else "cockpit_projection"
+            ),
         )
         return HandlerOutcome(
             result_code="DCE_STAGING_QUARANTINE_RECORDED",
@@ -314,6 +319,7 @@ class RejectDceStagedObjectUploadHandler:
                 "tenant_id": str(context.tenant_id),
                 "consultation_id": str(staged_object.consultation_id),
             },
+            topic="dce_staging_retention",
         )
         return HandlerOutcome(
             result_code="DCE_STAGING_UPLOAD_REJECTED",
@@ -435,6 +441,11 @@ class RecordDceStagedObjectScanHandler:
                 "consultation_id": str(staged_object.consultation_id),
                 "state": staged_object.state,
             },
+            topic=(
+                "dce_staging_retention"
+                if staged_object.state == "REJECTED"
+                else "cockpit_projection"
+            ),
         )
         return HandlerOutcome(
             result_code="DCE_STAGING_SCAN_RECORDED",

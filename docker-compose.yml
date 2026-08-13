@@ -37,6 +37,23 @@ services:
     ports:
       - "8000:8000"
 
+  dce-retention-worker:
+    build:
+      context: .
+      dockerfile: ops/docker/backend.Dockerfile
+    command: python -m app.workers.dce_retention
+    environment:
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
+      SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
+      SMART_AO_RETENTION_BATCH_SIZE: "50"
+      SMART_AO_RETENTION_LEASE_SECONDS: "120"
+      SMART_AO_RETENTION_POLL_SECONDS: "30"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - dce_quarantine:/var/lib/smart_ao/dce-quarantine
+
   clamav:
     image: clamav/clamav:1.4_base
     environment:

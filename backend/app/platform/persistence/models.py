@@ -163,6 +163,7 @@ class OutboxMessageRecord(TenantScopedRecord, Base):
     )
     next_attempt_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     published_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    last_error_code: Mapped[str | None] = mapped_column(sa.String(120), nullable=True)
     dedupe_key: Mapped[str] = mapped_column(sa.String(240), nullable=False)
 
 
