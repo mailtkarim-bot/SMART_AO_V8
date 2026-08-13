@@ -23,6 +23,7 @@
 - ARC-01 : arborescence modulaire et règles d'import.
 - Dépôt GitHub privé créé et premier commit publié sur `main`; contrats importés dans `docs/reference/`.
 - ROADMAP-01 ajoutée : ordre global des slices jusqu’à la préproduction VPS.
+- Documentation consolidée : PDF classés dans `docs/pdf/`, sources Markdown V8 importées dans `docs/reference/` et navigation centralisée dans `DOCUMENTATION_CATALOG.md`.
 
 ## Prochaine action unique
 

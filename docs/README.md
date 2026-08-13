@@ -7,3 +7,5 @@
 `DECISION_LOG.md` consigne les petits arbitrages. Une décision coûteuse, durable ou difficile devient une ADR dans `docs/adr/`.
 
 `ROADMAP_01_PLAN_GLOBAL_CODAGE.md` donne l’ordre global des slices, leurs critères de sortie et les jalons vers la préproduction. Il est lu après `PROJECT_STATE.md`, qui reste la source de l’action immédiate.
+
+`DOCUMENTATION_CATALOG.md` relie les sources Markdown aux PDF classés par rôle ; il permet d’explorer l’ensemble du patrimoine documentaire sans chercher dans les dossiers.
