@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | RBAC/ABAC/ReBAC : catalogue de capabilities serveur, affectation Case et contexte authentifié, publié dans le commit courant après validation locale complète. |
+| Commit | RBAC/ABAC/ReBAC : [`6517d5a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/6517d5a), catalogue de capabilities serveur, affectation Case et contexte authentifié. |
 | Migration Alembic | `20260813_0008` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **153 tests verts**, dont 12 scénarios RBAC/ABAC/ReBAC et persistance d’affectation. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider le périmètre RBAC/ABAC/ReBAC après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub RBAC/ABAC/ReBAC](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31712596185) est vert (lint et 153 tests). |
 
 ## Ce qui est terminé
 
