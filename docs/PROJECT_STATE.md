@@ -10,7 +10,7 @@
 | Commit | DCE-ADMIT-01 publié sur `main` : admission atomique de la version DCE et de ses pièces pré-stagées. |
 | Migration Alembic | `20260813_0009` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **168 tests verts**, incluant l’admission atomique DCE, son replay idempotent, le refus d’une Consultation stale et le refus d’un manifeste non canonique. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub DCE-READ-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31717459516) est vert (lint et 164 tests). |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub DCE-ADMIT-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31718931615) est vert (lint et 168 tests). |
 
 ## Ce qui est terminé
 
