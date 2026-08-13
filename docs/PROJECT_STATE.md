@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S01-I` — handlers de commandes, idempotence transactionnelle et dispatcher d’événements du premier slice, avant les endpoints FastAPI.
+`S01-J` — endpoints FastAPI APP-01 et projections de lecture minimales, en commençant par le premier chemin Consultation.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S01-H repositories applicatifs : [`b60c6fc`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/b60c6fc), avec ports sans ORM et adapters SQLAlchemy tenant-scoped de Case, Consultation, DceVersion et Decision. |
+| Commit | S01-I dispatcher : contrat Pydantic `CreateConsultation`, handler DCE propriétaire, receipt idempotent, Domain Event et outbox transactionnelle ; consulter `git log -1` pour le commit courant. |
 | Migration Alembic | `20260813_0004` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **81 tests verts**, dont 8 scénarios repositories PostgreSQL et 6 contrôles d’architecture. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert pour S01-H (lint et 81 tests). |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **85 tests verts**, dont 4 scénarios transactionnels de dispatcher. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; la CI S01-I sera confirmée après publication. |
 
 ## Ce qui est terminé
 
@@ -32,10 +32,11 @@
 - S01-F livré : modèles et migration `20260813_0003` Case, références tenant-scoped Consultation/DCE, unicité de l’identité fonctionnelle active, historiques internes et absence d’ownership mutable vers Decision, Pricing, Task ou Submission.
 - S01-G livré : modèles et migration `20260813_0004` Decision, FKs composites tenant-scoped vers Case et contextes internes, finalisation contrôlée, cycle de supersession, conditions et trigger d’immutabilité des contextes figés.
 - S01-H livré : ports applicatifs sans dépendance ORM, snapshots de persistance neutres, repositories SQLAlchemy tenant-scoped par root, chargement exclusif des entités internes et update atomique protégé par `aggregate_revision`.
+- S01-I livré : dispatcher technique générique, empreinte canonique, replay idempotent, mismatch de clé, rollback avant commit et transaction atomique `root + Domain Event + outbox + receipt` démontrés par `CreateConsultation`.
 
 ## Prochaine action unique
 
-Commencer `S01-I` : écrire les tests rouges des handlers de commandes et du dispatcher, puis implémenter l’idempotence, la transaction root + event + outbox + receipt et les premières commandes du slice.
+Commencer `S01-J` : exposer le premier chemin `CreateConsultation` via FastAPI APP-01, construire sa réponse RYOW sans ORM en route, puis ajouter une projection minimale de consultation.
 
 ## Décisions ouvertes
 
@@ -44,7 +45,8 @@ Commencer `S01-I` : écrire les tests rouges des handlers de commandes et du dis
 | Persistance Case DATA-01 | Livrée | S01-F : migration `20260813_0003`, validée et publiée. |
 | Persistance Decision DATA-01 | Livrée | S01-G : migration `20260813_0004`, validée localement et par CI GitHub. |
 | Repositories applicatifs du premier slice | Livrés | S01-H : un adapter par root, filtrage tenant, snapshots neutres, révision optimiste et CI GitHub verte. |
-| Handlers, dispatcher et outbox transactionnelle | À implémenter | S01-I : avant les endpoints FastAPI et les projections. |
+| Handlers, dispatcher et outbox transactionnelle | Livrés pour le premier chemin | S01-I : `CreateConsultation` démontre la chaîne complète ; les commandes suivantes se branchent sur le même dispatcher. |
+| Endpoints APP-01 et projections RYOW minimales | À implémenter | S01-J : avant le scénario complet de démonstration. |
 | Authentification réelle et bootstrap du premier patron | Différé | Avant le premier endpoint protégé. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
