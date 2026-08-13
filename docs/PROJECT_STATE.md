@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S01-F persistance Case : migration `20260813_0003`, Case tenant-scoped et historiques Consultation/DCE ; consulter `git log -1` pour le commit courant. |
+| Commit | S01-F persistance Case : [`edab4a2`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/edab4a2), avec migration `20260813_0003`, Case tenant-scoped et historiques Consultation/DCE. |
 | Migration Alembic | `20260813_0003` validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **59 tests verts**, dont 7 scénarios PostgreSQL Case. |
-| CI | Workflow backend configuré et publié ; son exécution GitHub doit être surveillée à chaque push. |
+| CI | PostgreSQL 16 ajouté au workflow par [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert (lint et 59 tests). |
 
 ## Ce qui est terminé
 
