@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S01-K` — démonstration de bout en bout du scénario M1 : Consultation, DCE, Case, décision et rectificatif sans perte d’historique.
+`S02` — identité, tenant et premier patron ; la prochaine action imposée est la rédaction de `SEC-01` avant toute route authentifiée.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S01-J API Consultation : [`5d488be`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/5d488be), avec route FastAPI APP-01, réponse idempotente et projection RYOW minimale. |
+| Commit | S01-K démonstration M1 : runner intégré Consultation → DCE v1 → Case → Decision Go → rectificatif ; consulter `git log -1` pour le commit courant. |
 | Migration Alembic | `20260813_0004` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **89 tests verts**, dont 3 scénarios API Consultation et un contrôle de frontière HTTP. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert pour S01-J (lint et 89 tests). |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **90 tests verts**, dont le scénario M1 PostgreSQL complet. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; la CI S01-K sera confirmée après publication. |
 
 ## Ce qui est terminé
 
@@ -34,10 +34,11 @@
 - S01-H livré : ports applicatifs sans dépendance ORM, snapshots de persistance neutres, repositories SQLAlchemy tenant-scoped par root, chargement exclusif des entités internes et update atomique protégé par `aggregate_revision`.
 - S01-I livré : dispatcher technique générique, empreinte canonique, replay idempotent, mismatch de clé, rollback avant commit et transaction atomique `root + Domain Event + outbox + receipt` démontrés par `CreateConsultation`.
 - S01-J livré : route FastAPI `POST/GET /api/v1/consultations`, contrat public Pydantic, replay HTTP 200, lecture RYOW tenant-scoped et interface HTTP sans ORM ni import d’infrastructure métier.
+- S01-K livré : runner de démonstration M1 contre PostgreSQL, prouvant Consultation, DCE v1, Case, Decision Go finalisée, DCE rectificatif v2, DCE historique conservé et marquage Case/Decision à revoir sans suppression.
 
 ## Prochaine action unique
 
-Commencer `S01-K` : construire le scénario M1 de démonstration, en ajoutant progressivement les commandes nécessaires pour Consultation → DCE → Case → Decision → rectificatif, puis vérifier l’historique et le replay idempotent.
+Rédiger `SEC-01` : threat model, identité, tenant, RBAC patron/collaborateur, contexte serveur et règles d’audit, avant d’implémenter S02 et toute route authentifiée.
 
 ## Décisions ouvertes
 
@@ -48,8 +49,8 @@ Commencer `S01-K` : construire le scénario M1 de démonstration, en ajoutant pr
 | Repositories applicatifs du premier slice | Livrés | S01-H : un adapter par root, filtrage tenant, snapshots neutres, révision optimiste et CI GitHub verte. |
 | Handlers, dispatcher et outbox transactionnelle | Livrés pour le premier chemin | S01-I : `CreateConsultation` démontre la chaîne complète, validée localement et par CI GitHub ; les commandes suivantes se branchent sur le même dispatcher. |
 | Endpoints APP-01 et projections RYOW minimales | Livrés pour Consultation | S01-J : premier chemin HTTP testé et validé par CI GitHub ; l’authentification réelle est encore différée. |
-| Démonstration métier M1 de bout en bout | À implémenter | S01-K : Consultation → DCE → Case → Decision → rectificatif. |
-| Authentification réelle et bootstrap du premier patron | Différé | Avant le premier endpoint protégé. |
+| Démonstration métier M1 de bout en bout | Livrée | S01-K : scénario PostgreSQL vérifié, historique DCE/Case/Decision conservé après rectificatif. |
+| Identité, tenant, RBAC et bootstrap patron | À concevoir | `SEC-01` obligatoire avant l’implémentation S02 et toute route authentifiée. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 

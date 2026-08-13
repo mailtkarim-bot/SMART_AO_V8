@@ -38,6 +38,7 @@ markers = [
   "schema: validation Pydantic sans dépendance externe",
   "domain: règles pures et invariants",
   "application: handlers, auth, idempotence et résultats",
+  "integration: scénario métier traversant plusieurs roots et adaptateurs",
   "db: PostgreSQL, contraintes et migrations",
   "api: contrats FastAPI",
   "architecture: frontières, imports et ORM",
