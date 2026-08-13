@@ -34,7 +34,7 @@ En cas de différence entre un PDF et son Markdown correspondant, le Markdown do
 | Coder le premier slice | DOMAIN-01 → DOMAIN-03 → APP-01 → TEST-01 → DATA-01 → ARC-01. |
 | Coder une commande collaborateur | Contrat Collaborateur → Matrice vue/action collaborateur → DOMAIN-02 → tests du slice. |
 | Coder une commande patron | Cahier Patron → Contrat patron → Matrice transitions patron → Spécification idempotence. |
-| Préparer la préproduction VPS | Architecture infrastructure → ARC-01 → futurs `SEC-01`, `OPS-01`, `BACKUP-01`, `DEPLOY-01`. |
+| Préparer la préproduction VPS | Architecture infrastructure → ARC-01 → `SEC-01` → futurs `OPS-01`, `BACKUP-01`, `DEPLOY-01`. |
 
 ---
 
@@ -91,6 +91,7 @@ En cas de différence entre un PDF et son Markdown correspondant, le Markdown do
 | DATA-01 persistance et Alembic | [Source Markdown](reference/SMART_AO_V8_DATA_01_MAPPING_PERSISTANCE_ALEMBIC_PREMIER_SLICE.md) | [PDF](pdf/06_implementation/SMART_AO_V8_DATA_01_MAPPING_PERSISTANCE_ALEMBIC_PREMIER_SLICE.pdf) | Tables, contraintes, index, triggers, migrations et règles SQLAlchemy. |
 | ARC-01 arborescence modulaire | [Source Markdown](reference/SMART_AO_V8_ARC_01_CONTRAT_ARBORESCENCE_MODULES.md) | [PDF](pdf/06_implementation/SMART_AO_V8_ARC_01_CONTRAT_ARBORESCENCE_MODULES.pdf) | Structure de dépôt, modules, imports, tests d’architecture et création incrémentale. |
 | Vérifications PostgreSQL idempotentes | Pas de Markdown V8 importé distinct. | [PDF](pdf/06_implementation/VERIFICATIONS_POSTGRESQL_COMMANDES_IDEMPOTENTES_V8.pdf) | Support de contrôle pour les tests DB et la mise en œuvre d’APP-01/DATA-01. |
+| SEC-01 contrat de sécurité, identité, tenant et audit | [Source Markdown](reference/SMART_AO_V8_SEC_01_CONTRAT_SECURITE_IDENTITE_TENANT_AUDIT.md) | Pas de PDF joint distinct. | Threat model, isolation tenant, RBAC/ABAC contextualisé, sessions, MFA, audit et plan de tests préalables à S02. |
 
 ## 8. Architecture et roadmap
 

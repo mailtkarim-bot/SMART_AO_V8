@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant et premier patron ; la prochaine action imposée est la rédaction de `SEC-01` avant toute route authentifiée.
+`S02` — identité, tenant et premier patron ; `SEC-01` est livré. La prochaine action imposée est `S02-A` : contrats de contexte serveur et interfaces de policy, avant toute route authentifiée.
 
 ## Dernier état vert
 
@@ -35,10 +35,11 @@
 - S01-I livré : dispatcher technique générique, empreinte canonique, replay idempotent, mismatch de clé, rollback avant commit et transaction atomique `root + Domain Event + outbox + receipt` démontrés par `CreateConsultation`.
 - S01-J livré : route FastAPI `POST/GET /api/v1/consultations`, contrat public Pydantic, replay HTTP 200, lecture RYOW tenant-scoped et interface HTTP sans ORM ni import d’infrastructure métier.
 - S01-K livré : runner de démonstration M1 contre PostgreSQL, prouvant Consultation, DCE v1, Case, Decision Go finalisée, DCE rectificatif v2, DCE historique conservé et marquage Case/Decision à revoir sans suppression.
+- SEC-01 livré : contrat normatif de sécurité préalable à S02, avec modèle de menace, séparation tenant, identité, sessions, MFA, RBAC/ABAC contextuel, audit append-only, secrets et tests de sécurité.
 
 ## Prochaine action unique
 
-Rédiger `SEC-01` : threat model, identité, tenant, RBAC patron/collaborateur, contexte serveur et règles d’audit, avant d’implémenter S02 et toute route authentifiée.
+Démarrer `S02-A` : définir les types internes `ActorContext`, les interfaces de policy et les erreurs d’autorisation neutres ; écrire leurs tests d’architecture et de schéma avant toute migration d’identité ou route authentifiée.
 
 ## Décisions ouvertes
 
@@ -50,7 +51,8 @@ Rédiger `SEC-01` : threat model, identité, tenant, RBAC patron/collaborateur, 
 | Handlers, dispatcher et outbox transactionnelle | Livrés pour le premier chemin | S01-I : `CreateConsultation` démontre la chaîne complète, validée localement et par CI GitHub ; les commandes suivantes se branchent sur le même dispatcher. |
 | Endpoints APP-01 et projections RYOW minimales | Livrés pour Consultation | S01-J : premier chemin HTTP testé et validé par CI GitHub ; l’authentification réelle est encore différée. |
 | Démonstration métier M1 de bout en bout | Livrée | S01-K : scénario PostgreSQL vérifié, historique DCE/Case/Decision conservé après rectificatif et CI GitHub verte. |
-| Identité, tenant, RBAC et bootstrap patron | À concevoir | `SEC-01` obligatoire avant l’implémentation S02 et toute route authentifiée. |
+| SEC-01 : sécurité, identité, tenant, RBAC et audit | Livré | Contrat normatif validé dans `docs/reference/SMART_AO_V8_SEC_01_CONTRAT_SECURITE_IDENTITE_TENANT_AUDIT.md`. |
+| Identité, tenant, RBAC et bootstrap patron | À implémenter | Démarrage par `S02-A` : `ActorContext`, interfaces de policy et erreurs neutres avant les migrations d’identité. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 
