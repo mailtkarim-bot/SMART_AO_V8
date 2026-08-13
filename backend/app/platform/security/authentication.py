@@ -97,6 +97,7 @@ class LoginResult:
     identity_id: UUID
     membership_id: UUID
     session_id: UUID
+    token_version: int
     refresh_family_id: UUID
     refresh_token_id: UUID
     refresh_token: str
@@ -108,7 +109,9 @@ class LoginResult:
 class RefreshResult:
     """The next refresh value after an atomic one-time rotation."""
 
+    identity_id: UUID
     session_id: UUID
+    token_version: int
     refresh_family_id: UUID
     refresh_token_id: UUID
     refresh_token: str
@@ -212,6 +215,7 @@ class AuthenticationService:
                 identity_id=identity.id,
                 membership_id=membership.id,
                 session_id=auth_session.id,
+                token_version=auth_session.token_version,
                 refresh_family_id=refresh_family.id,
                 refresh_token_id=refresh_token.id,
                 refresh_token=raw_refresh_token,
@@ -332,7 +336,9 @@ class AuthenticationService:
                     session.add(next_token)
 
                     return RefreshResult(
+                        identity_id=auth_session.identity_id,
                         session_id=auth_session.id,
+                        token_version=auth_session.token_version,
                         refresh_family_id=refresh_family.id,
                         refresh_token_id=next_token.id,
                         refresh_token=raw_next_token,

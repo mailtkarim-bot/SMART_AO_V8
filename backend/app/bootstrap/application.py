@@ -14,6 +14,10 @@ from uuid import UUID
 from fastapi import FastAPI
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.interfaces.http.routes.authentication import (
+    AuthenticationHttpRuntime,
+    build_authentication_router,
+)
 from app.interfaces.http.routes.consultations import build_consultation_router
 from app.modules.dce.application.handlers import CreateConsultationHandler
 from app.modules.dce.application.queries import ConsultationProjection
@@ -57,6 +61,7 @@ def create_app(
     *,
     runtime: AppRuntime | None = None,
     command_context_resolver: Callable[[], CommandContext] | None = None,
+    authentication_runtime: AuthenticationHttpRuntime | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="SMART_AO V8",
@@ -68,6 +73,8 @@ def create_app(
     def healthcheck() -> dict[str, str]:
         return {"status": "ok", "service": "smart-ao-v8"}
 
+    if authentication_runtime is not None:
+        app.include_router(build_authentication_router(runtime=authentication_runtime))
     if runtime is not None and command_context_resolver is not None:
         app.include_router(
             build_consultation_router(
