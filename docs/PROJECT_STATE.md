@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | DCE-UPLOAD-01 validé localement et prêt à publier : contrat, migration `0011`, service de quarantaine, client ClamAV, endpoint HTTP, Docker Compose et tests. |
+| Commit | DCE-UPLOAD-01 publié sur `main` : [`38cab9d`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/38cab9d), contrat, migration `0011`, service de quarantaine, client ClamAV, endpoint HTTP, Docker Compose et tests. |
 | Migration Alembic | `20260813_0011` validée : upgrade depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **192 tests verts**, dont flux chunké, hash réel, signature MIME, limites, ClamAV fail-closed, policy HTTP et régressions staging/admission. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7). La CI DCE-UPLOAD-01 sera référencée ici après publication sur `main`. Docker n’est pas disponible dans le sandbox : la syntaxe Compose et l’exécution d’un `clamd` réel seront vérifiées sur le VPS/Docker cible. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow DCE-UPLOAD-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31728128331) est vert (lint et smoke tests). Docker n’est pas disponible dans le sandbox : la syntaxe Compose et l’exécution d’un `clamd` réel seront vérifiées sur le VPS/Docker cible. |
 
 ## Ce qui est terminé
 
