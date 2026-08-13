@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | DCE-ADMIT-HTTP-01 validé localement ; commit et publication GitHub en cours. Le dernier commit publié est DCE-ADMIT-01 sur `main`. |
+| Commit | DCE-ADMIT-HTTP-01 publié sur `main` : route `POST /api/v1/dce-versions` protégée par bearer, capability et policy auditée. |
 | Migration Alembic | `20260813_0009` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **173 tests verts**, incluant DCE-ADMIT-HTTP-01 : bearer, admission patron, replay `201 → 200`, refus collaborateur audité, isolation inter-tenant auditée et rollback HTTP sans effet durable. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub DCE-ADMIT-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31718931615) est vert (lint et 168 tests). |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub DCE-ADMIT-HTTP-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31723871866) est vert (lint et 173 tests). |
 
 ## Ce qui est terminé
 
