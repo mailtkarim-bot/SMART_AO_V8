@@ -95,16 +95,18 @@ def _insert_session(
     session_id = str(uuid4())
     issued_at = datetime.now(tz=UTC)
     expires_at = issued_at + timedelta(hours=8)
+    absolute_expires_at = issued_at + timedelta(hours=24)
     connection.execute(
         sa.text(
             """
             INSERT INTO auth_sessions (
                 id, tenant_id, membership_id, identity_id, state, auth_strength,
-                token_version, issued_at, last_seen_at, expires_at, mfa_verified_at,
-                revoked_at, revoke_reason
+                token_version, issued_at, last_seen_at, expires_at, absolute_expires_at,
+                mfa_verified_at, revoked_at, revoke_reason
             ) VALUES (
                 :id, :tenant_id, :membership_id, :identity_id, :state, 'PASSWORD',
-                1, :issued_at, :issued_at, :expires_at, NULL, :revoked_at, :revoke_reason
+                1, :issued_at, :issued_at, :expires_at, :absolute_expires_at, NULL,
+                :revoked_at, :revoke_reason
             )
             """
         ),
@@ -116,6 +118,7 @@ def _insert_session(
             "state": state,
             "issued_at": issued_at,
             "expires_at": expires_at,
+            "absolute_expires_at": absolute_expires_at,
             "revoked_at": revoked_at,
             "revoke_reason": "LOGOUT" if revoked_at is not None else None,
         },

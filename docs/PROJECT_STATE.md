@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions et MFA ; `SEC-01`, `S02-A`, `S02-B` et `S02-C` sont livrés. La prochaine action imposée est `S02-D` : bootstrap applicatif atomique et connexion, avant toute exposition d’action métier sensible.
+`S02` — identité, tenant, sessions et MFA ; `SEC-01`, `S02-A`, `S02-B`, `S02-C` et le sous-périmètre transactionnel `S02-D` sont livrés. La prochaine action imposée est de compléter `S02-D` par les endpoints HTTP login/logout/refresh et le résolveur de contexte authentifié réel, avant toute exposition d’action métier sensible.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S02-C : [`b83f52a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/b83f52a), sessions, refresh tokens et MFA. |
-| Migration Alembic | `20260813_0006` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **121 tests verts**, dont 11 tests PostgreSQL S02-C de contraintes session, rotation refresh et MFA. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub S02-C](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31702034987) est vert (lint et 121 tests). |
+| Commit | S02-D transactionnel : login/logout/refresh et expiration absolue, publié dans le commit courant après validation locale complète. |
+| Migration Alembic | `20260813_0007` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **129 tests verts**, dont 8 scénarios S02-D couvrant login, refus neutre, rotation, réemploi, logout, suspension et Argon2id. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider S02-D transactionnel après publication. |
 
 ## Ce qui est terminé
 
@@ -39,10 +39,11 @@
 - S02-A livré : `ActorContext` immuable, classification de données, port de policy, policy baseline par défaut refusante, exigence MFA récente, mapping HTTP neutre et tests de frontière sans ORM/framework.
 - S02-B livré : migration `20260813_0005`, tables `Identity`, `PasswordCredential`, `TenantMembership` et tokens bootstrap hashés/expirables, avec contraintes de rôles, états, unicités, Argon2id et patron actif unique.
 - S02-C livré : migration `20260813_0006`, sessions tenant-scoped révocables, familles refresh rotatives, hashes opaques sans token en clair, consommation conditionnelle anti-réemploi, facteurs TOTP chiffrés et recovery codes hashés consommables une seule fois. Les clés composites empêchent les références inter-tenant et les index partiels imposent un seul patron actif, un seul refresh actif par famille et un seul TOTP actif par identité.
+- S02-D transactionnel livré : service sans dépendance HTTP pour login, logout et rotation de refresh ; vérification Argon2id, token opaque généré puis hashé SHA-256, session/famille/premier refresh créés dans une même transaction, réemploi compromettant la famille et révoquant la session, logout idempotent et invalidation après suspension de membership. La migration `20260813_0007` introduit l’expiration absolue des sessions : 8 heures d’inactivité, 24 heures standard et 12 heures pour patron/délégataire.
 
 ## Prochaine action unique
 
-Démarrer `S02-D` : créer les services applicatifs atomiques de bootstrap et de connexion. Le premier chemin devra créer tenant + patron + credential et consommer le token bootstrap dans une transaction ; le chemin de connexion devra vérifier Argon2id, créer Session + famille + premier refresh hashé, puis préparer les endpoints login/logout/refresh et le résolveur de contexte serveur réel.
+Compléter `S02-D` côté interfaces : écrire les contrats Pydantic et les endpoints anonymes neutres login/refresh, l’endpoint authentifié logout, les cookies `HttpOnly`/`Secure`/`SameSite=Lax`, le CSRF des méthodes unsafe et le résolveur de contexte serveur qui vérifie session, membership et identité. Le bootstrap atomique tenant + patron + credential + consommation du token reste un sous-chemin distinct à traiter avant l’onboarding client.
 
 ## Décisions ouvertes
 
@@ -58,7 +59,10 @@ Démarrer `S02-D` : créer les services applicatifs atomiques de bootstrap et de
 | Contrats de contexte et policy S02-A | Livrés | `ActorContext`, `AuthorizationPolicyPort`, policy baseline et erreurs HTTP neutres validés par 10 nouveaux tests. |
 | Persistance identité et membership S02-B | Livrée | Migration `20260813_0005`, contraintes PostgreSQL Identity/Credential/Membership/Bootstrap et 10 tests DB dédiés. |
 | Sessions, refresh tokens et MFA | Livrés | `S02-C` : migration `20260813_0006`, contraintes PostgreSQL de session, rotation/réemploi refresh et facteurs TOTP/recovery. |
-| Bootstrap applicatif et connexion | À implémenter | `S02-D` : transactions de bootstrap et login/logout/refresh, puis résolveur de contexte authentifié réel. |
+| Services transactionnels login/logout/refresh | Livrés | `S02-D` : Argon2id, session/famille/refresh atomiques, rotation, détection du réemploi, logout et invalidation après suspension. |
+| Expiration absolue de session | Livrée | Migration `20260813_0007` : borne absolue distincte de l’inactivité, non extensible pendant refresh. |
+| Interfaces HTTP et contexte authentifié | À implémenter | Suite de `S02-D` : contrats HTTP, cookies, CSRF, routes login/logout/refresh et résolveur de contexte réel. |
+| Bootstrap applicatif tenant + patron | À implémenter | Transaction tenant + patron + credential + token bootstrap consommé avant onboarding client. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 

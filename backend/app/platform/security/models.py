@@ -185,6 +185,8 @@ class AuthSessionRecord(TenantScopedRecord, Base):
         ),
         sa.CheckConstraint("token_version >= 1", name="token_version"),
         sa.CheckConstraint("expires_at > issued_at", name="expiry"),
+        sa.CheckConstraint("absolute_expires_at > issued_at", name="absolute_expiry"),
+        sa.CheckConstraint("expires_at <= absolute_expires_at", name="expiry_bound"),
         sa.CheckConstraint("last_seen_at >= issued_at", name="last_seen"),
         sa.CheckConstraint(
             "(auth_strength = 'PASSWORD' AND mfa_verified_at IS NULL) OR "
@@ -207,6 +209,9 @@ class AuthSessionRecord(TenantScopedRecord, Base):
     issued_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    absolute_expires_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False
+    )
     mfa_verified_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     revoke_reason: Mapped[str | None] = mapped_column(sa.String(64))
