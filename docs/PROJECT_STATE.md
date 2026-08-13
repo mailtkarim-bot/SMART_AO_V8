@@ -1,15 +1,15 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S01-E` — persistance tenant-scoped de `Consultation` et `DceVersion`, deuxième migration DATA-01, avant les repositories Case et Decision.
+`S01-F` — persistance tenant-scoped de `Case`, troisième migration DATA-01, avant la persistance `Decision` et les repositories applicatifs.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S01-D socle de durabilité : tenant, receipts d’idempotence, Domain Events, outbox, Process Inbox et migration Alembic 0001 ; consulter `git log -1` pour le commit courant. |
-| Migration Alembic | `20260813_0001` validée : upgrade, downgrade et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : 45 tests verts, dont 6 scénarios PostgreSQL du socle durable. |
+| Commit | S01-E persistance Consultation/DceVersion : migration 0002, corpus DCE et originaux immuables, clés composites tenant-scoped ; consulter `git log -1` pour le commit courant. |
+| Migration Alembic | `20260813_0002` validée : upgrade, downgrade et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : 52 tests verts, dont 7 scénarios PostgreSQL Consultation/DceVersion. |
 | CI | Workflow backend configuré et publié ; son exécution GitHub doit être surveillée à chaque push. |
 
 ## Ce qui est terminé
@@ -28,17 +28,18 @@
 - S01-B livré : aggregates purs `Consultation` et `DceVersion`, identité acheteur, lots/tranches source, corpus et documents immuables, manques sourcés, retrait, supersession et tests de frontière.
 - S01-C livré : aggregate pur `Decision`, contextes fingerprintés, finalisation patron, Go/Go conditionnel/No-Go, conditions, stale context, revue requise, supersession et tests de frontière.
 - S01-D livré : base SQLAlchemy, tenant minimal, receipts idempotents, Domain Events, outbox, Process Inbox, migration `20260813_0001`, contraintes PostgreSQL et rollback transactionnel prouvés.
+- S01-E livré : modèles et migration `20260813_0002` Consultation/DceVersion, lots/tranches/documents/ancres source, FKs composites tenant-scoped, unicités de corpus et triggers d’immutabilité PostgreSQL.
 
 ## Prochaine action unique
 
-Commencer `S01-E` : écrire les tests rouges PostgreSQL de `Consultation` et `DceVersion`, puis implémenter la migration `20260813_0002_consultation_dce` et leurs modèles SQLAlchemy sans relation mutable vers Case ou Decision.
+Commencer `S01-F` : écrire les tests rouges PostgreSQL de `Case`, puis implémenter la migration `20260813_0003_case` et ses historiques internes sans FK ou relation mutable vers Decision, Pricing, Task ou Submission.
 
 ## Décisions ouvertes
 
 | Sujet | État | Moment de décision |
 |---|---|---|
-| Persistance Consultation/DceVersion DATA-01 | À implémenter | S01-E : migration `20260813_0002` après validation S01-D. |
-| Persistance Case et Decision DATA-01 | Différée | Après S01-E, par migrations séparées `0003` puis `0004`. |
+| Persistance Case DATA-01 | À implémenter | S01-F : migration `20260813_0003` après validation S01-E. |
+| Persistance Decision DATA-01 | Différée | Après S01-F, par migration séparée `20260813_0004`. |
 | Authentification réelle et bootstrap du premier patron | Différé | Avant le premier endpoint protégé. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
