@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S01-K démonstration M1 : runner intégré Consultation → DCE v1 → Case → Decision Go → rectificatif ; consulter `git log -1` pour le commit courant. |
+| Commit | S01-K démonstration M1 : [`a95a9e6`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/a95a9e6), avec runner intégré Consultation → DCE v1 → Case → Decision Go → rectificatif. |
 | Migration Alembic | `20260813_0004` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **90 tests verts**, dont le scénario M1 PostgreSQL complet. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; la CI S01-K sera confirmée après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert pour S01-K (lint et 90 tests). |
 
 ## Ce qui est terminé
 
@@ -49,7 +49,7 @@ Rédiger `SEC-01` : threat model, identité, tenant, RBAC patron/collaborateur, 
 | Repositories applicatifs du premier slice | Livrés | S01-H : un adapter par root, filtrage tenant, snapshots neutres, révision optimiste et CI GitHub verte. |
 | Handlers, dispatcher et outbox transactionnelle | Livrés pour le premier chemin | S01-I : `CreateConsultation` démontre la chaîne complète, validée localement et par CI GitHub ; les commandes suivantes se branchent sur le même dispatcher. |
 | Endpoints APP-01 et projections RYOW minimales | Livrés pour Consultation | S01-J : premier chemin HTTP testé et validé par CI GitHub ; l’authentification réelle est encore différée. |
-| Démonstration métier M1 de bout en bout | Livrée | S01-K : scénario PostgreSQL vérifié, historique DCE/Case/Decision conservé après rectificatif. |
+| Démonstration métier M1 de bout en bout | Livrée | S01-K : scénario PostgreSQL vérifié, historique DCE/Case/Decision conservé après rectificatif et CI GitHub verte. |
 | Identité, tenant, RBAC et bootstrap patron | À concevoir | `SEC-01` obligatoire avant l’implémentation S02 et toute route authentifiée. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
