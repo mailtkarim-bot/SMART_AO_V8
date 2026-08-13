@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | DCE-READ-01 : contrat et route DceVersion sécurisée publiés dans le commit courant après validation locale complète. |
+| Commit | DCE-READ-01 : [`f36873b`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/f36873b), contrat et route DceVersion sécurisée. |
 | Migration Alembic | `20260813_0009` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **164 tests verts**, incluant bearer DCE, réponse métadonnée limitée, refus collaborateur, isolation inter-tenant et audit du refus DCE. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider DCE-READ-01 après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub DCE-READ-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31717459516) est vert (lint et 164 tests). |
 
 ## Ce qui est terminé
 
