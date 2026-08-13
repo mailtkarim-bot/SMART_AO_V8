@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S01-I dispatcher : contrat Pydantic `CreateConsultation`, handler DCE propriétaire, receipt idempotent, Domain Event et outbox transactionnelle ; consulter `git log -1` pour le commit courant. |
+| Commit | S01-I dispatcher : [`932cace`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/932cace), avec contrat Pydantic `CreateConsultation`, handler DCE propriétaire, receipt idempotent, Domain Event et outbox transactionnelle. |
 | Migration Alembic | `20260813_0004` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **85 tests verts**, dont 4 scénarios transactionnels de dispatcher. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; la CI S01-I sera confirmée après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert pour S01-I (lint et 85 tests). |
 
 ## Ce qui est terminé
 
@@ -45,7 +45,7 @@ Commencer `S01-J` : exposer le premier chemin `CreateConsultation` via FastAPI A
 | Persistance Case DATA-01 | Livrée | S01-F : migration `20260813_0003`, validée et publiée. |
 | Persistance Decision DATA-01 | Livrée | S01-G : migration `20260813_0004`, validée localement et par CI GitHub. |
 | Repositories applicatifs du premier slice | Livrés | S01-H : un adapter par root, filtrage tenant, snapshots neutres, révision optimiste et CI GitHub verte. |
-| Handlers, dispatcher et outbox transactionnelle | Livrés pour le premier chemin | S01-I : `CreateConsultation` démontre la chaîne complète ; les commandes suivantes se branchent sur le même dispatcher. |
+| Handlers, dispatcher et outbox transactionnelle | Livrés pour le premier chemin | S01-I : `CreateConsultation` démontre la chaîne complète, validée localement et par CI GitHub ; les commandes suivantes se branchent sur le même dispatcher. |
 | Endpoints APP-01 et projections RYOW minimales | À implémenter | S01-J : avant le scénario complet de démonstration. |
 | Authentification réelle et bootstrap du premier patron | Différé | Avant le premier endpoint protégé. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
