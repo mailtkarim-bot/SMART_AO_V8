@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant et premier patron ; `SEC-01`, `S02-A` et `S02-B` sont livrés. La prochaine action imposée est `S02-C` : sessions révocables, familles de refresh tokens et persistance MFA, avant toute route authentifiée.
+`S02` — identité, tenant, sessions et MFA ; `SEC-01`, `S02-A`, `S02-B` et `S02-C` sont livrés. La prochaine action imposée est `S02-D` : bootstrap applicatif atomique et connexion, avant toute exposition d’action métier sensible.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S02-B : [`20f79e1`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/20f79e1), migration identité, credentials, memberships et bootstrap. |
-| Migration Alembic | `20260813_0005` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **110 tests verts**, dont 10 tests PostgreSQL S02-B de contraintes identité et membership. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub est vert pour S02-B (lint et 110 tests). |
+| Commit | S02-C : sessions, refresh tokens et MFA, publié dans le commit courant après validation locale complète. |
+| Migration Alembic | `20260813_0006` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **121 tests verts**, dont 11 tests PostgreSQL S02-C de contraintes session, rotation refresh et MFA. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider S02-C (lint et 121 tests) après publication. |
 
 ## Ce qui est terminé
 
@@ -38,10 +38,11 @@
 - SEC-01 livré : contrat normatif de sécurité préalable à S02, avec modèle de menace, séparation tenant, identité, sessions, MFA, RBAC/ABAC contextuel, audit append-only, secrets et tests de sécurité.
 - S02-A livré : `ActorContext` immuable, classification de données, port de policy, policy baseline par défaut refusante, exigence MFA récente, mapping HTTP neutre et tests de frontière sans ORM/framework.
 - S02-B livré : migration `20260813_0005`, tables `Identity`, `PasswordCredential`, `TenantMembership` et tokens bootstrap hashés/expirables, avec contraintes de rôles, états, unicités, Argon2id et patron actif unique.
+- S02-C livré : migration `20260813_0006`, sessions tenant-scoped révocables, familles refresh rotatives, hashes opaques sans token en clair, consommation conditionnelle anti-réemploi, facteurs TOTP chiffrés et recovery codes hashés consommables une seule fois. Les clés composites empêchent les références inter-tenant et les index partiels imposent un seul patron actif, un seul refresh actif par famille et un seul TOTP actif par identité.
 
 ## Prochaine action unique
 
-Démarrer `S02-C` : écrire les tests PostgreSQL rouges pour les sessions révocables, familles de refresh tokens et facteurs MFA ; créer ensuite la migration et les modèles, sans encore exposer les endpoints de connexion.
+Démarrer `S02-D` : créer les services applicatifs atomiques de bootstrap et de connexion. Le premier chemin devra créer tenant + patron + credential et consommer le token bootstrap dans une transaction ; le chemin de connexion devra vérifier Argon2id, créer Session + famille + premier refresh hashé, puis préparer les endpoints login/logout/refresh et le résolveur de contexte serveur réel.
 
 ## Décisions ouvertes
 
@@ -56,7 +57,8 @@ Démarrer `S02-C` : écrire les tests PostgreSQL rouges pour les sessions révoc
 | SEC-01 : sécurité, identité, tenant, RBAC et audit | Livré | Contrat normatif validé dans `docs/reference/SMART_AO_V8_SEC_01_CONTRAT_SECURITE_IDENTITE_TENANT_AUDIT.md`. |
 | Contrats de contexte et policy S02-A | Livrés | `ActorContext`, `AuthorizationPolicyPort`, policy baseline et erreurs HTTP neutres validés par 10 nouveaux tests. |
 | Persistance identité et membership S02-B | Livrée | Migration `20260813_0005`, contraintes PostgreSQL Identity/Credential/Membership/Bootstrap et 10 tests DB dédiés. |
-| Sessions, refresh tokens et MFA | À implémenter | `S02-C` : modèles/migration de sessions révocables, refresh rotation et facteurs MFA avant endpoints de connexion. |
+| Sessions, refresh tokens et MFA | Livrés | `S02-C` : migration `20260813_0006`, contraintes PostgreSQL de session, rotation/réemploi refresh et facteurs TOTP/recovery. |
+| Bootstrap applicatif et connexion | À implémenter | `S02-D` : transactions de bootstrap et login/logout/refresh, puis résolveur de contexte authentifié réel. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 
