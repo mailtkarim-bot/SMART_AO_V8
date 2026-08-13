@@ -5,6 +5,7 @@ from logging.config import fileConfig
 from alembic import context
 from app.modules.case.infrastructure.models import case  # noqa: F401
 from app.modules.dce.infrastructure.models import consultation, dce_version  # noqa: F401
+from app.modules.decision.infrastructure.models import decision  # noqa: F401
 from app.platform.persistence import models  # noqa: F401
 from app.platform.persistence.base import Base
 from sqlalchemy import engine_from_config, pool

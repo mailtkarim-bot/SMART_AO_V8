@@ -1,15 +1,15 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S01-G` — persistance tenant-scoped et historique non destructif de `Decision`, quatrième migration DATA-01, avant les repositories applicatifs.
+`S01-H` — repositories applicatifs tenant-scoped de Case, Consultation, DceVersion et Decision, avant les handlers de commandes et l’outbox transactionnelle.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S01-F persistance Case : [`edab4a2`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/edab4a2), avec migration `20260813_0003`, Case tenant-scoped et historiques Consultation/DCE. |
-| Migration Alembic | `20260813_0003` validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **59 tests verts**, dont 7 scénarios PostgreSQL Case. |
+| Commit | S01-G persistance Decision : migration `20260813_0004`, contextes fingerprintés immuables, conditions et supersession tenant-scoped ; consulter `git log -1` pour le commit courant. |
+| Migration Alembic | `20260813_0004` validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **67 tests verts**, dont 8 scénarios PostgreSQL Decision. |
 | CI | PostgreSQL 16 ajouté au workflow par [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert (lint et 59 tests). |
 
 ## Ce qui est terminé
@@ -30,17 +30,19 @@
 - S01-D livré : base SQLAlchemy, tenant minimal, receipts idempotents, Domain Events, outbox, Process Inbox, migration `20260813_0001`, contraintes PostgreSQL et rollback transactionnel prouvés.
 - S01-E livré : modèles et migration `20260813_0002` Consultation/DceVersion, lots/tranches/documents/ancres source, FKs composites tenant-scoped, unicités de corpus et triggers d’immutabilité PostgreSQL.
 - S01-F livré : modèles et migration `20260813_0003` Case, références tenant-scoped Consultation/DCE, unicité de l’identité fonctionnelle active, historiques internes et absence d’ownership mutable vers Decision, Pricing, Task ou Submission.
+- S01-G livré : modèles et migration `20260813_0004` Decision, FKs composites tenant-scoped vers Case et contextes internes, finalisation contrôlée, cycle de supersession, conditions et trigger d’immutabilité des contextes figés.
 
 ## Prochaine action unique
 
-Commencer `S01-G` : écrire les tests rouges PostgreSQL de `Decision`, puis implémenter la migration `20260813_0004_decision` et ses contextes fingerprintés, conditions et supersessions, sans FK mutable vers Case, Pricing ou Submission.
+Commencer `S01-H` : définir les ports applicatifs et implémenter les repositories SQLAlchemy tenant-scoped de Case, Consultation, DceVersion et Decision, avec chargement exclusif de leurs entités internes et garde de révision optimiste.
 
 ## Décisions ouvertes
 
 | Sujet | État | Moment de décision |
 |---|---|---|
 | Persistance Case DATA-01 | Livrée | S01-F : migration `20260813_0003`, validée et publiée. |
-| Persistance Decision DATA-01 | À implémenter | S01-G : migration séparée `20260813_0004` après validation de S01-F. |
+| Persistance Decision DATA-01 | Livrée | S01-G : migration `20260813_0004`, validée localement avant publication. |
+| Repositories applicatifs du premier slice | À implémenter | S01-H : un repository par root, filtrage tenant et révision optimiste. |
 | Authentification réelle et bootstrap du premier patron | Différé | Avant le premier endpoint protégé. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
