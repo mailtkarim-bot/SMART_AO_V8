@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant et premier patron ; `SEC-01` et `S02-A` sont livrés. La prochaine action imposée est `S02-B` : persistance Identity, PasswordCredential, TenantMembership et bootstrap patron, avant toute session ou route authentifiée.
+`S02` — identité, tenant et premier patron ; `SEC-01`, `S02-A` et `S02-B` sont livrés. La prochaine action imposée est `S02-C` : sessions révocables, familles de refresh tokens et persistance MFA, avant toute route authentifiée.
 
 ## Dernier état vert
 
@@ -37,10 +37,11 @@
 - S01-K livré : runner de démonstration M1 contre PostgreSQL, prouvant Consultation, DCE v1, Case, Decision Go finalisée, DCE rectificatif v2, DCE historique conservé et marquage Case/Decision à revoir sans suppression.
 - SEC-01 livré : contrat normatif de sécurité préalable à S02, avec modèle de menace, séparation tenant, identité, sessions, MFA, RBAC/ABAC contextuel, audit append-only, secrets et tests de sécurité.
 - S02-A livré : `ActorContext` immuable, classification de données, port de policy, policy baseline par défaut refusante, exigence MFA récente, mapping HTTP neutre et tests de frontière sans ORM/framework.
+- S02-B livré : migration `20260813_0005`, tables `Identity`, `PasswordCredential`, `TenantMembership` et tokens bootstrap hashés/expirables, avec contraintes de rôles, états, unicités, Argon2id et patron actif unique.
 
 ## Prochaine action unique
 
-Démarrer `S02-B` : écrire les tests PostgreSQL rouges pour `Identity`, `PasswordCredential`, `TenantMembership` et le bootstrap patron à usage unique ; créer ensuite la migration et les modèles sans session navigateur ni route authentifiée.
+Démarrer `S02-C` : écrire les tests PostgreSQL rouges pour les sessions révocables, familles de refresh tokens et facteurs MFA ; créer ensuite la migration et les modèles, sans encore exposer les endpoints de connexion.
 
 ## Décisions ouvertes
 
@@ -54,7 +55,8 @@ Démarrer `S02-B` : écrire les tests PostgreSQL rouges pour `Identity`, `Passwo
 | Démonstration métier M1 de bout en bout | Livrée | S01-K : scénario PostgreSQL vérifié, historique DCE/Case/Decision conservé après rectificatif et CI GitHub verte. |
 | SEC-01 : sécurité, identité, tenant, RBAC et audit | Livré | Contrat normatif validé dans `docs/reference/SMART_AO_V8_SEC_01_CONTRAT_SECURITE_IDENTITE_TENANT_AUDIT.md`. |
 | Contrats de contexte et policy S02-A | Livrés | `ActorContext`, `AuthorizationPolicyPort`, policy baseline et erreurs HTTP neutres validés par 10 nouveaux tests. |
-| Identité, tenant, RBAC et bootstrap patron | À implémenter | `S02-B` : modèles/migration `Identity`, `PasswordCredential`, `TenantMembership` et bootstrap patron avant les sessions. |
+| Persistance identité et membership S02-B | Livrée | Migration `20260813_0005`, contraintes PostgreSQL Identity/Credential/Membership/Bootstrap et 10 tests DB dédiés. |
+| Sessions, refresh tokens et MFA | À implémenter | `S02-C` : modèles/migration de sessions révocables, refresh rotation et facteurs MFA avant endpoints de connexion. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 

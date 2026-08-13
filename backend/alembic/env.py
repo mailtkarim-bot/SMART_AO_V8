@@ -8,6 +8,7 @@ from app.modules.dce.infrastructure.models import consultation, dce_version  # n
 from app.modules.decision.infrastructure.models import decision  # noqa: F401
 from app.platform.persistence import models  # noqa: F401
 from app.platform.persistence.base import Base
+from app.platform.security import models as security_models  # noqa: F401
 from sqlalchemy import engine_from_config, pool
 
 config = context.config

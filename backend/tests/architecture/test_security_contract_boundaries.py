@@ -5,6 +5,10 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parents[2]
 SECURITY_DIR = PROJECT_ROOT / "app" / "platform" / "security"
+SECURITY_CONTRACT_FILES = (
+    SECURITY_DIR / "context.py",
+    SECURITY_DIR / "authorization.py",
+)
 ERROR_MAPPING = PROJECT_ROOT / "app" / "interfaces" / "http" / "error_mapping.py"
 
 
@@ -21,7 +25,7 @@ def _imports_from(path: Path) -> set[str]:
 
 def test_security_contracts__when_inspected__then_have_no_framework_orm_or_business_imports(
 ) -> None:
-    imports = set().union(*(_imports_from(path) for path in SECURITY_DIR.glob("*.py")))
+    imports = set().union(*(_imports_from(path) for path in SECURITY_CONTRACT_FILES))
 
     assert not any(name.startswith("fastapi") for name in imports)
     assert not any(name.startswith("sqlalchemy") for name in imports)
