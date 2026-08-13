@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-Initialisation du dépôt V8 — préparation du slice `Case + Consultation/DceVersion + Decision`.
+`S01-A` — domaine pur de `Case` dans le slice `Case + Consultation/DceVersion + Decision`.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | Initialisation en cours : premier commit à créer. |
+| Commit | `ce76712` — socle V8, contrats de référence et nettoyage des artefacts Python publiés sur `main`. |
 | Migration Alembic | Aucune migration appliquée. DATA-01 définit les quatre premières migrations à écrire avec les modèles SQLAlchemy. |
-| Tests | Test de fumée FastAPI ajouté ; suite métier à écrire selon TEST-01. |
-| CI | Workflow backend configuré, à valider après le premier push. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : 2 tests verts. La suite métier est à écrire selon TEST-01. |
+| CI | Workflow backend configuré et publié ; son exécution GitHub doit être surveillée à chaque push. |
 
 ## Ce qui est terminé
 
@@ -21,7 +21,8 @@ Initialisation du dépôt V8 — préparation du slice `Case + Consultation/DceV
 - TEST-01 : plan pytest de domaine, DB, sécurité, architecture et concurrence.
 - DATA-01 : mapping SQLAlchemy/Alembic attendu.
 - ARC-01 : arborescence modulaire et règles d'import.
-- Dépôt GitHub privé créé ; contrats importés dans `docs/reference/`.
+- Dépôt GitHub privé créé et premier commit publié sur `main`; contrats importés dans `docs/reference/`.
+- ROADMAP-01 ajoutée : ordre global des slices jusqu’à la préproduction VPS.
 
 ## Prochaine action unique
 

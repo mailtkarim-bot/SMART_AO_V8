@@ -5,3 +5,5 @@
 `PROJECT_STATE.md` est le premier fichier à lire pour reprendre le projet. Il doit être actualisé à chaque fin de session ou commit significatif.
 
 `DECISION_LOG.md` consigne les petits arbitrages. Une décision coûteuse, durable ou difficile devient une ADR dans `docs/adr/`.
+
+`ROADMAP_01_PLAN_GLOBAL_CODAGE.md` donne l’ordre global des slices, leurs critères de sortie et les jalons vers la préproduction. Il est lu après `PROJECT_STATE.md`, qui reste la source de l’action immédiate.
