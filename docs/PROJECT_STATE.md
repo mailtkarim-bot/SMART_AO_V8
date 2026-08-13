@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S01-G persistance Decision : migration `20260813_0004`, contextes fingerprintés immuables, conditions et supersession tenant-scoped ; consulter `git log -1` pour le commit courant. |
+| Commit | S01-G persistance Decision : [`76e826d`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/76e826d), avec migration `20260813_0004`, contextes fingerprintés immuables, conditions et supersession tenant-scoped. |
 | Migration Alembic | `20260813_0004` validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **67 tests verts**, dont 8 scénarios PostgreSQL Decision. |
-| CI | PostgreSQL 16 ajouté au workflow par [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert (lint et 59 tests). |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert pour S01-G (lint et 67 tests). |
 
 ## Ce qui est terminé
 
@@ -41,7 +41,7 @@ Commencer `S01-H` : définir les ports applicatifs et implémenter les repositor
 | Sujet | État | Moment de décision |
 |---|---|---|
 | Persistance Case DATA-01 | Livrée | S01-F : migration `20260813_0003`, validée et publiée. |
-| Persistance Decision DATA-01 | Livrée | S01-G : migration `20260813_0004`, validée localement avant publication. |
+| Persistance Decision DATA-01 | Livrée | S01-G : migration `20260813_0004`, validée localement et par CI GitHub. |
 | Repositories applicatifs du premier slice | À implémenter | S01-H : un repository par root, filtrage tenant et révision optimiste. |
 | Authentification réelle et bootstrap du premier patron | Différé | Avant le premier endpoint protégé. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
