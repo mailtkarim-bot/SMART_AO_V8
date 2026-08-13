@@ -1,15 +1,15 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S01-H` — repositories applicatifs tenant-scoped de Case, Consultation, DceVersion et Decision, avant les handlers de commandes et l’outbox transactionnelle.
+`S01-I` — handlers de commandes, idempotence transactionnelle et dispatcher d’événements du premier slice, avant les endpoints FastAPI.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S01-G persistance Decision : [`76e826d`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/76e826d), avec migration `20260813_0004`, contextes fingerprintés immuables, conditions et supersession tenant-scoped. |
-| Migration Alembic | `20260813_0004` validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **67 tests verts**, dont 8 scénarios PostgreSQL Decision. |
+| Commit | S01-H repositories applicatifs : ports sans ORM et adapters SQLAlchemy tenant-scoped de Case, Consultation, DceVersion et Decision ; consulter `git log -1` pour le commit courant. |
+| Migration Alembic | `20260813_0004` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **81 tests verts**, dont 8 scénarios repositories PostgreSQL et 6 contrôles d’architecture. |
 | CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub du 13 août 2026 est vert pour S01-G (lint et 67 tests). |
 
 ## Ce qui est terminé
@@ -31,10 +31,11 @@
 - S01-E livré : modèles et migration `20260813_0002` Consultation/DceVersion, lots/tranches/documents/ancres source, FKs composites tenant-scoped, unicités de corpus et triggers d’immutabilité PostgreSQL.
 - S01-F livré : modèles et migration `20260813_0003` Case, références tenant-scoped Consultation/DCE, unicité de l’identité fonctionnelle active, historiques internes et absence d’ownership mutable vers Decision, Pricing, Task ou Submission.
 - S01-G livré : modèles et migration `20260813_0004` Decision, FKs composites tenant-scoped vers Case et contextes internes, finalisation contrôlée, cycle de supersession, conditions et trigger d’immutabilité des contextes figés.
+- S01-H livré : ports applicatifs sans dépendance ORM, snapshots de persistance neutres, repositories SQLAlchemy tenant-scoped par root, chargement exclusif des entités internes et update atomique protégé par `aggregate_revision`.
 
 ## Prochaine action unique
 
-Commencer `S01-H` : définir les ports applicatifs et implémenter les repositories SQLAlchemy tenant-scoped de Case, Consultation, DceVersion et Decision, avec chargement exclusif de leurs entités internes et garde de révision optimiste.
+Commencer `S01-I` : écrire les tests rouges des handlers de commandes et du dispatcher, puis implémenter l’idempotence, la transaction root + event + outbox + receipt et les premières commandes du slice.
 
 ## Décisions ouvertes
 
@@ -42,7 +43,8 @@ Commencer `S01-H` : définir les ports applicatifs et implémenter les repositor
 |---|---|---|
 | Persistance Case DATA-01 | Livrée | S01-F : migration `20260813_0003`, validée et publiée. |
 | Persistance Decision DATA-01 | Livrée | S01-G : migration `20260813_0004`, validée localement et par CI GitHub. |
-| Repositories applicatifs du premier slice | À implémenter | S01-H : un repository par root, filtrage tenant et révision optimiste. |
+| Repositories applicatifs du premier slice | Livrés | S01-H : un adapter par root, filtrage tenant, snapshots neutres et révision optimiste. |
+| Handlers, dispatcher et outbox transactionnelle | À implémenter | S01-I : avant les endpoints FastAPI et les projections. |
 | Authentification réelle et bootstrap du premier patron | Différé | Avant le premier endpoint protégé. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
