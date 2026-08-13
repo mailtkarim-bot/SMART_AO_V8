@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | S02-C : sessions, refresh tokens et MFA, publié dans le commit courant après validation locale complète. |
+| Commit | S02-C : [`b83f52a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/b83f52a), sessions, refresh tokens et MFA. |
 | Migration Alembic | `20260813_0006` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **121 tests verts**, dont 11 tests PostgreSQL S02-C de contraintes session, rotation refresh et MFA. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider S02-C (lint et 121 tests) après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub S02-C](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31702034987) est vert (lint et 121 tests). |
 
 ## Ce qui est terminé
 
