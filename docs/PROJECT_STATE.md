@@ -1,15 +1,15 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées ; les fondations SEC-01, les lectures Consultation/DCE et l’admission durable DCE sont livrées. La prochaine action est d’exposer l’admission par une route HTTP authentifiée, sans réintroduire de contexte de test.
+`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées ; les fondations SEC-01, les lectures Consultation/DCE ainsi que l’admission atomique DCE par HTTP sont livrées. La prochaine action est de définir le flux de staging sécurisé avant d’exposer tout upload binaire.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | DCE-ADMIT-01 publié sur `main` : admission atomique de la version DCE et de ses pièces pré-stagées. |
+| Commit | DCE-ADMIT-HTTP-01 validé localement ; commit et publication GitHub en cours. Le dernier commit publié est DCE-ADMIT-01 sur `main`. |
 | Migration Alembic | `20260813_0009` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **168 tests verts**, incluant l’admission atomique DCE, son replay idempotent, le refus d’une Consultation stale et le refus d’un manifeste non canonique. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **173 tests verts**, incluant DCE-ADMIT-HTTP-01 : bearer, admission patron, replay `201 → 200`, refus collaborateur audité, isolation inter-tenant auditée et rollback HTTP sans effet durable. |
 | CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub DCE-ADMIT-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31718931615) est vert (lint et 168 tests). |
 
 ## Ce qui est terminé
@@ -47,10 +47,11 @@
 - Routes Consultation authentifiées livrées : `POST` et `GET` n’existent dans l’application composée qu’avec un runtime d’authentification réel. Elles résolvent le bearer en `ActorContext`, adaptent ce contexte serveur en `CommandContext` seulement après capability/policy, conservent l’idempotence et retournent `404 NOT_FOUND_OR_FORBIDDEN` pour une Consultation hors tenant. Le refus est journalisé par la policy auditée.
 - DCE-READ-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_READ_01_CONTRAT.md` et route `GET /api/v1/dce-versions/{id}`. La réponse expose seulement les métadonnées de version autorisées (cycle de vie, intégrité, readiness, dates et références), jamais les documents, stockage, hashes, provenance ni extraits. `dce.prepare`, tenant, policy et audit sont contrôlés côté serveur ; un collaborateur sans `Case` affectée est refusé.
 - DCE-ADMIT-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_ADMIT_01_CONTRAT.md`, commande `RegisterDceVersionCommand` et handler transactionnel. L’admission valide la Consultation et sa révision, l’unicité des IDs et hashes documentaires, ainsi que le `corpus_hash` SHA-256 du manifeste trié, séparé par un caractère LF réel et non par les deux caractères littéraux `\\` et `n`. La transaction écrit dans l’ordre la racine `DceVersion`, les documents, l’événement, l’outbox et le receipt idempotent ; le replay par le même tenant/acteur/commande ne crée aucun doublon.
+- DCE-ADMIT-HTTP-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_ADMIT_HTTP_01_CONTRAT.md` et route `POST /api/v1/dce-versions`. Le bearer est résolu uniquement côté serveur, puis `dce.prepare` et la policy auditée sont appliqués à la Consultation propriétaire avant le dispatcher. Un patron admis reçoit seulement le receipt autorisé ; le replay renvoie `200` sans doublon, un collaborateur sans scope reçoit `403` audité et un autre tenant reçoit `404 NOT_FOUND_OR_FORBIDDEN` audité. Aucun hash, document, provenance, `storage_object_id` ou `storage_key` n’est retourné.
 
 ## Prochaine action unique
 
-Implémenter `POST /api/v1/dce-versions` : bearer réel, capability `dce.prepare`, policy auditée, isolation tenant, dispatch de `RegisterDceVersionCommand`, réponse minimale contenant les références de version et tests HTTP dédiés. L’upload binaire reste explicitement différé : les références de stockage sont pré-stagées.
+Figer DCE-STAGING-01 avant tout upload binaire : contrat d’object storage tenant-scoped, autorisation de staging, antivirus, contrôle de taille/type/hash, durée de rétention, attachement atomique au corpus et non-exposition des clés de stockage. L’admission HTTP actuelle continue de n’accepter que des références pré-stagées.
 
 ## Décisions ouvertes
 
@@ -75,6 +76,7 @@ Implémenter `POST /api/v1/dce-versions` : bearer réel, capability `dce.prepare
 | Routes Consultation authentifiées | Livrées | Bearer résolu côté serveur, capability `consultation.create/read`, policy auditée, isolation tenant et réemploi idempotent préservés. |
 | Lecture DCE sécurisée | Livrée | DCE-READ-01 : route tenant-scoped, `dce.prepare`, réponse de métadonnées minimale et refus audités. |
 | Admission durable DceVersion | Livrée | DCE-ADMIT-01 : contrat, commande, handler transactionnel, manifeste SHA-256 canonique avec séparateur LF réel, persistence racine/documents/événement/outbox/receipt et replay idempotent démontrés par 4 tests DB. |
+| Admission DCE par HTTP sécurisée | Livrée | DCE-ADMIT-HTTP-01 : `POST /api/v1/dce-versions`, bearer réel, `dce.prepare`, policy auditée sur Consultation, isolation tenant, receipt minimal et replay HTTP contrôlé. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 

@@ -1,4 +1,4 @@
-"""Authenticated DCE-READ-01 HTTP transport for DceVersion metadata only."""
+"""Authenticated DCE read and DCE-ADMIT-HTTP-01 transports."""
 
 from __future__ import annotations
 
@@ -6,9 +6,19 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, status
+from fastapi.responses import JSONResponse
 
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
-from app.modules.dce.public.contracts import DceVersionMetadataResponse
+from app.modules.dce.public.contracts import (
+    DceVersionMetadataResponse,
+    RegisterDceVersionRequest,
+    RegisterDceVersionResponse,
+)
+from app.platform.events.dispatcher import (
+    CommandContext,
+    CommandExecutionError,
+    IdempotencyKeyReusedError,
+)
 from app.platform.security.authenticated_context import UnauthenticatedError
 from app.platform.security.authorization import AuthorizationRequest, AuthorizationResource
 from app.platform.security.capabilities import Capability
@@ -20,9 +30,78 @@ def build_dce_version_router(
     runtime,
     security_runtime: ConsultationSecurityRuntime,
 ) -> APIRouter:
-    """Build the metadata-only DceVersion read route defined by DCE-READ-01."""
+    """Build authenticated DceVersion read and admission routes."""
 
     router = APIRouter(prefix="/api/v1/dce-versions", tags=["dce-versions"])
+
+    @router.post(
+        "",
+        status_code=status.HTTP_201_CREATED,
+        response_model=RegisterDceVersionResponse,
+    )
+    def register_dce_version(
+        request: RegisterDceVersionRequest,
+        authorization: str | None = Header(default=None),
+    ) -> RegisterDceVersionResponse:
+        context = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        owner_tenant_id = runtime.get_consultation_tenant_id(
+            consultation_id=request.consultation_id
+        )
+        if owner_tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="NOT_FOUND_OR_FORBIDDEN",
+            )
+        decision = security_runtime.policy.authorize(
+            context=context,
+            request=AuthorizationRequest(
+                action=Capability.DCE_PREPARE,
+                resource=AuthorizationResource(
+                    resource_type="CONSULTATION",
+                    resource_id=request.consultation_id,
+                    tenant_id=owner_tenant_id,
+                    classification=DataClassification.PUBLIC_TENDER,
+                ),
+                evaluated_at=datetime.now(tz=UTC),
+            ),
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=decision.http_status_code, detail=decision.code)
+
+        command_context = CommandContext(
+            tenant_id=str(context.tenant_id),
+            actor_id=str(context.actor_id),
+            actor_kind=context.actor_kind.value,
+            received_at=datetime.now(tz=UTC),
+        )
+        try:
+            result = runtime.dispatcher.dispatch(command=request, context=command_context)
+        except IdempotencyKeyReusedError as error:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="IDEMPOTENCY_KEY_REUSED",
+            ) from error
+        except CommandExecutionError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="COMMAND_REJECTED",
+            ) from error
+
+        response = RegisterDceVersionResponse(
+            command_id=result.command_id,
+            idempotency_key=result.idempotency_key,
+            result_code=result.result_code,
+            aggregate_refs=list(result.aggregate_refs),
+            event_ids=list(result.event_ids),
+            replayed=result.replayed,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_200_OK if result.replayed else status.HTTP_201_CREATED,
+            content=response.model_dump(mode="json"),
+        )
 
     @router.get("/{dce_version_id}", response_model=DceVersionMetadataResponse)
     def get_dce_version(

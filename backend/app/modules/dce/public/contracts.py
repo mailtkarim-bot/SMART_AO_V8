@@ -8,7 +8,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.dce.application.commands import CreateConsultationCommand
+from app.modules.dce.application.commands import (
+    CreateConsultationCommand,
+    RegisterDceVersionCommand,
+)
 
 
 class PublicResponseModel(BaseModel):
@@ -37,6 +40,18 @@ class CreateConsultationResponse(PublicResponseModel):
     aggregate_refs: list[AggregateReferenceResponse]
     event_ids: list[UUID]
     projection: ProjectionStatusResponse
+    replayed: bool = False
+
+
+class RegisterDceVersionResponse(PublicResponseModel):
+    """DCE-ADMIT-HTTP-01 success receipt without document or storage metadata."""
+
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal["DCE_VERSION_REGISTERED"]
+    aggregate_refs: list[AggregateReferenceResponse]
+    event_ids: list[UUID]
     replayed: bool = False
 
 
@@ -69,3 +84,4 @@ class ConsultationProjectionResponse(PublicResponseModel):
 
 
 CreateConsultationRequest = CreateConsultationCommand
+RegisterDceVersionRequest = RegisterDceVersionCommand
