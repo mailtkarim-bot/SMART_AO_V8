@@ -1,12 +1,12 @@
-"""HTTP transport for the first Consultation command and RYOW query."""
+"""Authenticated HTTP transport for Consultation commands and tenant-scoped projections."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from app.modules.dce.public.contracts import (
@@ -19,19 +19,33 @@ from app.platform.events.dispatcher import (
     CommandExecutionError,
     IdempotencyKeyReusedError,
 )
+from app.platform.security.authenticated_context import (
+    AuthenticationContextResolver,
+    UnauthenticatedError,
+)
+from app.platform.security.authorization import (
+    AuthorizationPolicyPort,
+    AuthorizationRequest,
+    AuthorizationResource,
+)
+from app.platform.security.capabilities import Capability
+from app.platform.security.context import ActorContext, DataClassification
 
-if TYPE_CHECKING:
-    from app.bootstrap.application import AppRuntime
 
-CommandContextResolver = Callable[[], CommandContext]
+@dataclass(frozen=True, slots=True)
+class ConsultationSecurityRuntime:
+    """Trusted security dependencies required by every Consultation route."""
+
+    context_resolver: AuthenticationContextResolver
+    policy: AuthorizationPolicyPort
 
 
 def build_consultation_router(
     *,
-    runtime: AppRuntime,
-    command_context_resolver: CommandContextResolver,
+    runtime,
+    security_runtime: ConsultationSecurityRuntime,
 ) -> APIRouter:
-    """Build transport-only routes for the Consultation public contract."""
+    """Build Consultation routes that never accept client-provided authorization facts."""
 
     router = APIRouter(prefix="/api/v1/consultations", tags=["consultations"])
 
@@ -40,10 +54,29 @@ def build_consultation_router(
         status_code=status.HTTP_201_CREATED,
         response_model=CreateConsultationResponse,
     )
-    def create_consultation(request: CreateConsultationRequest) -> CreateConsultationResponse:
-        context = command_context_resolver()
+    def create_consultation(
+        request: CreateConsultationRequest,
+        authorization: str | None = Header(default=None),
+    ) -> CreateConsultationResponse:
+        context = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        _authorize(
+            context=context,
+            policy=security_runtime.policy,
+            action=Capability.CONSULTATION_CREATE,
+            resource_id=request.consultation_id,
+            tenant_id=context.tenant_id,
+        )
+        command_context = CommandContext(
+            tenant_id=str(context.tenant_id),
+            actor_id=str(context.actor_id),
+            actor_kind=context.actor_kind.value,
+            received_at=datetime.now(tz=UTC),
+        )
         try:
-            result = runtime.dispatcher.dispatch(command=request, context=context)
+            result = runtime.dispatcher.dispatch(command=request, context=command_context)
         except IdempotencyKeyReusedError as error:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -70,8 +103,27 @@ def build_consultation_router(
         )
 
     @router.get("/{consultation_id}", response_model=ConsultationProjectionResponse)
-    def get_consultation(consultation_id: UUID) -> ConsultationProjectionResponse:
-        context = command_context_resolver()
+    def get_consultation(
+        consultation_id: UUID,
+        authorization: str | None = Header(default=None),
+    ) -> ConsultationProjectionResponse:
+        context = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        owner_tenant_id = runtime.get_consultation_tenant_id(consultation_id=consultation_id)
+        if owner_tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="NOT_FOUND_OR_FORBIDDEN",
+            )
+        _authorize(
+            context=context,
+            policy=security_runtime.policy,
+            action=Capability.CONSULTATION_READ,
+            resource_id=consultation_id,
+            tenant_id=owner_tenant_id,
+        )
         projection = runtime.get_consultation_projection(
             tenant_id=context.tenant_id,
             consultation_id=consultation_id,
@@ -96,3 +148,47 @@ def build_consultation_router(
         )
 
     return router
+
+
+def _resolve_context(
+    *,
+    authorization: str | None,
+    context_resolver: AuthenticationContextResolver,
+) -> ActorContext:
+    if authorization is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="UNAUTHENTICATED")
+    scheme, _, access_token = authorization.partition(" ")
+    if scheme.casefold() != "bearer" or not access_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="UNAUTHENTICATED")
+    try:
+        return context_resolver.resolve(access_token=access_token)
+    except UnauthenticatedError as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="UNAUTHENTICATED",
+        ) from error
+
+
+def _authorize(
+    *,
+    context: ActorContext,
+    policy: AuthorizationPolicyPort,
+    action: str,
+    resource_id: UUID,
+    tenant_id: UUID,
+) -> None:
+    decision = policy.authorize(
+        context=context,
+        request=AuthorizationRequest(
+            action=action,
+            resource=AuthorizationResource(
+                resource_type="CONSULTATION",
+                resource_id=resource_id,
+                tenant_id=tenant_id,
+                classification=DataClassification.PUBLIC_TENDER,
+            ),
+            evaluated_at=datetime.now(tz=UTC),
+        ),
+    )
+    if not decision.allowed:
+        raise HTTPException(status_code=decision.http_status_code, detail=decision.code)

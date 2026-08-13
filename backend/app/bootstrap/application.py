@@ -7,10 +7,10 @@ transition or directly queries an ORM record from a route.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import FastAPI
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -18,13 +18,19 @@ from app.interfaces.http.routes.authentication import (
     AuthenticationHttpRuntime,
     build_authentication_router,
 )
-from app.interfaces.http.routes.consultations import build_consultation_router
+from app.interfaces.http.routes.consultations import (
+    ConsultationSecurityRuntime,
+    build_consultation_router,
+)
 from app.modules.dce.application.handlers import CreateConsultationHandler
 from app.modules.dce.application.queries import ConsultationProjection
 from app.modules.dce.infrastructure.consultation_projection_reader import (
     SqlAlchemyConsultationProjectionReader,
 )
-from app.platform.events.dispatcher import CommandContext, CommandDispatcher
+from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
+from app.platform.events.dispatcher import CommandDispatcher
+from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
+from app.platform.security.authorization import AuthorizationPolicy
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +50,15 @@ class AppRuntime:
             ),
         )
 
+    def get_consultation_tenant_id(self, *, consultation_id: UUID) -> UUID | None:
+        """Return only the owner tenant needed to authorize a requested Consultation."""
+
+        with self.session_factory() as session:
+            statement = sa.select(ConsultationRecord.tenant_id).where(
+                ConsultationRecord.id == consultation_id
+            )
+            return session.scalar(statement)
+
     def get_consultation_projection(
         self,
         *,
@@ -60,7 +75,6 @@ class AppRuntime:
 def create_app(
     *,
     runtime: AppRuntime | None = None,
-    command_context_resolver: Callable[[], CommandContext] | None = None,
     authentication_runtime: AuthenticationHttpRuntime | None = None,
 ) -> FastAPI:
     app = FastAPI(
@@ -75,11 +89,18 @@ def create_app(
 
     if authentication_runtime is not None:
         app.include_router(build_authentication_router(runtime=authentication_runtime))
-    if runtime is not None and command_context_resolver is not None:
+    if runtime is not None and authentication_runtime is not None:
         app.include_router(
             build_consultation_router(
                 runtime=runtime,
-                command_context_resolver=command_context_resolver,
+                security_runtime=ConsultationSecurityRuntime(
+                    context_resolver=authentication_runtime.context_resolver,
+                    policy=AuditedAuthorizationPolicy(
+                        policy=AuthorizationPolicy(),
+                        session_factory=runtime.session_factory,
+                        writer=SecurityAuditWriter(),
+                    ),
+                ),
             )
         )
     return app

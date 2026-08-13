@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée et audit append-only ; les fondations SEC-01 sont livrées. La prochaine action imposée est de brancher progressivement les routes métier de consultation au contexte authentifié et à la policy serveur.
+`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et première route métier authentifiée ; les fondations SEC-01 et l’intégration Consultation sont livrées. La prochaine action impose d’étendre ce même périmètre aux prochaines routes métier, sans réintroduire de contexte de test.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | Audit append-only : [`8d6aa4e`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/8d6aa4e), modèle, migration, writer et instrumentation d’authentification/policy. |
-| Migration Alembic | `20260813_0009` est validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **160 tests verts**, dont 7 scénarios d’audit de persistance et d’intégration authentification/autorisation. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub audit append-only](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31713939337) est vert (lint et 160 tests). |
+| Commit | Consultation authentifiée : contexte serveur, policy et audit publiés dans le commit courant après validation locale complète. |
+| Migration Alembic | `20260813_0009` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **161 tests verts**, incluant bearer, capability patron, replay idempotent, isolation inter-tenant et audit du refus Consultation. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider le branchement Consultation après publication. |
 
 ## Ce qui est terminé
 
@@ -44,10 +44,11 @@
 - Bootstrap patron livré : provisionnement local de tenant `ACTIVE` et secret d’amorçage aléatoire uniquement hashé avec expiration d’une heure ; complétion créant dans une transaction unique l’identité patron, son credential Argon2id, sa membership `PATRON_ADMIN ACTIVE` et la consommation définitive du secret. Réemploi, expiration, cross-tenant, slug dupliqué et échec de hash n’exposent aucune création partielle.
 - RBAC/ABAC/ReBAC livré : catalogue fermé de capabilities calculées seulement depuis les faits serveur ; policy tenant/classification/MFA/affectation renforcée ; migration `20260813_0008` créant les affectations collaborateur `Case` avec FKs composites tenant-scoped, scope JSONB actions/classifications, dates et unicité de l’affectation active. Le résolveur de contexte authentifié ne lit aucun rôle dans le JWT et injecte seulement les capabilities de la membership et les scopes actifs, filtrés et valides de la base.
 - Audit de sécurité append-only livré : migration `20260813_0009`, vocabulaire d’événements fermé, métadonnées applicatives allow-listées et pseudonymisées, trigger PostgreSQL interdisant `UPDATE` et `DELETE`, writer transactionnel et décorateurs pour login/refresh/logout ainsi que refus de policy. Les tokens, mots de passe, hash Argon2id, cookies, contenu DCE et montants sont refusés par conception du port d’audit.
+- Routes Consultation authentifiées livrées : `POST` et `GET` n’existent dans l’application composée qu’avec un runtime d’authentification réel. Elles résolvent le bearer en `ActorContext`, adaptent ce contexte serveur en `CommandContext` seulement après capability/policy, conservent l’idempotence et retournent `404 NOT_FOUND_OR_FORBIDDEN` pour une Consultation hors tenant. Le refus est journalisé par la policy auditée.
 
 ## Prochaine action unique
 
-Brancher les routes `Consultation` au contexte authentifié réel : remplacer le contexte de test, vérifier tenant/capability/policy avant handler, conserver les réponses neutres hors périmètre et tracer les refus par le décorateur d’audit déjà livré.
+Choisir puis brancher la prochaine route métier sur le même périmètre sécurisé — en priorité une route DCE ou Case déjà spécifiée — avec bearer, tenant, capability, policy, refus neutre et audit, sans dupliquer la mécanique Consultation.
 
 ## Décisions ouvertes
 
@@ -69,7 +70,8 @@ Brancher les routes `Consultation` au contexte authentifié réel : remplacer le
 | Bootstrap applicatif tenant + patron | Livré | Service local atomique : tenant + identité + credential Argon2id + membership patron + token consommé, sans secret persistant. |
 | Policy RBAC/ABAC/ReBAC et première affectation | Livré | Catalogue de capabilities calculé côté serveur, policy classification/scope et table `case_assignments` tenant-scoped injectée dans le contexte authentifié. |
 | Audit de sécurité append-only | Livré | Migration `20260813_0009`, vocabulaire fermé, métadonnées minimisées, trigger append-only et instrumentation auth/policy. |
-| Routes métier authentifiées | À implémenter | Brancher d’abord les routes Consultation sur le contexte, capabilities, policy et audit réels sans modifier les frontières métier. |
+| Routes Consultation authentifiées | Livrées | Bearer résolu côté serveur, capability `consultation.create/read`, policy auditée, isolation tenant et réemploi idempotent préservés. |
+| Prochaines routes métier authentifiées | À implémenter | Réutiliser le même périmètre pour DCE ou Case, sans voie de contexte de test ni claims JWT d’autorisation. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 

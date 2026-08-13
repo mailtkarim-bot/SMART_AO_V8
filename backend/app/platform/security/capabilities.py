@@ -11,6 +11,7 @@ from .context import ActorKind
 class Capability(StrEnum):
     """Stable action names recognized by the first authorization perimeter."""
 
+    CONSULTATION_CREATE = "consultation.create"
     CONSULTATION_READ = "consultation.read"
     DCE_PREPARE = "dce.prepare"
     DOCUMENT_ADMIN_READ = "document.administrative.read"
@@ -28,6 +29,7 @@ class Capability(StrEnum):
 
 _PATRON_ADMIN_CAPABILITIES = frozenset(
     {
+        Capability.CONSULTATION_CREATE,
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
         Capability.DOCUMENT_ADMIN_READ,

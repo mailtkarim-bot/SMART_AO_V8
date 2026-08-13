@@ -11,7 +11,12 @@ from alembic.config import Config
 from app.bootstrap.application import AppRuntime, create_app
 from app.interfaces.http.routes.authentication import AuthenticationHttpRuntime
 from app.platform.security.authentication import AuthenticationService
-from app.platform.security.models import AuthSessionRecord, IdentityRecord, TenantMembershipRecord
+from app.platform.security.models import (
+    AuthSessionRecord,
+    IdentityRecord,
+    SecurityAuditEventRecord,
+    TenantMembershipRecord,
+)
 from app.platform.security.tokens import JwtAccessTokenCodec
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
@@ -61,7 +66,11 @@ def isolate_consultation_records(database_engine: sa.Engine) -> None:
         connection.execute(sa.text("TRUNCATE TABLE tenants, identities CASCADE"))
 
 
-def _seed_patron(engine: sa.Engine) -> tuple[UUID, UUID]:
+def _seed_principal(
+    engine: sa.Engine,
+    *,
+    role: str = "PATRON_ADMIN",
+) -> tuple[UUID, UUID, UUID, UUID]:
     tenant_id = uuid4()
     identity_id = uuid4()
     membership_id = uuid4()
@@ -74,7 +83,7 @@ def _seed_patron(engine: sa.Engine) -> tuple[UUID, UUID]:
         connection.execute(
             sa.insert(IdentityRecord).values(
                 id=identity_id,
-                email_normalized=f"patron-{identity_id}@example.test",
+                email_normalized=f"user-{identity_id}@example.test",
                 lifecycle="ACTIVE",
                 email_verified_at=NOW,
             )
@@ -84,7 +93,7 @@ def _seed_patron(engine: sa.Engine) -> tuple[UUID, UUID]:
                 id=membership_id,
                 tenant_id=tenant_id,
                 identity_id=identity_id,
-                role="PATRON_ADMIN",
+                role=role,
                 state="ACTIVE",
                 activated_at=NOW,
                 revoked_at=None,
@@ -108,7 +117,7 @@ def _seed_patron(engine: sa.Engine) -> tuple[UUID, UUID]:
                 revoke_reason=None,
             )
         )
-    return identity_id, auth_session_id
+    return tenant_id, identity_id, membership_id, auth_session_id
 
 
 def _client(session_factory: sessionmaker[Session]) -> tuple[TestClient, JwtAccessTokenCodec]:
@@ -131,11 +140,16 @@ def _client(session_factory: sessionmaker[Session]) -> tuple[TestClient, JwtAcce
         csrf_token_generator=UnusedTokenGenerator(),
         clock=clock,
     )
-    app = create_app(
-        runtime=AppRuntime.create(session_factory=session_factory),
-        authentication_runtime=authentication_runtime,
+    return (
+        TestClient(
+            create_app(
+                runtime=AppRuntime.create(session_factory=session_factory),
+                authentication_runtime=authentication_runtime,
+            ),
+            base_url="https://smart-ao.test",
+        ),
+        access_tokens,
     )
-    return TestClient(app, base_url="https://smart-ao.test"), access_tokens
 
 
 def _headers(
@@ -168,23 +182,81 @@ def _payload() -> dict[str, str]:
 @pytest.mark.api
 @pytest.mark.db
 @pytest.mark.security
-def test_create_consultation_replay_returns_saved_success_with_authenticated_patron(
+def test_consultation_routes_require_server_resolved_bearer_context(
     database_engine: sa.Engine,
     session_factory: sessionmaker[Session],
 ) -> None:
-    identity_id, auth_session_id = _seed_patron(database_engine)
+    _seed_principal(database_engine)
+    client, _ = _client(session_factory)
+
+    response = client.post("/api/v1/consultations", json=_payload())
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "UNAUTHENTICATED"
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_can_create_and_read_consultation_with_authenticated_context(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, identity_id, _, auth_session_id = _seed_principal(database_engine)
     client, access_tokens = _client(session_factory)
     payload = _payload()
-    headers = _headers(
+    headers = _headers(access_tokens, identity_id=identity_id, session_id=auth_session_id)
+
+    created = client.post("/api/v1/consultations", json=payload, headers=headers)
+    read = client.get(f"/api/v1/consultations/{payload['consultation_id']}", headers=headers)
+
+    assert created.status_code == 201
+    assert read.status_code == 200
+    assert read.json()["id"] == payload["consultation_id"]
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_cross_tenant_consultation_read_is_neutral_and_audited(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, owner_identity_id, _, owner_session_id = _seed_principal(database_engine)
+    _, other_identity_id, _, other_session_id = _seed_principal(database_engine)
+    client, access_tokens = _client(session_factory)
+    payload = _payload()
+    owner_headers = _headers(
         access_tokens,
-        identity_id=identity_id,
-        session_id=auth_session_id,
+        identity_id=owner_identity_id,
+        session_id=owner_session_id,
+    )
+    other_headers = _headers(
+        access_tokens,
+        identity_id=other_identity_id,
+        session_id=other_session_id,
     )
 
-    first = client.post("/api/v1/consultations", json=payload, headers=headers)
-    replay = client.post("/api/v1/consultations", json=payload, headers=headers)
+    created = client.post(
+        "/api/v1/consultations",
+        json=payload,
+        headers=owner_headers,
+    )
+    assert created.status_code == 201
+    response = client.get(
+        f"/api/v1/consultations/{payload['consultation_id']}",
+        headers=other_headers,
+    )
 
-    assert first.status_code == 201
-    assert replay.status_code == 200
-    assert replay.json()["replayed"] is True
-    assert replay.json()["event_ids"] == first.json()["event_ids"]
+    assert response.status_code == 404
+    assert response.json()["detail"] == "NOT_FOUND_OR_FORBIDDEN"
+    with Session(database_engine) as session:
+        audit_event = session.scalar(
+            sa.select(SecurityAuditEventRecord)
+            .where(SecurityAuditEventRecord.event_type == "AUTHZ_DENIED")
+            .order_by(SecurityAuditEventRecord.occurred_at.desc())
+        )
+    assert audit_event is not None
+    assert audit_event.actor_id == other_identity_id
+    assert audit_event.resource_id == UUID(payload["consultation_id"])
+    assert audit_event.reason_code == "NOT_FOUND_OR_FORBIDDEN"
