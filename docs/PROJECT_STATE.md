@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | Consultation authentifiée : contexte serveur, policy et audit publiés dans le commit courant après validation locale complète. |
+| Commit | Consultation authentifiée : [`7346765`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/7346765), contexte serveur, policy et audit. |
 | Migration Alembic | `20260813_0009` reste validée : upgrade depuis `base`, downgrade vers `base` et `alembic check` sur PostgreSQL local sont verts. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **161 tests verts**, incluant bearer, capability patron, replay idempotent, isolation inter-tenant et audit du refus Consultation. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le workflow GitHub doit valider le branchement Consultation après publication. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow GitHub Consultation authentifiée](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31715518276) est vert (lint et 161 tests). |
 
 ## Ce qui est terminé
 
