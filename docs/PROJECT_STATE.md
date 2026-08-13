@@ -7,10 +7,10 @@
 
 | Élément | État |
 |---|---|
-| Commit | DCE-STAGING-01 validé localement et prêt à publier : contrat, registre durable, migration `0010`, routes et tests. |
+| Commit | DCE-STAGING-01 publié sur `main` : [`9a7d43e`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/9a7d43e), contrat, registre durable, migration `0010`, routes et tests. |
 | Migration Alembic | `20260813_0010` validée : upgrade depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Tests | `ruff check` vert ; `pytest backend/tests -q` : **183 tests verts**, dont staging, admission DCE reliée aux objets `CLEAN`, sécurité HTTP et régressions M1/repositories. |
-| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7). La CI DCE-STAGING-01 sera référencée ici après publication sur `main`. |
+| CI | PostgreSQL 16 est exécuté dans CI depuis [`e61cdb7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e61cdb7) ; le [workflow DCE-STAGING-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31725927491) est vert (lint et smoke tests). |
 
 ## Ce qui est terminé
 
