@@ -1,15 +1,15 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S01-B` — domaine pur de `Consultation` et `DceVersion` dans le slice `Case + Consultation/DceVersion + Decision`.
+`S01-C` — domaine pur de `Decision` dans le slice `Case + Consultation/DceVersion + Decision`.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | S01-A domaine pur de Case : création, scope explicite, référence tenant et frontière d’ownership ; consulter `git log -1` pour le commit courant. |
+| Commit | S01-B domaine pur de Consultation/DceVersion : identité, lots/tranches, corpus immuable, retrait et supersession ; consulter `git log -1` pour le commit courant. |
 | Migration Alembic | Aucune migration appliquée. DATA-01 définit les quatre premières migrations à écrire avec les modèles SQLAlchemy, après les roots de domaine purs. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : 11 tests verts. Domain Case et frontière d’architecture couverts. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : 26 tests verts. Domain Case, Consultation/DceVersion et frontières d’architecture couverts. |
 | CI | Workflow backend configuré et publié ; son exécution GitHub doit être surveillée à chaque push. |
 
 ## Ce qui est terminé
@@ -25,10 +25,11 @@
 - ROADMAP-01 ajoutée : ordre global des slices jusqu’à la préproduction VPS.
 - Documentation consolidée : PDF classés dans `docs/pdf/`, sources Markdown V8 importées dans `docs/reference/` et navigation centralisée dans `DOCUMENTATION_CATALOG.md`.
 - S01-A livré : aggregate `Case` pur, `CaseScope`, origine manuelle justifiée, références tenant-scoped, événements minimaux et tests `CASE-01` à `CASE-04`/ownership.
+- S01-B livré : aggregates purs `Consultation` et `DceVersion`, identité acheteur, lots/tranches source, corpus et documents immuables, manques sourcés, retrait, supersession et tests de frontière.
 
 ## Prochaine action unique
 
-Commencer `S01-B` : écrire les tests rouges purs de `Consultation` et `DceVersion` (identité, lots/tranches, corpus immuable, hash, retrait et supersession), conformément à DOMAIN-03 et TEST-01.
+Commencer `S01-C` : écrire les tests rouges purs de `Decision` (brouillon, contexte figé, Go/Go conditionnel/No-Go, conditions, contexte obsolète et supersession), conformément à DOMAIN-03 et TEST-01.
 
 ## Décisions ouvertes
 
