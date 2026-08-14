@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`CASE-DCE-READ-01-C` — validé localement, publication en cours. Cet incrément expose `GET /api/v1/cases/{case_id}/dce-reading` derrière bearer réel, `case.dce.read` et la policy SEC-01 auditée. Le transport n’accepte aucune DCE choisie par le client ; il résout la Case, son tenant et sa projection B côté serveur. Sa réponse Pydantic est fermée : elle n’expose que les états DCE, exigences, confirmations courantes, compteurs et locators bornés, jamais stockage, contenu, hash, provenance privée, audit, prix, marge ou décision patron.
+`CASE-DCE-READ-01-C` — publié sur `main` et CI GitHub verte. Cet incrément expose `GET /api/v1/cases/{case_id}/dce-reading` derrière bearer réel, `case.dce.read` et la policy SEC-01 auditée. Le transport n’accepte aucune DCE choisie par le client ; il résout la Case, son tenant et sa projection B côté serveur. Sa réponse Pydantic est fermée : elle n’expose que les états DCE, exigences, confirmations courantes, compteurs et locators bornés, jamais stockage, contenu, hash, provenance privée, audit, prix, marge ou décision patron.
 
 ## Dernier état vert
 
@@ -12,7 +12,7 @@
 | Migration Alembic | `20260814_0017` et `20260814_0018` validées : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Tests | `uv run ruff check .` vert ; `uv run pytest backend/tests -q` : **230 tests verts**. CASE-DCE-READ-01-C couvre bearer obligatoire, lecture patron, collaborateur affecté avec action autorisée, scope actif sans action refusé, absence d’affectation refusée et auditée, tenant étranger neutre et audité, Case sans DCE à `422` et absence de champs interdits dans le JSON. CASE-DCE-READ-01-B couvre la projection tenant-scopée fermée. |
-| CI | [Workflow GitHub vert #31811464630](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31811464630) : lint, secrets, audit dépendances, Bandit et **224 tests PostgreSQL** sont passés. Le job image a confirmé l’absence de Dockerfile; build et scan Trivy restent explicitement non applicables jusqu’à l’introduction d’un artefact conteneur. |
+| CI | [Workflow GitHub vert #31813762176](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31813762176) : lint, secrets, audit dépendances, Bandit et **230 tests PostgreSQL** sont passés. Le job image a confirmé l’absence de Dockerfile; build et scan Trivy restent explicitement non applicables jusqu’à l’introduction d’un artefact conteneur. |
 
 ## Ce qui est terminé
 
@@ -62,7 +62,7 @@
 
 ## Prochaine action unique
 
-Publier CASE-DCE-READ-01-C, puis ouvrir le premier incrément Web : initialiser le frontend React et afficher, pour une Case déjà autorisée, la lecture DCE fermée sans aucun écran financier ni téléchargement de document.
+Ouvrir le premier incrément Web : initialiser le frontend React et afficher, pour une Case déjà autorisée, la lecture DCE fermée sans aucun écran financier ni téléchargement de document.
 
 ## Décisions ouvertes
 
