@@ -12,6 +12,7 @@ from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.commands import (
     AmendCaseAssignmentScopeCommand,
     CreateCaseAssignmentCommand,
+    SuspendCaseAssignmentCommand,
 )
 from app.modules.membership.application.patron_assignment import (
     PatronAssignmentManagementService,
@@ -215,6 +216,22 @@ def _amend_command(
         scope_actions=scope_actions
         or [Capability.CASE_DCE_READ.value, Capability.PREPARATION_TRANSMIT.value],
         scope_classifications=["INTERNAL_OPERATIONAL"],
+    )
+
+
+def _suspend_command(
+    assignment_id: UUID,
+    *,
+    expected_revision: int = 0,
+    reason: str = "CASE_PAUSED",
+) -> SuspendCaseAssignmentCommand:
+    return SuspendCaseAssignmentCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        assignment_id=assignment_id,
+        expected_revision=expected_revision,
+        suspension_reason_code=reason,
     )
 
 
@@ -491,3 +508,109 @@ def test_patron_amends_suspended_assignment_without_reactivating_it(session_fact
     assert assignment is not None
     assert assignment.state == "SUSPENDED"
     assert assignment.aggregate_revision == 1
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_suspension_writes_revisioned_append_only_change_and_outbox(session_factory) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id)
+    service.create(actor=actor, command=creation, now=NOW)
+    suspension = _suspend_command(creation.assignment_id)
+
+    result = service.suspend(actor=actor, command=suspension, now=NOW)
+
+    assert result.result_code == "CASE_ASSIGNMENT_SUSPENDED"
+    with session_factory() as session:
+        assignment = session.get(CaseAssignmentRecord, creation.assignment_id)
+        change = session.scalar(
+            sa.select(CaseAssignmentChangeEventRecord).where(
+                CaseAssignmentChangeEventRecord.assignment_id == creation.assignment_id,
+                CaseAssignmentChangeEventRecord.event_type == "ASSIGNMENT_SUSPENDED",
+            )
+        )
+        events = list(session.scalars(sa.select(DomainEventRecord)))
+        outbox = list(session.scalars(sa.select(OutboxMessageRecord)))
+    assert assignment is not None
+    assert assignment.state == "SUSPENDED"
+    assert assignment.aggregate_revision == 1
+    assert assignment.scope_actions_json == [
+        Capability.ASSIGNMENT_HISTORY_READ.value,
+        Capability.CASE_DCE_READ.value,
+    ]
+    assert change is not None
+    assert change.previous_revision == 0
+    assert change.resulting_revision == 1
+    assert change.previous_state == "ACTIVE"
+    assert change.resulting_state == "SUSPENDED"
+    assert change.reason_code == "CASE_PAUSED"
+    assert change.previous_scope_actions_json == change.resulting_scope_actions_json
+    assert len(events) == 2
+    assert events[-1].event_type == "CaseAssignmentSuspended"
+    assert len(outbox) == 2
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_suspension_replay_and_invalid_transition_have_no_extra_write(
+    session_factory,
+) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id)
+    service.create(actor=actor, command=creation, now=NOW)
+    suspension = _suspend_command(creation.assignment_id)
+
+    first = service.suspend(actor=actor, command=suspension, now=NOW)
+    replay = service.suspend(actor=actor, command=suspension, now=NOW)
+    with pytest.raises(Exception, match="ASSIGNMENT_NOT_ACTIVE"):
+        service.suspend(
+            actor=actor,
+            command=_suspend_command(creation.assignment_id, expected_revision=1),
+            now=NOW,
+        )
+
+    assert first.result_code == "CASE_ASSIGNMENT_SUSPENDED"
+    assert replay.replayed is True
+    with session_factory() as session:
+        assert session.scalar(
+            sa.select(sa.func.count()).select_from(CaseAssignmentChangeEventRecord)
+        ) == 2
+        assert session.scalar(sa.select(sa.func.count()).select_from(DomainEventRecord)) == 2
+        assert session.scalar(sa.select(sa.func.count()).select_from(OutboxMessageRecord)) == 2
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_suspension_rejects_stale_revision_and_non_patron(session_factory) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id)
+    service.create(actor=actor, command=creation, now=NOW)
+    with pytest.raises(Exception, match="VERSION_CONFLICT"):
+        service.suspend(
+            actor=actor,
+            command=_suspend_command(creation.assignment_id, expected_revision=1),
+            now=NOW,
+        )
+    collaborator = replace(
+        actor,
+        actor_kind=ActorKind.COLLABORATEUR,
+        capabilities=capabilities_for(ActorKind.COLLABORATEUR),
+    )
+    with pytest.raises(PermissionError, match="ASSIGNMENT_PATRON_REQUIRED"):
+        service.suspend(
+            actor=collaborator,
+            command=_suspend_command(creation.assignment_id),
+            now=NOW,
+        )
+
+    with session_factory() as session:
+        assignment = session.get(CaseAssignmentRecord, creation.assignment_id)
+        assert assignment is not None
+        assert assignment.state == "ACTIVE"
+        assert assignment.aggregate_revision == 0
+        assert session.scalar(
+            sa.select(sa.func.count()).select_from(CaseAssignmentChangeEventRecord)
+        ) == 1

@@ -887,3 +887,93 @@ def test_patron_assignment_scope_payload_is_closed(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_suspension_returns_closed_receipt_and_replays(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    creation_payload = _patron_create_payload(target_membership_id)
+    creation = client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+    assignment_id = UUID(creation_payload["assignment_id"])
+    suspension_payload = {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "expected_revision": 0,
+        "suspension_reason_code": "CASE_PAUSED",
+    }
+
+    suspension = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/suspensions",
+        json=suspension_payload,
+        headers=headers,
+    )
+    replay = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/suspensions",
+        json=suspension_payload,
+        headers=headers,
+    )
+
+    assert creation.status_code == 201
+    assert suspension.status_code == 201
+    assert replay.status_code == 200
+    assert suspension.json()["result_code"] == "CASE_ASSIGNMENT_SUSPENDED"
+    assert replay.json()["replayed"] is True
+    prohibited = {"tenant_id", "target_membership_id", "suspension_reason_code"}
+    assert not prohibited.intersection(suspension.json())
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_suspension_requires_closed_reason(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    creation_payload = _patron_create_payload(target_membership_id)
+    client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+
+    response = client.post(
+        f"/api/v1/patron/assignments/{creation_payload['assignment_id']}/suspensions",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "expected_revision": 0,
+            "suspension_reason_code": "FINANCIAL_APPROVAL",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 422

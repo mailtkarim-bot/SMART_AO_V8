@@ -582,6 +582,24 @@ class AmendCaseAssignmentScopeCommand(AssignmentScopeCommand):
     expected_revision: int = Field(ge=0)
 
 
+SuspensionReasonCode = Literal[
+    "PATRON_SUSPENDED",
+    "WORKLOAD_REALLOCATION",
+    "CASE_PAUSED",
+    "ACCESS_REVIEW",
+]
+
+
+class SuspendCaseAssignmentCommand(ApplicationCommand):
+    """Suspend one active patron-owned assignment with a closed operational reason."""
+
+    command_type = "SuspendCaseAssignment"
+
+    assignment_id: UUID
+    expected_revision: int = Field(ge=0)
+    suspension_reason_code: SuspensionReasonCode
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

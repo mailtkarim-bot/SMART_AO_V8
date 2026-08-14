@@ -19,6 +19,8 @@ from app.modules.dce.application.commands import (
     RegisterDceVersionCommand,
     ReportAssignmentUnavailabilityCommand,
     RequestAssignmentClarificationCommand,
+    SuspendCaseAssignmentCommand,
+    SuspensionReasonCode,
 )
 
 
@@ -275,6 +277,7 @@ class AssignmentCommandResponse(PublicResponseModel):
         "ASSIGNMENT_UNAVAILABILITY_REPORTED",
         "CASE_ASSIGNMENT_CREATED",
         "CASE_ASSIGNMENT_SCOPE_AMENDED",
+        "CASE_ASSIGNMENT_SUSPENDED",
     ]
     aggregate_refs: list[AggregateReferenceResponse]
     event_ids: list[UUID]
@@ -326,6 +329,17 @@ class AmendPatronAssignmentScopeRequest(PatronAssignmentScopeRequest):
 
     def to_command(self, *, assignment_id: UUID) -> AmendCaseAssignmentScopeCommand:
         return AmendCaseAssignmentScopeCommand(**self.model_dump(), assignment_id=assignment_id)
+
+
+class SuspendPatronCaseAssignmentRequest(PublicRequestModel):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    expected_revision: int = Field(ge=0)
+    suspension_reason_code: SuspensionReasonCode
+
+    def to_command(self, *, assignment_id: UUID) -> SuspendCaseAssignmentCommand:
+        return SuspendCaseAssignmentCommand(**self.model_dump(), assignment_id=assignment_id)
 
 
 class RecordDceRequirementConfirmationRequest(PublicResponseModel):

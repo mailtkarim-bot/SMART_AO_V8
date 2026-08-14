@@ -69,4 +69,11 @@
 - [x] Vérifier l’upgrade/check/downgrade de la migration `20260814_0021` et mesurer les insertions/lectures du journal append-only avec un seuil explicitement documenté.
 - [x] Créer les routes HTTP patron uniquement pour `CreateCaseAssignment` et `AmendCaseAssignmentScope`, avec bearer réel, policy auditée, DTO fermés et OpenAPI vérifiée.
 - [x] Publier un amendement normatif et une migration additive `0022` pour lever le check historique incompatible avec les fenêtres d’affectation futures.
+- [x] Auditer le contrat patron publié, la machine d’état, le journal append-only, les routes patron et les conventions de migration applicables à `SuspendCaseAssignment`.
+- [x] Figer le contrat incrémental `PATRON-ASSIGNMENT-SUSPEND-01`, incluant les raisons fermées, l’état suspendu, la reprise, l’audit, l’idempotence et les non-fuites.
+- [x] Mettre à jour le registre et le snapshot OpenAPI avec la route de suspension, ses DTO fermés, ses statuts et ses erreurs publiques.
+- [x] Implémenter `SuspendCaseAssignment`, son journal append-only, son événement, son outbox, son receipt et vérifier qu’aucune migration additive n’est requise.
+- [x] Écrire les tests PostgreSQL et API de suspension : révision, rejeu, état, raisons, tenant, role, journal et absence de fuite.
+- [x] Mesurer le chemin append-only de suspension avec un seuil local de non-régression et confirmer le cycle Alembic jusqu’à la tête `0022`.
+- [ ] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de suspension.
 - [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub de l’incrément patron 2 (commit `5054416`, workflow `31844799829` vert).

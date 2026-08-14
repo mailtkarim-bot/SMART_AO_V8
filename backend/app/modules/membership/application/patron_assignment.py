@@ -14,6 +14,7 @@ from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.commands import (
     AmendCaseAssignmentScopeCommand,
     CreateCaseAssignmentCommand,
+    SuspendCaseAssignmentCommand,
 )
 from app.platform.events.dispatcher import (
     CommandContext,
@@ -138,6 +139,39 @@ class PatronAssignmentManagementService:
             raise PermissionError(decision.code)
         return self._dispatch(actor=actor, command=command, case_id=assignment.case_id, now=now)
 
+    def suspend(
+        self,
+        *,
+        actor: ActorContext,
+        command: SuspendCaseAssignmentCommand,
+        now: datetime,
+    ) -> DispatchResult:
+        self._require_patron(
+            actor=actor,
+            command=command,
+            now=now,
+            resource_type="CASE_ASSIGNMENT",
+            resource_id=command.assignment_id,
+            case_id=None,
+        )
+        assignment = self._resolve_assignment(
+            tenant_id=actor.tenant_id,
+            assignment_id=command.assignment_id,
+        )
+        if assignment is None:
+            self._record_manual_denial(
+                actor=actor,
+                command=command,
+                now=now,
+                reason_code="NOT_FOUND_OR_FORBIDDEN",
+                resource_type="CASE_ASSIGNMENT",
+                resource_id=command.assignment_id,
+                case_id=None,
+            )
+            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+        self._authorize_assignment_management(actor=actor, assignment=assignment, now=now)
+        return self._dispatch(actor=actor, command=command, case_id=assignment.case_id, now=now)
+
     def _dispatch(
         self,
         *,
@@ -211,6 +245,30 @@ class PatronAssignmentManagementService:
                     tenant_id=actor.tenant_id,
                     classification=DataClassification.INTERNAL_OPERATIONAL,
                     case_id=case.id,
+                ),
+                evaluated_at=now,
+            ),
+        )
+        if not decision.allowed:
+            raise PermissionError(decision.code)
+
+    def _authorize_assignment_management(
+        self,
+        *,
+        actor: ActorContext,
+        assignment: CaseAssignmentRecord,
+        now: datetime,
+    ) -> None:
+        decision = self._policy.authorize(
+            context=actor,
+            request=AuthorizationRequest(
+                action=Capability.ASSIGNMENT_MANAGE,
+                resource=AuthorizationResource(
+                    resource_type="CASE_ASSIGNMENT",
+                    resource_id=assignment.id,
+                    tenant_id=actor.tenant_id,
+                    classification=DataClassification.INTERNAL_OPERATIONAL,
+                    case_id=assignment.case_id,
                 ),
                 evaluated_at=now,
             ),
@@ -293,6 +351,8 @@ class PatronAssignmentManagementHandler:
             return self._create(session=session, command=command, context=context)
         if command.command_type == "AmendCaseAssignmentScope":
             return self._amend_scope(session=session, command=command, context=context)
+        if command.command_type == "SuspendCaseAssignment":
+            return self._suspend(session=session, command=command, context=context)
         raise CommandExecutionError(
             f"unsupported patron assignment command: {command.command_type}"
         )
@@ -491,6 +551,77 @@ class PatronAssignmentManagementHandler:
             ),
         )
 
+    @staticmethod
+    def _suspend(
+        *,
+        session: Session,
+        command: SuspendCaseAssignmentCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        assignment = session.scalar(
+            sa.select(CaseAssignmentRecord)
+            .where(
+                CaseAssignmentRecord.tenant_id == context.tenant_id,
+                CaseAssignmentRecord.id == command.assignment_id,
+            )
+            .with_for_update()
+        )
+        if assignment is None:
+            raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
+        if assignment.state != "ACTIVE":
+            raise CommandExecutionError("ASSIGNMENT_NOT_ACTIVE")
+        if assignment.aggregate_revision != command.expected_revision:
+            raise CommandExecutionError("VERSION_CONFLICT")
+        if context.case_id is not None and context.case_id != assignment.case_id:
+            raise CommandExecutionError("CASE_CONTEXT_MISMATCH")
+
+        revision = assignment.aggregate_revision + 1
+        assignment.state = "SUSPENDED"
+        assignment.aggregate_revision = revision
+        scope_actions = list(assignment.scope_actions_json)
+        scope_classifications = list(assignment.scope_classifications_json)
+        session.add(
+            CaseAssignmentChangeEventRecord(
+                id=uuid4(),
+                tenant_id=context.tenant_id,
+                assignment_id=assignment.id,
+                case_id=assignment.case_id,
+                target_membership_id=assignment.membership_id,
+                author_membership_id=context.membership_id,
+                event_type="ASSIGNMENT_SUSPENDED",
+                previous_revision=revision - 1,
+                resulting_revision=revision,
+                previous_state="ACTIVE",
+                resulting_state="SUSPENDED",
+                reason_code=command.suspension_reason_code,
+                previous_scope_actions_json=scope_actions,
+                previous_scope_classifications_json=scope_classifications,
+                resulting_scope_actions_json=scope_actions,
+                resulting_scope_classifications_json=scope_classifications,
+                command_id=command.command_id,
+                correlation_id=command.correlation_id,
+            )
+        )
+        return HandlerOutcome(
+            result_code="CASE_ASSIGNMENT_SUSPENDED",
+            aggregate_refs=(_aggregate_ref(assignment=assignment, revision=revision),),
+            events=(
+                PendingDomainEvent(
+                    aggregate_type="Assignment",
+                    aggregate_id=assignment.id,
+                    aggregate_revision=revision,
+                    event_type="CaseAssignmentSuspended",
+                    payload={
+                        "assignment_id": str(assignment.id),
+                        "case_id": str(assignment.case_id),
+                        "previous_revision": revision - 1,
+                        "resulting_revision": revision,
+                        "suspension_reason_code": command.suspension_reason_code,
+                    },
+                ),
+            ),
+        )
+
 
 def _change_event_for_creation(
     *,
@@ -539,10 +670,11 @@ def _scope_fingerprint(*, actions: list[str], classifications: list[str]) -> str
 
 
 def patron_assignment_handlers() -> dict[str, PatronAssignmentManagementHandler]:
-    """Return the closed patron command registrations available in increment two."""
+    """Return the closed patron command registrations available in the current increment."""
 
     handler = PatronAssignmentManagementHandler()
     return {
         "CreateCaseAssignment": handler,
         "AmendCaseAssignmentScope": handler,
+        "SuspendCaseAssignment": handler,
     }

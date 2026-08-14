@@ -30,7 +30,14 @@ READ_LIMIT = 100
 NOW = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
 
 
-def measure(engine: sa.Engine) -> dict[str, float | int]:
+def measure(
+    engine: sa.Engine,
+    *,
+    event_type: str = "ASSIGNMENT_SCOPE_AMENDED",
+) -> dict[str, float | int | str]:
+    if event_type not in {"ASSIGNMENT_SCOPE_AMENDED", "ASSIGNMENT_SUSPENDED"}:
+        raise ValueError("unsupported assignment journal benchmark event")
+    is_suspension = event_type == "ASSIGNMENT_SUSPENDED"
     tenant_id = uuid4()
     patron_identity_id = uuid4()
     patron_membership_id = uuid4()
@@ -143,15 +150,17 @@ def measure(engine: sa.Engine) -> dict[str, float | int]:
                     "case_id": case_id,
                     "target_membership_id": collaborator_membership_id,
                     "author_membership_id": patron_membership_id,
-                    "event_type": "ASSIGNMENT_SCOPE_AMENDED",
+                    "event_type": event_type,
                     "previous_revision": revision - 1,
                     "resulting_revision": revision,
                     "previous_state": "ACTIVE",
-                    "resulting_state": "ACTIVE",
-                    "reason_code": None,
+                    "resulting_state": "SUSPENDED" if is_suspension else "ACTIVE",
+                    "reason_code": "CASE_PAUSED" if is_suspension else None,
                     "previous_scope_actions_json": ["case.dce.read"],
                     "previous_scope_classifications_json": ["INTERNAL_OPERATIONAL"],
-                    "resulting_scope_actions_json": ["preparation.transmit"],
+                    "resulting_scope_actions_json": (
+                        ["case.dce.read"] if is_suspension else ["preparation.transmit"]
+                    ),
                     "resulting_scope_classifications_json": ["INTERNAL_OPERATIONAL"],
                     "command_id": uuid4(),
                     "correlation_id": uuid4(),
@@ -176,6 +185,7 @@ def measure(engine: sa.Engine) -> dict[str, float | int]:
         read_elapsed_ms = (perf_counter() - read_started) * 1_000
 
     return {
+        "event_type": event_type,
         "event_count": EVENT_COUNT,
         "recent_read_limit": READ_LIMIT,
         "insert_elapsed_ms": round(insert_elapsed_ms, 3),
