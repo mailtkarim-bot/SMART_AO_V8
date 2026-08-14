@@ -1,17 +1,17 @@
 # PROJECT_STATE
 
 ## Slice courant
-`COLLAB-ASSIGNMENT-01` — publié sur `main` par [`d7e97ca`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/d7e97ca), avec correctif CI final [`30d5ace`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/30d5ace). Le slice ajoute les trois commandes collaborateur prévues, la révision optimiste de `CaseAssignmentRecord`, trois historiques append-only tenant-scoped, la migration `0020`, l’idempotence fonctionnelle et les handlers transactionnels. Le raccordement HTTPS frontend reste suspendu jusqu’à la disponibilité d’un VPS.
+`COLLAB-ASSIGNMENT-HTTP-01` — implémenté localement et prêt à publier. Il expose les trois interactions Assignment avec bearer réel, DTO fermés, policy SEC-01 auditée, erreurs publiques minimisées et reçus idempotents. Il ne crée ni ne modifie une affectation, n’élargit aucun scope et ne donne aucun accès financier. Le raccordement HTTPS frontend reste suspendu jusqu’à la disponibilité d’un VPS.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | COLLAB-ASSIGNMENT-01 publié par [`d7e97ca`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/d7e97ca), correctif detect-secrets par [`30d5ace`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/30d5ace). |
+| Commit | Dernier commit publié stable : [`5faffed`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/5faffed). COLLAB-ASSIGNMENT-HTTP-01 reste local avant publication. |
 | Commit précédent | DCE-CLASSIFICATION-01 publié sur `main` : [`e099f2a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e099f2a), contrat normatif, migration `0015`, classifieur déterministe, registre append-only, projection courante historisée et tests dédiés. |
 | Migration Alembic | `20260814_0020` ajoutée pour la révision Assignment et les trois historiques collaborateur ; upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` validés sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
-| Tests | `uv run ruff check .` vert ; `uv run pytest backend/tests -q` : **244 tests verts**, 4 avertissements non bloquants. COLLAB-ASSIGNMENT-01 couvre validation Pydantic, autorisation ReBAC, révision, idempotence dispatcher/fonctionnelle, événements/outbox et append-only PostgreSQL. |
+| Tests | `uv run ruff check .` vert ; `uv run pytest backend/tests -q` : **251 tests verts**, 4 avertissements non bloquants. COLLAB-ASSIGNMENT-HTTP-01 couvre bearer, les trois routes, ReBAC, audit des refus, neutralité tenant, idempotence et projection de reçu fermée. |
 | CI | Le workflow [#31824210865](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31824210865) du commit `30d5ace` est **vert**. Lint, secrets scan, audit dépendances, SAST, smoke tests et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore. |
 
 ## Ce qui est terminé
@@ -63,10 +63,11 @@
 - CASE-DCE-IMPACT-01 publié par `968cfdf` : contrat normatif `SMART_AO_V8_CASE_DCE_IMPACT_01_CONTRAT.md`, commande Pydantic SYSTEM fermée, service déterministe, handler transactionnel idempotent, tables `case_dce_impact_runs` et `case_dce_impact_items`, FKs composites tenant, triggers append-only, événement et outbox. La Case doit pointer vers le prédécesseur ; le successeur doit appartenir à la même Consultation, référencer ce prédécesseur, être admis et vérifié ; les deux matérialisations d’exigences doivent être terminales. L’algorithme ne fabrique aucune correspondance sémantique entre versions. Validation : Ruff vert, 239 tests verts, Alembic `upgrade head/check/downgrade base` vert.
 - Correction CI publiée par `0c0de66` puis confirmée par le workflow vert `31822332866` sur `a380bad`. L’échec précédent `31820821308` était un défaut de synchronisation de baseline, pas un échec fonctionnel CASE-DCE-IMPACT-01.
 - `COLLAB-ASSIGNMENT-01` publié : le contrat normatif couvre `AcknowledgeAssignment`, `RequestAssignmentClarification` et `ReportAssignmentUnavailability`. Le slice ne crée ni ne modifie une affectation, n’élargit aucun scope ReBAC et ne touche ni prix, ni marge, ni tâche, ni échéance, ni décision patron. Les tables `case_assignment_acknowledgements`, `assignment_clarification_requests` et `case_assignment_unavailabilities` sont append-only par triggers PostgreSQL. Le faux positif detect-secrets de l’URL PostgreSQL de test a été corrigé dans `30d5ace`.
+- `COLLAB-ASSIGNMENT-HTTP-01` implémenté localement : contrat HTTP, routeur `/api/v1/assignments`, DTO Pydantic fermés, intégration au bootstrap sous le même `AuditedAuthorizationPolicy` que les routes DCE et façade applicative qui audite également les refus avant policy. Les trois routes retournent un reçu minimal `201`/`200`; les ressources étrangères restent `404`, les scopes incomplets `403`, le conflit d’idempotence `409` et les invariants `422`. Les 7 scénarios API ciblés et la régression complète de 251 tests sont verts. Le commit et le push restent à effectuer.
 
 ## Prochaine action unique
 
-Préparer le prochain contrat backend documenté ; le VPS reste requis uniquement pour configurer l’URL HTTPS et tester le parcours navigateur réel.
+Committer et pousser COLLAB-ASSIGNMENT-HTTP-01 après revue finale, puis vérifier sa CI GitHub. Le VPS reste requis uniquement pour configurer l’URL HTTPS et tester le parcours navigateur réel.
 
 ## Décisions ouvertes
 

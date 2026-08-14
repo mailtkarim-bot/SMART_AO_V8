@@ -37,3 +37,11 @@
 - [x] Corriger le faux positif detect-secrets sur l’URL PostgreSQL de test et republier le correctif.
 - [x] Vérifier la CI finale : workflow `31824210865` vert.
 - [ ] Implémenter, tester, valider et publier le prochain slice retenu.
+- [x] Auditer les conventions de routes, DTO, contexte bearer et audit SEC-01 pour les commandes Assignment.
+- [x] Figer le contrat HTTP des trois commandes Assignment et leurs erreurs publiques fermées.
+- [x] Implémenter la façade HTTP auditée et son branchement au bootstrap V8.
+- [x] Ajouter les tests API de succès, refus ReBAC, neutralité tenant, idempotence et audit.
+- [x] Générer le résumé de couverture de tests et des exigences ReBAC associées.
+- [x] Inscrire dans le dépôt la matrice vérifiable de couverture HTTP Assignment et de contrôles ReBAC.
+- [x] Valider Ruff, pytest, Alembic et detect-secrets avant publication de la façade HTTP.
+- [ ] Committer et pousser COLLAB-ASSIGNMENT-HTTP-01, puis vérifier la CI GitHub.

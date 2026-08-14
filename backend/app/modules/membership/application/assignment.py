@@ -24,6 +24,13 @@ from app.platform.events.dispatcher import (
     HandlerOutcome,
     PendingDomainEvent,
 )
+from app.platform.security.audit import (
+    AuditEventType,
+    AuditOutcome,
+    AuditSeverity,
+    SecurityAuditEntry,
+    SecurityAuditWriter,
+)
 from app.platform.security.authorization import (
     AuthorizationPolicyPort,
     AuthorizationRequest,
@@ -54,10 +61,12 @@ class AssignmentInteractionService:
         session_factory: sessionmaker[Session],
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
+        audit_writer: SecurityAuditWriter | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._dispatcher = dispatcher
         self._policy = policy
+        self._audit_writer = audit_writer or SecurityAuditWriter()
 
     def acknowledge(
         self,
@@ -88,7 +97,21 @@ class AssignmentInteractionService:
 
     def _authorize_and_dispatch(self, *, actor: ActorContext, command, now: datetime):
         if actor.actor_kind is not ActorKind.COLLABORATEUR:
+            self._record_manual_denial(
+                actor=actor,
+                command=command,
+                now=now,
+                reason_code="ASSIGNMENT_COLLABORATOR_REQUIRED",
+            )
             raise PermissionError("ASSIGNMENT_COLLABORATOR_REQUIRED")
+        if actor.membership_id is None:
+            self._record_manual_denial(
+                actor=actor,
+                command=command,
+                now=now,
+                reason_code="ASSIGNMENT_MEMBERSHIP_REQUIRED",
+            )
+            raise PermissionError("ASSIGNMENT_MEMBERSHIP_REQUIRED")
 
         assignment = self._resolve_assignment(
             tenant_id=actor.tenant_id,
@@ -96,6 +119,12 @@ class AssignmentInteractionService:
             assignment_id=command.assignment_id,
         )
         if assignment is None:
+            self._record_manual_denial(
+                actor=actor,
+                command=command,
+                now=now,
+                reason_code="NOT_FOUND_OR_FORBIDDEN",
+            )
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
         action = _ACTION_BY_COMMAND[command.command_type]
         decision = self._policy.authorize(
@@ -129,6 +158,42 @@ class AssignmentInteractionService:
                 correlation_id=actor.correlation_id,
             ),
         )
+
+    def _record_manual_denial(
+        self,
+        *,
+        actor: ActorContext,
+        command,
+        now: datetime,
+        reason_code: str,
+    ) -> None:
+        with self._session_factory.begin() as session:
+            self._audit_writer.record(
+                session=session,
+                entry=SecurityAuditEntry(
+                    occurred_at=now,
+                    tenant_id=actor.tenant_id,
+                    actor_id=actor.actor_id,
+                    identity_id=actor.identity_id,
+                    session_id=actor.session_id,
+                    actor_kind=actor.actor_kind.value,
+                    auth_strength=None,
+                    event_type=AuditEventType.AUTHZ_DENIED,
+                    outcome=AuditOutcome.DENIED,
+                    severity=AuditSeverity.WARNING,
+                    action=str(_ACTION_BY_COMMAND[command.command_type]),
+                    resource_type="CASE_ASSIGNMENT",
+                    resource_id=command.assignment_id,
+                    case_id=None,
+                    correlation_id=command.correlation_id,
+                    command_id=command.command_id,
+                    request_id=None,
+                    source_ip_hash=None,
+                    user_agent_family=None,
+                    reason_code=reason_code,
+                    metadata={"channel": "service"},
+                ),
+            )
 
     def _resolve_assignment(
         self,
@@ -240,7 +305,7 @@ class AssignmentInteractionHandler:
                 {
                     "aggregate_type": "Assignment",
                     "aggregate_id": str(assignment.id),
-                    "revision": revision,
+                    "aggregate_revision": revision,
                 },
             ),
             events=(
@@ -279,7 +344,7 @@ class AssignmentInteractionHandler:
                     {
                         "aggregate_type": "AssignmentClarificationRequest",
                         "aggregate_id": str(existing.id),
-                        "revision": 1,
+                        "aggregate_revision": 1,
                     },
                 ),
                 events=(),
@@ -309,7 +374,7 @@ class AssignmentInteractionHandler:
                 {
                     "aggregate_type": "AssignmentClarificationRequest",
                     "aggregate_id": str(request.id),
-                    "revision": 1,
+                    "aggregate_revision": 1,
                 },
             ),
             events=(
@@ -357,7 +422,7 @@ class AssignmentInteractionHandler:
                 {
                     "aggregate_type": "Assignment",
                     "aggregate_id": str(assignment.id),
-                    "revision": revision,
+                    "aggregate_revision": revision,
                 },
             ),
             events=(

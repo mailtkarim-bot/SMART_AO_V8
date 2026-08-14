@@ -9,9 +9,12 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.dce.application.commands import (
+    AcknowledgeAssignmentCommand,
     CreateConsultationCommand,
     RecordDceRequirementConfirmationCommand,
     RegisterDceVersionCommand,
+    ReportAssignmentUnavailabilityCommand,
+    RequestAssignmentClarificationCommand,
 )
 
 
@@ -19,6 +22,12 @@ class PublicResponseModel(BaseModel):
     """Closed response base that serializes only explicitly approved fields."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+class PublicRequestModel(BaseModel):
+    """Closed HTTP intent model; server-owned actor and tenant stay outside it."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
 class ProjectionStatusResponse(PublicResponseModel):
@@ -177,6 +186,93 @@ class AssignedCaseResponse(PublicResponseModel):
     case_lifecycle: str
     commercial_stage: str
     dce_availability: str
+
+
+class AcknowledgeAssignmentRequest(PublicRequestModel):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    expected_revision: int = Field(ge=0)
+    note: str | None = Field(default=None, max_length=500)
+
+    def to_command(self, *, assignment_id: UUID) -> AcknowledgeAssignmentCommand:
+        return AcknowledgeAssignmentCommand(
+            **self.model_dump(),
+            assignment_id=assignment_id,
+        )
+
+
+class RequestAssignmentClarificationRequest(PublicRequestModel):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    expected_revision: int = Field(ge=0)
+    clarification_kind: Literal[
+        "SCOPE",
+        "PRIORITY",
+        "DEADLINE",
+        "DOCUMENT",
+        "RESPONSIBILITY",
+        "OTHER",
+    ]
+    subject: str = Field(min_length=1, max_length=160)
+    question: str = Field(min_length=1, max_length=2_000)
+    requested_scope: str | None = Field(default=None, max_length=500)
+    priority: Literal["LOW", "NORMAL", "HIGH"] = "NORMAL"
+
+    def to_command(
+        self,
+        *,
+        assignment_id: UUID,
+    ) -> RequestAssignmentClarificationCommand:
+        return RequestAssignmentClarificationCommand(
+            **self.model_dump(),
+            assignment_id=assignment_id,
+        )
+
+
+class ReportAssignmentUnavailabilityRequest(PublicRequestModel):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    expected_revision: int = Field(ge=0)
+    reason_kind: Literal[
+        "SICKNESS",
+        "LEAVE",
+        "CAPACITY_CONFLICT",
+        "SKILL_GAP",
+        "ACCESS_PROBLEM",
+        "OTHER",
+    ]
+    reason: str = Field(min_length=1, max_length=2_000)
+    unavailable_from: datetime
+    unavailable_until: datetime | None = None
+    known_deadline_impact: bool = False
+    impact_note: str | None = Field(default=None, max_length=500)
+
+    def to_command(
+        self,
+        *,
+        assignment_id: UUID,
+    ) -> ReportAssignmentUnavailabilityCommand:
+        return ReportAssignmentUnavailabilityCommand(
+            **self.model_dump(),
+            assignment_id=assignment_id,
+        )
+
+
+class AssignmentCommandResponse(PublicResponseModel):
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal[
+        "ASSIGNMENT_ACKNOWLEDGED",
+        "ASSIGNMENT_CLARIFICATION_REQUESTED",
+        "ASSIGNMENT_UNAVAILABILITY_REPORTED",
+    ]
+    aggregate_refs: list[AggregateReferenceResponse]
+    event_ids: list[UUID]
+    replayed: bool = False
 
 
 class RecordDceRequirementConfirmationRequest(PublicResponseModel):
