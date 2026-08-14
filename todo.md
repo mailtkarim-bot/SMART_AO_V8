@@ -19,3 +19,4 @@
 - [x] Implémenter uniquement son périmètre fermé dans le backend V8.
 - [x] Ajouter les tests de persistance, tenant, idempotence, append-only et acteur SYSTEM requis.
 - [x] Valider Ruff, pytest, Alembic et les invariants avant commit et push.
+- [x] Committer et pousser CASE-DCE-IMPACT-01 sur `main`.
