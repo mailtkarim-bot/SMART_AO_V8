@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`CASE-DCE-READ-01-B` — validé localement, publication en cours. Cet incrément ajoute la query applicative tenant-scopée qui résout exclusivement une `Case` et sa DCE applicable ; elle retourne une projection de lecture fermée, ou un état explicite d’absence de DCE applicable. Les exigences sont jointes uniquement à leur DCE applicable, les confirmations courantes sont projetées sans auteur ni historique et les locators sont dérivés sous forme bornée. Aucun contenu source, hash, stockage, URL, audit, prix, marge ou donnée de décision n’est chargé dans le modèle de sortie.
+`CASE-DCE-READ-01-B` — publié sur `main` et CI GitHub verte. Cet incrément ajoute la query applicative tenant-scopée qui résout exclusivement une `Case` et sa DCE applicable ; elle retourne une projection de lecture fermée, ou un état explicite d’absence de DCE applicable. Les exigences sont jointes uniquement à leur DCE applicable, les confirmations courantes sont projetées sans auteur ni historique et les locators sont dérivés sous forme bornée. Aucun contenu source, hash, stockage, URL, audit, prix, marge ou donnée de décision n’est chargé dans le modèle de sortie.
 
 ## Dernier état vert
 
@@ -12,7 +12,7 @@
 | Migration Alembic | `20260814_0017` et `20260814_0018` validées : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Tests | `uv run ruff check .` vert ; `uv run pytest backend/tests -q` : **224 tests verts**. CASE-DCE-READ-01-B couvre projection Case/DCE tenant-scopée, confirmations courantes, compteurs cohérents, ordre déterministe, source non classifiée, DCE supersédée visible, Case sans DCE, Case hors tenant et absence de champs interdits. CASE-DCE-READ-01-A couvre capability patron/collaborateur et scope ReBAC. |
-| CI | [Workflow GitHub vert #31798368104](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31798368104) : lint, secrets, audit dépendances, Bandit et **222 tests PostgreSQL** sont passés. Le job image a confirmé l’absence de Dockerfile; build et scan Trivy restent explicitement non applicables jusqu’à l’introduction d’un artefact conteneur. |
+| CI | [Workflow GitHub vert #31811464630](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31811464630) : lint, secrets, audit dépendances, Bandit et **224 tests PostgreSQL** sont passés. Le job image a confirmé l’absence de Dockerfile; build et scan Trivy restent explicitement non applicables jusqu’à l’introduction d’un artefact conteneur. |
 
 ## Ce qui est terminé
 
@@ -62,7 +62,7 @@
 
 ## Prochaine action unique
 
-Publier CASE-DCE-READ-01-B, puis ouvrir `CASE-DCE-READ-01-C` : route HTTP authentifiée `GET /api/v1/cases/{case_id}/dce-reading`, policy SEC-01 auditée, DTO Pydantic fermés et réponses 401/403/404/422 neutres, avant toute interface React.
+Ouvrir `CASE-DCE-READ-01-C` : route HTTP authentifiée `GET /api/v1/cases/{case_id}/dce-reading`, policy SEC-01 auditée, DTO Pydantic fermés et réponses 401/403/404/422 neutres, avant toute interface React.
 
 ## Décisions ouvertes
 
