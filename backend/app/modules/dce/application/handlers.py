@@ -24,10 +24,16 @@ from app.modules.dce.application.commands import (
     RecordDceDocumentClassificationRunCommand,
     RecordDceDocumentExtractionCommand,
     RecordDceRcAnalysisCommand,
+    RecordDceRequirementMaterializationRunCommand,
     RecordDceStagedObjectQuarantineCommand,
     RecordDceStagedObjectScanCommand,
     RegisterDceVersionCommand,
     RejectDceStagedObjectUploadCommand,
+)
+from app.modules.dce.application.requirements import (
+    RequirementSignal,
+    project_requirements,
+    requirements_manifest_sha256,
 )
 from app.modules.dce.domain.consultation import BuyerIdentity, Consultation
 from app.modules.dce.domain.dce_version import DceDocument, DceVersion
@@ -45,6 +51,11 @@ from app.modules.dce.infrastructure.models.dce_rc_analysis import (
     DceRcAnalysisRunRecord,
     DceRcRequirementObservationRecord,
     DceRcRequirementSourceRecord,
+)
+from app.modules.dce.infrastructure.models.dce_requirements import (
+    DceRequirementMaterializationRunRecord,
+    DceRequirementRecord,
+    DceRequirementSourceRecord,
 )
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.models.dce_version import (
@@ -1324,3 +1335,194 @@ def _functional_identity_hash(consultation: Consultation) -> str:
         separators=(",", ":"),
     )
     return sha256(canonical_identity.encode("utf-8")).hexdigest()
+
+
+class RecordDceRequirementMaterializationRunHandler:
+    """Persist atomic human-pending requirements from one completed RC analysis."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: RecordDceRequirementMaterializationRunCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != "SYSTEM":
+            raise ValueError("DCE_REQUIREMENT_SYSTEM_ACTOR_REQUIRED")
+        dce_version = session.scalar(
+            sa.select(DceVersionRecord)
+            .where(
+                DceVersionRecord.tenant_id == context.tenant_id,
+                DceVersionRecord.id == command.dce_version_id,
+            )
+            .with_for_update()
+        )
+        if (
+            dce_version is None
+            or dce_version.lifecycle not in {"ADMITTED", "SUPERSEDED"}
+            or dce_version.integrity != "VERIFIED"
+        ):
+            raise ValueError("DCE_VERSION_NOT_REQUIREMENTS_READY")
+        analysis = session.scalar(
+            sa.select(DceRcAnalysisRunRecord)
+            .where(
+                DceRcAnalysisRunRecord.tenant_id == context.tenant_id,
+                DceRcAnalysisRunRecord.id == command.dce_rc_analysis_id,
+                DceRcAnalysisRunRecord.dce_version_id == dce_version.id,
+            )
+            .with_for_update()
+        )
+        if analysis is None or analysis.status != "COMPLETED":
+            raise ValueError("DCE_RC_ANALYSIS_COMPLETED_REQUIRED")
+        rows = session.execute(
+            sa.select(DceRcRequirementObservationRecord, DceRcRequirementSourceRecord)
+            .join(
+                DceRcRequirementSourceRecord,
+                sa.and_(
+                    DceRcRequirementSourceRecord.tenant_id
+                    == DceRcRequirementObservationRecord.tenant_id,
+                    DceRcRequirementSourceRecord.observation_id
+                    == DceRcRequirementObservationRecord.id,
+                ),
+            )
+            .where(
+                DceRcRequirementObservationRecord.tenant_id == context.tenant_id,
+                DceRcRequirementObservationRecord.analysis_id == analysis.id,
+                DceRcRequirementObservationRecord.dce_version_id == dce_version.id,
+            )
+            .order_by(DceRcRequirementObservationRecord.id)
+            .with_for_update()
+        ).all()
+        signals = tuple(
+            RequirementSignal(
+                observation_id=observation.id,
+                requirement_kind=observation.requirement_kind,
+                directive=observation.directive,
+                rule_id=observation.rule_id,
+                rule_version=observation.rule_version,
+                fragment_id=source.fragment_id,
+                start_byte_offset=source.start_byte_offset,
+                end_byte_offset=source.end_byte_offset,
+            )
+            for observation, source in rows
+        )
+        expected_manifest = requirements_manifest_sha256(signals=signals)
+        if command.input_manifest_sha256.lower() != expected_manifest:
+            raise ValueError("DCE_REQUIREMENT_INPUT_MANIFEST_REQUIRED")
+        if command.source_observation_count != len(signals):
+            raise ValueError("DCE_REQUIREMENT_SOURCE_COUNT_REQUIRED")
+        existing = session.scalar(
+            sa.select(DceRequirementMaterializationRunRecord).where(
+                DceRequirementMaterializationRunRecord.tenant_id == context.tenant_id,
+                DceRequirementMaterializationRunRecord.dce_version_id == dce_version.id,
+                DceRequirementMaterializationRunRecord.dce_rc_analysis_id == analysis.id,
+                DceRequirementMaterializationRunRecord.input_manifest_sha256
+                == command.input_manifest_sha256.lower(),
+                DceRequirementMaterializationRunRecord.materializer_id == command.materializer_id,
+                DceRequirementMaterializationRunRecord.materializer_version
+                == command.materializer_version,
+            )
+        )
+        if existing is not None:
+            return HandlerOutcome(
+                result_code="DCE_REQUIREMENTS_ALREADY_MATERIALIZED",
+                aggregate_refs=(
+                    {
+                        "aggregate_type": "DCE_REQUIREMENT_MATERIALIZATION_RUN",
+                        "aggregate_id": str(existing.id),
+                        "aggregate_revision": 0,
+                    },
+                ),
+            )
+        projection = project_requirements(signals=signals)
+        if command.status != projection.status or command.failure_code != projection.failure_code:
+            raise ValueError("DCE_REQUIREMENT_PROJECTION_REQUIRED")
+        expected_types = {
+            "RC_DOCUMENT_CANDIDATURE": "CANDIDATURE_DOCUMENT",
+            "RC_CONTENT_OFFER": "OFFER_DOCUMENT",
+            "RC_SUBMISSION_DEADLINE": "SUBMISSION_DEADLINE_SIGNAL",
+            "RC_RESPONSE_CHANNEL": "SUBMISSION_CHANNEL",
+            "RC_FILE_CONSTRAINT": "FILE_CONSTRAINT",
+            "RC_SITE_VISIT": "SITE_VISIT",
+            "RC_AWARD_CRITERION": "AWARD_CRITERION_SIGNAL",
+            "RC_NEGOTIATION": "NEGOTIATION_SIGNAL",
+            "RC_OFFER_VALIDITY": "OFFER_VALIDITY_SIGNAL",
+        }
+        if command.status == "COMPLETED":
+            if len(command.requirements) != len(signals):
+                raise ValueError("DCE_REQUIREMENT_COUNT_REQUIRED")
+            for received, signal in zip(command.requirements, signals, strict=True):
+                if (
+                    received.source_observation_id != signal.observation_id
+                    or received.requirement_type != expected_types[signal.requirement_kind]
+                    or received.directive_signal != signal.directive
+                    or received.confirmation_status != "PENDING_HUMAN_CONFIRMATION"
+                    or received.uncertainty_status != "SOURCE_SIGNAL_ONLY"
+                ):
+                    raise ValueError("DCE_REQUIREMENT_MAPPING_REQUIRED")
+        requirement_run = DceRequirementMaterializationRunRecord(
+            id=command.requirements_run_id,
+            tenant_id=context.tenant_id,
+            dce_version_id=dce_version.id,
+            dce_rc_analysis_id=analysis.id,
+            input_manifest_sha256=command.input_manifest_sha256.lower(),
+            materializer_id=command.materializer_id,
+            materializer_version=command.materializer_version,
+            status=command.status,
+            source_observation_count=command.source_observation_count,
+            failure_code=command.failure_code,
+        )
+        session.add(requirement_run)
+        session.flush()
+        source_by_observation = {observation.id: source for observation, source in rows}
+        for item in command.requirements:
+            source = source_by_observation[item.source_observation_id]
+            requirement = DceRequirementRecord(
+                id=item.requirement_id,
+                tenant_id=context.tenant_id,
+                requirements_run_id=requirement_run.id,
+                dce_version_id=dce_version.id,
+                source_observation_id=item.source_observation_id,
+                requirement_type=item.requirement_type,
+                directive_signal=item.directive_signal,
+                confirmation_status=item.confirmation_status,
+                uncertainty_status=item.uncertainty_status,
+            )
+            session.add(requirement)
+            session.flush()
+            session.add(
+                DceRequirementSourceRecord(
+                    id=uuid4(),
+                    tenant_id=context.tenant_id,
+                    requirement_id=requirement.id,
+                    source_observation_id=item.source_observation_id,
+                    fragment_id=source.fragment_id,
+                    start_byte_offset=source.start_byte_offset,
+                    end_byte_offset=source.end_byte_offset,
+                )
+            )
+        event = PendingDomainEvent(
+            aggregate_type="DCE_REQUIREMENT_MATERIALIZATION_RUN",
+            aggregate_id=requirement_run.id,
+            aggregate_revision=0,
+            event_type="DCE_REQUIREMENTS_MATERIALIZED",
+            payload={
+                "requirements_run_id": str(requirement_run.id),
+                "dce_version_id": str(dce_version.id),
+                "dce_rc_analysis_id": str(analysis.id),
+                "status": command.status,
+                "source_observation_count": command.source_observation_count,
+                "requirement_count": len(command.requirements),
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_REQUIREMENTS_MATERIALIZED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_REQUIREMENT_MATERIALIZATION_RUN",
+                    "aggregate_id": str(requirement_run.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )

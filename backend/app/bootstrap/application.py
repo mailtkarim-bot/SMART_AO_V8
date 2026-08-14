@@ -35,6 +35,7 @@ from app.modules.dce.application.handlers import (
     RecordDceDocumentClassificationRunHandler,
     RecordDceDocumentExtractionHandler,
     RecordDceRcAnalysisHandler,
+    RecordDceRequirementMaterializationRunHandler,
     RecordDceStagedObjectQuarantineHandler,
     RecordDceStagedObjectScanHandler,
     RegisterDceVersionHandler,
@@ -96,6 +97,9 @@ class AppRuntime:
                 "RecordDceDocumentClassificationRun": RecordDceDocumentClassificationRunHandler(),
                 "RecordDceDocumentExtraction": RecordDceDocumentExtractionHandler(),
                 "RecordDceRcAnalysis": RecordDceRcAnalysisHandler(),
+                "RecordDceRequirementMaterializationRun": (
+                    RecordDceRequirementMaterializationRunHandler()
+                ),
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
             },

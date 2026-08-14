@@ -59,9 +59,7 @@ class PrepareDceStagingCommand(ApplicationCommand):
     consultation_revision: int = Field(ge=0)
     original_filename: str = Field(min_length=1, max_length=500)
     expected_byte_size: int = Field(gt=0, le=2_000_000_000)
-    source_channel: str = Field(
-        pattern=r"^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$"
-    )
+    source_channel: str = Field(pattern=r"^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$")
     expires_at: datetime
 
 
@@ -263,9 +261,7 @@ class DceDocumentClassificationResultInput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     dce_document_id: UUID
-    status: str = Field(
-        pattern=r"^(CLASSIFIED|UNCLASSIFIED|REVIEW_REQUIRED|NOT_EXTRACTED)$"
-    )
+    status: str = Field(pattern=r"^(CLASSIFIED|UNCLASSIFIED|REVIEW_REQUIRED|NOT_EXTRACTED)$")
     classification: str | None = Field(
         default=None,
         pattern=r"^(RC|CCAP|AE|CCTP|DPGF|BPU|PLAN|ANNEX|RECTIFICATION|OTHER)$",
@@ -321,6 +317,75 @@ class RecordDceDocumentClassificationRunCommand(ApplicationCommand):
         return self
 
 
+class DceRequirementInput(BaseModel):
+    """One human-pending atomic requirement derived from exactly one RC observation."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    requirement_id: UUID
+    source_observation_id: UUID
+    requirement_type: str = Field(
+        pattern=(
+            r"^(CANDIDATURE_DOCUMENT|OFFER_DOCUMENT|SUBMISSION_DEADLINE_SIGNAL|"
+            r"SUBMISSION_CHANNEL|FILE_CONSTRAINT|SITE_VISIT|AWARD_CRITERION_SIGNAL|"
+            r"NEGOTIATION_SIGNAL|OFFER_VALIDITY_SIGNAL)$"
+        )
+    )
+    directive_signal: str = Field(pattern=r"^(REQUIRED_SIGNAL|OPTIONAL_SIGNAL|UNSPECIFIED)$")
+    confirmation_status: str = Field(pattern=r"^PENDING_HUMAN_CONFIRMATION$")
+    uncertainty_status: str = Field(pattern=r"^SOURCE_SIGNAL_ONLY$")
+
+
+class RecordDceRequirementMaterializationRunCommand(ApplicationCommand):
+    """System-only append-only conversion of one completed RC analysis into requirements."""
+
+    command_type = "RecordDceRequirementMaterializationRun"
+
+    requirements_run_id: UUID
+    dce_version_id: UUID
+    dce_rc_analysis_id: UUID
+    input_manifest_sha256: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-fA-F]{64}$",
+    )
+    materializer_id: str = Field(min_length=1, max_length=100)
+    materializer_version: str = Field(min_length=1, max_length=64)
+    status: str = Field(pattern=r"^(COMPLETED|NO_SIGNAL|REJECTED_LIMIT|FAILED_SAFE)$")
+    source_observation_count: int = Field(ge=0)
+    failure_code: str | None = Field(default=None, max_length=120)
+    requirements: list[DceRequirementInput] = Field(default_factory=list, max_length=20_000)
+
+    @model_validator(mode="after")
+    def validate_terminal_projection(self) -> RecordDceRequirementMaterializationRunCommand:
+        observation_ids = [item.source_observation_id for item in self.requirements]
+        requirement_ids = [item.requirement_id for item in self.requirements]
+        if len(observation_ids) != len(set(observation_ids)):
+            raise ValueError("requirement source observation identifier duplicate")
+        if len(requirement_ids) != len(set(requirement_ids)):
+            raise ValueError("requirement identifier duplicate")
+        if self.status == "COMPLETED":
+            if (
+                self.failure_code is not None
+                or len(self.requirements) != self.source_observation_count
+            ):
+                raise ValueError(
+                    "completed materialization requires one requirement per observation"
+                )
+        elif self.status == "NO_SIGNAL":
+            if (
+                self.failure_code is not None
+                or self.source_observation_count != 0
+                or self.requirements
+            ):
+                raise ValueError(
+                    "no-signal materialization requires no observations or requirements"
+                )
+        elif self.failure_code is None or self.requirements:
+            raise ValueError("failed materialization requires a code and no requirements")
+        return self
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 
@@ -330,9 +395,7 @@ class RegisterDceVersionCommand(ApplicationCommand):
     consultation_id: UUID
     consultation_revision: int = Field(ge=0)
     corpus_hash: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
-    provenance_channel: str = Field(
-        pattern=r"^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$"
-    )
+    provenance_channel: str = Field(pattern=r"^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$")
     provenance_reference: str | None = Field(default=None, max_length=240)
     provenance_url: str | None = Field(default=None, max_length=2_000)
     source_received_at: datetime
