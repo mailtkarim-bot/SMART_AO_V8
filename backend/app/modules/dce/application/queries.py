@@ -105,3 +105,20 @@ class CaseDceReadingReader(Protocol):
         tenant_id: UUID | str,
         case_id: UUID | str,
     ) -> CaseDceReadingLookup | None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class AssignedCaseProjection:
+    """Closed Case summary candidate; authorization remains a route concern."""
+
+    case_id: UUID
+    work_label: str
+    case_lifecycle: str
+    commercial_stage: str
+    dce_availability: str
+
+
+class AssignedCaseReader(Protocol):
+    """Tenant-scoped candidate reader for the server-filtered Case collection."""
+
+    def list(self, *, tenant_id: UUID | str) -> tuple[AssignedCaseProjection, ...]: ...

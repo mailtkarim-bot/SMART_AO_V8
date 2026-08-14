@@ -169,6 +169,16 @@ class CaseDceReadingResponse(PublicResponseModel):
     requirements: list[CaseDceReadingRequirementResponse]
 
 
+class AssignedCaseResponse(PublicResponseModel):
+    """Closed Case list item returned after server-side ReBAC filtering."""
+
+    case_id: UUID
+    work_label: str
+    case_lifecycle: str
+    commercial_stage: str
+    dce_availability: str
+
+
 class RecordDceRequirementConfirmationRequest(PublicResponseModel):
     """Untrusted HTTP intent; scope and actor stay server-resolved."""
 

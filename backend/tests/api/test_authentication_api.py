@@ -192,6 +192,8 @@ def test_login_sets_secure_refresh_and_csrf_cookies_and_returns_short_lived_acce
     assert "HttpOnly" not in csrf_cookie
     assert "Secure" in csrf_cookie
     assert "SameSite=strict" in csrf_cookie
+    assert "Path=/" in csrf_cookie
+    assert "Path=/api/v1/auth" not in csrf_cookie
     assert client.cookies.get("smart_ao_refresh") == "refresh-1"
     assert client.cookies.get("smart_ao_csrf") == "csrf-1"
     with Session(database_engine) as session:
@@ -307,7 +309,7 @@ def test_logout_requires_authenticated_context_and_csrf_then_clears_cookies(
         for cookie in deleted_cookies
     )
     assert any(
-        "smart_ao_csrf=" in cookie and "Max-Age=0" in cookie
+        "smart_ao_csrf=" in cookie and "Max-Age=0" in cookie and "Path=/" in cookie
         for cookie in deleted_cookies
     )
 

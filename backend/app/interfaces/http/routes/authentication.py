@@ -246,7 +246,7 @@ def _set_authentication_cookies(
         key=_CSRF_COOKIE_NAME,
         value=csrf_token,
         max_age=max_age_seconds,
-        path="/api/v1/auth",
+        path="/",
         secure=True,
         httponly=False,
         samesite="strict",
@@ -263,7 +263,7 @@ def _clear_authentication_cookies(response: Response) -> None:
     )
     response.delete_cookie(
         key=_CSRF_COOKIE_NAME,
-        path="/api/v1/auth",
+        path="/",
         secure=True,
         httponly=False,
         samesite="strict",

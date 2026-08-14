@@ -21,6 +21,7 @@ from app.interfaces.http.routes.authentication import (
     AuthenticationHttpRuntime,
     build_authentication_router,
 )
+from app.interfaces.http.routes.case_assigned import build_assigned_case_router
 from app.interfaces.http.routes.case_dce_reading import build_case_dce_reading_router
 from app.interfaces.http.routes.consultations import (
     ConsultationSecurityRuntime,
@@ -52,6 +53,7 @@ from app.modules.dce.application.requirement_confirmation import (
     DceRequirementConfirmationService,
 )
 from app.modules.dce.application.upload import DceUploadService
+from app.modules.dce.infrastructure.case_assigned_reader import SqlAlchemyAssignedCaseReader
 from app.modules.dce.infrastructure.case_dce_reading_reader import (
     SqlAlchemyCaseDceReadingReader,
 )
@@ -165,6 +167,12 @@ class AppRuntime:
                 tenant_id=tenant_id,
                 case_id=case_id,
             )
+
+    def get_assigned_case_candidates(self, *, tenant_id: UUID):
+        """Return closed same-tenant candidates for the audited ReBAC route."""
+
+        with self.session_factory() as session:
+            return SqlAlchemyAssignedCaseReader(session).list(tenant_id=tenant_id)
 
     def get_dce_version_tenant_id(self, *, dce_version_id: UUID) -> UUID | None:
         """Return only the owning tenant needed to authorize a DceVersion read."""
@@ -281,6 +289,12 @@ def create_app(
         )
         app.include_router(
             build_case_dce_reading_router(
+                runtime=runtime,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_assigned_case_router(
                 runtime=runtime,
                 security_runtime=security_runtime,
             )
