@@ -24,4 +24,6 @@
 - [x] Identifier le prochain slice backend explicitement présent dans la feuille de route V8 : `COLLAB-ASSIGNMENT-01`.
 - [x] Régénérer `.secrets.baseline` pour corriger l’échec du job Secrets scan.
 - [x] Figer son contrat normatif avant toute nouvelle modification de code.
+- [x] Publier la baseline et le contrat `COLLAB-ASSIGNMENT-01` sur `main`.
+- [x] Vérifier la CI post-correction : workflow `31822069069` vert.
 - [ ] Implémenter, tester, valider et publier le prochain slice retenu.

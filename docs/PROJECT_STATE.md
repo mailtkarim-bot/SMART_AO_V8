@@ -12,7 +12,7 @@
 | Migration Alembic | `20260814_0019` ajoutée pour le registre Case-DCE-Impact ; upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` validés sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Tests | `uv run ruff check .` vert ; `uv run pytest backend/tests -q` : **239 tests verts**, 4 avertissements non bloquants. CASE-DCE-IMPACT-01 couvre la préparation conservatrice d’un rectificatif, le replay idempotent, l’événement/outbox, l’append-only PostgreSQL et le refus d’un acteur humain. Les tests CASES-ASSIGNED-01 et CSRF restent verts. |
-| CI | Le workflow [#31820821308](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31820821308) du commit `92259e7` est terminé en échec. La cause est isolée au job **Secrets scan** : `detect-secrets-hook` a modifié `.secrets.baseline` pour maintenir les lignes à jour et le workflow exige que cette modification soit committée. Les validations locales restent vertes ; le job image n’a pas encore fourni de nouveau verdict. |
+| CI | Le workflow [#31822069069](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31822069069) du commit `0c0de66` est **vert**. Les jobs backend (lint, secrets scan, audit dépendances, SAST et smoke tests) et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore, conformément au comportement conditionnel du workflow. |
 
 ## Ce qui est terminé
 
@@ -63,10 +63,11 @@
 - CASE-DCE-IMPACT-01 publié par `968cfdf` : contrat normatif `SMART_AO_V8_CASE_DCE_IMPACT_01_CONTRAT.md`, commande Pydantic SYSTEM fermée, service déterministe, handler transactionnel idempotent, tables `case_dce_impact_runs` et `case_dce_impact_items`, FKs composites tenant, triggers append-only, événement et outbox. La Case doit pointer vers le prédécesseur ; le successeur doit appartenir à la même Consultation, référencer ce prédécesseur, être admis et vérifié ; les deux matérialisations d’exigences doivent être terminales. L’algorithme ne fabrique aucune correspondance sémantique entre versions. Validation : Ruff vert, 239 tests verts, Alembic `upgrade head/check/downgrade base` vert.
 - CI post-publication à corriger : le code CASE-DCE-IMPACT-01 n’a pas été signalé en échec par les logs disponibles ; le workflow s’est arrêté sur la baseline `detect-secrets` devenue modifiée. La baseline devra être régénérée localement, vérifiée puis publiée dans un commit séparé avant de considérer la CI V8 verte.
 - `COLLAB-ASSIGNMENT-01` préparé sans code : contrat normatif `SMART_AO_V8_COLLAB_ASSIGNMENT_01_CONTRAT.md` figé pour `AcknowledgeAssignment`, `RequestAssignmentClarification` et `ReportAssignmentUnavailability`. Le slice ne crée ni ne modifie une affectation ; il historise uniquement la reconnaissance, la demande opérationnelle ou l’indisponibilité d’un collaborateur déjà affecté. Aucun scope, droit, prix, marge, tâche, échéance ou décision patron n’est modifié directement.
+- Correction CI publiée par `0c0de66` : `.secrets.baseline` a été régénéré et le workflow `31822069069` est vert. L’échec précédent `31820821308` était donc un défaut de synchronisation de baseline, pas un échec fonctionnel CASE-DCE-IMPACT-01.
 
 ## Prochaine action unique
 
-Publier la baseline CI réparée et le contrat `COLLAB-ASSIGNMENT-01`, puis seulement ensuite implémenter son périmètre fermé.
+Implémenter `COLLAB-ASSIGNMENT-01` uniquement dans son périmètre fermé, puis ajouter ses tests PostgreSQL et sa migration additive si nécessaire.
 
 ## Décisions ouvertes
 
