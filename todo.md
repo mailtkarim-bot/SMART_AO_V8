@@ -56,4 +56,4 @@
 - [x] Rédiger le contrat normatif patron : commandes, machine d’état, scopes fermés, ReBAC, audit, idempotence, persistance et non-fuites.
 - [x] Vérifier le registre OpenAPI Assignment, régénérer son snapshot via le script reproductible et contrôler les quatre opérations.
 - [x] Rejouer les tests backend complets et le harnais API Assignment couvrant `GET /api/v1/assignments/{assignment_id}/history`.
-- [ ] Mettre à jour `PROJECT_STATE.md`, valider le diff et publier la frontière documentaire patron après revue finale.
+- [x] Mettre à jour `PROJECT_STATE.md`, valider le diff et publier la frontière documentaire patron après revue finale (contrat `c3b8c01`, CI `31832528921` verte).
