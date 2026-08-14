@@ -26,4 +26,12 @@
 - [x] Figer son contrat normatif avant toute nouvelle modification de code.
 - [x] Publier la baseline et le contrat `COLLAB-ASSIGNMENT-01` sur `main`.
 - [x] Vérifier la CI post-correction : workflow `31822069069` vert.
+- [x] Vérifier le statut de la dernière CI GitHub sur le commit `a380bad` : workflow `31822332866` vert.
+- [x] Auditer `CaseAssignmentRecord`, les memberships, la policy et le dispatcher avant code.
+- [x] Ajouter la révision optimiste et les historiques append-only du slice Assignment.
+- [x] Ajouter les commandes `AcknowledgeAssignment`, `RequestAssignmentClarification` et `ReportAssignmentUnavailability`.
+- [x] Implémenter les handlers transactionnels avec idempotence et événements minimisés.
+- [x] Ajouter les tests unitaires de validation/invariants et les tests PostgreSQL tenant-scoped.
+- [x] Valider Ruff, pytest, Alembic, detect-secrets et CI avant publication.
+- [ ] Committer et pousser COLLAB-ASSIGNMENT-01 après revue finale du diff.
 - [ ] Implémenter, tester, valider et publier le prochain slice retenu.

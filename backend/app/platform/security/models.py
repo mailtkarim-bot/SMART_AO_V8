@@ -277,6 +277,7 @@ class CaseAssignmentRecord(TenantScopedRecord, Base):
             "(state IN ('ENDED', 'EXPIRED') AND ended_at IS NOT NULL)",
             name="state_timestamps",
         ),
+        sa.CheckConstraint("aggregate_revision >= 0", name="aggregate_revision"),
         sa.Index(
             "ux_assignments__active_member_case",
             "tenant_id",
@@ -299,6 +300,12 @@ class CaseAssignmentRecord(TenantScopedRecord, Base):
     membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    aggregate_revision: Mapped[int] = mapped_column(
+        sa.Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
     scope_actions_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     scope_classifications_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     granted_by_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
@@ -306,6 +313,178 @@ class CaseAssignmentRecord(TenantScopedRecord, Base):
     starts_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     ends_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+
+class CaseAssignmentAcknowledgementRecord(TenantScopedRecord, Base):
+    """Immutable collaborator acknowledgement of one assignment revision."""
+
+    __tablename__ = "case_assignment_acknowledgements"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_assignment_ack__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "assignment_id"],
+            ["case_assignments.tenant_id", "case_assignments.id"],
+            name="fk_assignment_ack__assignment",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_assignment_ack__membership",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_assignment_ack__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "assignment_id",
+            "actor_id",
+            "assignment_revision",
+            name="uq_assignment_ack__revision_actor",
+        ),
+        sa.CheckConstraint("assignment_revision >= 0", name="assignment_revision"),
+        sa.Index(
+            "ix_assignment_ack__tenant_assignment",
+            "tenant_id",
+            "assignment_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    assignment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    assignment_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    note: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
+class AssignmentClarificationRequestRecord(TenantScopedRecord, Base):
+    """Immutable operational clarification request linked to one assignment."""
+
+    __tablename__ = "assignment_clarification_requests"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_assignment_clarification__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "assignment_id"],
+            ["case_assignments.tenant_id", "case_assignments.id"],
+            name="fk_assignment_clarification__assignment",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "case_id"],
+            ["cases.tenant_id", "cases.id"],
+            name="fk_assignment_clarification__case",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_assignment_clarification__membership",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_assignment_clarification__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "functional_key", name="uq_assignment_clarification__functional_key"
+        ),
+        sa.CheckConstraint(
+            "clarification_kind IN ('SCOPE', 'PRIORITY', 'DEADLINE', 'DOCUMENT', "
+            "'RESPONSIBILITY', 'OTHER')",
+            name="clarification_kind",
+        ),
+        sa.CheckConstraint("priority IN ('LOW', 'NORMAL', 'HIGH')", name="priority"),
+        sa.CheckConstraint("state = 'OPEN'", name="state_open_only"),
+        sa.Index(
+            "ix_assignment_clarification__tenant_assignment",
+            "tenant_id",
+            "assignment_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    assignment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    clarification_kind: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    subject: Mapped[str] = mapped_column(sa.String(160), nullable=False)
+    question: Mapped[str] = mapped_column(sa.String(2_000), nullable=False)
+    requested_scope: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
+    priority: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False, default="OPEN")
+    functional_key: Mapped[str] = mapped_column(sa.CHAR(64), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
+class CaseAssignmentUnavailabilityRecord(TenantScopedRecord, Base):
+    """Immutable collaborator unavailability observation for one assignment."""
+
+    __tablename__ = "case_assignment_unavailabilities"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_assignment_unavailability__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "assignment_id"],
+            ["case_assignments.tenant_id", "case_assignments.id"],
+            name="fk_assignment_unavailability__assignment",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_assignment_unavailability__membership",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_assignment_unavailability__tenant_id"),
+        sa.CheckConstraint(
+            "reason_kind IN ('SICKNESS', 'LEAVE', 'CAPACITY_CONFLICT', 'SKILL_GAP', "
+            "'ACCESS_PROBLEM', 'OTHER')",
+            name="reason_kind",
+        ),
+        sa.CheckConstraint(
+            "unavailable_until IS NULL OR unavailable_until > unavailable_from",
+            name="period_ordered",
+        ),
+        sa.CheckConstraint(
+            "known_deadline_impact = FALSE OR NULLIF(BTRIM(impact_note), '') IS NOT NULL",
+            name="impact_note_required",
+        ),
+        sa.CheckConstraint("assignment_revision >= 0", name="assignment_revision"),
+        sa.Index(
+            "ix_assignment_unavailability__tenant_assignment",
+            "tenant_id",
+            "assignment_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    assignment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    assignment_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    reason_kind: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(sa.String(2_000), nullable=False)
+    unavailable_from: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    unavailable_until: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    known_deadline_impact: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=False)
+    impact_note: Mapped[str | None] = mapped_column(sa.String(500), nullable=True)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
 class AuthSessionRecord(TenantScopedRecord, Base):

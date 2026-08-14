@@ -16,6 +16,9 @@ class Capability(StrEnum):
     DCE_PREPARE = "dce.prepare"
     CASE_DCE_READ = "case.dce.read"
     DCE_REQUIREMENT_CONFIRM = "dce.requirement.confirm"
+    ASSIGNMENT_ACKNOWLEDGE = "assignment.acknowledge"
+    ASSIGNMENT_CLARIFY = "assignment.clarify"
+    ASSIGNMENT_UNAVAILABILITY = "assignment.unavailability"
     DOCUMENT_ADMIN_READ = "document.administrative.read"
     PREPARATION_TRANSMIT = "preparation.transmit"
     MEMBERSHIP_MANAGE = "membership.manage"
@@ -54,6 +57,9 @@ _COLLABORATOR_CAPABILITIES = frozenset(
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
+        Capability.ASSIGNMENT_ACKNOWLEDGE,
+        Capability.ASSIGNMENT_CLARIFY,
+        Capability.ASSIGNMENT_UNAVAILABILITY,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
     }

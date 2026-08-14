@@ -47,6 +47,7 @@ class CommandContext:
     actor_kind: str
     received_at: datetime
     identity_id: UUID | str | None = None
+    membership_id: UUID | str | None = None
     session_id: UUID | str | None = None
     case_id: UUID | str | None = None
     correlation_id: UUID | str | None = None

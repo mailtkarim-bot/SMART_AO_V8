@@ -70,6 +70,7 @@ from app.modules.dce.infrastructure.quarantine import (
     LocalQuarantineStorageAdapter,
     PythonMagicContentInspectionAdapter,
 )
+from app.modules.membership.application.assignment import assignment_handlers
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
@@ -120,6 +121,7 @@ class AppRuntime:
                 "RecordDceRequirementConfirmation": RecordDceRequirementConfirmationHandler(),
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
+                **assignment_handlers(),
             },
         )
         upload_service = (

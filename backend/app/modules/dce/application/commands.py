@@ -473,6 +473,57 @@ class RecordCaseDceImpactRunCommand(ApplicationCommand):
         return self
 
 
+class AcknowledgeAssignmentCommand(ApplicationCommand):
+    """Record a collaborator's acknowledgement of one active assignment."""
+
+    command_type = "AcknowledgeAssignment"
+
+    assignment_id: UUID
+    expected_revision: int = Field(ge=0)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class RequestAssignmentClarificationCommand(ApplicationCommand):
+    """Open one bounded operational clarification request for an assignment."""
+
+    command_type = "RequestAssignmentClarification"
+
+    assignment_id: UUID
+    expected_revision: int = Field(ge=0)
+    clarification_kind: str = Field(
+        pattern=r"^(SCOPE|PRIORITY|DEADLINE|DOCUMENT|RESPONSIBILITY|OTHER)$"
+    )
+    subject: str = Field(min_length=1, max_length=160)
+    question: str = Field(min_length=1, max_length=2_000)
+    requested_scope: str | None = Field(default=None, max_length=500)
+    priority: str = Field(pattern=r"^(LOW|NORMAL|HIGH)$", default="NORMAL")
+
+
+class ReportAssignmentUnavailabilityCommand(ApplicationCommand):
+    """Record a collaborator's bounded unavailability observation."""
+
+    command_type = "ReportAssignmentUnavailability"
+
+    assignment_id: UUID
+    expected_revision: int = Field(ge=0)
+    reason_kind: str = Field(
+        pattern=r"^(SICKNESS|LEAVE|CAPACITY_CONFLICT|SKILL_GAP|ACCESS_PROBLEM|OTHER)$"
+    )
+    reason: str = Field(min_length=1, max_length=2_000)
+    unavailable_from: datetime
+    unavailable_until: datetime | None = None
+    known_deadline_impact: bool = False
+    impact_note: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_period(self) -> ReportAssignmentUnavailabilityCommand:
+        if self.unavailable_until is not None and self.unavailable_until <= self.unavailable_from:
+            raise ValueError("unavailability period must be strictly ordered")
+        if self.known_deadline_impact and not self.impact_note:
+            raise ValueError("known deadline impact requires an impact note")
+        return self
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 
