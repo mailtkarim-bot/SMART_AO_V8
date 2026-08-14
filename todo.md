@@ -44,4 +44,4 @@
 - [x] Générer le résumé de couverture de tests et des exigences ReBAC associées.
 - [x] Inscrire dans le dépôt la matrice vérifiable de couverture HTTP Assignment et de contrôles ReBAC.
 - [x] Valider Ruff, pytest, Alembic et detect-secrets avant publication de la façade HTTP.
-- [ ] Committer et pousser COLLAB-ASSIGNMENT-HTTP-01, puis vérifier la CI GitHub.
+- [x] Committer et pousser COLLAB-ASSIGNMENT-HTTP-01, puis vérifier la CI GitHub : workflow `31829240985` vert.
