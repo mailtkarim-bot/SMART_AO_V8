@@ -62,4 +62,4 @@
 - [x] Ajouter et tester les schémas Pydantic fermés `CreateCaseAssignment` et `AmendCaseAssignmentScope`.
 - [x] Implémenter le premier handler transactionnel `CreateCaseAssignment`, son journal patron, son événement, son outbox et son receipt idempotent.
 - [x] Écrire les tests d’intégration PostgreSQL du premier incrément : tenant, FKs, unicité, append-only, rollback, idempotence et conflit de révision Case.
-- [ ] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du premier incrément patron.
+- [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du premier incrément patron (commit `04f0469`, workflow `31838720621` vert).
