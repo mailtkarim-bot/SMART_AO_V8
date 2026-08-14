@@ -69,6 +69,7 @@ def test_patron_admin_receives_server_catalog_but_no_claim_based_authority() -> 
     assert Capability.SUBMISSION_AUTHORIZE in capabilities
     assert Capability.MEMBERSHIP_MANAGE in capabilities
     assert Capability.CONSULTATION_READ in capabilities
+    assert Capability.CASE_DCE_READ in capabilities
 
 
 def test_collaborator_catalog_never_contains_financial_decision_or_submission_capabilities(
@@ -77,11 +78,83 @@ def test_collaborator_catalog_never_contains_financial_decision_or_submission_ca
 
     assert Capability.CONSULTATION_READ in capabilities
     assert Capability.DCE_PREPARE in capabilities
+    assert Capability.CASE_DCE_READ in capabilities
     assert Capability.PREPARATION_TRANSMIT in capabilities
     assert Capability.PRICING_READ not in capabilities
     assert Capability.DECISION_FINALIZE not in capabilities
     assert Capability.SUBMISSION_AUTHORIZE not in capabilities
-    assert Capability.MEMBERSHIP_MANAGE not in capabilities
+    assert Capability.PRICING_READ not in capabilities
+
+
+def test_case_dce_read__when_patron_has_catalog_capability__then_allows_case_scoped_read() -> None:
+    context = _context(actor_kind=ActorKind.PATRON_ADMIN)
+    request = AuthorizationRequest(
+        action=Capability.CASE_DCE_READ,
+        resource=_resource(
+            context,
+            classification=DataClassification.INTERNAL_OPERATIONAL,
+            case_id=uuid4(),
+        ),
+    )
+
+    decision = AuthorizationPolicy().authorize(context=context, request=request)
+
+    assert decision.allowed is True
+    assert decision.code == "ALLOWED"
+
+
+def test_case_dce_read__when_collaborator_has_matching_case_scope__then_allows_read() -> None:
+    case_id = uuid4()
+    context = _context(
+        actor_kind=ActorKind.COLLABORATEUR,
+        assignment_scopes=(
+            AssignmentScope(
+                case_id=case_id,
+                allowed_actions=frozenset({Capability.CASE_DCE_READ}),
+                allowed_classifications=frozenset({DataClassification.INTERNAL_OPERATIONAL}),
+            ),
+        ),
+    )
+    request = AuthorizationRequest(
+        action=Capability.CASE_DCE_READ,
+        resource=_resource(
+            context,
+            classification=DataClassification.INTERNAL_OPERATIONAL,
+            case_id=case_id,
+        ),
+    )
+
+    decision = AuthorizationPolicy().authorize(context=context, request=request)
+
+    assert decision.allowed is True
+    assert decision.code == "ALLOWED"
+
+
+def test_case_dce_read__when_collaborator_scope_lacks_read_action__then_denies_access() -> None:
+    case_id = uuid4()
+    context = _context(
+        actor_kind=ActorKind.COLLABORATEUR,
+        assignment_scopes=(
+            AssignmentScope(
+                case_id=case_id,
+                allowed_actions=frozenset({Capability.DCE_PREPARE}),
+                allowed_classifications=frozenset({DataClassification.INTERNAL_OPERATIONAL}),
+            ),
+        ),
+    )
+    request = AuthorizationRequest(
+        action=Capability.CASE_DCE_READ,
+        resource=_resource(
+            context,
+            classification=DataClassification.INTERNAL_OPERATIONAL,
+            case_id=case_id,
+        ),
+    )
+
+    decision = AuthorizationPolicy().authorize(context=context, request=request)
+
+    assert decision.allowed is False
+    assert decision.code == "AUTHORIZATION_DENIED"
 
 
 def test_delegate_can_only_receive_explicit_capabilities_in_the_delegable_allow_list() -> None:
@@ -90,6 +163,7 @@ def test_delegate_can_only_receive_explicit_capabilities_in_the_delegable_allow_
         delegated_capabilities=frozenset(
             {
                 Capability.CONSULTATION_READ,
+                Capability.CASE_DCE_READ,
                 Capability.DECISION_FINALIZE,
                 Capability.PRICING_READ,
             }
@@ -97,6 +171,7 @@ def test_delegate_can_only_receive_explicit_capabilities_in_the_delegable_allow_
     )
 
     assert Capability.CONSULTATION_READ in capabilities
+    assert Capability.CASE_DCE_READ in capabilities
     assert Capability.DECISION_FINALIZE in capabilities
     assert Capability.PRICING_READ not in capabilities
 

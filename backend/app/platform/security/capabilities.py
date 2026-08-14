@@ -14,6 +14,7 @@ class Capability(StrEnum):
     CONSULTATION_CREATE = "consultation.create"
     CONSULTATION_READ = "consultation.read"
     DCE_PREPARE = "dce.prepare"
+    CASE_DCE_READ = "case.dce.read"
     DCE_REQUIREMENT_CONFIRM = "dce.requirement.confirm"
     DOCUMENT_ADMIN_READ = "document.administrative.read"
     PREPARATION_TRANSMIT = "preparation.transmit"
@@ -33,6 +34,7 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.CONSULTATION_CREATE,
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
+        Capability.CASE_DCE_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
@@ -50,6 +52,7 @@ _COLLABORATOR_CAPABILITIES = frozenset(
     {
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
+        Capability.CASE_DCE_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
@@ -59,6 +62,7 @@ _DELEGABLE_CAPABILITIES = frozenset(
     {
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
+        Capability.CASE_DCE_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
