@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`CASE-DCE-READ-01-A` — validé localement, publication en cours. Cet incrément introduit la capability fermée `case.dce.read` pour la future lecture DCE par affaire, attribuée au patron, au collaborateur et seulement aux délégations explicites. La policy SEC-01 existante l’applique avec une `Case` résolue côté serveur, une affectation ReBAC active, l’action déclarée dans le scope et la classification `INTERNAL_OPERATIONAL`. Les fondations SEC-01, DCE-READ-01, DCE-REQUIREMENTS-CONFIRMATION-01 et les slices DCE précédents restent publiés sur `main`.
+`CASE-DCE-READ-01-A` — publié sur `main` et CI GitHub verte. Cet incrément introduit la capability fermée `case.dce.read` pour la future lecture DCE par affaire, attribuée au patron, au collaborateur et seulement aux délégations explicites. La policy SEC-01 existante l’applique avec une `Case` résolue côté serveur, une affectation ReBAC active, l’action déclarée dans le scope et la classification `INTERNAL_OPERATIONAL`. Les fondations SEC-01, DCE-READ-01, DCE-REQUIREMENTS-CONFIRMATION-01 et les slices DCE précédents restent publiés sur `main`.
 
 ## Dernier état vert
 
@@ -12,7 +12,7 @@
 | Migration Alembic | `20260814_0017` et `20260814_0018` validées : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Tests | `uv run ruff check .` vert ; `uv run pytest backend/tests -q` : **222 tests verts**. CASE-DCE-READ-01-A couvre capability patron/collaborateur, patron autorisé, collaborateur avec scope Case/action/classification autorisé et refus lorsque l’action de lecture manque au scope. Les scénarios API de confirmation couvrent également bearer obligatoire, succès patron audité, collaborateur sans affectation, `NOT_APPLICABLE` interdit et audité, ressource hors tenant neutre et DCE rattachée à plusieurs Cases refusée. |
-| CI | [Workflow GitHub vert #31794051057](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31794051057) : lint, secrets, audit dépendances, Bandit et 219 tests PostgreSQL sont passés. Le job image a confirmé l’absence de Dockerfile; build et scan Trivy restent explicitement non applicables jusqu’à l’introduction d’un artefact conteneur. |
+| CI | [Workflow GitHub vert #31798368104](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31798368104) : lint, secrets, audit dépendances, Bandit et **222 tests PostgreSQL** sont passés. Le job image a confirmé l’absence de Dockerfile; build et scan Trivy restent explicitement non applicables jusqu’à l’introduction d’un artefact conteneur. |
 
 ## Ce qui est terminé
 
@@ -62,7 +62,7 @@
 
 ## Prochaine action unique
 
-Publier CASE-DCE-READ-01-A, puis ouvrir `CASE-DCE-READ-01-B` : query applicative tenant-scopée qui résout une Case et sa DCE applicable côté serveur et retourne une projection DCE strictement fermée, avant toute route HTTP ou interface React.
+Ouvrir `CASE-DCE-READ-01-B` : query applicative tenant-scopée qui résout une Case et sa DCE applicable côté serveur et retourne une projection DCE strictement fermée, avant toute route HTTP ou interface React.
 
 ## Décisions ouvertes
 
