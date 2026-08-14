@@ -102,6 +102,76 @@
         "title": "AggregateReferenceResponse",
         "type": "object"
       },
+      "AmendPatronAssignmentScopeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "scope_actions": {
+            "items": {
+              "enum": [
+                "case.dce.read",
+                "dce.requirement.confirm",
+                "document.administrative.read",
+                "preparation.transmit",
+                "assignment.acknowledge",
+                "assignment.clarify",
+                "assignment.history.read",
+                "assignment.unavailability"
+              ],
+              "type": "string"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Scope Actions",
+            "type": "array"
+          },
+          "scope_classifications": {
+            "items": {
+              "const": "INTERNAL_OPERATIONAL",
+              "type": "string"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "title": "Scope Classifications",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope_actions",
+          "scope_classifications",
+          "command_id",
+          "idempotency_key",
+          "expected_revision"
+        ],
+        "title": "AmendPatronAssignmentScopeRequest",
+        "type": "object"
+      },
       "AssignedCaseResponse": {
         "additionalProperties": false,
         "description": "Closed Case list item returned after server-side ReBAC filtering.",
@@ -175,7 +245,9 @@
             "enum": [
               "ASSIGNMENT_ACKNOWLEDGED",
               "ASSIGNMENT_CLARIFICATION_REQUESTED",
-              "ASSIGNMENT_UNAVAILABILITY_REPORTED"
+              "ASSIGNMENT_UNAVAILABILITY_REPORTED",
+              "CASE_ASSIGNMENT_CREATED",
+              "CASE_ASSIGNMENT_SCOPE_AMENDED"
             ],
             "title": "Result Code",
             "type": "string"
@@ -817,6 +889,106 @@
           "projection"
         ],
         "title": "CreateConsultationResponse",
+        "type": "object"
+      },
+      "CreatePatronCaseAssignmentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "expected_case_revision": {
+            "minimum": 0.0,
+            "title": "Expected Case Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "scope_actions": {
+            "items": {
+              "enum": [
+                "case.dce.read",
+                "dce.requirement.confirm",
+                "document.administrative.read",
+                "preparation.transmit",
+                "assignment.acknowledge",
+                "assignment.clarify",
+                "assignment.history.read",
+                "assignment.unavailability"
+              ],
+              "type": "string"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Scope Actions",
+            "type": "array"
+          },
+          "scope_classifications": {
+            "items": {
+              "const": "INTERNAL_OPERATIONAL",
+              "type": "string"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "title": "Scope Classifications",
+            "type": "array"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "target_membership_id": {
+            "format": "uuid",
+            "title": "Target Membership Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope_actions",
+          "scope_classifications",
+          "command_id",
+          "idempotency_key",
+          "assignment_id",
+          "target_membership_id",
+          "expected_case_revision",
+          "starts_at"
+        ],
+        "title": "CreatePatronCaseAssignmentRequest",
         "type": "object"
       },
       "DceDocumentAdmissionInput": {
@@ -2020,6 +2192,174 @@
         "summary": "Report Unavailability",
         "tags": [
           "assignments"
+        ]
+      }
+    },
+    "/api/v1/patron/assignments/{assignment_id}/scope-amendments": {
+      "post": {
+        "operationId": "amend_case_assignment_scope_api_v1_patron_assignments__assignment_id__scope_amendments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendPatronAssignmentScopeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Rejeu idempotent de la commande patron déjà appliquée."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability patron insuffisante."
+          },
+          "404": {
+            "description": "Affaire ou affectation absente ou hors tenant : réponse neutre."
+          },
+          "409": {
+            "description": "Clé d’idempotence réutilisée ou conflit de révision détecté."
+          },
+          "422": {
+            "description": "Validation de requête ou invariant métier refusé."
+          }
+        },
+        "summary": "Amend Case Assignment Scope",
+        "tags": [
+          "patron-assignments"
+        ]
+      }
+    },
+    "/api/v1/patron/cases/{case_id}/assignments": {
+      "post": {
+        "operationId": "create_case_assignment_api_v1_patron_cases__case_id__assignments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePatronCaseAssignmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Rejeu idempotent de la commande patron déjà appliquée."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability patron insuffisante."
+          },
+          "404": {
+            "description": "Affaire ou affectation absente ou hors tenant : réponse neutre."
+          },
+          "409": {
+            "description": "Clé d’idempotence réutilisée ou conflit de révision détecté."
+          },
+          "422": {
+            "description": "Validation de requête ou invariant métier refusé."
+          }
+        },
+        "summary": "Create Case Assignment",
+        "tags": [
+          "patron-assignments"
         ]
       }
     }

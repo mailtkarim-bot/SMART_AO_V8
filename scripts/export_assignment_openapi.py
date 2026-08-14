@@ -66,7 +66,7 @@ def main() -> None:
     assignment_paths = {
         path: operation
         for path, operation in app.openapi()["paths"].items()
-        if path.startswith("/api/v1/assignments/")
+        if path.startswith("/api/v1/assignments/") or path.startswith("/api/v1/patron/")
     }
     payload = {
         "openapi": app.openapi()["openapi"],

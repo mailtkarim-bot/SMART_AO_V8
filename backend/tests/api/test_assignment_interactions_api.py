@@ -187,6 +187,67 @@ def _seed_case_and_assignment(
     return case_id, assignment_id
 
 
+def _seed_patron_case_and_target(
+    session_factory: sessionmaker[Session],
+    *,
+    tenant_id: UUID,
+) -> tuple[UUID, UUID]:
+    target_identity_id = uuid4()
+    target_membership_id = uuid4()
+    case_id = uuid4()
+    with session_factory.begin() as session:
+        session.add(
+            IdentityRecord(
+                id=target_identity_id,
+                email_normalized=f"target-{target_identity_id.hex[:12]}@example.test",
+                lifecycle="ACTIVE",
+                email_verified_at=NOW,
+            )
+        )
+        session.add(
+            TenantMembershipRecord(
+                id=target_membership_id,
+                tenant_id=tenant_id,
+                identity_id=target_identity_id,
+                role="COLLABORATEUR",
+                state="ACTIVE",
+                activated_at=NOW,
+                revoked_at=None,
+            )
+        )
+        session.flush()
+        session.add(
+            CaseRecord(
+                id=case_id,
+                tenant_id=tenant_id,
+                aggregate_revision=5,
+                functional_identity_hash="c" * 64,
+                title="Affaire HTTP patron",
+                object_description=None,
+                business_origin="MANUAL",
+                origin_reference_id=None,
+                origin_rationale="Test de façade patron",
+                consultation_id=None,
+                scope_kind="CUSTOM",
+                scope_json={},
+                scope_fingerprint="d" * 64,
+                applicable_dce_version_id=None,
+                lifecycle="ACTIVE",
+                commercial_stage="ANALYSIS",
+                decision_readiness="NOT_ASSESSED",
+                dce_freshness="NO_DCE",
+                responsibility_status="UNASSIGNED",
+                stopped_reason=None,
+                stopped_at=None,
+                archived_reason=None,
+                archived_at=None,
+                created_by_actor_id=None,
+                updated_by_actor_id=None,
+            )
+        )
+    return case_id, target_membership_id
+
+
 def _client(
     session_factory: sessionmaker[Session],
 ) -> tuple[TestClient, JwtAccessTokenCodec]:
@@ -242,6 +303,21 @@ def _ack_payload() -> dict[str, str | int]:
         "correlation_id": str(uuid4()),
         "expected_revision": 0,
         "note": "Affectation reçue.",
+    }
+
+
+def _patron_create_payload(target_membership_id: UUID) -> dict[str, str | int | list[str]]:
+    return {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "assignment_id": str(uuid4()),
+        "target_membership_id": str(target_membership_id),
+        "expected_case_revision": 5,
+        "scope_actions": ["case.dce.read", "assignment.history.read"],
+        "scope_classifications": ["INTERNAL_OPERATIONAL"],
+        "starts_at": "2026-08-14T12:00:00Z",
+        "ends_at": "2026-08-21T12:00:00Z",
     }
 
 
@@ -678,3 +754,136 @@ def test_assignment_history_requires_bearer(
     response = client.get(f"/api/v1/assignments/{assignment_id}/history")
 
     assert response.status_code == 401
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_creation_and_scope_amendment_return_closed_receipts(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    creation_payload = _patron_create_payload(target_membership_id)
+
+    creation = client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+    replay = client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+    assignment_id = UUID(creation_payload["assignment_id"])
+    amendment = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/scope-amendments",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "correlation_id": str(uuid4()),
+            "expected_revision": 0,
+            "scope_actions": ["case.dce.read", "preparation.transmit"],
+            "scope_classifications": ["INTERNAL_OPERATIONAL"],
+        },
+        headers=headers,
+    )
+
+    assert creation.status_code == 201
+    assert replay.status_code == 200
+    assert creation.json()["result_code"] == "CASE_ASSIGNMENT_CREATED"
+    assert replay.json()["replayed"] is True
+    assert amendment.status_code == 201
+    assert amendment.json()["result_code"] == "CASE_ASSIGNMENT_SCOPE_AMENDED"
+    prohibited = {"tenant_id", "target_membership_id", "scope_actions", "scope_classifications"}
+    assert not prohibited.intersection(creation.json())
+    assert not prohibited.intersection(amendment.json())
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_management_rejects_collaborator_and_foreign_case_neutrally(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(database_engine)
+    other_tenant, _, _, _ = _seed_principal(database_engine)
+    foreign_case_id, foreign_target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=other_tenant,
+    )
+    client, tokens = _client(session_factory)
+    response = client.post(
+        f"/api/v1/patron/cases/{foreign_case_id}/assignments",
+        json=_patron_create_payload(foreign_target_membership_id),
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "FORBIDDEN"}
+    with session_factory() as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.action == "assignment.manage",
+                SecurityAuditEventRecord.reason_code == "ASSIGNMENT_PATRON_REQUIRED",
+            )
+        )
+    assert audit is not None
+
+    patron_tenant, patron_identity_id, _, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    del patron_tenant
+    neutral = client.post(
+        f"/api/v1/patron/cases/{foreign_case_id}/assignments",
+        json=_patron_create_payload(foreign_target_membership_id),
+        headers=_headers(
+            tokens,
+            identity_id=patron_identity_id,
+            session_id=patron_session_id,
+        ),
+    )
+
+    assert neutral.status_code == 404
+    assert neutral.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_scope_payload_is_closed(
+    database_engine: sa.Engine,
+    session_factory,
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    payload = _patron_create_payload(target_membership_id)
+    payload["scope_actions"] = ["pricing.read"]
+    client, tokens = _client(session_factory)
+
+    response = client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=payload,
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 422

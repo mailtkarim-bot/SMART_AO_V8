@@ -270,7 +270,6 @@ class CaseAssignmentRecord(TenantScopedRecord, Base):
             "AND jsonb_array_length(scope_classifications_json) > 0",
             name="classifications",
         ),
-        sa.CheckConstraint("granted_at >= starts_at", name="granted_after_start"),
         sa.CheckConstraint("ends_at IS NULL OR ends_at > starts_at", name="end_after_start"),
         sa.CheckConstraint(
             "(state IN ('ACTIVE', 'SUSPENDED') AND ended_at IS NULL) OR "

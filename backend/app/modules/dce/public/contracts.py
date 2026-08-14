@@ -6,10 +6,14 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from app.modules.dce.application.commands import (
     AcknowledgeAssignmentCommand,
+    AmendCaseAssignmentScopeCommand,
+    AssignmentScopeAction,
+    AssignmentScopeClassification,
+    CreateCaseAssignmentCommand,
     CreateConsultationCommand,
     RecordDceRequirementConfirmationCommand,
     RegisterDceVersionCommand,
@@ -269,10 +273,59 @@ class AssignmentCommandResponse(PublicResponseModel):
         "ASSIGNMENT_ACKNOWLEDGED",
         "ASSIGNMENT_CLARIFICATION_REQUESTED",
         "ASSIGNMENT_UNAVAILABILITY_REPORTED",
+        "CASE_ASSIGNMENT_CREATED",
+        "CASE_ASSIGNMENT_SCOPE_AMENDED",
     ]
     aggregate_refs: list[AggregateReferenceResponse]
     event_ids: list[UUID]
     replayed: bool = False
+
+
+class PatronAssignmentScopeRequest(PublicRequestModel):
+    """Closed operational scope intentionally excluding all pricing and decision actions."""
+
+    scope_actions: list[AssignmentScopeAction] = Field(min_length=1, max_length=8)
+    scope_classifications: list[AssignmentScopeClassification] = Field(min_length=1, max_length=1)
+
+    @model_validator(mode="after")
+    def validate_and_canonicalize_scope(self) -> PatronAssignmentScopeRequest:
+        if len(self.scope_actions) != len(set(self.scope_actions)):
+            raise ValueError("assignment scope actions must not contain duplicates")
+        if len(self.scope_classifications) != len(set(self.scope_classifications)):
+            raise ValueError("assignment scope classifications must not contain duplicates")
+        self.scope_actions.sort()
+        self.scope_classifications.sort()
+        return self
+
+
+class CreatePatronCaseAssignmentRequest(PatronAssignmentScopeRequest):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    assignment_id: UUID
+    target_membership_id: UUID
+    expected_case_revision: int = Field(ge=0)
+    starts_at: AwareDatetime
+    ends_at: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def validate_period(self) -> CreatePatronCaseAssignmentRequest:
+        if self.ends_at is not None and self.ends_at <= self.starts_at:
+            raise ValueError("assignment period must be strictly ordered")
+        return self
+
+    def to_command(self, *, case_id: UUID) -> CreateCaseAssignmentCommand:
+        return CreateCaseAssignmentCommand(**self.model_dump(), case_id=case_id)
+
+
+class AmendPatronAssignmentScopeRequest(PatronAssignmentScopeRequest):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    expected_revision: int = Field(ge=0)
+
+    def to_command(self, *, assignment_id: UUID) -> AmendCaseAssignmentScopeCommand:
+        return AmendCaseAssignmentScopeCommand(**self.model_dump(), assignment_id=assignment_id)
 
 
 class RecordDceRequirementConfirmationRequest(PublicResponseModel):

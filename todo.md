@@ -63,3 +63,10 @@
 - [x] Implémenter le premier handler transactionnel `CreateCaseAssignment`, son journal patron, son événement, son outbox et son receipt idempotent.
 - [x] Écrire les tests d’intégration PostgreSQL du premier incrément : tenant, FKs, unicité, append-only, rollback, idempotence et conflit de révision Case.
 - [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du premier incrément patron (commit `04f0469`, workflow `31838720621` vert).
+- [x] Auditer les conventions du handler patron, du journal `case_assignment_change_events`, des routes authentifiées et des tests API existants.
+- [x] Implémenter `AmendCaseAssignmentScope` avec verrou, révision optimiste, journal append-only, événement, outbox et receipt idempotent.
+- [x] Écrire les tests PostgreSQL d’amendement : scope fermé, révision, rejeu, refus tenant/role/état et append-only.
+- [x] Vérifier l’upgrade/check/downgrade de la migration `20260814_0021` et mesurer les insertions/lectures du journal append-only avec un seuil explicitement documenté.
+- [x] Créer les routes HTTP patron uniquement pour `CreateCaseAssignment` et `AmendCaseAssignmentScope`, avec bearer réel, policy auditée, DTO fermés et OpenAPI vérifiée.
+- [x] Publier un amendement normatif et une migration additive `0022` pour lever le check historique incompatible avec les fenêtres d’affectation futures.
+- [ ] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub de l’incrément patron 2.

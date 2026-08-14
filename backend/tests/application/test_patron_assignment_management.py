@@ -9,7 +9,10 @@ import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 from app.modules.case.infrastructure.models.case import CaseRecord
-from app.modules.dce.application.commands import CreateCaseAssignmentCommand
+from app.modules.dce.application.commands import (
+    AmendCaseAssignmentScopeCommand,
+    CreateCaseAssignmentCommand,
+)
 from app.modules.membership.application.patron_assignment import (
     PatronAssignmentManagementService,
     patron_assignment_handlers,
@@ -197,6 +200,24 @@ def _command(case_id: UUID, target_membership_id: UUID) -> CreateCaseAssignmentC
     )
 
 
+def _amend_command(
+    assignment_id: UUID,
+    *,
+    expected_revision: int = 0,
+    scope_actions: list[str] | None = None,
+) -> AmendCaseAssignmentScopeCommand:
+    return AmendCaseAssignmentScopeCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        assignment_id=assignment_id,
+        expected_revision=expected_revision,
+        scope_actions=scope_actions
+        or [Capability.CASE_DCE_READ.value, Capability.PREPARATION_TRANSMIT.value],
+        scope_classifications=["INTERNAL_OPERATIONAL"],
+    )
+
+
 @pytest.mark.db
 @pytest.mark.security
 def test_patron_creation_writes_append_only_change_event_and_outbox(session_factory) -> None:
@@ -253,6 +274,27 @@ def test_patron_creation_replay_has_no_duplicate_change_or_event(session_factory
         ) == 1
         assert session.scalar(sa.select(sa.func.count()).select_from(DomainEventRecord)) == 1
         assert session.scalar(sa.select(sa.func.count()).select_from(OutboxMessageRecord)) == 1
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_creation_accepts_a_future_operational_window(session_factory) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    command = _command(case_id, target_membership_id).model_copy(
+        update={
+            "starts_at": NOW + timedelta(days=2),
+            "ends_at": NOW + timedelta(days=9),
+        }
+    )
+
+    result = _service(session_factory).create(actor=actor, command=command, now=NOW)
+
+    assert result.result_code == "CASE_ASSIGNMENT_CREATED"
+    with session_factory() as session:
+        assignment = session.get(CaseAssignmentRecord, command.assignment_id)
+    assert assignment is not None
+    assert assignment.state == "ACTIVE"
+    assert assignment.starts_at == NOW + timedelta(days=2)
 
 
 @pytest.mark.db
@@ -314,3 +356,138 @@ def test_non_patron_is_denied_before_dispatch_without_assignment_write(session_f
     with session_factory() as session:
         assert session.scalar(sa.select(CaseAssignmentRecord)) is None
         assert session.scalar(sa.select(CaseAssignmentChangeEventRecord)) is None
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_amends_scope_with_revisioned_change_event_and_outbox(session_factory) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id)
+    service.create(actor=actor, command=creation, now=NOW)
+    amendment = _amend_command(creation.assignment_id)
+
+    result = service.amend_scope(actor=actor, command=amendment, now=NOW)
+
+    assert result.result_code == "CASE_ASSIGNMENT_SCOPE_AMENDED"
+    with session_factory() as session:
+        assignment = session.get(CaseAssignmentRecord, creation.assignment_id)
+        changes = list(
+            session.scalars(
+                sa.select(CaseAssignmentChangeEventRecord).where(
+                    CaseAssignmentChangeEventRecord.assignment_id == creation.assignment_id,
+                    CaseAssignmentChangeEventRecord.event_type == "ASSIGNMENT_SCOPE_AMENDED",
+                )
+            )
+        )
+        events = list(session.scalars(sa.select(DomainEventRecord)))
+        outbox = list(session.scalars(sa.select(OutboxMessageRecord)))
+    assert assignment is not None
+    assert assignment.aggregate_revision == 1
+    assert assignment.scope_actions_json == [
+        Capability.CASE_DCE_READ.value,
+        Capability.PREPARATION_TRANSMIT.value,
+    ]
+    assert len(changes) == 1
+    assert changes[0].previous_revision == 0
+    assert changes[0].resulting_revision == 1
+    assert changes[0].previous_scope_actions_json == [
+        Capability.ASSIGNMENT_HISTORY_READ.value,
+        Capability.CASE_DCE_READ.value,
+    ]
+    assert len(events) == 2
+    assert events[-1].event_type == "CaseAssignmentScopeAmended"
+    assert len(outbox) == 2
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_scope_amendment_replays_without_second_durable_change(session_factory) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id)
+    service.create(actor=actor, command=creation, now=NOW)
+    amendment = _amend_command(creation.assignment_id)
+
+    first = service.amend_scope(actor=actor, command=amendment, now=NOW)
+    replay = service.amend_scope(actor=actor, command=amendment, now=NOW)
+
+    assert first.result_code == "CASE_ASSIGNMENT_SCOPE_AMENDED"
+    assert replay.replayed is True
+    with session_factory() as session:
+        assignment = session.get(CaseAssignmentRecord, creation.assignment_id)
+        changes = list(session.scalars(sa.select(CaseAssignmentChangeEventRecord)))
+        events = list(session.scalars(sa.select(DomainEventRecord)))
+        outbox = list(session.scalars(sa.select(OutboxMessageRecord)))
+    assert assignment is not None
+    assert assignment.aggregate_revision == 1
+    assert len(changes) == 2
+    assert len(events) == 2
+    assert len(outbox) == 2
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_scope_amendment_rejects_unchanged_or_stale_scope(session_factory) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id)
+    service.create(actor=actor, command=creation, now=NOW)
+
+    with pytest.raises(Exception, match="ASSIGNMENT_SCOPE_UNCHANGED"):
+        service.amend_scope(
+            actor=actor,
+            command=_amend_command(
+                creation.assignment_id,
+                scope_actions=[
+                    Capability.ASSIGNMENT_HISTORY_READ.value,
+                    Capability.CASE_DCE_READ.value,
+                ],
+            ),
+            now=NOW,
+        )
+    service.amend_scope(actor=actor, command=_amend_command(creation.assignment_id), now=NOW)
+    with pytest.raises(Exception, match="VERSION_CONFLICT"):
+        service.amend_scope(
+            actor=actor,
+            command=_amend_command(
+                creation.assignment_id,
+                expected_revision=0,
+                scope_actions=[Capability.CASE_DCE_READ.value],
+            ),
+            now=NOW,
+        )
+
+    with session_factory() as session:
+        assignment = session.get(CaseAssignmentRecord, creation.assignment_id)
+        assert assignment is not None
+        assert assignment.aggregate_revision == 1
+        assert session.scalar(
+            sa.select(sa.func.count()).select_from(CaseAssignmentChangeEventRecord)
+        ) == 2
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_amends_suspended_assignment_without_reactivating_it(session_factory) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id)
+    service.create(actor=actor, command=creation, now=NOW)
+    with session_factory.begin() as session:
+        assignment = session.get(CaseAssignmentRecord, creation.assignment_id)
+        assert assignment is not None
+        assignment.state = "SUSPENDED"
+
+    result = service.amend_scope(
+        actor=actor,
+        command=_amend_command(creation.assignment_id),
+        now=NOW,
+    )
+
+    assert result.result_code == "CASE_ASSIGNMENT_SCOPE_AMENDED"
+    with session_factory() as session:
+        assignment = session.get(CaseAssignmentRecord, creation.assignment_id)
+    assert assignment is not None
+    assert assignment.state == "SUSPENDED"
+    assert assignment.aggregate_revision == 1

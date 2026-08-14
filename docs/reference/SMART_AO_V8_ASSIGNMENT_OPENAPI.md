@@ -2,10 +2,10 @@
 
 **Statut :** référence générée et vérifiée.
 
-**Périmètre :** les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01` et la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`.
+**Périmètre :** les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01` et les deux commandes patron implémentées de `PATRON-ASSIGNMENT-MANAGEMENT-01`.
 **Source de vérité exécutable :** `scripts/export_assignment_openapi.py`, qui produit le snapshot [`SMART_AO_V8_ASSIGNMENT_OPENAPI.json`](SMART_AO_V8_ASSIGNMENT_OPENAPI.json) depuis `create_app()` et ses dépendances SEC-01 réelles.
 
-Ce registre décrit les routes HTTP sous le préfixe `/api/v1/assignments`. Elles résolvent toujours l’acteur depuis le bearer serveur : aucun tenant, membership, scope, acteur ou contexte de test n’est accepté depuis le corps client.
+Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et `/api/v1/patron`. Elles résolvent toujours l’acteur depuis le bearer serveur : aucun tenant, membership d’auteur, scope d’autorité, acteur ou contexte de test n’est accepté depuis le corps client.
 
 | Méthode | Route | Capability et scope ReBAC | Réponse métier |
 |---|---|---|---|
@@ -13,6 +13,8 @@ Ce registre décrit les routes HTTP sous le préfixe `/api/v1/assignments`. Elle
 | `POST` | `/{assignment_id}/clarification-requests` | `assignment.clarify` | Demande de clarification append-only transmise au patron. |
 | `POST` | `/{assignment_id}/unavailability-reports` | `assignment.unavailability` | Signalement append-only d’indisponibilité. |
 | `GET` | `/{assignment_id}/history?limit=1..200` | `assignment.history.read` | Vue fermée, chronologique et bornée des trois historiques. |
+| `POST` | `/api/v1/patron/cases/{case_id}/assignments` | `assignment.manage`, `PATRON_ADMIN` | Création transactionnelle d’une affectation opérationnelle. |
+| `POST` | `/api/v1/patron/assignments/{assignment_id}/scope-amendments` | `assignment.manage`, `PATRON_ADMIN` | Amendement révisionné du scope opérationnel fermé. |
 
 ## Conventions transverses
 
@@ -39,6 +41,17 @@ Les trois commandes ont une réponse commune `AssignmentCommandResponse`, strict
 | Signalement d’indisponibilité | `command_id`, `idempotency_key`, `expected_revision`, `reason_kind`, `reason`, `unavailable_from`, `unavailable_until?`, `known_deadline_impact`, `impact_note?` | `ASSIGNMENT_UNAVAILABILITY_REPORTED` |
 
 > Les notes, questions, raisons, demandes de périmètre et textes d’impact sont des entrées nécessaires aux commandes ; ils ne sont jamais repris dans la vue publique d’historique.
+
+## Commandes patron disponibles
+
+Les deux routes patron utilisent `PATRON_ADMIN` et la capability serveur `assignment.manage`. Elles ne reçoivent jamais `tenant_id`, auteur, rôle, capability, état, prix, marge, donnée de trésorerie, décision, scope libre ni date d’écriture. Le tenant, le patron et la date effective sont résolus par SEC-01 et par l’horloge serveur.
+
+| Opération | Corps JSON principal | Codes résultat possibles | Mutation durable |
+|---|---|---|---|
+| Création d’affectation | `command_id`, `idempotency_key`, `assignment_id`, `target_membership_id`, `expected_case_revision`, scope fermé, fenêtre | `CASE_ASSIGNMENT_CREATED` | Racine `ACTIVE` révision `0`, journal patron, événement, outbox, receipt. |
+| Amendement de scope | `command_id`, `idempotency_key`, `expected_revision`, scope fermé | `CASE_ASSIGNMENT_SCOPE_AMENDED` | Scope remplacé, révision +1, journal patron, événement, outbox, receipt. |
+
+Les listes de scope n’acceptent que les actions collaborateur opérationnelles et `INTERNAL_OPERATIONAL`. Une action financière, une action de décision/dépôt, une valeur inconnue, une classification interdite, un doublon ou un champ supplémentaire échoue avant la transaction. L’amendement sur une affectation absente ou hors tenant est neutre ; une révision obsolète retourne `409 VERSION_CONFLICT`; un scope identique, une affectation fermée ou un invariant métier retourne `422`.
 
 ## Lecture fermée d’historique
 

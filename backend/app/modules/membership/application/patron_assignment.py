@@ -1,7 +1,9 @@
-"""First patron-owned transactional boundary for controlled Case assignment creation."""
+"""Transactional patron-owned boundaries for controlled Case assignment management."""
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -9,7 +11,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.case.infrastructure.models.case import CaseRecord
-from app.modules.dce.application.commands import CreateCaseAssignmentCommand
+from app.modules.dce.application.commands import (
+    AmendCaseAssignmentScopeCommand,
+    CreateCaseAssignmentCommand,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -40,7 +45,7 @@ from app.platform.security.models import (
 
 
 class PatronAssignmentManagementService:
-    """Resolve patron authority before dispatching an assignment creation."""
+    """Resolve patron authority before dispatching assignment management commands."""
 
     def __init__(
         self,
@@ -62,12 +67,119 @@ class PatronAssignmentManagementService:
         command: CreateCaseAssignmentCommand,
         now: datetime,
     ) -> DispatchResult:
+        self._require_patron(
+            actor=actor,
+            command=command,
+            now=now,
+            resource_type="CASE",
+            resource_id=command.case_id,
+            case_id=command.case_id,
+        )
+        case = self._resolve_case(tenant_id=actor.tenant_id, case_id=command.case_id)
+        if case is None:
+            self._record_manual_denial(
+                actor=actor,
+                command=command,
+                now=now,
+                reason_code="NOT_FOUND_OR_FORBIDDEN",
+                resource_type="CASE",
+                resource_id=command.case_id,
+                case_id=command.case_id,
+            )
+            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+        self._authorize_case_management(actor=actor, case=case, now=now)
+        return self._dispatch(actor=actor, command=command, case_id=case.id, now=now)
+
+    def amend_scope(
+        self,
+        *,
+        actor: ActorContext,
+        command: AmendCaseAssignmentScopeCommand,
+        now: datetime,
+    ) -> DispatchResult:
+        self._require_patron(
+            actor=actor,
+            command=command,
+            now=now,
+            resource_type="CASE_ASSIGNMENT",
+            resource_id=command.assignment_id,
+            case_id=None,
+        )
+        assignment = self._resolve_assignment(
+            tenant_id=actor.tenant_id,
+            assignment_id=command.assignment_id,
+        )
+        if assignment is None:
+            self._record_manual_denial(
+                actor=actor,
+                command=command,
+                now=now,
+                reason_code="NOT_FOUND_OR_FORBIDDEN",
+                resource_type="CASE_ASSIGNMENT",
+                resource_id=command.assignment_id,
+                case_id=None,
+            )
+            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+        decision = self._policy.authorize(
+            context=actor,
+            request=AuthorizationRequest(
+                action=Capability.ASSIGNMENT_MANAGE,
+                resource=AuthorizationResource(
+                    resource_type="CASE_ASSIGNMENT",
+                    resource_id=assignment.id,
+                    tenant_id=actor.tenant_id,
+                    classification=DataClassification.INTERNAL_OPERATIONAL,
+                    case_id=assignment.case_id,
+                ),
+                evaluated_at=now,
+            ),
+        )
+        if not decision.allowed:
+            raise PermissionError(decision.code)
+        return self._dispatch(actor=actor, command=command, case_id=assignment.case_id, now=now)
+
+    def _dispatch(
+        self,
+        *,
+        actor: ActorContext,
+        command,
+        case_id: UUID,
+        now: datetime,
+    ) -> DispatchResult:
+        return self._dispatcher.dispatch(
+            command=command,
+            context=CommandContext(
+                tenant_id=actor.tenant_id,
+                actor_id=actor.actor_id,
+                actor_kind=actor.actor_kind.value,
+                received_at=now,
+                identity_id=actor.identity_id,
+                membership_id=actor.membership_id,
+                session_id=actor.session_id,
+                case_id=case_id,
+                correlation_id=actor.correlation_id,
+            ),
+        )
+
+    def _require_patron(
+        self,
+        *,
+        actor: ActorContext,
+        command,
+        now: datetime,
+        resource_type: str,
+        resource_id: UUID,
+        case_id: UUID | None,
+    ) -> None:
         if actor.actor_kind is not ActorKind.PATRON_ADMIN:
             self._record_manual_denial(
                 actor=actor,
                 command=command,
                 now=now,
                 reason_code="ASSIGNMENT_PATRON_REQUIRED",
+                resource_type=resource_type,
+                resource_id=resource_id,
+                case_id=case_id,
             )
             raise PermissionError("ASSIGNMENT_PATRON_REQUIRED")
         if actor.membership_id is None:
@@ -76,18 +188,19 @@ class PatronAssignmentManagementService:
                 command=command,
                 now=now,
                 reason_code="ASSIGNMENT_MEMBERSHIP_REQUIRED",
+                resource_type=resource_type,
+                resource_id=resource_id,
+                case_id=case_id,
             )
             raise PermissionError("ASSIGNMENT_MEMBERSHIP_REQUIRED")
 
-        case = self._resolve_case(tenant_id=actor.tenant_id, case_id=command.case_id)
-        if case is None:
-            self._record_manual_denial(
-                actor=actor,
-                command=command,
-                now=now,
-                reason_code="NOT_FOUND_OR_FORBIDDEN",
-            )
-            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+    def _authorize_case_management(
+        self,
+        *,
+        actor: ActorContext,
+        case: CaseRecord,
+        now: datetime,
+    ) -> None:
         decision = self._policy.authorize(
             context=actor,
             request=AuthorizationRequest(
@@ -105,28 +218,16 @@ class PatronAssignmentManagementService:
         if not decision.allowed:
             raise PermissionError(decision.code)
 
-        return self._dispatcher.dispatch(
-            command=command,
-            context=CommandContext(
-                tenant_id=actor.tenant_id,
-                actor_id=actor.actor_id,
-                actor_kind=actor.actor_kind.value,
-                received_at=now,
-                identity_id=actor.identity_id,
-                membership_id=actor.membership_id,
-                session_id=actor.session_id,
-                case_id=case.id,
-                correlation_id=actor.correlation_id,
-            ),
-        )
-
     def _record_manual_denial(
         self,
         *,
         actor: ActorContext,
-        command: CreateCaseAssignmentCommand,
+        command,
         now: datetime,
         reason_code: str,
+        resource_type: str,
+        resource_id: UUID,
+        case_id: UUID | None,
     ) -> None:
         with self._session_factory.begin() as session:
             self._audit_writer.record(
@@ -143,9 +244,9 @@ class PatronAssignmentManagementService:
                     outcome=AuditOutcome.DENIED,
                     severity=AuditSeverity.WARNING,
                     action=str(Capability.ASSIGNMENT_MANAGE),
-                    resource_type="CASE",
-                    resource_id=command.case_id,
-                    case_id=command.case_id,
+                    resource_type=resource_type,
+                    resource_id=resource_id,
+                    case_id=case_id,
                     correlation_id=command.correlation_id,
                     command_id=command.command_id,
                     request_id=None,
@@ -165,24 +266,44 @@ class PatronAssignmentManagementService:
                 )
             )
 
+    def _resolve_assignment(
+        self,
+        *,
+        tenant_id: UUID,
+        assignment_id: UUID,
+    ) -> CaseAssignmentRecord | None:
+        with self._session_factory() as session:
+            return session.scalar(
+                sa.select(CaseAssignmentRecord).where(
+                    CaseAssignmentRecord.tenant_id == tenant_id,
+                    CaseAssignmentRecord.id == assignment_id,
+                )
+            )
+
 
 class PatronAssignmentManagementHandler:
-    """Own the atomic creation of one patron-controlled Case assignment."""
+    """Own the atomic patron mutations available in the current increment."""
 
-    def execute(
-        self,
+    def execute(self, *, session: Session, command, context: CommandContext) -> HandlerOutcome:
+        if context.actor_kind != ActorKind.PATRON_ADMIN.value:
+            raise CommandExecutionError("ASSIGNMENT_PATRON_REQUIRED")
+        if context.membership_id is None:
+            raise CommandExecutionError("ASSIGNMENT_MEMBERSHIP_CONTEXT_REQUIRED")
+        if command.command_type == "CreateCaseAssignment":
+            return self._create(session=session, command=command, context=context)
+        if command.command_type == "AmendCaseAssignmentScope":
+            return self._amend_scope(session=session, command=command, context=context)
+        raise CommandExecutionError(
+            f"unsupported patron assignment command: {command.command_type}"
+        )
+
+    @staticmethod
+    def _create(
         *,
         session: Session,
         command: CreateCaseAssignmentCommand,
         context: CommandContext,
     ) -> HandlerOutcome:
-        if context.actor_kind != ActorKind.PATRON_ADMIN.value:
-            raise CommandExecutionError("ASSIGNMENT_PATRON_REQUIRED")
-        if context.membership_id is None:
-            raise CommandExecutionError("ASSIGNMENT_MEMBERSHIP_CONTEXT_REQUIRED")
-        if command.starts_at > context.received_at:
-            raise CommandExecutionError("ASSIGNMENT_STARTS_IN_FUTURE")
-
         case = session.scalar(
             sa.select(CaseRecord)
             .where(
@@ -246,36 +367,16 @@ class PatronAssignmentManagementHandler:
         )
         session.add(assignment)
         session.flush()
-        change_event = CaseAssignmentChangeEventRecord(
-            id=uuid4(),
-            tenant_id=context.tenant_id,
-            assignment_id=assignment.id,
-            case_id=case.id,
-            target_membership_id=target_membership.id,
-            author_membership_id=context.membership_id,
-            event_type="ASSIGNMENT_CREATED",
-            previous_revision=None,
-            resulting_revision=0,
-            previous_state=None,
-            resulting_state="ACTIVE",
-            reason_code=None,
-            previous_scope_actions_json=None,
-            previous_scope_classifications_json=None,
-            resulting_scope_actions_json=list(command.scope_actions),
-            resulting_scope_classifications_json=list(command.scope_classifications),
-            command_id=command.command_id,
-            correlation_id=command.correlation_id,
+        session.add(
+            _change_event_for_creation(
+                assignment=assignment,
+                author_membership_id=context.membership_id,
+                command=command,
+            )
         )
-        session.add(change_event)
         return HandlerOutcome(
             result_code="CASE_ASSIGNMENT_CREATED",
-            aggregate_refs=(
-                {
-                    "aggregate_type": "Assignment",
-                    "aggregate_id": str(assignment.id),
-                    "aggregate_revision": 0,
-                },
-            ),
+            aggregate_refs=(_aggregate_ref(assignment=assignment, revision=0),),
             events=(
                 PendingDomainEvent(
                     aggregate_type="Assignment",
@@ -294,9 +395,154 @@ class PatronAssignmentManagementHandler:
             ),
         )
 
+    @staticmethod
+    def _amend_scope(
+        *,
+        session: Session,
+        command: AmendCaseAssignmentScopeCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        assignment = session.scalar(
+            sa.select(CaseAssignmentRecord)
+            .where(
+                CaseAssignmentRecord.tenant_id == context.tenant_id,
+                CaseAssignmentRecord.id == command.assignment_id,
+            )
+            .with_for_update()
+        )
+        if assignment is None:
+            raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
+        if assignment.state not in {"ACTIVE", "SUSPENDED"}:
+            raise CommandExecutionError("ASSIGNMENT_INACTIVE")
+        if assignment.aggregate_revision != command.expected_revision:
+            raise CommandExecutionError("VERSION_CONFLICT")
+        if context.case_id is not None and context.case_id != assignment.case_id:
+            raise CommandExecutionError("CASE_CONTEXT_MISMATCH")
+
+        case = session.scalar(
+            sa.select(CaseRecord).where(
+                CaseRecord.tenant_id == context.tenant_id,
+                CaseRecord.id == assignment.case_id,
+            )
+        )
+        if case is None or case.lifecycle == "ARCHIVED":
+            raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
+
+        previous_actions = list(assignment.scope_actions_json)
+        previous_classifications = list(assignment.scope_classifications_json)
+        resulting_actions = list(command.scope_actions)
+        resulting_classifications = list(command.scope_classifications)
+        if (
+            previous_actions == resulting_actions
+            and previous_classifications == resulting_classifications
+        ):
+            raise CommandExecutionError("ASSIGNMENT_SCOPE_UNCHANGED")
+
+        revision = assignment.aggregate_revision + 1
+        assignment.scope_actions_json = resulting_actions
+        assignment.scope_classifications_json = resulting_classifications
+        assignment.aggregate_revision = revision
+        session.add(
+            CaseAssignmentChangeEventRecord(
+                id=uuid4(),
+                tenant_id=context.tenant_id,
+                assignment_id=assignment.id,
+                case_id=assignment.case_id,
+                target_membership_id=assignment.membership_id,
+                author_membership_id=context.membership_id,
+                event_type="ASSIGNMENT_SCOPE_AMENDED",
+                previous_revision=revision - 1,
+                resulting_revision=revision,
+                previous_state=assignment.state,
+                resulting_state=assignment.state,
+                reason_code=None,
+                previous_scope_actions_json=previous_actions,
+                previous_scope_classifications_json=previous_classifications,
+                resulting_scope_actions_json=resulting_actions,
+                resulting_scope_classifications_json=resulting_classifications,
+                command_id=command.command_id,
+                correlation_id=command.correlation_id,
+            )
+        )
+        return HandlerOutcome(
+            result_code="CASE_ASSIGNMENT_SCOPE_AMENDED",
+            aggregate_refs=(_aggregate_ref(assignment=assignment, revision=revision),),
+            events=(
+                PendingDomainEvent(
+                    aggregate_type="Assignment",
+                    aggregate_id=assignment.id,
+                    aggregate_revision=revision,
+                    event_type="CaseAssignmentScopeAmended",
+                    payload={
+                        "assignment_id": str(assignment.id),
+                        "case_id": str(assignment.case_id),
+                        "previous_revision": revision - 1,
+                        "resulting_revision": revision,
+                        "previous_scope_fingerprint": _scope_fingerprint(
+                            actions=previous_actions,
+                            classifications=previous_classifications,
+                        ),
+                        "resulting_scope_fingerprint": _scope_fingerprint(
+                            actions=resulting_actions,
+                            classifications=resulting_classifications,
+                        ),
+                    },
+                ),
+            ),
+        )
+
+
+def _change_event_for_creation(
+    *,
+    assignment: CaseAssignmentRecord,
+    author_membership_id: UUID,
+    command: CreateCaseAssignmentCommand,
+) -> CaseAssignmentChangeEventRecord:
+    return CaseAssignmentChangeEventRecord(
+        id=uuid4(),
+        tenant_id=assignment.tenant_id,
+        assignment_id=assignment.id,
+        case_id=assignment.case_id,
+        target_membership_id=assignment.membership_id,
+        author_membership_id=author_membership_id,
+        event_type="ASSIGNMENT_CREATED",
+        previous_revision=None,
+        resulting_revision=0,
+        previous_state=None,
+        resulting_state="ACTIVE",
+        reason_code=None,
+        previous_scope_actions_json=None,
+        previous_scope_classifications_json=None,
+        resulting_scope_actions_json=list(assignment.scope_actions_json),
+        resulting_scope_classifications_json=list(assignment.scope_classifications_json),
+        command_id=command.command_id,
+        correlation_id=command.correlation_id,
+    )
+
+
+def _aggregate_ref(*, assignment: CaseAssignmentRecord, revision: int) -> dict[str, object]:
+    return {
+        "aggregate_type": "Assignment",
+        "aggregate_id": str(assignment.id),
+        "aggregate_revision": revision,
+    }
+
+
+def _scope_fingerprint(*, actions: list[str], classifications: list[str]) -> str:
+    payload = json.dumps(
+        {"actions": actions, "classifications": classifications},
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
 
 def patron_assignment_handlers() -> dict[str, PatronAssignmentManagementHandler]:
-    """Return the closed patron command registrations available in increment one."""
+    """Return the closed patron command registrations available in increment two."""
 
     handler = PatronAssignmentManagementHandler()
-    return {"CreateCaseAssignment": handler}
+    return {
+        "CreateCaseAssignment": handler,
+        "AmendCaseAssignmentScope": handler,
+    }

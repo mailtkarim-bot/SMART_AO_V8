@@ -36,6 +36,9 @@ from app.interfaces.http.routes.dce_requirement_confirmations import (
 )
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
+from app.interfaces.http.routes.patron_assignment_management import (
+    build_patron_assignment_management_router,
+)
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
@@ -79,7 +82,10 @@ from app.modules.membership.application.assignment import (
     assignment_handlers,
 )
 from app.modules.membership.application.assignment_history import AssignmentHistoryService
-from app.modules.membership.application.patron_assignment import patron_assignment_handlers
+from app.modules.membership.application.patron_assignment import (
+    PatronAssignmentManagementService,
+    patron_assignment_handlers,
+)
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
@@ -331,6 +337,11 @@ def create_app(
             session_factory=runtime.session_factory,
             policy=security_policy,
         )
+        patron_assignment_management_service = PatronAssignmentManagementService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         app.include_router(
             build_case_dce_reading_router(
                 runtime=runtime,
@@ -376,6 +387,12 @@ def create_app(
         app.include_router(
             build_assignment_history_router(
                 service=assignment_history_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_assignment_management_router(
+                service=patron_assignment_management_service,
                 security_runtime=security_runtime,
             )
         )

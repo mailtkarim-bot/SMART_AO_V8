@@ -34,7 +34,7 @@ Les deux schémas vivent dans `backend/app/modules/dce/application/commands.py`,
 | `starts_at` | datetime timezone-aware | Doit être `<= received_at` pour l’incrément 1. |
 | `ends_at` | datetime timezone-aware optionnel | Si présent, doit être strictement postérieur à `starts_at`. |
 
-Le choix de limiter l’incrément 1 à `starts_at <= received_at` évite de créer une affectation `ACTIVE` à usage différé sans projection patron permettant de l’expliquer. Le support du démarrage futur prévu par le contrat normatif sera un amendement dédié, avec tests de contexte ReBAC et d’affichage.
+Une affectation créée avec un démarrage futur reste `ACTIVE`, conformément au contrat normatif. Elle est néanmoins inutilisable par le collaborateur avant `starts_at`, car les frontières collaborateur contrôlent déjà la fenêtre d’accès à l’exécution. La création ne réécrit jamais cette fenêtre après son commit.
 
 ### 2.2 `AmendCaseAssignmentScopeCommand`
 
@@ -231,3 +231,14 @@ Le harnais est créé dans `backend/tests/application/test_patron_assignment_man
 ## 7. Critère de sortie de l’incrément 1
 
 L’incrément est livrable seulement si la migration passe `upgrade head`, `alembic check`, `downgrade base`; si les contrats Pydantic sont fermés et testés; si les tests PostgreSQL démontrent l’append-only, le tenant P0, l’idempotence, l’atomicité et le conflit de révision; et si Ruff, `detect-secrets`, la suite backend, `git diff --check` et la CI GitHub sont verts.
+
+## 8. Mesure locale du journal append-only
+
+Le script reproductible `scripts/benchmark_assignment_change_journal.py` insère 1 000 événements `ASSIGNMENT_SCOPE_AMENDED` réels dans PostgreSQL puis relit les 100 derniers événements d’une affectation. Il ne simule ni la base, ni le trigger, ni les contraintes de clé étrangère.
+
+| Mesure locale contrôlée | Résultat observé | Budget de test |
+|---|---:|---:|
+| 1 000 insertions append-only | 102,887 ms, soit 9 719,4 événements/s | moins de 5 000 ms |
+| Lecture des 100 derniers événements | 13,223 ms | moins de 500 ms |
+
+Le test PostgreSQL `test_assignment_change_journal_performance.py` applique ces budgets volontairement prudents. Ils constituent un garde-fou de régression dans cet environnement, et non une promesse de capacité pour un VPS client : la latence disque, la charge concurrente et le volume réel devront être mesurés lors du protocole de préproduction.

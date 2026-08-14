@@ -1,6 +1,14 @@
 # SMART_AO V8 — Contrat normatif `PATRON-ASSIGNMENT-MANAGEMENT-01`
 
-**Statut : FIGÉ avant code.**
+**Statut : FIGÉ avant code, amendé une fois pour résoudre la fenêtre future.**
+
+> **Amendement normatif A — fenêtre future.** La phrase de l’invariant 3 qui imposait
+> `starts_at <= granted_at` contredisait la machine d’état des sections 4 et 5, qui autorise
+> explicitement une affectation `ACTIVE` avec démarrage futur. La machine d’état prévaut :
+> `starts_at` peut être antérieur, égal ou postérieur à `granted_at`; seule la règle
+> `ends_at IS NULL OR ends_at > starts_at` reste une contrainte temporelle de persistance.
+> La migration additive `20260814_0022` retire le check PostgreSQL contradictoire sans réécrire
+> les affectations ni leurs journaux.
 
 Ce contrat définit la prochaine frontière d’écriture permettant au patron de créer et de piloter des affectations collaborateur sur une affaire. Il est la source de vérité pour le domaine, les commandes, la migration, les handlers, les routes HTTP futures, les projections et les tests. Toute divergence ultérieure exige un amendement explicite du présent contrat avant modification de code.
 
@@ -96,7 +104,7 @@ Les invariants suivants sont obligatoires :
 
 1. Une commande ne change jamais `case_id`, `membership_id`, `granted_by_membership_id`, `granted_at`, `starts_at` ou `ends_at` après création. Une nouvelle période ou un nouveau destinataire exige la fin de l’affectation existante puis la création d’une nouvelle affectation et d’un nouvel identifiant.
 2. Une même membership ne possède jamais plus d’une affectation `ACTIVE` **ou** `SUSPENDED` pour la même Case. La migration remplace l’index partiel existant par une contrainte équivalente sur `state IN ('ACTIVE', 'SUSPENDED')`.
-3. `starts_at` est au plus égal à `granted_at`, `ends_at` est absente ou strictement postérieure à `starts_at`, et une réactivation est refusée si `ends_at <= received_at`.
+3. `starts_at` peut être antérieur, égal ou postérieur à `granted_at`; `ends_at` est absente ou strictement postérieure à `starts_at`, et une réactivation est refusée si `ends_at <= received_at`.
 4. Une suspension, une fin ou un scope amendé n’écrit aucune ligne dans `case_assignment_acknowledgements`, `assignment_clarification_requests` ou `case_assignment_unavailabilities`.
 5. Toute mutation réussie fait progresser `aggregate_revision` d’exactement une unité, sauf la création qui initialise la révision à `0`.
 6. L’absence d’effet est totale sur conflit de révision, idempotence divergente, scope invalide, actor invalide, Case interdite ou tenant différent.
