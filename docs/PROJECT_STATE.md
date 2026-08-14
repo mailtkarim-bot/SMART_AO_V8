@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`CASE-ASSIGNMENT-HISTORY-01` — publié sur `main` par [`257ddca`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/257ddca) et validé par CI. Il ajoute la lecture fermée des trois historiques collaborateur avec bearer réel, tenant/membership-scoping, ReBAC auditée, tri déterministe, borne globale `1..200` et projection sans texte libre, finance, audit ou métadonnées de déduplication. Les trois commandes Assignment restent inchangées. Le raccordement HTTPS frontend reste suspendu jusqu’à la disponibilité d’un VPS.
+`PATRON-ASSIGNMENT-MANAGEMENT-01` — contrat normatif figé localement, sans code, migration ni route patron implémentés. Il définit les cinq actes du patron sur une affectation, la capability dédiée, le scope collaborateur fermé, les transitions, le journal append-only et les gates de tests. La dernière frontière fonctionnelle publiée reste `CASE-ASSIGNMENT-HISTORY-01` par [`257ddca`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/257ddca). Le raccordement HTTPS frontend reste suspendu jusqu’à la disponibilité d’un VPS.
 
 ## Dernier état vert
 
@@ -12,7 +12,7 @@
 | Commit précédent | DCE-CLASSIFICATION-01 publié sur `main` : [`e099f2a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e099f2a), contrat normatif, migration `0015`, classifieur déterministe, registre append-only, projection courante historisée et tests dédiés. |
 | Migration Alembic | `20260814_0020` ajoutée pour la révision Assignment et les trois historiques collaborateur ; upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` validés sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
-| Validation locale courante | `git diff --check`, `uv run ruff check .`, secrets scan, `uv run pytest backend/tests -q` : **255 tests verts**, cycle Alembic `upgrade head` / `check` / `downgrade base` verts. Les 4 avertissements restants sont des dépréciations tierces FastAPI/TestClient déjà connues. |
+| Validation locale courante | OpenAPI Assignment régénérée par `scripts/export_assignment_openapi.py` : **4 opérations** sans dérive de snapshot. `uv run ruff check .` vert ; le harnais ciblé `assignment_history` : **4 tests verts** ; `uv run pytest backend/tests -q` : **255 tests verts**. Les 4 avertissements restants sont des dépréciations tierces FastAPI/TestClient déjà connues. |
 | CI | Le workflow [#31831648517](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31831648517) du commit `257ddca` est **vert**. Lint, secrets scan, audit dépendances, SAST, smoke tests et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore. |
 
 ## Ce qui est terminé
@@ -66,10 +66,11 @@
 - `COLLAB-ASSIGNMENT-01` publié : le contrat normatif couvre `AcknowledgeAssignment`, `RequestAssignmentClarification` et `ReportAssignmentUnavailability`. Le slice ne crée ni ne modifie une affectation, n’élargit aucun scope ReBAC et ne touche ni prix, ni marge, ni tâche, ni échéance, ni décision patron. Les tables `case_assignment_acknowledgements`, `assignment_clarification_requests` et `case_assignment_unavailabilities` sont append-only par triggers PostgreSQL. Le faux positif detect-secrets de l’URL PostgreSQL de test a été corrigé dans `30d5ace`.
 - `COLLAB-ASSIGNMENT-HTTP-01` publié par `79fd600` : contrat HTTP, routeur `/api/v1/assignments`, DTO Pydantic fermés, intégration au bootstrap sous le même `AuditedAuthorizationPolicy` que les routes DCE et façade applicative qui audite également les refus avant policy. Les trois routes retournent un reçu minimal `201`/`200`; les ressources étrangères restent `404`, les scopes incomplets `403`, le conflit d’idempotence `409` et les invariants `422`. Les 7 scénarios API ciblés et la régression complète de 251 tests sont verts ; la CI `31829240985` est verte.
 - `CASE-ASSIGNMENT-HISTORY-01` publié par `257ddca` et validé par CI `31831648517` : capability `assignment.history.read`, projections et DTO fermés, lecteur SQLAlchemy borné par source et globalement, service auditant les refus avant policy et route `GET /api/v1/assignments/{assignment_id}/history?limit=1..200`. Les 11 scénarios API Assignment couvrent liste vide, trois types d’historique, borne, bearer, ReBAC, neutralité inter-tenant, audit et non-fuite. Le snapshot OpenAPI reproductible (`scripts/export_assignment_openapi.py`) et son registre Markdown décrivent les trois POST et le GET, y compris les statuts publics. Le plan `PATRON-ASSIGNMENT-MANAGEMENT-01` précise maintenant capability dédiée, scopes fermés, migration append-only et matrice de tests ; aucun de son code n’a été commencé.
+- `PATRON-ASSIGNMENT-MANAGEMENT-01` figé localement : le contrat `SMART_AO_V8_PATRON_ASSIGNMENT_MANAGEMENT_01_CONTRAT.md` formalise `CreateCaseAssignment`, `AmendCaseAssignmentScope`, `SuspendCaseAssignment`, `ReactivateCaseAssignment` et `EndCaseAssignment`. Il impose `assignment.manage` au seul patron, un catalogue fermé de scopes `INTERNAL_OPERATIONAL`, la révision optimiste, les refus neutres, le journal patron append-only, l’atomicité agrégat/journal/événement/outbox/receipt et l’absence absolue de données financières ou de décisions automatiques. Aucune migration ni code de ce slice n’a encore été écrit.
 
 ## Prochaine action unique
 
-Figer le contrat normatif `PATRON-ASSIGNMENT-MANAGEMENT-01` avant toute modification de code. Son plan, ses décisions préparatoires et sa matrice de tests sont déjà documentés. Le VPS reste requis uniquement pour configurer l’URL HTTPS et tester le parcours navigateur réel.
+Relire puis implémenter `PATRON-ASSIGNMENT-MANAGEMENT-01` par petits incréments : capability et contrats Pydantic, migration append-only, handlers transactionnels, tests PostgreSQL, puis seulement façade HTTP patron. Le VPS reste requis uniquement pour configurer l’URL HTTPS et tester le parcours navigateur réel.
 
 ## Décisions ouvertes
 

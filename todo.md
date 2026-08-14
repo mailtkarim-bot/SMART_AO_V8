@@ -52,3 +52,8 @@
 - [x] Générer et vérifier l’OpenAPI des quatre routes Assignment (trois POST et un GET).
 - [x] Préparer le plan contractuel de gestion patron des affectations et la matrice de tests unitaires associée.
 - [x] Relancer la validation complète, publier CASE-ASSIGNMENT-HISTORY-01 et vérifier la CI GitHub (commit `257ddca`, workflow `31831648517` vert).
+- [x] Auditer les invariants, capabilities, modèles et conventions déjà publiés avant de figer `PATRON-ASSIGNMENT-MANAGEMENT-01`.
+- [x] Rédiger le contrat normatif patron : commandes, machine d’état, scopes fermés, ReBAC, audit, idempotence, persistance et non-fuites.
+- [x] Vérifier le registre OpenAPI Assignment, régénérer son snapshot via le script reproductible et contrôler les quatre opérations.
+- [x] Rejouer les tests backend complets et le harnais API Assignment couvrant `GET /api/v1/assignments/{assignment_id}/history`.
+- [ ] Mettre à jour `PROJECT_STATE.md`, valider le diff et publier la frontière documentaire patron après revue finale.
