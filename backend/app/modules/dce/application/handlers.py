@@ -9,12 +9,14 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from app.modules.dce.application.analysis import is_valid_rc_observation
 from app.modules.dce.application.commands import (
     ClaimDceStagedObjectUploadCommand,
     CreateConsultationCommand,
     ExpireDceStagedObjectCommand,
     PrepareDceStagingCommand,
     RecordDceDocumentExtractionCommand,
+    RecordDceRcAnalysisCommand,
     RecordDceStagedObjectQuarantineCommand,
     RecordDceStagedObjectScanCommand,
     RegisterDceVersionCommand,
@@ -26,6 +28,11 @@ from app.modules.dce.infrastructure.models.consultation import ConsultationRecor
 from app.modules.dce.infrastructure.models.dce_extraction import (
     DceDocumentExtractionFragmentRecord,
     DceDocumentExtractionRecord,
+)
+from app.modules.dce.infrastructure.models.dce_rc_analysis import (
+    DceRcAnalysisRunRecord,
+    DceRcRequirementObservationRecord,
+    DceRcRequirementSourceRecord,
 )
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.models.dce_version import DceDocumentRecord, DceVersionRecord
@@ -574,6 +581,179 @@ class RecordDceDocumentExtractionHandler:
         )
 
 
+class RecordDceRcAnalysisHandler:
+    """Persist source-bound deterministic RC signals without reading originals or deciding."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: RecordDceRcAnalysisCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != "SYSTEM":
+            raise ValueError("DCE_ANALYSIS_SYSTEM_ACTOR_REQUIRED")
+        dce_version = session.scalar(
+            sa.select(DceVersionRecord)
+            .where(
+                DceVersionRecord.tenant_id == context.tenant_id,
+                DceVersionRecord.id == command.dce_version_id,
+            )
+            .with_for_update()
+        )
+        if (
+            dce_version is None
+            or dce_version.lifecycle not in {"ADMITTED", "SUPERSEDED"}
+            or dce_version.integrity != "VERIFIED"
+        ):
+            raise ValueError("DCE_VERSION_NOT_ANALYSABLE")
+
+        source_rows = session.execute(
+            sa.select(
+                DceDocumentRecord.id,
+                DceDocumentExtractionRecord.id,
+                DceDocumentExtractionFragmentRecord,
+            )
+            .join(
+                DceDocumentExtractionRecord,
+                sa.and_(
+                    DceDocumentExtractionRecord.tenant_id
+                    == DceDocumentExtractionFragmentRecord.tenant_id,
+                    DceDocumentExtractionRecord.id
+                    == DceDocumentExtractionFragmentRecord.extraction_id,
+                ),
+            )
+            .join(
+                DceDocumentRecord,
+                sa.and_(
+                    DceDocumentRecord.tenant_id == DceDocumentExtractionRecord.tenant_id,
+                    DceDocumentRecord.id == DceDocumentExtractionRecord.dce_document_id,
+                ),
+            )
+            .where(
+                DceDocumentRecord.tenant_id == context.tenant_id,
+                DceDocumentRecord.dce_version_id == dce_version.id,
+                DceDocumentExtractionRecord.status == "COMPLETED",
+            )
+            .order_by(
+                DceDocumentRecord.id,
+                DceDocumentExtractionRecord.id,
+                DceDocumentExtractionFragmentRecord.ordinal,
+                DceDocumentExtractionFragmentRecord.id,
+            )
+            .with_for_update()
+        ).all()
+        if not source_rows:
+            raise ValueError("DCE_EXTRACTION_COMPLETED_REQUIRED")
+        source_fragment_ids = [fragment.id for _, _, fragment in source_rows]
+        if source_fragment_ids != command.source_fragment_ids:
+            raise ValueError("DCE_ANALYSIS_SOURCE_FRAGMENT_REQUIRED")
+        source_char_count = sum(len(fragment.text) for _, _, fragment in source_rows)
+        if (
+            len(source_rows) != command.source_fragment_count
+            or source_char_count != command.source_char_count
+        ):
+            raise ValueError("DCE_ANALYSIS_SOURCE_COUNT_REQUIRED")
+        expected_manifest = _rc_analysis_input_manifest(source_rows=source_rows)
+        if command.input_manifest_sha256.lower() != expected_manifest:
+            raise ValueError("DCE_ANALYSIS_INPUT_MANIFEST_REQUIRED")
+
+        existing = session.scalar(
+            sa.select(DceRcAnalysisRunRecord).where(
+                DceRcAnalysisRunRecord.tenant_id == context.tenant_id,
+                DceRcAnalysisRunRecord.dce_version_id == dce_version.id,
+                DceRcAnalysisRunRecord.input_manifest_sha256
+                == command.input_manifest_sha256.lower(),
+                DceRcAnalysisRunRecord.analyzer_id == command.analyzer_id,
+                DceRcAnalysisRunRecord.analyzer_version == command.analyzer_version,
+            )
+        )
+        if existing is not None:
+            return HandlerOutcome(
+                result_code="DCE_RC_ANALYSIS_ALREADY_RECORDED",
+                aggregate_refs=(
+                    {
+                        "aggregate_type": "DCE_RC_ANALYSIS",
+                        "aggregate_id": str(existing.id),
+                        "aggregate_revision": 0,
+                    },
+                ),
+            )
+
+        fragments_by_id = {fragment.id: fragment for _, _, fragment in source_rows}
+        if command.status == "COMPLETED":
+            _validate_rc_analysis_observations(
+                command=command,
+                fragments_by_id=fragments_by_id,
+            )
+        analysis = DceRcAnalysisRunRecord(
+            id=command.analysis_id,
+            tenant_id=context.tenant_id,
+            dce_version_id=dce_version.id,
+            input_manifest_sha256=command.input_manifest_sha256.lower(),
+            analyzer_id=command.analyzer_id,
+            analyzer_version=command.analyzer_version,
+            status=command.status,
+            source_fragment_count=command.source_fragment_count,
+            source_char_count=command.source_char_count,
+            failure_code=command.failure_code,
+        )
+        session.add(analysis)
+        session.flush()
+        for observation in command.observations:
+            source = observation.sources[0]
+            session.add(
+                DceRcRequirementObservationRecord(
+                    id=observation.observation_id,
+                    tenant_id=context.tenant_id,
+                    analysis_id=analysis.id,
+                    dce_version_id=dce_version.id,
+                    requirement_kind=observation.requirement_kind,
+                    directive=observation.directive,
+                    rule_id=observation.rule_id,
+                    rule_version=observation.rule_version,
+                    fragment_id=source.fragment_id,
+                    start_byte_offset=source.start_byte_offset,
+                    end_byte_offset=source.end_byte_offset,
+                    excerpt=observation.excerpt,
+                )
+            )
+            session.add(
+                DceRcRequirementSourceRecord(
+                    id=uuid4(),
+                    tenant_id=context.tenant_id,
+                    observation_id=observation.observation_id,
+                    fragment_id=source.fragment_id,
+                    start_byte_offset=source.start_byte_offset,
+                    end_byte_offset=source.end_byte_offset,
+                )
+            )
+        event = PendingDomainEvent(
+            aggregate_type="DCE_RC_ANALYSIS",
+            aggregate_id=analysis.id,
+            aggregate_revision=0,
+            event_type="DCE_RC_ANALYSIS_RECORDED",
+            payload={
+                "analysis_id": str(analysis.id),
+                "dce_version_id": str(dce_version.id),
+                "status": analysis.status,
+                "source_fragment_count": analysis.source_fragment_count,
+                "observation_count": len(command.observations),
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_RC_ANALYSIS_RECORDED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_RC_ANALYSIS",
+                    "aggregate_id": str(analysis.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
 class RegisterDceVersionHandler:
     """Admit a new immutable DCE root and its originals in one dispatcher transaction."""
 
@@ -726,6 +906,55 @@ class RegisterDceVersionHandler:
             ),
             events=(event,),
         )
+
+
+def _validate_rc_analysis_observations(
+    *,
+    command: RecordDceRcAnalysisCommand,
+    fragments_by_id: dict[UUID, DceDocumentExtractionFragmentRecord],
+) -> None:
+    for observation in command.observations:
+        source = observation.sources[0]
+        fragment = fragments_by_id.get(source.fragment_id)
+        if fragment is None:
+            raise ValueError("DCE_ANALYSIS_SOURCE_FRAGMENT_REQUIRED")
+        source_bytes = fragment.text.encode("utf-8")
+        if source.end_byte_offset > len(source_bytes):
+            raise ValueError("DCE_ANALYSIS_SOURCE_OFFSET_REQUIRED")
+        try:
+            sourced_excerpt = source_bytes[
+                source.start_byte_offset : source.end_byte_offset
+            ].decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ValueError("DCE_ANALYSIS_SOURCE_OFFSET_REQUIRED") from error
+        if sourced_excerpt != observation.excerpt:
+            raise ValueError("DCE_ANALYSIS_SOURCE_EXCERPT_REQUIRED")
+        if not is_valid_rc_observation(
+            requirement_kind=observation.requirement_kind,
+            rule_id=observation.rule_id,
+            directive=observation.directive,
+            excerpt=observation.excerpt,
+        ):
+            raise ValueError("DCE_ANALYSIS_RULE_REQUIRED")
+
+
+def _rc_analysis_input_manifest(
+    *,
+    source_rows: list[tuple[UUID, UUID, DceDocumentExtractionFragmentRecord]],
+) -> str:
+    canonical_manifest = "\n".join(
+        "|".join(
+            (
+                str(document_id),
+                str(extraction_id),
+                str(fragment.id),
+                str(fragment.ordinal),
+                fragment.text_sha256.lower(),
+            )
+        )
+        for document_id, extraction_id, fragment in source_rows
+    )
+    return sha256(canonical_manifest.encode("utf-8")).hexdigest()
 
 
 def _validate_extraction_fragments(*, command: RecordDceDocumentExtractionCommand) -> None:

@@ -158,6 +158,86 @@ class RecordDceDocumentExtractionCommand(ApplicationCommand):
         return self
 
 
+class DceRcRequirementSourceInput(BaseModel):
+    """One exact immutable extraction-fragment proof for an RC observation."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    fragment_id: UUID
+    start_byte_offset: int = Field(ge=0)
+    end_byte_offset: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def validate_offsets(self) -> DceRcRequirementSourceInput:
+        if self.end_byte_offset <= self.start_byte_offset:
+            raise ValueError("RC observation source offsets must be strictly ordered")
+        return self
+
+
+class DceRcRequirementObservationInput(BaseModel):
+    """A bounded lexical RC signal and its one source fragment in this first slice."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    observation_id: UUID
+    requirement_kind: str = Field(
+        pattern=(
+            r"^(RC_DOCUMENT_CANDIDATURE|RC_CONTENT_OFFER|RC_SUBMISSION_DEADLINE|"
+            r"RC_RESPONSE_CHANNEL|RC_FILE_CONSTRAINT|RC_SITE_VISIT|"
+            r"RC_AWARD_CRITERION|RC_NEGOTIATION|RC_OFFER_VALIDITY)$"
+        )
+    )
+    directive: str = Field(pattern=r"^(REQUIRED_SIGNAL|OPTIONAL_SIGNAL|UNSPECIFIED)$")
+    rule_id: str = Field(min_length=1, max_length=120, pattern=r"^[A-Z0-9_]+_V[0-9]+$")
+    rule_version: str = Field(min_length=1, max_length=64)
+    excerpt: str = Field(min_length=1, max_length=1_000)
+    sources: list[DceRcRequirementSourceInput] = Field(min_length=1, max_length=1)
+
+
+class RecordDceRcAnalysisCommand(ApplicationCommand):
+    """System-only immutable recording of deterministic RC requirement signals."""
+
+    command_type = "RecordDceRcAnalysis"
+
+    analysis_id: UUID
+    dce_version_id: UUID
+    input_manifest_sha256: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-fA-F]{64}$",
+    )
+    analyzer_id: str = Field(min_length=1, max_length=100)
+    analyzer_version: str = Field(min_length=1, max_length=64)
+    status: str = Field(pattern=r"^(COMPLETED|NO_RC_MARKER|REJECTED_LIMIT|FAILED_SAFE)$")
+    source_fragment_count: int = Field(gt=0)
+    source_char_count: int = Field(gt=0)
+    failure_code: str | None = Field(default=None, max_length=120)
+    source_fragment_ids: list[UUID] = Field(min_length=1)
+    observations: list[DceRcRequirementObservationInput] = Field(
+        default_factory=list,
+        max_length=20_000,
+    )
+
+    @model_validator(mode="after")
+    def validate_terminal_projection(self) -> RecordDceRcAnalysisCommand:
+        if len(self.source_fragment_ids) != self.source_fragment_count:
+            raise ValueError("RC analysis source fragment count mismatch")
+        if len(self.source_fragment_ids) != len(set(self.source_fragment_ids)):
+            raise ValueError("RC analysis source fragment identifier duplicate")
+        observation_ids = [observation.observation_id for observation in self.observations]
+        if len(observation_ids) != len(set(observation_ids)):
+            raise ValueError("RC analysis observation identifier duplicate")
+        if self.status == "COMPLETED":
+            if self.failure_code is not None or not self.observations:
+                raise ValueError("completed RC analysis requires observations and no failure code")
+        elif self.status == "NO_RC_MARKER":
+            if self.failure_code != "NO_RC_MARKER" or self.observations:
+                raise ValueError("no-marker RC analysis requires its code and no observations")
+        elif self.failure_code is None or self.observations:
+            raise ValueError("failed RC analysis requires a code and no observations")
+        return self
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

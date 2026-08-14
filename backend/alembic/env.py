@@ -7,6 +7,7 @@ from app.modules.case.infrastructure.models import case  # noqa: F401
 from app.modules.dce.infrastructure.models import (  # noqa: F401
     consultation,
     dce_extraction,
+    dce_rc_analysis,
     dce_staging,
     dce_version,
 )
