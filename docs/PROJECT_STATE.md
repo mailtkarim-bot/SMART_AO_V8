@@ -1,18 +1,18 @@
 # PROJECT_STATE
 
 ## Slice courant
-`COLLAB-ASSIGNMENT-01` — implémenté localement et prêt à publier. Le slice ajoute les trois commandes collaborateur prévues, la révision optimiste de `CaseAssignmentRecord`, trois historiques append-only tenant-scoped, la migration `0020`, l’idempotence fonctionnelle et les handlers transactionnels. Le raccordement HTTPS frontend reste suspendu jusqu’à la disponibilité d’un VPS.
+`COLLAB-ASSIGNMENT-01` — publié sur `main` par [`d7e97ca`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/d7e97ca), avec correctif CI final [`30d5ace`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/30d5ace). Le slice ajoute les trois commandes collaborateur prévues, la révision optimiste de `CaseAssignmentRecord`, trois historiques append-only tenant-scoped, la migration `0020`, l’idempotence fonctionnelle et les handlers transactionnels. Le raccordement HTTPS frontend reste suspendu jusqu’à la disponibilité d’un VPS.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | Dernier commit publié stable : [`a380bad`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/a380bad). COLLAB-ASSIGNMENT-01 reste local avant publication. |
+| Commit | COLLAB-ASSIGNMENT-01 publié par [`d7e97ca`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/d7e97ca), correctif detect-secrets par [`30d5ace`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/30d5ace). |
 | Commit précédent | DCE-CLASSIFICATION-01 publié sur `main` : [`e099f2a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e099f2a), contrat normatif, migration `0015`, classifieur déterministe, registre append-only, projection courante historisée et tests dédiés. |
 | Migration Alembic | `20260814_0020` ajoutée pour la révision Assignment et les trois historiques collaborateur ; upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` validés sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Tests | `uv run ruff check .` vert ; `uv run pytest backend/tests -q` : **244 tests verts**, 4 avertissements non bloquants. COLLAB-ASSIGNMENT-01 couvre validation Pydantic, autorisation ReBAC, révision, idempotence dispatcher/fonctionnelle, événements/outbox et append-only PostgreSQL. |
-| CI | Le workflow [#31822332866](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31822332866) du commit `a380bad` est **vert**. Les jobs backend et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore. |
+| CI | Le workflow [#31824210865](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31824210865) du commit `30d5ace` est **vert**. Lint, secrets scan, audit dépendances, SAST, smoke tests et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore. |
 
 ## Ce qui est terminé
 
@@ -62,11 +62,11 @@
 - CASES-ASSIGNED-01 publié par `7874e00` : contrat normatif, projection applicative `AssignedCaseProjection`, lecteur SQLAlchemy tenant-scoped, DTO fermé `AssignedCaseResponse` et route `GET /api/v1/cases/assigned` branchée au runtime bearer et à `AuditedAuthorizationPolicy`. Le patron voit les Cases non archivées de son tenant ; le collaborateur ne voit qu’une Case avec affectation active, action `case.dce.read` et classification `INTERNAL_OPERATIONAL`. Une affectation incomplète, une Case étrangère ou une Case archivée ne fuit aucune ligne. Le cookie CSRF lisible par navigateur utilise `Path=/`, tandis que le refresh reste sous `/api/v1/auth`. Validation locale : Ruff vert, 237 tests verts, cycle Alembic `upgrade head/check/downgrade base` vert.
 - CASE-DCE-IMPACT-01 publié par `968cfdf` : contrat normatif `SMART_AO_V8_CASE_DCE_IMPACT_01_CONTRAT.md`, commande Pydantic SYSTEM fermée, service déterministe, handler transactionnel idempotent, tables `case_dce_impact_runs` et `case_dce_impact_items`, FKs composites tenant, triggers append-only, événement et outbox. La Case doit pointer vers le prédécesseur ; le successeur doit appartenir à la même Consultation, référencer ce prédécesseur, être admis et vérifié ; les deux matérialisations d’exigences doivent être terminales. L’algorithme ne fabrique aucune correspondance sémantique entre versions. Validation : Ruff vert, 239 tests verts, Alembic `upgrade head/check/downgrade base` vert.
 - Correction CI publiée par `0c0de66` puis confirmée par le workflow vert `31822332866` sur `a380bad`. L’échec précédent `31820821308` était un défaut de synchronisation de baseline, pas un échec fonctionnel CASE-DCE-IMPACT-01.
-- `COLLAB-ASSIGNMENT-01` implémenté localement : le contrat normatif couvre `AcknowledgeAssignment`, `RequestAssignmentClarification` et `ReportAssignmentUnavailability`. Le slice ne crée ni ne modifie une affectation, n’élargit aucun scope ReBAC et ne touche ni prix, ni marge, ni tâche, ni échéance, ni décision patron. Les tables `case_assignment_acknowledgements`, `assignment_clarification_requests` et `case_assignment_unavailabilities` sont append-only par triggers PostgreSQL. Le commit et le push restent à effectuer.
+- `COLLAB-ASSIGNMENT-01` publié : le contrat normatif couvre `AcknowledgeAssignment`, `RequestAssignmentClarification` et `ReportAssignmentUnavailability`. Le slice ne crée ni ne modifie une affectation, n’élargit aucun scope ReBAC et ne touche ni prix, ni marge, ni tâche, ni échéance, ni décision patron. Les tables `case_assignment_acknowledgements`, `assignment_clarification_requests` et `case_assignment_unavailabilities` sont append-only par triggers PostgreSQL. Le faux positif detect-secrets de l’URL PostgreSQL de test a été corrigé dans `30d5ace`.
 
 ## Prochaine action unique
 
-Committer et pousser COLLAB-ASSIGNMENT-01 après une dernière revue du diff ; la prochaine CI devra confirmer la migration `0020` et les 244 tests.
+Préparer le prochain contrat backend documenté ; le VPS reste requis uniquement pour configurer l’URL HTTPS et tester le parcours navigateur réel.
 
 ## Décisions ouvertes
 

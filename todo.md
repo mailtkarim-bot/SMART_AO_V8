@@ -33,5 +33,7 @@
 - [x] Implémenter les handlers transactionnels avec idempotence et événements minimisés.
 - [x] Ajouter les tests unitaires de validation/invariants et les tests PostgreSQL tenant-scoped.
 - [x] Valider Ruff, pytest, Alembic, detect-secrets et CI avant publication.
-- [ ] Committer et pousser COLLAB-ASSIGNMENT-01 après revue finale du diff.
+- [x] Committer et pousser COLLAB-ASSIGNMENT-01 après revue finale du diff.
+- [x] Corriger le faux positif detect-secrets sur l’URL PostgreSQL de test et republier le correctif.
+- [x] Vérifier la CI finale : workflow `31824210865` vert.
 - [ ] Implémenter, tester, valider et publier le prochain slice retenu.
