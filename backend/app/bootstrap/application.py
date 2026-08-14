@@ -38,6 +38,7 @@ from app.modules.dce.application.handlers import (
     CreateConsultationHandler,
     ExpireDceStagedObjectHandler,
     PrepareDceStagingHandler,
+    RecordCaseDceImpactRunHandler,
     RecordDceDocumentClassificationRunHandler,
     RecordDceDocumentExtractionHandler,
     RecordDceRcAnalysisHandler,
@@ -48,6 +49,7 @@ from app.modules.dce.application.handlers import (
     RegisterDceVersionHandler,
     RejectDceStagedObjectUploadHandler,
 )
+from app.modules.dce.application.impact import CaseDceImpactService
 from app.modules.dce.application.queries import ConsultationProjection
 from app.modules.dce.application.requirement_confirmation import (
     DceRequirementConfirmationService,
@@ -111,6 +113,7 @@ class AppRuntime:
                 "RecordDceDocumentClassificationRun": RecordDceDocumentClassificationRunHandler(),
                 "RecordDceDocumentExtraction": RecordDceDocumentExtractionHandler(),
                 "RecordDceRcAnalysis": RecordDceRcAnalysisHandler(),
+                "RecordCaseDceImpactRun": RecordCaseDceImpactRunHandler(),
                 "RecordDceRequirementMaterializationRun": (
                     RecordDceRequirementMaterializationRunHandler()
                 ),
@@ -173,6 +176,26 @@ class AppRuntime:
 
         with self.session_factory() as session:
             return SqlAlchemyAssignedCaseReader(session).list(tenant_id=tenant_id)
+
+    def run_case_dce_impact(
+        self,
+        *,
+        tenant_id: UUID,
+        case_id: UUID,
+        predecessor_dce_version_id: UUID,
+        successor_dce_version_id: UUID,
+    ):
+        """Run the internal SYSTEM impact preparation for one Case rectification."""
+
+        return CaseDceImpactService(
+            session_factory=self.session_factory,
+            dispatcher=self.dispatcher,
+        ).run(
+            tenant_id=tenant_id,
+            case_id=case_id,
+            predecessor_dce_version_id=predecessor_dce_version_id,
+            successor_dce_version_id=successor_dce_version_id,
+        )
 
     def get_dce_version_tenant_id(self, *, dce_version_id: UUID) -> UUID | None:
         """Return only the owning tenant needed to authorize a DceVersion read."""

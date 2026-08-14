@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 from hashlib import sha256
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.analysis import is_valid_rc_observation
 from app.modules.dce.application.classification import (
     ClassificationDocument,
@@ -21,6 +22,7 @@ from app.modules.dce.application.commands import (
     CreateConsultationCommand,
     ExpireDceStagedObjectCommand,
     PrepareDceStagingCommand,
+    RecordCaseDceImpactRunCommand,
     RecordDceDocumentClassificationRunCommand,
     RecordDceDocumentExtractionCommand,
     RecordDceRcAnalysisCommand,
@@ -31,6 +33,11 @@ from app.modules.dce.application.commands import (
     RegisterDceVersionCommand,
     RejectDceStagedObjectUploadCommand,
 )
+from app.modules.dce.application.impact import (
+    expected_impact_items,
+    impact_manifest_sha256,
+    load_impact_requirements,
+)
 from app.modules.dce.application.requirements import (
     RequirementSignal,
     project_requirements,
@@ -38,6 +45,10 @@ from app.modules.dce.application.requirements import (
 )
 from app.modules.dce.domain.consultation import BuyerIdentity, Consultation
 from app.modules.dce.domain.dce_version import DceDocument, DceVersion
+from app.modules.dce.infrastructure.models.case_dce_impact import (
+    CaseDceImpactItemRecord,
+    CaseDceImpactRunRecord,
+)
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
 from app.modules.dce.infrastructure.models.dce_classification import (
     DceDocumentClassificationEvidenceRecord,
@@ -1533,6 +1544,179 @@ class RecordDceRequirementMaterializationRunHandler:
                 {
                     "aggregate_type": "DCE_REQUIREMENT_MATERIALIZATION_RUN",
                     "aggregate_id": str(requirement_run.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
+class RecordCaseDceImpactRunHandler:
+    """Persist a conservative, immutable impact ledger for one Case rectification."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: RecordCaseDceImpactRunCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != "SYSTEM":
+            raise ValueError("CASE_DCE_IMPACT_SYSTEM_ACTOR_REQUIRED")
+
+        case = session.scalar(
+            sa.select(CaseRecord)
+            .where(
+                CaseRecord.tenant_id == context.tenant_id,
+                CaseRecord.id == command.case_id,
+            )
+            .with_for_update()
+        )
+        predecessor = session.scalar(
+            sa.select(DceVersionRecord)
+            .where(
+                DceVersionRecord.tenant_id == context.tenant_id,
+                DceVersionRecord.id == command.predecessor_dce_version_id,
+            )
+            .with_for_update()
+        )
+        successor = session.scalar(
+            sa.select(DceVersionRecord)
+            .where(
+                DceVersionRecord.tenant_id == context.tenant_id,
+                DceVersionRecord.id == command.successor_dce_version_id,
+            )
+            .with_for_update()
+        )
+        if case is None or case.lifecycle == "ARCHIVED":
+            raise ValueError("CASE_NOT_FOUND_OR_FORBIDDEN")
+        if (
+            predecessor is None
+            or successor is None
+            or case.applicable_dce_version_id != predecessor.id
+            or predecessor.consultation_id != successor.consultation_id
+            or successor.predecessor_dce_version_id != predecessor.id
+            or predecessor.lifecycle not in {"ADMITTED", "SUPERSEDED"}
+            or predecessor.integrity != "VERIFIED"
+            or successor.lifecycle != "ADMITTED"
+            or successor.integrity != "VERIFIED"
+        ):
+            raise ValueError("CASE_DCE_PREDECESSOR_MISMATCH")
+
+        previous_requirements = load_impact_requirements(
+            session=session,
+            tenant_id=context.tenant_id,
+            dce_version_id=predecessor.id,
+        )
+        successor_requirements = load_impact_requirements(
+            session=session,
+            tenant_id=context.tenant_id,
+            dce_version_id=successor.id,
+        )
+        manifest = impact_manifest_sha256(
+            case_id=command.case_id,
+            predecessor_dce_version_id=predecessor.id,
+            successor_dce_version_id=successor.id,
+            previous_requirements=previous_requirements,
+            successor_requirements=successor_requirements,
+        )
+        expected_run_id = uuid5(
+            command.case_id,
+            f"{predecessor.id}:{successor.id}:{manifest}:"
+            "smart-ao-case-dce-impact:1",
+        )
+        if command.impact_run_id != expected_run_id or (
+            command.input_manifest_sha256.lower() != manifest
+        ):
+            raise ValueError("CASE_DCE_IMPACT_INPUT_MANIFEST_REQUIRED")
+        if (
+            command.previous_requirement_count != len(previous_requirements)
+            or command.successor_requirement_count != len(successor_requirements)
+        ):
+            raise ValueError("CASE_DCE_IMPACT_SOURCE_COUNT_REQUIRED")
+        expected_items = expected_impact_items(
+            impact_run_id=command.impact_run_id,
+            previous_requirements=previous_requirements,
+            successor_requirements=successor_requirements,
+        )
+        if command.items != list(expected_items):
+            raise ValueError("CASE_DCE_IMPACT_PROJECTION_REQUIRED")
+        existing = session.scalar(
+            sa.select(CaseDceImpactRunRecord).where(
+                CaseDceImpactRunRecord.tenant_id == context.tenant_id,
+                CaseDceImpactRunRecord.case_id == command.case_id,
+                CaseDceImpactRunRecord.predecessor_dce_version_id == predecessor.id,
+                CaseDceImpactRunRecord.successor_dce_version_id == successor.id,
+                CaseDceImpactRunRecord.input_manifest_sha256 == manifest,
+                CaseDceImpactRunRecord.algorithm_id == command.algorithm_id,
+                CaseDceImpactRunRecord.algorithm_version == command.algorithm_version,
+            )
+        )
+        if existing is not None:
+            return HandlerOutcome(
+                result_code="CASE_DCE_IMPACT_ALREADY_RECORDED",
+                aggregate_refs=(
+                    {
+                        "aggregate_type": "CASE_DCE_IMPACT_RUN",
+                        "aggregate_id": str(existing.id),
+                        "aggregate_revision": 0,
+                    },
+                ),
+            )
+
+        impact_run = CaseDceImpactRunRecord(
+            id=command.impact_run_id,
+            tenant_id=context.tenant_id,
+            case_id=case.id,
+            predecessor_dce_version_id=predecessor.id,
+            successor_dce_version_id=successor.id,
+            input_manifest_sha256=manifest,
+            algorithm_id=command.algorithm_id,
+            algorithm_version=command.algorithm_version,
+            status=command.status,
+            previous_requirement_count=command.previous_requirement_count,
+            successor_requirement_count=command.successor_requirement_count,
+            failure_code=None,
+            created_by_actor_id=context.actor_id,
+        )
+        session.add(impact_run)
+        session.flush()
+        for item in command.items:
+            session.add(
+                CaseDceImpactItemRecord(
+                    id=item.impact_item_id,
+                    tenant_id=context.tenant_id,
+                    impact_run_id=impact_run.id,
+                    case_id=case.id,
+                    impact_kind=item.impact_kind,
+                    previous_requirement_id=item.previous_requirement_id,
+                    successor_requirement_id=item.successor_requirement_id,
+                    review_state=item.review_state,
+                    evidence_code=item.evidence_code,
+                )
+            )
+        event = PendingDomainEvent(
+            aggregate_type="CASE_DCE_IMPACT_RUN",
+            aggregate_id=impact_run.id,
+            aggregate_revision=0,
+            event_type="CASE_DCE_IMPACT_RECORDED",
+            payload={
+                "impact_run_id": str(impact_run.id),
+                "case_id": str(case.id),
+                "predecessor_dce_version_id": str(predecessor.id),
+                "successor_dce_version_id": str(successor.id),
+                "status": impact_run.status,
+                "previous_requirement_count": impact_run.previous_requirement_count,
+                "successor_requirement_count": impact_run.successor_requirement_count,
+                "item_count": len(command.items),
+            },
+        )
+        return HandlerOutcome(
+            result_code="CASE_DCE_IMPACT_RECORDED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "CASE_DCE_IMPACT_RUN",
+                    "aggregate_id": str(impact_run.id),
                     "aggregate_revision": 0,
                 },
             ),

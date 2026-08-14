@@ -8,3 +8,14 @@
 - [x] Tester login, refresh, logout, CSRF invalide et cookie HttpOnly.
 - [x] Rejouer Ruff, pytest, Alembic et les contrôles SEC-01 avant publication.
 - [ ] Raccorder le frontend à l’endpoint publié et mettre à jour la mémoire durable.
+- [ ] Maintenir le raccordement HTTPS frontend en attente jusqu’à la disponibilité d’un VPS et d’une URL backend réelle.
+- [ ] Ne configurer `VITE_API_BASE_URL` qu’après réception et vérification de l’URL HTTPS backend.
+- [ ] Choisir et figer le prochain slice backend à partir de la roadmap V8 avant toute nouvelle implémentation.
+- [x] Identifier le prochain slice backend explicitement documenté après `CASES-ASSIGNED-01`.
+- [ ] Slice retenu : `CASE-DCE-IMPACT-01`, analyse d’impact d’un rectificatif DCE dans une Case, sans recalcul silencieux des confirmations.
+- [x] Slice retenu : `CASE-DCE-IMPACT-01`, analyse d’impact d’un rectificatif DCE dans une Case, sans recalcul silencieux des confirmations.
+- [x] Vérifier que son contrat, sa matrice de sécurité et ses critères de fermeture existent avant le code.
+- [x] Figer ou compléter le contrat normatif du slice retenu.
+- [x] Implémenter uniquement son périmètre fermé dans le backend V8.
+- [x] Ajouter les tests de persistance, tenant, idempotence, append-only et acteur SYSTEM requis.
+- [x] Valider Ruff, pytest, Alembic et les invariants avant commit et push.

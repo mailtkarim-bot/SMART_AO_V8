@@ -411,6 +411,68 @@ class RecordDceRequirementConfirmationCommand(ApplicationCommand):
         return self
 
 
+class CaseDceImpactItemInput(BaseModel):
+    """One conservative, human-reviewable impact item."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    impact_item_id: UUID
+    impact_kind: str = Field(
+        pattern=(
+            r"^(DCE_VERSION_REPLACED|PREVIOUS_REQUIREMENT_REQUIRES_REVIEW|"
+            r"SUCCESSOR_REQUIREMENT_CANDIDATE|VERSION_HAS_NO_MATERIALIZED_SIGNAL)$"
+        )
+    )
+    previous_requirement_id: UUID | None = None
+    successor_requirement_id: UUID | None = None
+    review_state: str = Field(pattern=r"^(REVIEW_REQUIRED|PENDING_HUMAN_REVIEW)$")
+    evidence_code: str = Field(
+        pattern=r"^(RECTIFICATION_CHAIN|PREVIOUS_REQUIREMENT|SUCCESSOR_REQUIREMENT|NO_SIGNAL)$"
+    )
+
+
+class RecordCaseDceImpactRunCommand(ApplicationCommand):
+    """System-only append-only recording of one Case-scoped DCE impact run."""
+
+    command_type = "RecordCaseDceImpactRun"
+
+    impact_run_id: UUID
+    case_id: UUID
+    predecessor_dce_version_id: UUID
+    successor_dce_version_id: UUID
+    input_manifest_sha256: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-fA-F]{64}$",
+    )
+    algorithm_id: str = Field(min_length=1, max_length=100)
+    algorithm_version: str = Field(min_length=1, max_length=64)
+    status: str = Field(pattern=r"^(COMPLETED|NO_SIGNAL)$")
+    previous_requirement_count: int = Field(ge=0)
+    successor_requirement_count: int = Field(ge=0)
+    failure_code: str | None = Field(default=None, max_length=120)
+    items: list[CaseDceImpactItemInput] = Field(default_factory=list, max_length=40_000)
+
+    @model_validator(mode="after")
+    def validate_terminal_projection(self) -> RecordCaseDceImpactRunCommand:
+        item_ids = [item.impact_item_id for item in self.items]
+        if len(item_ids) != len(set(item_ids)):
+            raise ValueError("impact item identifier duplicate")
+        if self.failure_code is not None:
+            raise ValueError("successful impact run cannot carry failure code")
+        if self.status == "NO_SIGNAL" and (
+            self.previous_requirement_count != 0
+            or self.successor_requirement_count != 0
+        ):
+            raise ValueError("no-signal impact requires empty requirement counts")
+        if self.previous_requirement_count + self.successor_requirement_count == 0:
+            if self.status != "NO_SIGNAL":
+                raise ValueError("empty impact requires no-signal status")
+        elif self.status != "COMPLETED":
+            raise ValueError("materialized impact requires completed status")
+        return self
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 
