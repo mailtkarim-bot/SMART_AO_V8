@@ -40,7 +40,7 @@ DATABASE_URL = os.getenv(
     "SMART_AO_TEST_DATABASE_URL",
     "postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5432/smart_ao",
 )
-NOW = datetime(2026, 8, 13, 15, 0, tzinfo=UTC)
+NOW = datetime.now(tz=UTC)
 
 
 class StaticInspector:

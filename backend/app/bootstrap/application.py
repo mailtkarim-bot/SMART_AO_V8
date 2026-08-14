@@ -21,6 +21,7 @@ from app.interfaces.http.routes.authentication import (
     AuthenticationHttpRuntime,
     build_authentication_router,
 )
+from app.interfaces.http.routes.case_dce_reading import build_case_dce_reading_router
 from app.interfaces.http.routes.consultations import (
     ConsultationSecurityRuntime,
     build_consultation_router,
@@ -30,6 +31,7 @@ from app.interfaces.http.routes.dce_requirement_confirmations import (
 )
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
+from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
     CreateConsultationHandler,
@@ -50,6 +52,9 @@ from app.modules.dce.application.requirement_confirmation import (
     DceRequirementConfirmationService,
 )
 from app.modules.dce.application.upload import DceUploadService
+from app.modules.dce.infrastructure.case_dce_reading_reader import (
+    SqlAlchemyCaseDceReadingReader,
+)
 from app.modules.dce.infrastructure.consultation_projection_reader import (
     SqlAlchemyConsultationProjectionReader,
 )
@@ -144,6 +149,21 @@ class AppRuntime:
                 storage_key=record.storage_key,
                 expected_byte_size=record.expected_byte_size,
                 state=record.state,
+            )
+
+    def get_case_tenant_id(self, *, case_id: UUID) -> UUID | None:
+        """Return only the Case owner tenant required before SEC-01 authorization."""
+
+        with self.session_factory() as session:
+            return session.scalar(sa.select(CaseRecord.tenant_id).where(CaseRecord.id == case_id))
+
+    def get_case_dce_reading(self, *, tenant_id: UUID, case_id: UUID):
+        """Return the closed B projection scoped to one trusted tenant and Case."""
+
+        with self.session_factory() as session:
+            return SqlAlchemyCaseDceReadingReader(session).get(
+                tenant_id=tenant_id,
+                case_id=case_id,
             )
 
     def get_dce_version_tenant_id(self, *, dce_version_id: UUID) -> UUID | None:
@@ -258,6 +278,12 @@ def create_app(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
             policy=security_policy,
+        )
+        app.include_router(
+            build_case_dce_reading_router(
+                runtime=runtime,
+                security_runtime=security_runtime,
+            )
         )
         app.include_router(
             build_consultation_router(

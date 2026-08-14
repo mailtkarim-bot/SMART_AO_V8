@@ -289,6 +289,7 @@ def _assign_collaborator(
     tenant_id: UUID,
     membership_id: UUID,
     case_id: UUID,
+    scope_actions: list[str] | None = None,
 ) -> None:
     with session_factory.begin() as session:
         session.add(
@@ -298,7 +299,7 @@ def _assign_collaborator(
                 membership_id=membership_id,
                 case_id=case_id,
                 state="ACTIVE",
-                scope_actions_json=["dce.requirement.confirm"],
+                scope_actions_json=scope_actions or ["dce.requirement.confirm"],
                 scope_classifications_json=["INTERNAL_OPERATIONAL"],
                 granted_by_membership_id=membership_id,
                 granted_at=NOW,
@@ -520,6 +521,226 @@ def test_other_tenant_requirement_returns_neutral_not_found_and_is_audited(
     assert audit is not None
     assert audit.resource_id == requirement_id
     assert audit.case_id is None
+
+
+def _forbidden_response_keys(value: object) -> set[str]:
+    forbidden = {
+        "storage_key",
+        "storage_object_id",
+        "original_filename",
+        "media_type",
+        "byte_size",
+        "sha256",
+        "corpus_hash",
+        "provenance_channel",
+        "provenance_reference",
+        "provenance_url",
+        "excerpt",
+        "text",
+        "locator_json",
+        "confirmed_by_actor_id",
+        "price",
+        "margin",
+        "budget",
+        "audit",
+    }
+    if isinstance(value, dict):
+        return (set(value) & forbidden) | set().union(
+            *(_forbidden_response_keys(item) for item in value.values())
+        )
+    if isinstance(value, list):
+        return set().union(*(_forbidden_response_keys(item) for item in value)) if value else set()
+    return set()
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_case_dce_reading_patron_requires_real_bearer_and_returns_closed_projection(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    _, case_id = _seed_requirement_and_case(session_factory, tenant_id=tenant_id)
+    client, tokens = _client(session_factory)
+
+    unauthenticated = client.get(f"/api/v1/cases/{case_id}/dce-reading")
+    assert unauthenticated.status_code == 401
+    assert unauthenticated.json() == {"detail": "UNAUTHENTICATED"}
+
+    response = client.get(
+        f"/api/v1/cases/{case_id}/dce-reading",
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["case_id"] == str(case_id)
+    assert payload["availability"] == "AVAILABLE"
+    assert payload["dce"]["lifecycle"] == "ADMITTED"
+    assert payload["counters"]["total"] == 1
+    assert payload["requirements"][0]["confirmation_outcome"] == "PENDING_HUMAN_CONFIRMATION"
+    assert not _forbidden_response_keys(payload)
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_case_dce_reading_collaborator_with_matching_scope_is_allowed(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(
+        database_engine,
+        role="COLLABORATEUR",
+    )
+    _, case_id = _seed_requirement_and_case(session_factory, tenant_id=tenant_id)
+    _assign_collaborator(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        case_id=case_id,
+        scope_actions=["case.dce.read"],
+    )
+    client, tokens = _client(session_factory)
+
+    response = client.get(
+        f"/api/v1/cases/{case_id}/dce-reading",
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["availability"] == "AVAILABLE"
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_case_dce_reading_collaborator_with_scope_missing_read_action_is_denied(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(
+        database_engine,
+        role="COLLABORATEUR",
+    )
+    _, case_id = _seed_requirement_and_case(session_factory, tenant_id=tenant_id)
+    _assign_collaborator(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        case_id=case_id,
+        scope_actions=["dce.requirement.confirm"],
+    )
+    client, tokens = _client(session_factory)
+
+    response = client.get(
+        f"/api/v1/cases/{case_id}/dce-reading",
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "FORBIDDEN"}
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_case_dce_reading_collaborator_without_assignment_is_denied_and_audited(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="COLLABORATEUR",
+    )
+    _, case_id = _seed_requirement_and_case(session_factory, tenant_id=tenant_id)
+    client, tokens = _client(session_factory)
+
+    response = client.get(
+        f"/api/v1/cases/{case_id}/dce-reading",
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "FORBIDDEN"}
+    with session_factory() as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.action == "case.dce.read",
+            )
+        )
+    assert audit is not None
+    assert audit.resource_id == case_id
+    assert audit.case_id == case_id
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_case_dce_reading_other_tenant_is_neutral_and_audited(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    owner_tenant_id, _, _, _ = _seed_principal(database_engine, role="PATRON_ADMIN")
+    _, case_id = _seed_requirement_and_case(session_factory, tenant_id=owner_tenant_id)
+    requester_tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    client, tokens = _client(session_factory)
+
+    response = client.get(
+        f"/api/v1/cases/{case_id}/dce-reading",
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
+    with session_factory() as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.tenant_id == requester_tenant_id,
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.action == "case.dce.read",
+                SecurityAuditEventRecord.reason_code == "NOT_FOUND_OR_FORBIDDEN",
+            )
+        )
+    assert audit is not None
+    assert audit.resource_id == case_id
+    assert audit.case_id == case_id
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_case_dce_reading_case_without_applicable_dce_is_rejected(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    _, case_id = _seed_requirement_and_case(session_factory, tenant_id=tenant_id)
+    with session_factory.begin() as session:
+        case = session.get(CaseRecord, case_id)
+        assert case is not None
+        case.applicable_dce_version_id = None
+        case.dce_freshness = "NO_DCE"
+    client, tokens = _client(session_factory)
+
+    response = client.get(
+        f"/api/v1/cases/{case_id}/dce-reading",
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "COMMAND_REJECTED"}
 
 
 @pytest.mark.api

@@ -130,6 +130,45 @@ class ConsultationProjectionResponse(PublicResponseModel):
     projection_status: Literal["CURRENT", "REFRESH_PENDING", "PARTIAL"]
 
 
+class CaseDceReadingDceResponse(PublicResponseModel):
+    dce_version_id: UUID
+    lifecycle: str
+    integrity: str
+    classification_readiness: str
+    analysis_readiness: str
+    source_received_at: datetime
+
+
+class CaseDceReadingCountersResponse(PublicResponseModel):
+    total: int = Field(ge=0)
+    pending_human_confirmation: int = Field(ge=0)
+    confirmed: int = Field(ge=0)
+    review_required: int = Field(ge=0)
+    not_applicable: int = Field(ge=0)
+
+
+class CaseDceReadingRequirementResponse(PublicResponseModel):
+    requirement_id: UUID
+    requirement_type: str
+    directive_signal: str
+    confirmation_outcome: str
+    uncertainty_status: str
+    document_family: str
+    source_locator_label: str
+
+
+class CaseDceReadingResponse(PublicResponseModel):
+    case_id: UUID
+    work_label: str
+    case_lifecycle: str
+    commercial_stage: str
+    dce_freshness: str
+    availability: Literal["AVAILABLE"]
+    dce: CaseDceReadingDceResponse
+    counters: CaseDceReadingCountersResponse
+    requirements: list[CaseDceReadingRequirementResponse]
+
+
 class RecordDceRequirementConfirmationRequest(PublicResponseModel):
     """Untrusted HTTP intent; scope and actor stay server-resolved."""
 
