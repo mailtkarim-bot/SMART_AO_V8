@@ -1,18 +1,18 @@
 # PROJECT_STATE
 
 ## Slice courant
-`DCE-REQUIREMENTS-CONFIRMATION-01` — finalisé localement, prêt à publication sous réserve de CI GitHub. Le slice ajoute la confirmation humaine historisée, la route HTTP authentifiée, la résolution serveur d’une Case active unique, la policy SEC-01, l’audit succès/refus, la migration `0017` du registre et la migration `0018` du vocabulaire `AUTHZ_SUCCEEDED`. Les fondations SEC-01, les lectures Consultation/DCE, l’admission, le staging, l’upload, la rétention, DCE-DOCUMENT-EXTRACTION-01, DCE-ANALYSIS-01, DCE-CLASSIFICATION-01 et DCE-REQUIREMENTS-01 restent publiés sur `main`.
+`DCE-REQUIREMENTS-CONFIRMATION-01` — publié sur `main` et CI GitHub verte. Le slice ajoute la confirmation humaine historisée, la route HTTP authentifiée, la résolution serveur d’une Case active unique, la policy SEC-01, l’audit succès/refus, la migration `0017` du registre et la migration `0018` du vocabulaire `AUTHZ_SUCCEEDED`. Les fondations SEC-01, les lectures Consultation/DCE, l’admission, le staging, l’upload, la rétention, DCE-DOCUMENT-EXTRACTION-01, DCE-ANALYSIS-01, DCE-CLASSIFICATION-01 et DCE-REQUIREMENTS-01 restent publiés sur `main`.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | Commit de tête prêt à pousser : DCE-REQUIREMENTS-CONFIRMATION-01, confirmation humaine append-only, route authentifiée, policy ReBAC, audit succès/refus, migrations `0017`/`0018`, tests API et CI renforcée. |
+| Commit | DCE-REQUIREMENTS-CONFIRMATION-01 publié par [`88bf725`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/88bf725), puis CI corrigée par [`8efb0ca`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/8efb0ca) et [`6bf989a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/6bf989a). |
 | Commit précédent | DCE-CLASSIFICATION-01 publié sur `main` : [`e099f2a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e099f2a), contrat normatif, migration `0015`, classifieur déterministe, registre append-only, projection courante historisée et tests dédiés. |
 | Migration Alembic | `20260814_0017` et `20260814_0018` validées : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Tests | `uv run ruff check .` vert ; `uv run pytest backend/tests -q` : **219 tests verts**. Les nouveaux scénarios API couvrent bearer obligatoire, succès patron audité, collaborateur sans affectation, `NOT_APPLICABLE` interdit et audité, ressource hors tenant neutre et DCE rattachée à plusieurs Cases refusée. |
-| CI | Le workflow local est étendu avec `detect-secrets-hook`, export uv + `pip-audit --strict`, `bandit -ll` et un job Trivy conditionnel. La réussite GitHub de ce nouveau workflow reste à confirmer après push. PostgreSQL 16 est exécuté dans CI ; aucun Dockerfile n’existe encore, donc aucun scan d’image n’est prétendu exécuté. |
+| CI | [Workflow GitHub vert #31794051057](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31794051057) : lint, secrets, audit dépendances, Bandit et 219 tests PostgreSQL sont passés. Le job image a confirmé l’absence de Dockerfile; build et scan Trivy restent explicitement non applicables jusqu’à l’introduction d’un artefact conteneur. |
 
 ## Ce qui est terminé
 
@@ -61,7 +61,7 @@
 
 ## Prochaine action unique
 
-Pousser le commit **DCE-REQUIREMENTS-CONFIRMATION-01** puis confirmer la CI GitHub. Le script `docs/presentations/SMART_AO_V8_DCE_REQUIREMENTS_01_SCRIPT.md` est déjà rédigé pour les huit diapositives; ne pas ouvrir le prochain slice avant le statut CI vert.
+Choisir et contractualiser le prochain slice métier après revue humaine de la livraison publiée. Le script `docs/presentations/SMART_AO_V8_DCE_REQUIREMENTS_01_SCRIPT.md` est déjà rédigé pour les huit diapositives, et le prochain besoin technique important reste la modélisation Case-scopée des exigences pour une DCE partagée par plusieurs affaires.
 
 ## Décisions ouvertes
 

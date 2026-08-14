@@ -1,7 +1,7 @@
 # Audit SEC-01 — DCE Requirements Confirmation
 
 **Date :** 14 août 2026.  
-**Périmètre :** `DCE-REQUIREMENTS-01` publié (`054054e`) et `DCE-REQUIREMENTS-CONFIRMATION-01` finalisé localement avant publication.  
+**Périmètre :** `DCE-REQUIREMENTS-01` publié (`054054e`) et `DCE-REQUIREMENTS-CONFIRMATION-01` publié sur `main` (`88bf725`), avec correctifs CI (`8efb0ca`, `6bf989a`).  
 **Méthode :** revue des contrats, du modèle de menace SEC-01, des modèles SQLAlchemy, des migrations Alembic, de la policy centrale, du transport HTTP, des tests PostgreSQL et des contrôles CI. Cet audit n’est ni une certification ni un test d’intrusion.
 
 ## Conclusion exécutive
@@ -43,8 +43,8 @@ La portée de sécurité est volontairement **DCE-scopée avec résolution trans
 | `SEC-REQC-02` | Audit transactionnel du succès et des refus manuels absent. | `SecurityAuditWriter` est appelé dans la transaction du handler pour le succès; la façade écrit les refus système, hors tenant et `NOT_APPLICABLE` collaborateur. | `handlers.py`, `requirement_confirmation.py`; audit API PostgreSQL. | **Fermé pour le slice.** |
 | `SEC-REQC-03` | La Case n’était pas contrôlée côté serveur. | Résolution tenant-scopée de l’exigence vers sa DCE puis vers une Case active unique; cardinalité ambiguë refusée; la Case n’est jamais acceptée du corps HTTP ni persistée dans la confirmation. | Contrat normatif mis à jour; tests inter-tenant et multi-Case. | **Fermé pour la frontière actuelle.** |
 | `SEC-REQC-04` | Les autorisations réussies n’étaient pas enregistrées. | Ajout de `AUTHZ_SUCCEEDED` au vocabulaire et au modèle; audit succès transactionnel de la mutation de confirmation. Migration additive `0018`. | `audit.py`, `models.py`, `20260814_0018_security_audit_authorization_success.py`; test de succès audité. | **Fermé pour ce slice.** |
-| `SEC-REQC-05` | Migration `0017` non publiée et non intégrée à la validation finale. | Migration `0017` conservée pour le registre; migration `0018` ajoutée pour le vocabulaire d’audit. Cycle `upgrade head`, `alembic check`, `downgrade base` exécuté avec succès. | Migrations `0017` et `0018`; sortie Alembic du 14 août 2026. | **Fermé localement, publication à confirmer par CI.** |
-| `SEC-REQC-06` | Contrôles secrets, dépendances, SAST et image absents de la CI. | CI ajoutée pour `detect-secrets-hook`, export uv + `pip-audit --strict`, `bandit -ll` et job Trivy conditionnel lorsqu’un Dockerfile existe. | `.github/workflows/ci.yml`, `.secrets.baseline`, `pyproject.toml`; contrôles locaux verts. | **Fermé pour l’état actuel; scan image non exécuté faute de Dockerfile.** |
+| `SEC-REQC-05` | Migration `0017` non publiée et non intégrée à la validation finale. | Migration `0017` conservée pour le registre; migration `0018` ajoutée pour le vocabulaire d’audit. Cycle `upgrade head`, `alembic check`, `downgrade base` exécuté avec succès, puis publication sur `main`. | Migrations `0017` et `0018`; workflow GitHub vert #31794051057. | **Fermé et publié.** |
+| `SEC-REQC-06` | Contrôles secrets, dépendances, SAST et image absents de la CI. | CI ajoutée pour `detect-secrets-hook`, export uv + `pip-audit --strict`, `bandit -ll` et job Trivy conditionnel lorsqu’un Dockerfile existe. | [Workflow GitHub vert #31794051057](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31794051057). | **Fermé pour l’état actuel; scan image non exécuté faute de Dockerfile.** |
 
 ## Validation exécutée
 
@@ -62,7 +62,7 @@ La portée de sécurité est volontairement **DCE-scopée avec résolution trans
 
 ## Décision de sécurité
 
-> **Décision : autoriser la publication de `DCE-REQUIREMENTS-CONFIRMATION-01` sous réserve de la réussite de la CI GitHub et du contrôle humain du diff final.**
+> **Décision : `DCE-REQUIREMENTS-CONFIRMATION-01` est publié sur `main` et sa CI GitHub est verte. Le slice peut servir de base au prochain incrément, sous réserve de conserver sa limite de portée Case documentée.**
 
 Cette autorisation ne constitue ni une certification de sécurité, ni une garantie d’absence de vulnérabilité, ni une validation juridique des réponses à un appel d’offres. Elle confirme uniquement que la frontière livrée respecte les invariants SEC-01 documentés et qu’elle est testée dans l’environnement PostgreSQL local décrit par le dépôt.
 
