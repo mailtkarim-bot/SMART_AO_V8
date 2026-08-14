@@ -7,10 +7,10 @@ outside the public payload and are supplied by the server-side command context.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import ClassVar
+from typing import ClassVar, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 
 class ApplicationCommand(BaseModel):
@@ -522,6 +522,64 @@ class ReportAssignmentUnavailabilityCommand(ApplicationCommand):
         if self.known_deadline_impact and not self.impact_note:
             raise ValueError("known deadline impact requires an impact note")
         return self
+
+
+AssignmentScopeAction = Literal[
+    "case.dce.read",
+    "dce.requirement.confirm",
+    "document.administrative.read",
+    "preparation.transmit",
+    "assignment.acknowledge",
+    "assignment.clarify",
+    "assignment.history.read",
+    "assignment.unavailability",
+]
+AssignmentScopeClassification = Literal["INTERNAL_OPERATIONAL"]
+
+
+class AssignmentScopeCommand(ApplicationCommand):
+    """Closed, canonical collaborator scope carried by a patron command."""
+
+    scope_actions: list[AssignmentScopeAction] = Field(min_length=1, max_length=8)
+    scope_classifications: list[AssignmentScopeClassification] = Field(min_length=1, max_length=1)
+
+    @model_validator(mode="after")
+    def validate_and_canonicalize_scope(self) -> AssignmentScopeCommand:
+        if len(self.scope_actions) != len(set(self.scope_actions)):
+            raise ValueError("assignment scope actions must not contain duplicates")
+        if len(self.scope_classifications) != len(set(self.scope_classifications)):
+            raise ValueError("assignment scope classifications must not contain duplicates")
+        self.scope_actions.sort()
+        self.scope_classifications.sort()
+        return self
+
+
+class CreateCaseAssignmentCommand(AssignmentScopeCommand):
+    """Create one immediately usable, tenant-scoped collaborator assignment."""
+
+    command_type = "CreateCaseAssignment"
+
+    assignment_id: UUID
+    case_id: UUID
+    target_membership_id: UUID
+    expected_case_revision: int = Field(ge=0)
+    starts_at: AwareDatetime
+    ends_at: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def validate_period(self) -> CreateCaseAssignmentCommand:
+        if self.ends_at is not None and self.ends_at <= self.starts_at:
+            raise ValueError("assignment period must be strictly ordered")
+        return self
+
+
+class AmendCaseAssignmentScopeCommand(AssignmentScopeCommand):
+    """Request a revisioned replacement of an existing assignment scope."""
+
+    command_type = "AmendCaseAssignmentScope"
+
+    assignment_id: UUID
+    expected_revision: int = Field(ge=0)
 
 
 class RegisterDceVersionCommand(ApplicationCommand):

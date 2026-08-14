@@ -20,6 +20,7 @@ class Capability(StrEnum):
     ASSIGNMENT_CLARIFY = "assignment.clarify"
     ASSIGNMENT_HISTORY_READ = "assignment.history.read"
     ASSIGNMENT_UNAVAILABILITY = "assignment.unavailability"
+    ASSIGNMENT_MANAGE = "assignment.manage"
     DOCUMENT_ADMIN_READ = "document.administrative.read"
     PREPARATION_TRANSMIT = "preparation.transmit"
     MEMBERSHIP_MANAGE = "membership.manage"
@@ -42,6 +43,7 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
+        Capability.ASSIGNMENT_MANAGE,
         Capability.MEMBERSHIP_MANAGE,
         Capability.TENANT_MANAGE,
         Capability.DECISION_FINALIZE,

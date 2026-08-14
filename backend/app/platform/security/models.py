@@ -279,12 +279,12 @@ class CaseAssignmentRecord(TenantScopedRecord, Base):
         ),
         sa.CheckConstraint("aggregate_revision >= 0", name="aggregate_revision"),
         sa.Index(
-            "ux_assignments__active_member_case",
+            "ux_assignments__open_member_case",
             "tenant_id",
             "membership_id",
             "case_id",
             unique=True,
-            postgresql_where=sa.text("state = 'ACTIVE'"),
+            postgresql_where=sa.text("state IN ('ACTIVE', 'SUSPENDED')"),
         ),
         sa.Index(
             "ix_assignments__context_resolution",
@@ -313,6 +313,119 @@ class CaseAssignmentRecord(TenantScopedRecord, Base):
     starts_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     ends_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+
+class CaseAssignmentChangeEventRecord(TenantScopedRecord, Base):
+    """Immutable patron-owned history of authority changes on one assignment."""
+
+    __tablename__ = "case_assignment_change_events"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_assignment_change__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "assignment_id"],
+            ["case_assignments.tenant_id", "case_assignments.id"],
+            name="fk_assignment_change__assignment",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "case_id"],
+            ["cases.tenant_id", "cases.id"],
+            name="fk_assignment_change__case",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "target_membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_assignment_change__target_membership",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "author_membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_assignment_change__author_membership",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_assignment_change__tenant_id"),
+        sa.CheckConstraint(
+            "event_type IN ('ASSIGNMENT_CREATED', 'ASSIGNMENT_SCOPE_AMENDED', "
+            "'ASSIGNMENT_SUSPENDED', 'ASSIGNMENT_REACTIVATED', 'ASSIGNMENT_ENDED')",
+            name="event_type",
+        ),
+        sa.CheckConstraint(
+            "resulting_revision >= 0 AND (previous_revision IS NULL OR previous_revision >= 0) "
+            "AND ((event_type = 'ASSIGNMENT_CREATED' AND previous_revision IS NULL "
+            "AND resulting_revision = 0) OR (event_type <> 'ASSIGNMENT_CREATED' "
+            "AND previous_revision IS NOT NULL "
+            "AND resulting_revision = previous_revision + 1))",
+            name="revision",
+        ),
+        sa.CheckConstraint(
+            "(previous_state IS NULL OR previous_state IN ('ACTIVE', 'SUSPENDED', "
+            "'ENDED', 'EXPIRED')) AND resulting_state IN ('ACTIVE', 'SUSPENDED', "
+            "'ENDED', 'EXPIRED')",
+            name="state",
+        ),
+        sa.CheckConstraint(
+            "jsonb_typeof(resulting_scope_actions_json) = 'array' "
+            "AND jsonb_array_length(resulting_scope_actions_json) > 0 "
+            "AND jsonb_typeof(resulting_scope_classifications_json) = 'array' "
+            "AND jsonb_array_length(resulting_scope_classifications_json) > 0",
+            name="scope_result",
+        ),
+        sa.CheckConstraint(
+            "(previous_scope_actions_json IS NULL AND previous_scope_classifications_json "
+            "IS NULL) OR (jsonb_typeof(previous_scope_actions_json) = 'array' "
+            "AND jsonb_array_length(previous_scope_actions_json) > 0 "
+            "AND jsonb_typeof(previous_scope_classifications_json) = 'array' "
+            "AND jsonb_array_length(previous_scope_classifications_json) > 0)",
+            name="scope_previous",
+        ),
+        sa.CheckConstraint(
+            "reason_code IS NULL OR reason_code IN ('PATRON_SUSPENDED', "
+            "'WORKLOAD_REALLOCATION', 'CASE_PAUSED', 'ACCESS_REVIEW', 'PATRON_ENDED', "
+            "'CASE_STOPPED', 'CASE_ARCHIVED', 'COLLABORATOR_UNAVAILABLE', "
+            "'MEMBERSHIP_REVOKED')",
+            name="reason",
+        ),
+        sa.Index(
+            "ix_assignment_change__tenant_assignment",
+            "tenant_id",
+            "assignment_id",
+            "created_at",
+        ),
+        sa.Index(
+            "ix_assignment_change__tenant_case_target",
+            "tenant_id",
+            "case_id",
+            "target_membership_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    assignment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    target_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    author_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    event_type: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    previous_revision: Mapped[int | None] = mapped_column(sa.Integer)
+    resulting_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    previous_state: Mapped[str | None] = mapped_column(sa.String(16))
+    resulting_state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    reason_code: Mapped[str | None] = mapped_column(sa.String(40))
+    previous_scope_actions_json: Mapped[list[str] | None] = mapped_column(JSONB(none_as_null=True))
+    previous_scope_classifications_json: Mapped[list[str] | None] = mapped_column(
+        JSONB(none_as_null=True)
+    )
+    resulting_scope_actions_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    resulting_scope_classifications_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
 
 
 class CaseAssignmentAcknowledgementRecord(TenantScopedRecord, Base):

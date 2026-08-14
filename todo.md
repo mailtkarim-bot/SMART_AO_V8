@@ -57,3 +57,9 @@
 - [x] Vérifier le registre OpenAPI Assignment, régénérer son snapshot via le script reproductible et contrôler les quatre opérations.
 - [x] Rejouer les tests backend complets et le harnais API Assignment couvrant `GET /api/v1/assignments/{assignment_id}/history`.
 - [x] Mettre à jour `PROJECT_STATE.md`, valider le diff et publier la frontière documentaire patron après revue finale (contrat `c3b8c01`, CI `31832528921` verte).
+- [x] Auditer les patterns de migration Alembic, modèles ORM, commandes Pydantic, dispatcher et tests PostgreSQL applicables à la création d’affectation patron.
+- [x] Rédiger la spécification technique et le plan SQL de la migration append-only `PATRON-ASSIGNMENT-MANAGEMENT-01`.
+- [x] Ajouter et tester les schémas Pydantic fermés `CreateCaseAssignment` et `AmendCaseAssignmentScope`.
+- [x] Implémenter le premier handler transactionnel `CreateCaseAssignment`, son journal patron, son événement, son outbox et son receipt idempotent.
+- [x] Écrire les tests d’intégration PostgreSQL du premier incrément : tenant, FKs, unicité, append-only, rollback, idempotence et conflit de révision Case.
+- [ ] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du premier incrément patron.

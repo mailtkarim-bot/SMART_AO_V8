@@ -79,6 +79,7 @@ from app.modules.membership.application.assignment import (
     assignment_handlers,
 )
 from app.modules.membership.application.assignment_history import AssignmentHistoryService
+from app.modules.membership.application.patron_assignment import patron_assignment_handlers
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
@@ -130,6 +131,7 @@ class AppRuntime:
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
                 **assignment_handlers(),
+                **patron_assignment_handlers(),
             },
         )
         upload_service = (
