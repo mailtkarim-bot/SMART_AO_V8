@@ -82,5 +82,5 @@
 - [x] Implémenter `ReactivateCaseAssignment`, son journal append-only, son événement, son outbox et son receipt, avec la migration additive `0023` nécessaire au catalogue fermé de motifs.
 - [x] Écrire les tests PostgreSQL et API de réactivation : révision, rejeu, état, motif, fenêtre, tenant, rôle, journal et absence de fuite.
 - [x] Mesurer le chemin append-only de réactivation avec un seuil local de non-régression et confirmer le cycle Alembic jusqu’à la tête `0023`.
-- [ ] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de réactivation.
+- [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de réactivation (commit `ca740c6`, workflow `31850271931` vert).
 - [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub de l’incrément patron 2 (commit `5054416`, workflow `31844799829` vert).
