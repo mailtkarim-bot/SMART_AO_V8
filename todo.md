@@ -75,5 +75,5 @@
 - [x] Implémenter `SuspendCaseAssignment`, son journal append-only, son événement, son outbox, son receipt et vérifier qu’aucune migration additive n’est requise.
 - [x] Écrire les tests PostgreSQL et API de suspension : révision, rejeu, état, raisons, tenant, role, journal et absence de fuite.
 - [x] Mesurer le chemin append-only de suspension avec un seuil local de non-régression et confirmer le cycle Alembic jusqu’à la tête `0022`.
-- [ ] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de suspension.
+- [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de suspension (commit `2b421cf`, workflow `31847314071` vert).
 - [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub de l’incrément patron 2 (commit `5054416`, workflow `31844799829` vert).
