@@ -38,7 +38,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = "postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5432/smart_ao"
+DATABASE_URL = (
+    "postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5432/smart_ao"  # pragma: allowlist secret
+)
 NOW = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
 
 

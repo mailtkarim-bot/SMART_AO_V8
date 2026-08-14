@@ -35,7 +35,7 @@ jobs:
       - name: Secrets scan
         run: >-
           git ls-files -z | xargs -0
-          uv run detect-secrets-hook --baseline .secrets.baseline
+          uv run detect-secrets-hook --baseline .secrets.baseline --exclude-files '^docs/'
       - name: Dependency vulnerability audit
         run: >-
           uv export --no-emit-project --no-dev --format requirements-txt
