@@ -69,4 +69,4 @@
 - [x] Vérifier l’upgrade/check/downgrade de la migration `20260814_0021` et mesurer les insertions/lectures du journal append-only avec un seuil explicitement documenté.
 - [x] Créer les routes HTTP patron uniquement pour `CreateCaseAssignment` et `AmendCaseAssignmentScope`, avec bearer réel, policy auditée, DTO fermés et OpenAPI vérifiée.
 - [x] Publier un amendement normatif et une migration additive `0022` pour lever le check historique incompatible avec les fenêtres d’affectation futures.
-- [ ] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub de l’incrément patron 2.
+- [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub de l’incrément patron 2 (commit `5054416`, workflow `31844799829` vert).
