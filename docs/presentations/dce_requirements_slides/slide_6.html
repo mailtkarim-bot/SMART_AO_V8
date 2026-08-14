@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E2E8F0;
+            position: relative;
+        }
+        .decorative-line {
+            width: 100%;
+            border-top: 8px solid #000000;
+            position: absolute;
+            top: 52px;
+            left: 0;
+        }
+        .content-wrapper {
+            padding-top: 100px;
+            padding-left: 52px;
+            padding-right: 52px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+        .header-block {
+            grid-column: 1 / 12;
+            background-color: #DD6B20;
+            padding: 24px 40px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #000000;
+            font-weight: 800;
+            font-size: 48px;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            text-align: left;
+        }
+        .grid-2x2 {
+            grid-column: 1 / 13;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .info-block {
+            background-color: #ffffff;
+            border-top: 8px solid #000000;
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .info-block.accent {
+            border-top-color: #DD6B20;
+        }
+        .block-title {
+            color: #000000;
+            font-weight: 800;
+            font-size: 28px;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+        .block-text {
+            color: #1A202C;
+            font-weight: 500;
+            font-size: 22px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="decorative-line"></div>
+        <div class="content-wrapper">
+            <div class="header-block">
+                <h2>La confirmation humaine est la prochaine frontière contrôlée</h2>
+            </div>
+            <div class="grid-2x2">
+                <div class="info-block">
+                    <div class="block-title">Succession historisée</div>
+                    <div class="block-text">DCE-REQUIREMENTS-CONFIRMATION-01 ajoute une succession historisée append-only.</div>
+                </div>
+                <div class="info-block">
+                    <div class="block-title">Séparation des rôles</div>
+                    <div class="block-text">Le patron et le collaborateur affecté ne disposent pas des mêmes outcomes (ex: NOT_APPLICABLE).</div>
+                </div>
+                <div class="info-block">
+                    <div class="block-title">Policy SEC-01 stricte</div>
+                    <div class="block-text">La policy doit vérifier le tenant, le membership, la capability et l'affectation à la Case.</div>
+                </div>
+                <div class="info-block accent">
+                    <div class="block-title">Limites fonctionnelles</div>
+                    <div class="block-text">La confirmation ne devient ni une conformité juridique, ni un prix, ni une autorisation de dépôt.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

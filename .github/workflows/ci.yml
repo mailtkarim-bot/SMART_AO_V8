@@ -32,5 +32,32 @@ jobs:
         run: uv sync --group dev
       - name: Lint
         run: uv run ruff check .
+      - name: Secrets scan
+        run: >-
+          git ls-files -z | xargs -0
+          uv run detect-secrets-hook --baseline .secrets.baseline
+      - name: Dependency vulnerability audit
+        run: >-
+          uv export --no-emit-project --no-dev --format requirements-txt
+          -o /tmp/smart_ao_requirements.txt
+          && uv run pip-audit --strict -r /tmp/smart_ao_requirements.txt
+      - name: Python SAST
+        run: uv run bandit -q -r backend/app -ll
       - name: Smoke tests
         run: uv run pytest backend/tests -q
+
+  image-security:
+    if: ${{ hashFiles('Dockerfile', '**/Dockerfile') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build deployment image
+        run: docker build --tag smart-ao-v8:ci .
+      - name: Scan deployment image
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: smart-ao-v8:ci
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH

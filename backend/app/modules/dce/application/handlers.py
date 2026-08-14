@@ -24,6 +24,7 @@ from app.modules.dce.application.commands import (
     RecordDceDocumentClassificationRunCommand,
     RecordDceDocumentExtractionCommand,
     RecordDceRcAnalysisCommand,
+    RecordDceRequirementConfirmationCommand,
     RecordDceRequirementMaterializationRunCommand,
     RecordDceStagedObjectQuarantineCommand,
     RecordDceStagedObjectScanCommand,
@@ -52,6 +53,10 @@ from app.modules.dce.infrastructure.models.dce_rc_analysis import (
     DceRcRequirementObservationRecord,
     DceRcRequirementSourceRecord,
 )
+from app.modules.dce.infrastructure.models.dce_requirement_confirmations import (
+    DceRequirementConfirmationCurrentRecord,
+    DceRequirementConfirmationRecord,
+)
 from app.modules.dce.infrastructure.models.dce_requirements import (
     DceRequirementMaterializationRunRecord,
     DceRequirementRecord,
@@ -64,6 +69,13 @@ from app.modules.dce.infrastructure.models.dce_version import (
     DceVersionRecord,
 )
 from app.platform.events.dispatcher import CommandContext, HandlerOutcome, PendingDomainEvent
+from app.platform.security.audit import (
+    AuditEventType,
+    AuditOutcome,
+    AuditSeverity,
+    SecurityAuditEntry,
+    SecurityAuditWriter,
+)
 
 
 class CreateConsultationHandler:
@@ -1522,6 +1534,123 @@ class RecordDceRequirementMaterializationRunHandler:
                     "aggregate_type": "DCE_REQUIREMENT_MATERIALIZATION_RUN",
                     "aggregate_id": str(requirement_run.id),
                     "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
+class RecordDceRequirementConfirmationHandler:
+    """Persist a human confirmation as an immutable successor of one requirement."""
+
+    def __init__(self, *, audit_writer: SecurityAuditWriter | None = None) -> None:
+        self._audit_writer = audit_writer or SecurityAuditWriter()
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: RecordDceRequirementConfirmationCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind == "SYSTEM":
+            raise ValueError("DCE_REQUIREMENT_HUMAN_ACTOR_REQUIRED")
+        requirement = session.scalar(
+            sa.select(DceRequirementRecord)
+            .where(
+                DceRequirementRecord.tenant_id == context.tenant_id,
+                DceRequirementRecord.id == command.requirement_id,
+            )
+            .with_for_update()
+        )
+        if requirement is None:
+            raise ValueError("NOT_FOUND_OR_FORBIDDEN")
+        current = session.scalar(
+            sa.select(DceRequirementConfirmationCurrentRecord)
+            .where(
+                DceRequirementConfirmationCurrentRecord.tenant_id == context.tenant_id,
+                DceRequirementConfirmationCurrentRecord.requirement_id == requirement.id,
+            )
+            .with_for_update()
+        )
+        current_revision = current.revision if current is not None else 0
+        if current_revision != command.expected_confirmation_revision:
+            raise ValueError("DCE_REQUIREMENT_CONFIRMATION_STALE")
+        if command.outcome == "NOT_APPLICABLE" and context.actor_kind == "COLLABORATEUR":
+            raise ValueError("DCE_REQUIREMENT_PATRON_REQUIRED")
+        confirmation = DceRequirementConfirmationRecord(
+            id=command.confirmation_id,
+            tenant_id=context.tenant_id,
+            requirement_id=requirement.id,
+            revision=current_revision + 1,
+            previous_confirmation_id=current.confirmation_id if current is not None else None,
+            outcome=command.outcome,
+            reason_code=command.reason_code,
+            confirmed_by_actor_id=context.actor_id,
+        )
+        session.add(confirmation)
+        session.flush()
+        if current is None:
+            session.add(
+                DceRequirementConfirmationCurrentRecord(
+                    tenant_id=context.tenant_id,
+                    requirement_id=requirement.id,
+                    confirmation_id=confirmation.id,
+                    revision=confirmation.revision,
+                    outcome=confirmation.outcome,
+                )
+            )
+        else:
+            current.confirmation_id = confirmation.id
+            current.revision = confirmation.revision
+            current.outcome = confirmation.outcome
+        if context.case_id is not None:
+            self._audit_writer.record(
+                session=session,
+                entry=SecurityAuditEntry(
+                    occurred_at=context.received_at,
+                    tenant_id=context.tenant_id,
+                    actor_id=context.actor_id,
+                    identity_id=context.identity_id,
+                    session_id=context.session_id,
+                    actor_kind=context.actor_kind,
+                    auth_strength=None,
+                    event_type=AuditEventType.AUTHZ_SUCCEEDED,
+                    outcome=AuditOutcome.SUCCEEDED,
+                    severity=AuditSeverity.INFO,
+                    action="dce.requirement.confirm",
+                    resource_type="DCE_REQUIREMENT",
+                    resource_id=requirement.id,
+                    case_id=context.case_id,
+                    correlation_id=command.correlation_id,
+                    command_id=command.command_id,
+                    request_id=None,
+                    source_ip_hash=None,
+                    user_agent_family=None,
+                    reason_code="DCE_REQUIREMENT_CONFIRMED",
+                    metadata={"channel": "command"},
+                ),
+            )
+        event = PendingDomainEvent(
+            aggregate_type="DCE_REQUIREMENT_CONFIRMATION",
+            aggregate_id=confirmation.id,
+            aggregate_revision=confirmation.revision,
+            event_type="DCE_REQUIREMENT_CONFIRMED",
+            payload={
+                "confirmation_id": str(confirmation.id),
+                "requirement_id": str(requirement.id),
+                "outcome": confirmation.outcome,
+                "reason_code": confirmation.reason_code,
+                "revision": confirmation.revision,
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_REQUIREMENT_CONFIRMED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_REQUIREMENT_CONFIRMATION",
+                    "aggregate_id": str(confirmation.id),
+                    "aggregate_revision": confirmation.revision,
                 },
             ),
             events=(event,),

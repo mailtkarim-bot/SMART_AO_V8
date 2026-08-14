@@ -176,7 +176,7 @@ class SecurityAuditEventRecord(Base):
             "'AUTH_LOGIN_SUCCEEDED', 'AUTH_LOGIN_DENIED', "
             "'AUTH_REFRESH_SUCCEEDED', 'AUTH_REFRESH_DENIED', "
             "'AUTH_LOGOUT_SUCCEEDED', 'AUTH_SESSION_REJECTED', "
-            "'AUTHZ_DENIED', 'AUTHZ_STEP_UP_REQUIRED'"
+            "'AUTHZ_SUCCEEDED', 'AUTHZ_DENIED', 'AUTHZ_STEP_UP_REQUIRED'"
             ")",
             name="event_type",
         ),

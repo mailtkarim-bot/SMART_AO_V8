@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E2E8F0;
+            position: relative;
+        }
+        .decorative-line {
+            width: 100%;
+            border-top: 8px solid #000000;
+            position: absolute;
+            top: 52px;
+            left: 0;
+        }
+        .content-wrapper {
+            padding-top: 100px;
+            padding-left: 52px;
+            padding-right: 52px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+        .header-block {
+            grid-column: 1 / 12;
+            background-color: #DD6B20;
+            padding: 24px 40px;
+            margin-bottom: 40px;
+        }
+        h2 {
+            color: #000000;
+            font-weight: 800;
+            font-size: 48px;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            text-align: left;
+        }
+        .grid-2x2 {
+            grid-column: 1 / 13;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .info-block {
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        .info-block.dark {
+            background-color: #1A202C;
+            color: #ffffff;
+        }
+        .info-block.light {
+            background-color: #ffffff;
+            color: #1A202C;
+            border-top: 12px solid #000000;
+        }
+        .info-block.accent {
+            background-color: #DD6B20;
+            color: #000000;
+        }
+        h3 {
+            font-weight: 800;
+            font-size: 28px;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+        p {
+            font-weight: 500;
+            font-size: 24px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="decorative-line"></div>
+        <div class="content-wrapper">
+            <div class="header-block">
+                <h2>Le matérialiseur ne relit jamais les originaux</h2>
+            </div>
+            <div class="grid-2x2">
+                <div class="info-block dark">
+                    <h3>Entrée unique</h3>
+                    <p>Observations COMPLETED de l’analyse RC.</p>
+                </div>
+                <div class="info-block light">
+                    <h3>Mapping fermé</h3>
+                    <p>Candidature, offre, dépôt, format, visite, critère, négociation, validité.</p>
+                </div>
+                <div class="info-block light">
+                    <h3>Intégrité</h3>
+                    <p>Manifest SHA-256 canonique et relecture serveur avant écriture.</p>
+                </div>
+                <div class="info-block accent">
+                    <h3>Confidentialité</h3>
+                    <p>Extrait, texte original, nom de fichier et montant absents des messages durables.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

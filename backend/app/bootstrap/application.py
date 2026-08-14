@@ -25,6 +25,9 @@ from app.interfaces.http.routes.consultations import (
     ConsultationSecurityRuntime,
     build_consultation_router,
 )
+from app.interfaces.http.routes.dce_requirement_confirmations import (
+    build_dce_requirement_confirmation_router,
+)
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
 from app.modules.dce.application.handlers import (
@@ -35,6 +38,7 @@ from app.modules.dce.application.handlers import (
     RecordDceDocumentClassificationRunHandler,
     RecordDceDocumentExtractionHandler,
     RecordDceRcAnalysisHandler,
+    RecordDceRequirementConfirmationHandler,
     RecordDceRequirementMaterializationRunHandler,
     RecordDceStagedObjectQuarantineHandler,
     RecordDceStagedObjectScanHandler,
@@ -42,6 +46,9 @@ from app.modules.dce.application.handlers import (
     RejectDceStagedObjectUploadHandler,
 )
 from app.modules.dce.application.queries import ConsultationProjection
+from app.modules.dce.application.requirement_confirmation import (
+    DceRequirementConfirmationService,
+)
 from app.modules.dce.application.upload import DceUploadService
 from app.modules.dce.infrastructure.consultation_projection_reader import (
     SqlAlchemyConsultationProjectionReader,
@@ -100,6 +107,7 @@ class AppRuntime:
                 "RecordDceRequirementMaterializationRun": (
                     RecordDceRequirementMaterializationRunHandler()
                 ),
+                "RecordDceRequirementConfirmation": RecordDceRequirementConfirmationHandler(),
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
             },
@@ -237,13 +245,19 @@ def create_app(
     if authentication_runtime is not None:
         app.include_router(build_authentication_router(runtime=authentication_runtime))
     if runtime is not None and authentication_runtime is not None:
+        security_policy = AuditedAuthorizationPolicy(
+            policy=AuthorizationPolicy(),
+            session_factory=runtime.session_factory,
+            writer=SecurityAuditWriter(),
+        )
         security_runtime = ConsultationSecurityRuntime(
             context_resolver=authentication_runtime.context_resolver,
-            policy=AuditedAuthorizationPolicy(
-                policy=AuthorizationPolicy(),
-                session_factory=runtime.session_factory,
-                writer=SecurityAuditWriter(),
-            ),
+            policy=security_policy,
+        )
+        requirement_confirmation_service = DceRequirementConfirmationService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
         )
         app.include_router(
             build_consultation_router(
@@ -260,6 +274,12 @@ def create_app(
         app.include_router(
             build_dce_version_router(
                 runtime=runtime,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_dce_requirement_confirmation_router(
+                service=requirement_confirmation_service,
                 security_runtime=security_runtime,
             )
         )

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E2E8F0;
+            position: relative;
+        }
+        .decorative-line {
+            width: 100%;
+            border-top: 8px solid #000000;
+            position: absolute;
+            top: 52px;
+            left: 0;
+        }
+        .content-wrapper {
+            padding-top: 100px;
+            padding-left: 52px;
+            padding-right: 52px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+        .header-block {
+            grid-column: 1 / 11;
+            background-color: #DD6B20;
+            padding: 24px 40px;
+            margin-bottom: 60px;
+        }
+        h2 {
+            color: #000000;
+            font-weight: 800;
+            font-size: 48px;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            text-align: left;
+        }
+        .statement-block {
+            grid-column: 1 / 6;
+            padding-left: 40px;
+            border-left: 12px solid #000000;
+        }
+        .statement-text {
+            color: #000000;
+            font-weight: 800;
+            font-size: 36px;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+        .list-block {
+            grid-column: 7 / 13;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+        .list-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+        }
+        .list-marker {
+            width: 24px;
+            height: 24px;
+            background-color: #DD6B20;
+            flex-shrink: 0;
+            margin-top: 6px;
+        }
+        p {
+            color: #1A202C;
+            font-weight: 500;
+            font-size: 28px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="decorative-line"></div>
+        <div class="content-wrapper">
+            <div class="header-block">
+                <h2>Le problème métier est borné avant d’être automatisé</h2>
+            </div>
+            <div class="statement-block">
+                <div class="statement-text">Un signal RC n’est pas encore une obligation juridique.</div>
+            </div>
+            <div class="list-block">
+                <div class="list-item">
+                    <div class="list-marker"></div>
+                    <p>Une exigence est une proposition de suivi interne, à confirmer par un humain.</p>
+                </div>
+                <div class="list-item">
+                    <div class="list-marker"></div>
+                    <p>Le système ne calcule ni délai, ni conformité, ni prix, ni Go/No-Go.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

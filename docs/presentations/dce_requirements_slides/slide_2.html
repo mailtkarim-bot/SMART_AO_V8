@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E2E8F0;
+            position: relative;
+        }
+        .decorative-line {
+            width: 100%;
+            border-top: 8px solid #000000;
+            position: absolute;
+            top: 52px;
+            left: 0;
+        }
+        .content-wrapper {
+            padding-top: 100px;
+            padding-left: 52px;
+            padding-right: 52px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+        .header-block {
+            grid-column: 1 / 12;
+            background-color: #DD6B20;
+            /* keep top padding to preserve title spacing; reduce bottom padding to save height */
+            padding: 24px 40px 12px 40px;
+            margin-bottom: 12px; /* reduced from 40px */
+        }
+        h2 {
+            color: #000000;
+            font-weight: 800;
+            font-size: 48px;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            text-align: left;
+        }
+        .timeline-container {
+            grid-column: 2 / 12;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .timeline-step {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            background-color: #ffffff;
+            border-left: 12px solid #000000;
+        }
+        .timeline-step.final {
+            border-left-color: #DD6B20;
+        }
+        .step-module {
+            background-color: #1A202C;
+            color: #ffffff;
+            padding: 20px;
+            font-weight: 800;
+            font-size: 20px;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+        }
+        .step-desc {
+            padding: 20px 30px;
+            color: #1A202C;
+            font-weight: 500;
+            font-size: 24px;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="decorative-line"></div>
+        <div class="content-wrapper">
+            <div class="header-block">
+                <h2>La chaîne DCE sépare extraction, analyse et décision</h2>
+            </div>
+            <div class="timeline-container">
+                <div class="timeline-step">
+                    <div class="step-module">DCE-DOCUMENT-EXTRACTION-01</div>
+                    <div class="step-desc">Produit des fragments techniques sourcés.</div>
+                </div>
+                <div class="timeline-step">
+                    <div class="step-module">DCE-ANALYSIS-01</div>
+                    <div class="step-desc">Transforme les fragments en signaux RC déterministes.</div>
+                </div>
+                <div class="timeline-step">
+                    <div class="step-module" style="background-color: #DD6B20; color: #000000;">DCE-REQUIREMENTS-01</div>
+                    <div class="step-desc">Matérialise les signaux en exigences atomiques.</div>
+                </div>
+                <div class="timeline-step final">
+                    <div class="step-module" style="background-color: #E2E8F0; color: #1A202C; border-right: 4px solid #000000;">Décision</div>
+                    <div class="step-desc">Reste dans un futur périmètre patron, jamais dans cette chaîne.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

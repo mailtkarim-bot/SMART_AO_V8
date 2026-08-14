@@ -386,6 +386,31 @@ class RecordDceRequirementMaterializationRunCommand(ApplicationCommand):
         return self
 
 
+class RecordDceRequirementConfirmationCommand(ApplicationCommand):
+    """Human confirmation recorded as an immutable successor of a requirement."""
+
+    command_type = "RecordDceRequirementConfirmation"
+
+    confirmation_id: UUID
+    requirement_id: UUID
+    expected_confirmation_revision: int = Field(ge=0)
+    outcome: str = Field(pattern=r"^(CONFIRMED|REVIEW_REQUIRED|NOT_APPLICABLE)$")
+    reason_code: str = Field(
+        pattern=(
+            r"^(SOURCE_REVIEWED|AMBIGUOUS_SOURCE|CONTRADICTORY_DCE|"
+            r"PATRON_NOT_APPLICABLE|NEEDS_EXTERNAL_CLARIFICATION)$"
+        )
+    )
+
+    @model_validator(mode="after")
+    def validate_outcome_reason(self) -> RecordDceRequirementConfirmationCommand:
+        if self.outcome == "NOT_APPLICABLE" and self.reason_code != "PATRON_NOT_APPLICABLE":
+            raise ValueError("not-applicable confirmation requires patron reason")
+        if self.outcome != "NOT_APPLICABLE" and self.reason_code == "PATRON_NOT_APPLICABLE":
+            raise ValueError("patron-not-applicable reason requires not-applicable outcome")
+        return self
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

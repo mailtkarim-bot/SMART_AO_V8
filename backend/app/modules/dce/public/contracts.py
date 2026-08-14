@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.dce.application.commands import (
     CreateConsultationCommand,
+    RecordDceRequirementConfirmationCommand,
     RegisterDceVersionCommand,
 )
 
@@ -127,6 +128,44 @@ class ConsultationProjectionResponse(PublicResponseModel):
     lots: list[str]
     tranches: list[str]
     projection_status: Literal["CURRENT", "REFRESH_PENDING", "PARTIAL"]
+
+
+class RecordDceRequirementConfirmationRequest(PublicResponseModel):
+    """Untrusted HTTP intent; scope and actor stay server-resolved."""
+
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    confirmation_id: UUID
+    expected_confirmation_revision: int = Field(ge=0)
+    outcome: Literal["CONFIRMED", "REVIEW_REQUIRED", "NOT_APPLICABLE"]
+    reason_code: Literal[
+        "SOURCE_REVIEWED",
+        "AMBIGUOUS_SOURCE",
+        "CONTRADICTORY_DCE",
+        "PATRON_NOT_APPLICABLE",
+        "NEEDS_EXTERNAL_CLARIFICATION",
+    ]
+
+    def to_command(
+        self,
+        *,
+        requirement_id: UUID,
+    ) -> RecordDceRequirementConfirmationCommand:
+        return RecordDceRequirementConfirmationCommand(
+            **self.model_dump(),
+            requirement_id=requirement_id,
+        )
+
+
+class RecordDceRequirementConfirmationResponse(PublicResponseModel):
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal["DCE_REQUIREMENT_CONFIRMED"]
+    aggregate_refs: list[AggregateReferenceResponse]
+    event_ids: list[UUID]
+    replayed: bool = False
 
 
 CreateConsultationRequest = CreateConsultationCommand

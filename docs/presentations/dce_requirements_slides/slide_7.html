@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E2E8F0;
+            position: relative;
+        }
+        .decorative-line {
+            width: 100%;
+            border-top: 8px solid #000000;
+            position: absolute;
+            top: 52px;
+            left: 0;
+        }
+        .content-wrapper {
+            padding-top: 100px;
+            padding-left: 52px;
+            padding-right: 52px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+        .header-block {
+            grid-column: 1 / 12;
+            background-color: #DD6B20;
+            padding: 24px 40px;
+            margin-bottom: 40px;
+        }
+        h2 {
+            color: #000000;
+            font-weight: 800;
+            font-size: 48px;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            text-align: left;
+        }
+        .grid-container {
+            grid-column: 1 / 13;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .status-block {
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .status-block.published {
+            background-color: #1A202C;
+            color: #ffffff;
+        }
+        .status-block.unpublished {
+            background-color: #ffffff;
+            border: 8px solid #000000;
+            color: #1A202C;
+        }
+        .status-block.audit {
+            background-color: #ffffff;
+            border: 8px solid #000000;
+            color: #1A202C;
+        }
+        .status-block.decision {
+            background-color: #DD6B20;
+            color: #000000;
+        }
+        .block-title {
+            font-weight: 800;
+            font-size: 28px;
+            letter-spacing: -0.02em;
+            text-transform: uppercase;
+        }
+        .block-content {
+            font-weight: 500;
+            font-size: 22px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="decorative-line"></div>
+        <div class="content-wrapper">
+            <div class="header-block">
+                <h2>État réel de livraison</h2>
+            </div>
+            <div class="grid-container">
+                <div class="status-block published">
+                    <div class="block-title">DCE-REQUIREMENTS-01</div>
+                    <div class="block-content">Publié sur main, migration 0016, 213 tests verts, CI verte.</div>
+                </div>
+                <div class="status-block unpublished">
+                    <div class="block-title">Confirmation humaine</div>
+                    <div class="block-content">Contrat, migration 0017, socle et test local présents, non publiés.</div>
+                </div>
+                <div class="status-block audit">
+                    <div class="block-title">Audit SEC-01</div>
+                    <div class="block-content">Écarts restants sur audit succès, route authentifiée et preuve de portée Case.</div>
+                </div>
+                <div class="status-block decision">
+                    <div class="block-title">Décision</div>
+                    <div class="block-content">Ne pas vendre la confirmation humaine avant fermeture de ces écarts.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

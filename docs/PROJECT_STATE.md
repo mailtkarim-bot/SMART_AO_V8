@@ -1,18 +1,18 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées. Les fondations SEC-01, les lectures Consultation/DCE, l’admission atomique, le staging, l’upload, la rétention physique, DCE-DOCUMENT-EXTRACTION-01, DCE-ANALYSIS-01 et **DCE-CLASSIFICATION-01** sont publiés sur `main`. Le classement des pièces repose sur des preuves extraites, sans lecture d’original ni conclusion de conformité, et sa CI GitHub est verte. **DCE-REQUIREMENTS-01** est publié sur `main` : il matérialise des exigences atomiques à confirmer, sans calcul juridique ni décision automatique, et sa CI GitHub est verte.
+`DCE-REQUIREMENTS-CONFIRMATION-01` — finalisé localement, prêt à publication sous réserve de CI GitHub. Le slice ajoute la confirmation humaine historisée, la route HTTP authentifiée, la résolution serveur d’une Case active unique, la policy SEC-01, l’audit succès/refus, la migration `0017` du registre et la migration `0018` du vocabulaire `AUTHZ_SUCCEEDED`. Les fondations SEC-01, les lectures Consultation/DCE, l’admission, le staging, l’upload, la rétention, DCE-DOCUMENT-EXTRACTION-01, DCE-ANALYSIS-01, DCE-CLASSIFICATION-01 et DCE-REQUIREMENTS-01 restent publiés sur `main`.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | DCE-REQUIREMENTS-01 publié sur `main` : [`054054e`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/054054e), contrat normatif, migration `0016`, matérialiseur `SYSTEM`, registre append-only et scénario PostgreSQL dédié. |
+| Commit | Commit de tête prêt à pousser : DCE-REQUIREMENTS-CONFIRMATION-01, confirmation humaine append-only, route authentifiée, policy ReBAC, audit succès/refus, migrations `0017`/`0018`, tests API et CI renforcée. |
 | Commit précédent | DCE-CLASSIFICATION-01 publié sur `main` : [`e099f2a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e099f2a), contrat normatif, migration `0015`, classifieur déterministe, registre append-only, projection courante historisée et tests dédiés. |
-| Migration Alembic | `20260814_0016` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. |
+| Migration Alembic | `20260814_0017` et `20260814_0018` validées : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **213 tests verts**. Les cinq scénarios dédiés couvrent les familles sourcées, le replay, l’absence de faux positif, le cas ambigu, l’acteur système, la succession historique, les limites et l’immutabilité. |
-| CI | Le [workflow DCE-REQUIREMENTS-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31759441345) est vert : lint et smoke tests réussis. PostgreSQL 16 est exécuté dans CI ; Docker n’est pas disponible dans le sandbox : l’exécution réelle du worker de rétention et de ClamAV reste à vérifier sur le VPS/Docker cible. |
+| Tests | `uv run ruff check .` vert ; `uv run pytest backend/tests -q` : **219 tests verts**. Les nouveaux scénarios API couvrent bearer obligatoire, succès patron audité, collaborateur sans affectation, `NOT_APPLICABLE` interdit et audité, ressource hors tenant neutre et DCE rattachée à plusieurs Cases refusée. |
+| CI | Le workflow local est étendu avec `detect-secrets-hook`, export uv + `pip-audit --strict`, `bandit -ll` et un job Trivy conditionnel. La réussite GitHub de ce nouveau workflow reste à confirmer après push. PostgreSQL 16 est exécuté dans CI ; aucun Dockerfile n’existe encore, donc aucun scan d’image n’est prétendu exécuté. |
 
 ## Ce qui est terminé
 
@@ -57,10 +57,11 @@
 - DCE-ANALYSIS-01 livré et publié : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_ANALYSIS_01_CONTRAT.md`, migration `20260814_0014`, exécutions `dce_rc_analysis_runs`, observations et preuves de fragments append-only. Un service `SYSTEM` ne relit que les fragments des extractions `COMPLETED` d’une DCE admise et vérifiée ; il reconnaît un catalogue fermé de signaux RC (candidature, offre, dépôt, délai, format, visite, critères, négociation et validité) avec extrait et offsets UTF-8 bornés. Il ne lit aucun original, n’appelle aucun LLM, ne déduit aucune absence d’exigence, ne décide ni prix, ni Go/No-Go, ni dépôt.
 - DCE-REQUIREMENTS-01 livré et publié : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_REQUIREMENTS_01_CONTRAT.md`, migration `20260814_0016`, exécutions, exigences atomiques et sources append-only. Un service `SYSTEM` convertit exclusivement les observations `COMPLETED` de DCE-ANALYSIS-01 selon un mapping fermé, conserve directive et preuves, et assigne systématiquement `PENDING_HUMAN_CONFIRMATION` / `SOURCE_SIGNAL_ONLY`. Aucun calcul de délai, conformité, pièce manquante, tâche, prix ou décision n’est produit.
 - DCE-CLASSIFICATION-01 livré et publié : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_CLASSIFICATION_01_CONTRAT.md`, migration `20260814_0015`, exécutions, résultats et preuves de classement append-only. Un service `SYSTEM` classe seulement sur le texte immuable des extractions `COMPLETED`, avec manifest canonique couvrant les documents sans extrait, règles versionnées et offsets UTF-8. RC, CCAP, CCTP, AE, BPU, DPGF, plan, annexe et rectificatif restent des familles candidates, jamais des preuves de conformité. La projection `dce_document_classifications` conserve l’historique de succession sans écraser une famille antérieure ; le root DCE met à jour uniquement `classification_readiness`.
+- DCE-REQUIREMENTS-CONFIRMATION-01 finalisé localement : contrat normatif mis à jour sur la portée DCE/Case, migration `20260814_0017`, route `POST /api/v1/dce-requirements/{requirement_id}/confirmations`, DTO fermé sans `case_id`, résolution serveur d’une Case active unique, policy auditée, audit `AUTHZ_SUCCEEDED` transactionnel, refus manuels audités, trigger append-only et migration additive `20260814_0018`. Cinq tests API réels et la régression complète de 219 tests sont verts. Le slice ne confirme jamais une conformité, un prix, un Go/No-Go ou un dépôt.
 
 ## Prochaine action unique
 
-Figer **DCE-REQUIREMENTS-CONFIRMATION-01** : permettre au collaborateur de confirmer, invalider ou signaler à revoir une exigence atomique déjà matérialisée, sans modifier son signal source ni l’historique. Toute confirmation devra être historisée, policy-protégée et explicitement revue par le patron lorsque son impact est sensible. Cette frontière ne calculera aucun délai légal, ne déclarera aucune pièce absente, ne choisira aucun prix ni Go/No-Go.
+Pousser le commit **DCE-REQUIREMENTS-CONFIRMATION-01** puis confirmer la CI GitHub. Le script `docs/presentations/SMART_AO_V8_DCE_REQUIREMENTS_01_SCRIPT.md` est déjà rédigé pour les huit diapositives; ne pas ouvrir le prochain slice avant le statut CI vert.
 
 ## Décisions ouvertes
 
@@ -81,7 +82,7 @@ Figer **DCE-REQUIREMENTS-CONFIRMATION-01** : permettre au collaborateur de confi
 | Interfaces HTTP et contexte authentifié | Livrés | `S02-D` : JWT court sans claims d’autorisation, cookies sécurisés, CSRF, routes login/refresh/logout et contrôle serveur de session/membership/identité. |
 | Bootstrap applicatif tenant + patron | Livré | Service local atomique : tenant + identité + credential Argon2id + membership patron + token consommé, sans secret persistant. |
 | Policy RBAC/ABAC/ReBAC et première affectation | Livré | Catalogue de capabilities calculé côté serveur, policy classification/scope et table `case_assignments` tenant-scoped injectée dans le contexte authentifié. |
-| Audit de sécurité append-only | Livré | Migration `20260813_0009`, vocabulaire fermé, métadonnées minimisées, trigger append-only et instrumentation auth/policy. |
+| Audit de sécurité append-only | Livré et étendu pour la confirmation humaine | Migration `20260813_0009`, vocabulaire fermé, métadonnées minimisées, trigger append-only, instrumentation auth/policy et migration `20260814_0018` ajoutant `AUTHZ_SUCCEEDED`. |
 | Routes Consultation authentifiées | Livrées | Bearer résolu côté serveur, capability `consultation.create/read`, policy auditée, isolation tenant et réemploi idempotent préservés. |
 | Lecture DCE sécurisée | Livrée | DCE-READ-01 : route tenant-scoped, `dce.prepare`, réponse de métadonnées minimale et refus audités. |
 | Admission durable DceVersion | Livrée | DCE-ADMIT-01 : contrat, commande, handler transactionnel, manifeste SHA-256 canonique avec séparateur LF réel, persistence racine/documents/événement/outbox/receipt et replay idempotent démontrés par 4 tests DB. |

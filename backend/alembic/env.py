@@ -9,6 +9,7 @@ from app.modules.dce.infrastructure.models import (  # noqa: F401
     dce_classification,
     dce_extraction,
     dce_rc_analysis,
+    dce_requirement_confirmations,
     dce_requirements,
     dce_staging,
     dce_version,
