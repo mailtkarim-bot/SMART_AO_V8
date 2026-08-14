@@ -1,16 +1,16 @@
 # PROJECT_STATE
 
 ## Slice courant
-`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées. Les fondations SEC-01, les lectures Consultation/DCE, l’admission atomique, le staging, l’upload, la rétention physique, DCE-DOCUMENT-EXTRACTION-01 et **DCE-ANALYSIS-01** sont publiés sur `main`. L’analyse RC est déterministe, sourcée, sans lecture d’original ni décision automatisée, et sa CI GitHub est verte.
+`S02` — identité, tenant, sessions, MFA, bootstrap patron, policy contextualisée, audit append-only et premières routes métier authentifiées. Les fondations SEC-01, les lectures Consultation/DCE, l’admission atomique, le staging, l’upload, la rétention physique, DCE-DOCUMENT-EXTRACTION-01 et DCE-ANALYSIS-01 sont publiés sur `main`. **DCE-CLASSIFICATION-01** est validé localement : il classe les pièces DCE sur des preuves extraites, sans lecture d’original, ni conclusion de conformité.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit | DCE-ANALYSIS-01 publié sur `main` : [`5f8ed86`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/5f8ed86), contrat normatif, migration `0014`, registre append-only d’analyse RC, service système déterministe et tests dédiés. |
-| Migration Alembic | `20260814_0014` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
-| Tests | `ruff check` vert ; `pytest backend/tests -q` : **207 tests verts**. Les cinq scénarios dédiés couvrent les signaux RC sourcés, le replay, le résultat sans marqueur, l’acteur système, l’injection de source, les limites et l’immutabilité. |
-| CI | Le [workflow DCE-ANALYSIS-01](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31757117789) est vert : lint et smoke tests réussis. PostgreSQL 16 est exécuté dans CI ; Docker n’est pas disponible dans le sandbox : l’exécution réelle du worker de rétention et de ClamAV reste à vérifier sur le VPS/Docker cible. |
+| Commit | DCE-CLASSIFICATION-01 validé localement, prêt au commit : contrat normatif, migration `0015`, classifieur déterministe, registre append-only, projection courante historisée et tests dédiés. |
+| Migration Alembic | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
+| Tests | `ruff check` vert ; `pytest backend/tests -q` : **212 tests verts**. Les cinq scénarios dédiés couvrent les familles sourcées, le replay, l’absence de faux positif, le cas ambigu, l’acteur système, la succession historique, les limites et l’immutabilité. |
+| CI | Publication GitHub et CI de DCE-CLASSIFICATION-01 en attente. PostgreSQL 16 est exécuté dans CI ; Docker n’est pas disponible dans le sandbox : l’exécution réelle du worker de rétention et de ClamAV reste à vérifier sur le VPS/Docker cible. |
 
 ## Ce qui est terminé
 
@@ -53,10 +53,11 @@
 - DCE-RETENTION-01 livré : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_RETENTION_01_CONTRAT.md`, migration `20260813_0012` et worker Docker sans port public. Le worker balaie les objets non consommés arrivés à expiration, les fait passer de façon transactionnelle à `EXPIRED`, puis consomme `dce_staging_retention` avec `FOR UPDATE SKIP LOCKED`. Il efface seulement les binaires des objets relus `REJECTED` ou `EXPIRED`; `CLEAN` et `CONSUMED` sont bloqués par conception. `FileNotFound` est un succès idempotent, une erreur passe l’outbox en `RETRY` avec backoff borné et `last_error_code` fermé. Le worker partage uniquement PostgreSQL et le volume privé de quarantaine.
 - DCE-DOCUMENT-EXTRACTION-01 livré et publié : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_DOCUMENT_EXTRACTION_01_CONTRAT.md`, migration `20260813_0013`, registres `dce_document_extractions` et `dce_document_extraction_fragments` append-only par triggers PostgreSQL, et commande réservée à l’acteur `SYSTEM`. Les projections sont déterministes, bornées et sourcées par page PDF, paragraphe DOCX, cellule XLSX ou ligne TXT. Elles refusent sans analyse métier les formats non pris en charge, les entrées malformées et les dépassements anti-bombes ; elles ne lisent jamais les originaux hors de la quarantaine privée et n’exposent aucun binaire.
 - DCE-ANALYSIS-01 livré et publié : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_ANALYSIS_01_CONTRAT.md`, migration `20260814_0014`, exécutions `dce_rc_analysis_runs`, observations et preuves de fragments append-only. Un service `SYSTEM` ne relit que les fragments des extractions `COMPLETED` d’une DCE admise et vérifiée ; il reconnaît un catalogue fermé de signaux RC (candidature, offre, dépôt, délai, format, visite, critères, négociation et validité) avec extrait et offsets UTF-8 bornés. Il ne lit aucun original, n’appelle aucun LLM, ne déduit aucune absence d’exigence, ne décide ni prix, ni Go/No-Go, ni dépôt.
+- DCE-CLASSIFICATION-01 validé localement : contrat normatif dans `docs/reference/SMART_AO_V8_DCE_CLASSIFICATION_01_CONTRAT.md`, migration `20260814_0015`, exécutions, résultats et preuves de classement append-only. Un service `SYSTEM` classe seulement sur le texte immuable des extractions `COMPLETED`, avec manifest canonique couvrant les documents sans extrait, règles versionnées et offsets UTF-8. RC, CCAP, CCTP, AE, BPU, DPGF, plan, annexe et rectificatif restent des familles candidates, jamais des preuves de conformité. La projection `dce_document_classifications` conserve l’historique de succession sans écraser une famille antérieure ; le root DCE met à jour uniquement `classification_readiness`.
 
 ## Prochaine action unique
 
-Figer **DCE-CLASSIFICATION-01** : classification déterministe, sourcée et révisable des documents et fragments DCE (RC, CCAP, CCTP, BPU, DPGF, acte d’engagement, plans et annexes) sans modifier les originaux ni conclure sur la conformité. La future projection cockpit devra respecter SEC-01 et ne révéler aucun texte DCE par défaut.
+Figer **DCE-REQUIREMENTS-01** : transformer les signaux RC déjà sourcés en exigences métier atomiques à confirmer (pièces à fournir, modalités de dépôt, visite, critères et échéances textuelles), avec provenance, statut d’incertitude et revue humaine obligatoire. Cette frontière ne calculera aucun délai légal, ne déclarera aucune pièce absente, ne choisira aucun prix ni Go/No-Go.
 
 ## Décisions ouvertes
 
@@ -87,6 +88,7 @@ Figer **DCE-CLASSIFICATION-01** : classification déterministe, sourcée et rév
 | Rétention physique DCE | Livrée localement | DCE-RETENTION-01 : migration `0012`, worker d’outbox idempotent sans port, `SKIP LOCKED`, expiration d’orphelins, suppression seulement `REJECTED`/`EXPIRED`, retry/backoff et code d’erreur durable. Le test Docker réel reste requis sur VPS. |
 | Registre d’extraction documentaire DCE | Publié et CI verte | DCE-DOCUMENT-EXTRACTION-01 : migration `0013`, extractions déterministes PDF/DOCX/XLSX/TXT, provenance fine, limites anti-bombes, immutabilité PostgreSQL et commande réservée à `SYSTEM`. L’analyse métier, l’OCR, les plans et le LLM restent volontairement hors périmètre. |
 | Analyse déterministe du règlement de consultation | Publiée et CI verte | DCE-ANALYSIS-01 : migration `0014`, registre RC append-only, signaux lexicaux sourcés sur fragments, manifest d’entrée canonique, limites, acteur `SYSTEM` et zéro accès à l’original. Aucun avis juridique, calcul de délai, prix, Go/No-Go ou dépôt n’est produit. |
+| Classification déterministe des pièces DCE | Validée localement, publication CI en attente | DCE-CLASSIFICATION-01 : migration `0015`, registre append-only de runs/résultats/preuves, familles candidate RC/CCAP/CCTP/AE/BPU/DPGF/PLAN/ANNEX/RECTIFICATION, historique de projection courante, acteur `SYSTEM`, règles lexicales versionnées et zéro accès aux originaux. Aucun contrôle de conformité ni déclaration de manque n’est produit. |
 | Installation React/Vite complète | Différée | Après les premiers endpoints/read models du slice. |
 | API Manus, retrieval et agents | Différés | Slice analyse DCE/cognitive. |
 

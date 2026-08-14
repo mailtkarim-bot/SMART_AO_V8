@@ -238,6 +238,89 @@ class RecordDceRcAnalysisCommand(ApplicationCommand):
         return self
 
 
+class DceDocumentClassificationEvidenceInput(BaseModel):
+    """One bounded extraction-fragment proof for a deterministic document family."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fragment_id: UUID
+    rule_id: str = Field(min_length=1, max_length=120, pattern=r"^[A-Z0-9_]+_V[0-9]+$")
+    rule_version: str = Field(min_length=1, max_length=64)
+    start_byte_offset: int = Field(ge=0)
+    end_byte_offset: int = Field(gt=0)
+    excerpt: str = Field(min_length=1, max_length=1_000)
+
+    @model_validator(mode="after")
+    def validate_offsets(self) -> DceDocumentClassificationEvidenceInput:
+        if self.end_byte_offset <= self.start_byte_offset:
+            raise ValueError("classification evidence offsets must be strictly ordered")
+        return self
+
+
+class DceDocumentClassificationResultInput(BaseModel):
+    """Terminal deterministic classification result for one admitted DCE document."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    dce_document_id: UUID
+    status: str = Field(
+        pattern=r"^(CLASSIFIED|UNCLASSIFIED|REVIEW_REQUIRED|NOT_EXTRACTED)$"
+    )
+    classification: str | None = Field(
+        default=None,
+        pattern=r"^(RC|CCAP|AE|CCTP|DPGF|BPU|PLAN|ANNEX|RECTIFICATION|OTHER)$",
+    )
+    rule_match_count: int = Field(ge=0)
+    evidence: list[DceDocumentClassificationEvidenceInput] = Field(
+        default_factory=list,
+        max_length=20,
+    )
+
+    @model_validator(mode="after")
+    def validate_terminal_result(self) -> DceDocumentClassificationResultInput:
+        if self.status == "CLASSIFIED":
+            if self.classification is None or not self.evidence or self.rule_match_count <= 0:
+                raise ValueError("classified document requires family, evidence and positive score")
+        elif self.classification is not None or self.evidence or self.rule_match_count != 0:
+            raise ValueError("non-classified document cannot carry a family, evidence or score")
+        return self
+
+
+class RecordDceDocumentClassificationRunCommand(ApplicationCommand):
+    """System-only immutable recording of a deterministic full-DCE classification run."""
+
+    command_type = "RecordDceDocumentClassificationRun"
+
+    classification_run_id: UUID
+    dce_version_id: UUID
+    expected_dce_version_revision: int = Field(ge=0)
+    input_manifest_sha256: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-fA-F]{64}$",
+    )
+    classifier_id: str = Field(min_length=1, max_length=100)
+    classifier_version: str = Field(min_length=1, max_length=64)
+    status: str = Field(pattern=r"^(COMPLETED|REJECTED_LIMIT|FAILED_SAFE)$")
+    document_count: int = Field(gt=0)
+    source_fragment_count: int = Field(ge=0)
+    source_char_count: int = Field(ge=0)
+    failure_code: str | None = Field(default=None, max_length=120)
+    results: list[DceDocumentClassificationResultInput] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_terminal_projection(self) -> RecordDceDocumentClassificationRunCommand:
+        result_document_ids = [result.dce_document_id for result in self.results]
+        if len(result_document_ids) != len(set(result_document_ids)):
+            raise ValueError("classification result document identifier duplicate")
+        if self.status == "COMPLETED":
+            if self.failure_code is not None or len(self.results) != self.document_count:
+                raise ValueError("completed classification requires one result per DCE document")
+        elif self.failure_code is None or self.results:
+            raise ValueError("failed classification requires a code and no results")
+        return self
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

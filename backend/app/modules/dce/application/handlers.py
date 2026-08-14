@@ -10,11 +10,18 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.modules.dce.application.analysis import is_valid_rc_observation
+from app.modules.dce.application.classification import (
+    ClassificationDocument,
+    ClassificationFragment,
+    classification_input_manifest_sha256,
+    project_dce_classification,
+)
 from app.modules.dce.application.commands import (
     ClaimDceStagedObjectUploadCommand,
     CreateConsultationCommand,
     ExpireDceStagedObjectCommand,
     PrepareDceStagingCommand,
+    RecordDceDocumentClassificationRunCommand,
     RecordDceDocumentExtractionCommand,
     RecordDceRcAnalysisCommand,
     RecordDceStagedObjectQuarantineCommand,
@@ -25,6 +32,11 @@ from app.modules.dce.application.commands import (
 from app.modules.dce.domain.consultation import BuyerIdentity, Consultation
 from app.modules.dce.domain.dce_version import DceDocument, DceVersion
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
+from app.modules.dce.infrastructure.models.dce_classification import (
+    DceDocumentClassificationEvidenceRecord,
+    DceDocumentClassificationResultRecord,
+    DceDocumentClassificationRunRecord,
+)
 from app.modules.dce.infrastructure.models.dce_extraction import (
     DceDocumentExtractionFragmentRecord,
     DceDocumentExtractionRecord,
@@ -35,7 +47,11 @@ from app.modules.dce.infrastructure.models.dce_rc_analysis import (
     DceRcRequirementSourceRecord,
 )
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
-from app.modules.dce.infrastructure.models.dce_version import DceDocumentRecord, DceVersionRecord
+from app.modules.dce.infrastructure.models.dce_version import (
+    DceDocumentClassificationRecord,
+    DceDocumentRecord,
+    DceVersionRecord,
+)
 from app.platform.events.dispatcher import CommandContext, HandlerOutcome, PendingDomainEvent
 
 
@@ -581,6 +597,265 @@ class RecordDceDocumentExtractionHandler:
         )
 
 
+class RecordDceDocumentClassificationRunHandler:
+    """Persist deterministic source-bound document families and their current history."""
+
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: RecordDceDocumentClassificationRunCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != "SYSTEM":
+            raise ValueError("DCE_CLASSIFICATION_SYSTEM_ACTOR_REQUIRED")
+        dce_version = session.scalar(
+            sa.select(DceVersionRecord)
+            .where(
+                DceVersionRecord.tenant_id == context.tenant_id,
+                DceVersionRecord.id == command.dce_version_id,
+            )
+            .with_for_update()
+        )
+        if (
+            dce_version is None
+            or dce_version.lifecycle not in {"ADMITTED", "SUPERSEDED"}
+            or dce_version.integrity != "VERIFIED"
+        ):
+            raise ValueError("DCE_VERSION_NOT_CLASSIFIABLE")
+        documents = list(
+            session.scalars(
+                sa.select(DceDocumentRecord)
+                .where(
+                    DceDocumentRecord.tenant_id == context.tenant_id,
+                    DceDocumentRecord.dce_version_id == dce_version.id,
+                )
+                .order_by(DceDocumentRecord.id)
+                .with_for_update()
+            )
+        )
+        if not documents:
+            raise ValueError("DCE_DOCUMENT_REQUIRED")
+        document_ids = [document.id for document in documents]
+        if len(documents) != command.document_count:
+            raise ValueError("DCE_CLASSIFICATION_DOCUMENT_COUNT_REQUIRED")
+        extraction_rows = session.execute(
+            sa.select(
+                DceDocumentExtractionRecord.dce_document_id,
+                DceDocumentExtractionRecord.id,
+                DceDocumentExtractionFragmentRecord,
+            )
+            .join(
+                DceDocumentExtractionFragmentRecord,
+                sa.and_(
+                    DceDocumentExtractionFragmentRecord.tenant_id
+                    == DceDocumentExtractionRecord.tenant_id,
+                    DceDocumentExtractionFragmentRecord.extraction_id
+                    == DceDocumentExtractionRecord.id,
+                ),
+            )
+            .where(
+                DceDocumentExtractionRecord.tenant_id == context.tenant_id,
+                DceDocumentExtractionRecord.dce_document_id.in_(document_ids),
+                DceDocumentExtractionRecord.status == "COMPLETED",
+            )
+            .order_by(
+                DceDocumentExtractionRecord.dce_document_id,
+                DceDocumentExtractionRecord.id,
+                DceDocumentExtractionFragmentRecord.ordinal,
+                DceDocumentExtractionFragmentRecord.id,
+            )
+            .with_for_update()
+        ).all()
+        fragments_by_document: dict[UUID, list[ClassificationFragment]] = {
+            document_id: [] for document_id in document_ids
+        }
+        fragment_records: dict[UUID, DceDocumentExtractionFragmentRecord] = {}
+        for document_id, extraction_id, fragment in extraction_rows:
+            fragment_records[fragment.id] = fragment
+            fragments_by_document[document_id].append(
+                ClassificationFragment(
+                    extraction_id=extraction_id,
+                    fragment_id=fragment.id,
+                    ordinal=fragment.ordinal,
+                    text=fragment.text,
+                    text_sha256=fragment.text_sha256,
+                )
+            )
+        classification_documents = tuple(
+            ClassificationDocument(
+                dce_document_id=document_id,
+                fragments=tuple(fragments_by_document[document_id]),
+            )
+            for document_id in document_ids
+        )
+        expected_manifest = classification_input_manifest_sha256(
+            documents=classification_documents
+        )
+        if command.input_manifest_sha256.lower() != expected_manifest:
+            raise ValueError("DCE_CLASSIFICATION_INPUT_MANIFEST_REQUIRED")
+        source_fragment_count = sum(
+            len(document.fragments) for document in classification_documents
+        )
+        source_char_count = sum(
+            len(fragment.text)
+            for document in classification_documents
+            for fragment in document.fragments
+        )
+        if (
+            source_fragment_count != command.source_fragment_count
+            or source_char_count != command.source_char_count
+        ):
+            raise ValueError("DCE_CLASSIFICATION_SOURCE_COUNT_REQUIRED")
+
+        existing_run = session.scalar(
+            sa.select(DceDocumentClassificationRunRecord).where(
+                DceDocumentClassificationRunRecord.tenant_id == context.tenant_id,
+                DceDocumentClassificationRunRecord.dce_version_id == dce_version.id,
+                DceDocumentClassificationRunRecord.input_manifest_sha256
+                == command.input_manifest_sha256.lower(),
+                DceDocumentClassificationRunRecord.classifier_id == command.classifier_id,
+                DceDocumentClassificationRunRecord.classifier_version == command.classifier_version,
+            )
+        )
+        if existing_run is not None:
+            return HandlerOutcome(
+                result_code="DCE_DOCUMENT_CLASSIFICATION_ALREADY_RECORDED",
+                aggregate_refs=(
+                    {
+                        "aggregate_type": "DCE_DOCUMENT_CLASSIFICATION_RUN",
+                        "aggregate_id": str(existing_run.id),
+                        "aggregate_revision": 0,
+                    },
+                ),
+            )
+
+        if dce_version.aggregate_revision != command.expected_dce_version_revision:
+            raise ValueError("DCE_VERSION_STALE")
+
+        expected_projection = project_dce_classification(documents=classification_documents)
+        _validate_classification_command(
+            command=command,
+            expected_projection=expected_projection,
+            fragment_records=fragment_records,
+        )
+        classification_run = DceDocumentClassificationRunRecord(
+            id=command.classification_run_id,
+            tenant_id=context.tenant_id,
+            dce_version_id=dce_version.id,
+            dce_version_revision_before=command.expected_dce_version_revision,
+            input_manifest_sha256=command.input_manifest_sha256.lower(),
+            classifier_id=command.classifier_id,
+            classifier_version=command.classifier_version,
+            status=command.status,
+            document_count=command.document_count,
+            source_fragment_count=command.source_fragment_count,
+            source_char_count=command.source_char_count,
+            failure_code=command.failure_code,
+        )
+        session.add(classification_run)
+        session.flush()
+
+        current_by_document = {
+            classification.dce_document_id: classification
+            for classification in session.scalars(
+                sa.select(DceDocumentClassificationRecord)
+                .where(
+                    DceDocumentClassificationRecord.tenant_id == context.tenant_id,
+                    DceDocumentClassificationRecord.dce_document_id.in_(document_ids),
+                    DceDocumentClassificationRecord.is_current.is_(True),
+                )
+                .with_for_update()
+            )
+        }
+        classifications_by_document: dict[UUID, DceDocumentClassificationRecord] = {}
+        for result in command.results:
+            if result.status != "CLASSIFIED":
+                continue
+            current = current_by_document.get(result.dce_document_id)
+            if current is not None and current.classification == result.classification:
+                classifications_by_document[result.dce_document_id] = current
+                continue
+            if current is not None:
+                current.is_current = False
+                session.flush()
+            classification = DceDocumentClassificationRecord(
+                id=uuid4(),
+                tenant_id=context.tenant_id,
+                dce_document_id=result.dce_document_id,
+                classification=result.classification,
+                rationale=None,
+                source="SYSTEM_DETERMINISTIC_V1",
+                previous_classification_id=current.id if current is not None else None,
+                is_current=True,
+                created_by_actor_id=context.actor_id,
+            )
+            session.add(classification)
+            classifications_by_document[result.dce_document_id] = classification
+        session.flush()
+
+        for result in command.results:
+            classification = classifications_by_document.get(result.dce_document_id)
+            result_record = DceDocumentClassificationResultRecord(
+                id=uuid4(),
+                tenant_id=context.tenant_id,
+                classification_run_id=classification_run.id,
+                dce_version_id=dce_version.id,
+                dce_document_id=result.dce_document_id,
+                status=result.status,
+                classification=result.classification,
+                rule_match_count=result.rule_match_count,
+                classification_id=classification.id if classification is not None else None,
+            )
+            session.add(result_record)
+            session.flush()
+            for evidence in result.evidence:
+                session.add(
+                    DceDocumentClassificationEvidenceRecord(
+                        id=uuid4(),
+                        tenant_id=context.tenant_id,
+                        classification_result_id=result_record.id,
+                        fragment_id=evidence.fragment_id,
+                        classification_id=classification.id,
+                        rule_id=evidence.rule_id,
+                        rule_version=evidence.rule_version,
+                        start_byte_offset=evidence.start_byte_offset,
+                        end_byte_offset=evidence.end_byte_offset,
+                        excerpt=evidence.excerpt,
+                    )
+                )
+
+        dce_version.classification_readiness = _classification_readiness(command=command)
+        dce_version.aggregate_revision += 1
+        dce_version.updated_by_actor_id = context.actor_id
+        event = PendingDomainEvent(
+            aggregate_type="DCE_DOCUMENT_CLASSIFICATION_RUN",
+            aggregate_id=classification_run.id,
+            aggregate_revision=0,
+            event_type="DCE_DOCUMENT_CLASSIFICATION_RECORDED",
+            payload={
+                "classification_run_id": str(classification_run.id),
+                "dce_version_id": str(dce_version.id),
+                "classification_readiness": dce_version.classification_readiness,
+                "document_count": command.document_count,
+                "classified_document_count": sum(
+                    result.status == "CLASSIFIED" for result in command.results
+                ),
+            },
+        )
+        return HandlerOutcome(
+            result_code="DCE_DOCUMENT_CLASSIFICATION_RECORDED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "DCE_DOCUMENT_CLASSIFICATION_RUN",
+                    "aggregate_id": str(classification_run.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(event,),
+        )
+
+
 class RecordDceRcAnalysisHandler:
     """Persist source-bound deterministic RC signals without reading originals or deciding."""
 
@@ -906,6 +1181,68 @@ class RegisterDceVersionHandler:
             ),
             events=(event,),
         )
+
+
+def _validate_classification_command(
+    *,
+    command: RecordDceDocumentClassificationRunCommand,
+    expected_projection: object,
+    fragment_records: dict[UUID, DceDocumentExtractionFragmentRecord],
+) -> None:
+    expected_status = expected_projection.status
+    expected_failure_code = expected_projection.failure_code
+    expected_results = expected_projection.results
+    if command.status != expected_status or command.failure_code != expected_failure_code:
+        raise ValueError("DCE_CLASSIFICATION_PROJECTION_REQUIRED")
+    if command.status != "COMPLETED":
+        return
+    if len(command.results) != len(expected_results):
+        raise ValueError("DCE_CLASSIFICATION_RESULT_REQUIRED")
+    for received, expected in zip(command.results, expected_results, strict=True):
+        if (
+            received.dce_document_id != expected.dce_document_id
+            or received.status != expected.status
+            or received.classification != expected.classification
+            or received.rule_match_count != expected.rule_match_count
+            or len(received.evidence) != len(expected.evidence)
+        ):
+            raise ValueError("DCE_CLASSIFICATION_RESULT_REQUIRED")
+        for received_evidence, expected_evidence in zip(
+            received.evidence,
+            expected.evidence,
+            strict=True,
+        ):
+            fragment = fragment_records.get(received_evidence.fragment_id)
+            if fragment is None:
+                raise ValueError("DCE_CLASSIFICATION_SOURCE_FRAGMENT_REQUIRED")
+            if (
+                received_evidence.fragment_id != expected_evidence.fragment_id
+                or received_evidence.rule_id != expected_evidence.rule_id
+                or received_evidence.start_byte_offset != expected_evidence.start_byte_offset
+                or received_evidence.end_byte_offset != expected_evidence.end_byte_offset
+                or received_evidence.excerpt != expected_evidence.excerpt
+            ):
+                raise ValueError("DCE_CLASSIFICATION_EVIDENCE_REQUIRED")
+            source_bytes = fragment.text.encode("utf-8")
+            if received_evidence.end_byte_offset > len(source_bytes):
+                raise ValueError("DCE_CLASSIFICATION_SOURCE_OFFSET_REQUIRED")
+            try:
+                sourced_excerpt = source_bytes[
+                    received_evidence.start_byte_offset : received_evidence.end_byte_offset
+                ].decode("utf-8")
+            except UnicodeDecodeError as error:
+                raise ValueError("DCE_CLASSIFICATION_SOURCE_OFFSET_REQUIRED") from error
+            if sourced_excerpt != received_evidence.excerpt:
+                raise ValueError("DCE_CLASSIFICATION_SOURCE_EXCERPT_REQUIRED")
+
+
+def _classification_readiness(*, command: RecordDceDocumentClassificationRunCommand) -> str:
+    classified_count = sum(result.status == "CLASSIFIED" for result in command.results)
+    if classified_count == 0:
+        return "UNCLASSIFIED"
+    if classified_count == len(command.results):
+        return "CLASSIFIED"
+    return "PARTIALLY_CLASSIFIED"
 
 
 def _validate_rc_analysis_observations(
