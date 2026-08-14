@@ -16,6 +16,7 @@ Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et 
 | `POST` | `/api/v1/patron/cases/{case_id}/assignments` | `assignment.manage`, `PATRON_ADMIN` | Création transactionnelle d’une affectation opérationnelle. |
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/scope-amendments` | `assignment.manage`, `PATRON_ADMIN` | Amendement révisionné du scope opérationnel fermé. |
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/suspensions` | `assignment.manage`, `PATRON_ADMIN` | Suspension révisionnée et temporaire d’une affectation active. |
+| `POST` | `/api/v1/patron/assignments/{assignment_id}/reactivations` | `assignment.manage`, `PATRON_ADMIN` | Réactivation révisionnée d’une affectation suspendue dans sa fenêtre valide. |
 
 ## Conventions transverses
 
@@ -52,10 +53,13 @@ Les deux routes patron utilisent `PATRON_ADMIN` et la capability serveur `assign
 | Création d’affectation | `command_id`, `idempotency_key`, `assignment_id`, `target_membership_id`, `expected_case_revision`, scope fermé, fenêtre | `CASE_ASSIGNMENT_CREATED` | Racine `ACTIVE` révision `0`, journal patron, événement, outbox, receipt. |
 | Amendement de scope | `command_id`, `idempotency_key`, `expected_revision`, scope fermé | `CASE_ASSIGNMENT_SCOPE_AMENDED` | Scope remplacé, révision +1, journal patron, événement, outbox, receipt. |
 | Suspension | `command_id`, `idempotency_key`, `expected_revision`, `suspension_reason_code` fermé | `CASE_ASSIGNMENT_SUSPENDED` | État `SUSPENDED`, révision +1, journal patron, événement, outbox, receipt. |
+| Réactivation | `command_id`, `idempotency_key`, `expected_revision`, `reactivation_reason_code` fermé | `CASE_ASSIGNMENT_REACTIVATED` | État `ACTIVE`, révision +1, journal patron, événement, outbox, receipt. |
 
 Les listes de scope n’acceptent que les actions collaborateur opérationnelles et `INTERNAL_OPERATIONAL`. Une action financière, une action de décision/dépôt, une valeur inconnue, une classification interdite, un doublon ou un champ supplémentaire échoue avant la transaction. L’amendement sur une affectation absente ou hors tenant est neutre ; une révision obsolète retourne `409 VERSION_CONFLICT`; un scope identique, une affectation fermée ou un invariant métier retourne `422`.
 
 La suspension n’accepte que `PATRON_SUSPENDED`, `WORKLOAD_REALLOCATION`, `CASE_PAUSED` ou `ACCESS_REVIEW`. Elle est admise exclusivement depuis `ACTIVE`; un état déjà suspendu, terminé ou expiré retourne `422` sans deuxième journal. Le motif fermé est présent dans le journal patron et l’événement domaine, mais il n’est pas renvoyé dans le receipt HTTP.
+
+La réactivation n’accepte que `PATRON_REACTIVATED`, `CASE_RESUMED` ou `ACCESS_REVIEW_CLEARED`. Elle est admise exclusivement depuis `SUSPENDED`, pendant une fenêtre ouverte et si la Case ainsi que la cible collaborateur sont encore actives dans le tenant. Un état actif, terminé ou expiré, une fenêtre future/fermée ou une cible inactive retourne `422` sans modifier le journal. Le motif fermé reste absent du receipt HTTP.
 
 ## Lecture fermée d’historique
 
@@ -80,4 +84,4 @@ Le snapshot doit être régénéré dès qu’une route, un DTO ou un code publi
 uv run python scripts/export_assignment_openapi.py
 ```
 
-La validation du slice comprend le contrôle Ruff du script, la régénération du JSON et le harnais API `test_assignment_interactions_api.py`. Celui-ci couvre notamment la liste vide, les trois types d’historique, la borne globale, le refus ReBAC audité, la neutralité inter-tenant, l’absence de bearer, l’absence de champs sensibles dans la projection, ainsi que les receipts, rejoues et motifs fermés des commandes patron.
+La validation du slice comprend le contrôle Ruff du script, la régénération du JSON et le harnais API `test_assignment_interactions_api.py`. Celui-ci couvre notamment la liste vide, les trois types d’historique, la borne globale, le refus ReBAC audité, la neutralité inter-tenant, l’absence de bearer, l’absence de champs sensibles dans la projection, ainsi que les receipts, rejoues, motifs fermés et fenêtres de réactivation des commandes patron.

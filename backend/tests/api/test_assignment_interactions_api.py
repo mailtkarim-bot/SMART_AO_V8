@@ -977,3 +977,114 @@ def test_patron_assignment_suspension_requires_closed_reason(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_reactivation_returns_closed_receipt_and_replays(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    creation_payload = _patron_create_payload(target_membership_id)
+    client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+    assignment_id = UUID(creation_payload["assignment_id"])
+    suspension = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/suspensions",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "expected_revision": 0,
+            "suspension_reason_code": "CASE_PAUSED",
+        },
+        headers=headers,
+    )
+    reactivation_payload = {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "expected_revision": 1,
+        "reactivation_reason_code": "CASE_RESUMED",
+    }
+
+    reactivation = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/reactivations",
+        json=reactivation_payload,
+        headers=headers,
+    )
+    replay = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/reactivations",
+        json=reactivation_payload,
+        headers=headers,
+    )
+
+    assert suspension.status_code == 201
+    assert reactivation.status_code == 201
+    assert replay.status_code == 200
+    assert reactivation.json()["result_code"] == "CASE_ASSIGNMENT_REACTIVATED"
+    assert replay.json()["replayed"] is True
+    prohibited = {"tenant_id", "target_membership_id", "reactivation_reason_code"}
+    assert not prohibited.intersection(reactivation.json())
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_reactivation_requires_closed_reason(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    creation_payload = _patron_create_payload(target_membership_id)
+    client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+    assignment_id = UUID(creation_payload["assignment_id"])
+    client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/suspensions",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "expected_revision": 0,
+            "suspension_reason_code": "CASE_PAUSED",
+        },
+        headers=headers,
+    )
+
+    response = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/reactivations",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "expected_revision": 1,
+            "reactivation_reason_code": "PRICING_REVIEWED",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 422

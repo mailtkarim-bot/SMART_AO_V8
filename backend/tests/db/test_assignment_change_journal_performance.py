@@ -34,7 +34,11 @@ def _measure(engine: sa.Engine, *, event_type: str) -> dict[str, float | int | s
 @pytest.mark.db
 @pytest.mark.parametrize(
     "event_type",
-    ["ASSIGNMENT_SCOPE_AMENDED", "ASSIGNMENT_SUSPENDED"],
+    [
+        "ASSIGNMENT_SCOPE_AMENDED",
+        "ASSIGNMENT_SUSPENDED",
+        "ASSIGNMENT_REACTIVATED",
+    ],
 )
 def test_assignment_change_journal_performance_budget(event_type: str) -> None:
     """Exercise real PostgreSQL inserts and indexed recent reads over 1,000 rows."""
@@ -46,6 +50,8 @@ def test_assignment_change_journal_performance_budget(event_type: str) -> None:
     try:
         result = _measure(engine, event_type=event_type)
     finally:
+        with engine.begin() as connection:
+            connection.execute(sa.text("TRUNCATE TABLE tenants, identities CASCADE"))
         engine.dispose()
         command.downgrade(config, "base")
 

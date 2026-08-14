@@ -600,6 +600,23 @@ class SuspendCaseAssignmentCommand(ApplicationCommand):
     suspension_reason_code: SuspensionReasonCode
 
 
+ReactivationReasonCode = Literal[
+    "PATRON_REACTIVATED",
+    "CASE_RESUMED",
+    "ACCESS_REVIEW_CLEARED",
+]
+
+
+class ReactivateCaseAssignmentCommand(ApplicationCommand):
+    """Reactivate one suspended assignment during its server-validated access window."""
+
+    command_type = "ReactivateCaseAssignment"
+
+    assignment_id: UUID
+    expected_revision: int = Field(ge=0)
+    reactivation_reason_code: ReactivationReasonCode
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

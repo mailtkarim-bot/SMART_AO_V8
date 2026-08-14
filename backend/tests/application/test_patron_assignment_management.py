@@ -12,6 +12,7 @@ from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.commands import (
     AmendCaseAssignmentScopeCommand,
     CreateCaseAssignmentCommand,
+    ReactivateCaseAssignmentCommand,
     SuspendCaseAssignmentCommand,
 )
 from app.modules.membership.application.patron_assignment import (
@@ -64,6 +65,9 @@ def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
 
 @pytest.fixture(autouse=True)
 def isolate_patron_assignment_management(database_engine: sa.Engine) -> None:
+    with database_engine.begin() as connection:
+        connection.execute(sa.text("TRUNCATE TABLE tenants, identities CASCADE"))
+    yield
     with database_engine.begin() as connection:
         connection.execute(sa.text("TRUNCATE TABLE tenants, identities CASCADE"))
 
@@ -232,6 +236,22 @@ def _suspend_command(
         assignment_id=assignment_id,
         expected_revision=expected_revision,
         suspension_reason_code=reason,
+    )
+
+
+def _reactivate_command(
+    assignment_id: UUID,
+    *,
+    expected_revision: int = 1,
+    reason: str = "CASE_RESUMED",
+) -> ReactivateCaseAssignmentCommand:
+    return ReactivateCaseAssignmentCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        assignment_id=assignment_id,
+        expected_revision=expected_revision,
+        reactivation_reason_code=reason,
     )
 
 
@@ -614,3 +634,122 @@ def test_patron_suspension_rejects_stale_revision_and_non_patron(session_factory
         assert session.scalar(
             sa.select(sa.func.count()).select_from(CaseAssignmentChangeEventRecord)
         ) == 1
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_reactivation_writes_revisioned_append_only_change_and_outbox(
+    session_factory,
+) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id)
+    service.create(actor=actor, command=creation, now=NOW)
+    service.suspend(
+        actor=actor,
+        command=_suspend_command(creation.assignment_id),
+        now=NOW,
+    )
+
+    result = service.reactivate(
+        actor=actor,
+        command=_reactivate_command(creation.assignment_id),
+        now=NOW,
+    )
+
+    assert result.result_code == "CASE_ASSIGNMENT_REACTIVATED"
+    with session_factory() as session:
+        assignment = session.get(CaseAssignmentRecord, creation.assignment_id)
+        change = session.scalar(
+            sa.select(CaseAssignmentChangeEventRecord).where(
+                CaseAssignmentChangeEventRecord.assignment_id == creation.assignment_id,
+                CaseAssignmentChangeEventRecord.event_type == "ASSIGNMENT_REACTIVATED",
+            )
+        )
+        events = list(session.scalars(sa.select(DomainEventRecord)))
+        outbox = list(session.scalars(sa.select(OutboxMessageRecord)))
+    assert assignment is not None
+    assert assignment.state == "ACTIVE"
+    assert assignment.aggregate_revision == 2
+    assert change is not None
+    assert change.previous_revision == 1
+    assert change.resulting_revision == 2
+    assert change.previous_state == "SUSPENDED"
+    assert change.resulting_state == "ACTIVE"
+    assert change.reason_code == "CASE_RESUMED"
+    assert change.previous_scope_actions_json == change.resulting_scope_actions_json
+    assert len(events) == 3
+    assert events[-1].event_type == "CaseAssignmentReactivated"
+    assert len(outbox) == 3
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_reactivation_replay_and_invalid_state_have_no_extra_write(session_factory) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id)
+    service.create(actor=actor, command=creation, now=NOW)
+    service.suspend(
+        actor=actor,
+        command=_suspend_command(creation.assignment_id),
+        now=NOW,
+    )
+    reactivation = _reactivate_command(creation.assignment_id)
+
+    first = service.reactivate(actor=actor, command=reactivation, now=NOW)
+    replay = service.reactivate(actor=actor, command=reactivation, now=NOW)
+    with pytest.raises(Exception, match="ASSIGNMENT_NOT_SUSPENDED"):
+        service.reactivate(
+            actor=actor,
+            command=_reactivate_command(creation.assignment_id, expected_revision=2),
+            now=NOW,
+        )
+
+    assert first.result_code == "CASE_ASSIGNMENT_REACTIVATED"
+    assert replay.replayed is True
+    with session_factory() as session:
+        assert session.scalar(
+            sa.select(sa.func.count()).select_from(CaseAssignmentChangeEventRecord)
+        ) == 3
+        assert session.scalar(sa.select(sa.func.count()).select_from(DomainEventRecord)) == 3
+        assert session.scalar(sa.select(sa.func.count()).select_from(OutboxMessageRecord)) == 3
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_reactivation_requires_open_window_and_patron_authority(session_factory) -> None:
+    actor, case_id, target_membership_id = _seed_case_and_memberships(session_factory)
+    service = _service(session_factory)
+    creation = _command(case_id, target_membership_id).model_copy(
+        update={"starts_at": NOW + timedelta(days=1), "ends_at": NOW + timedelta(days=7)}
+    )
+    service.create(actor=actor, command=creation, now=NOW)
+    service.suspend(
+        actor=actor,
+        command=_suspend_command(creation.assignment_id),
+        now=NOW,
+    )
+    with pytest.raises(Exception, match="ASSIGNMENT_WINDOW_NOT_OPEN"):
+        service.reactivate(
+            actor=actor,
+            command=_reactivate_command(creation.assignment_id),
+            now=NOW,
+        )
+    collaborator = replace(
+        actor,
+        actor_kind=ActorKind.COLLABORATEUR,
+        capabilities=capabilities_for(ActorKind.COLLABORATEUR),
+    )
+    with pytest.raises(PermissionError, match="ASSIGNMENT_PATRON_REQUIRED"):
+        service.reactivate(
+            actor=collaborator,
+            command=_reactivate_command(creation.assignment_id),
+            now=NOW + timedelta(days=2),
+        )
+
+    with session_factory() as session:
+        assignment = session.get(CaseAssignmentRecord, creation.assignment_id)
+        assert assignment is not None
+        assert assignment.state == "SUSPENDED"
+        assert assignment.aggregate_revision == 1

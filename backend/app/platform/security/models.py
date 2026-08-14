@@ -388,7 +388,8 @@ class CaseAssignmentChangeEventRecord(TenantScopedRecord, Base):
             "reason_code IS NULL OR reason_code IN ('PATRON_SUSPENDED', "
             "'WORKLOAD_REALLOCATION', 'CASE_PAUSED', 'ACCESS_REVIEW', 'PATRON_ENDED', "
             "'CASE_STOPPED', 'CASE_ARCHIVED', 'COLLABORATOR_UNAVAILABLE', "
-            "'MEMBERSHIP_REVOKED')",
+            "'MEMBERSHIP_REVOKED', 'PATRON_REACTIVATED', 'CASE_RESUMED', "
+            "'ACCESS_REVIEW_CLEARED')",
             name="reason",
         ),
         sa.Index(

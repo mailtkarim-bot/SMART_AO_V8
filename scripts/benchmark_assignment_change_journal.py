@@ -35,9 +35,14 @@ def measure(
     *,
     event_type: str = "ASSIGNMENT_SCOPE_AMENDED",
 ) -> dict[str, float | int | str]:
-    if event_type not in {"ASSIGNMENT_SCOPE_AMENDED", "ASSIGNMENT_SUSPENDED"}:
+    if event_type not in {
+        "ASSIGNMENT_SCOPE_AMENDED",
+        "ASSIGNMENT_SUSPENDED",
+        "ASSIGNMENT_REACTIVATED",
+    }:
         raise ValueError("unsupported assignment journal benchmark event")
     is_suspension = event_type == "ASSIGNMENT_SUSPENDED"
+    is_reactivation = event_type == "ASSIGNMENT_REACTIVATED"
     tenant_id = uuid4()
     patron_identity_id = uuid4()
     patron_membership_id = uuid4()
@@ -153,13 +158,21 @@ def measure(
                     "event_type": event_type,
                     "previous_revision": revision - 1,
                     "resulting_revision": revision,
-                    "previous_state": "ACTIVE",
+                    "previous_state": "SUSPENDED" if is_reactivation else "ACTIVE",
                     "resulting_state": "SUSPENDED" if is_suspension else "ACTIVE",
-                    "reason_code": "CASE_PAUSED" if is_suspension else None,
+                    "reason_code": (
+                        "CASE_PAUSED"
+                        if is_suspension
+                        else "CASE_RESUMED"
+                        if is_reactivation
+                        else None
+                    ),
                     "previous_scope_actions_json": ["case.dce.read"],
                     "previous_scope_classifications_json": ["INTERNAL_OPERATIONAL"],
                     "resulting_scope_actions_json": (
-                        ["case.dce.read"] if is_suspension else ["preparation.transmit"]
+                        ["case.dce.read"]
+                        if is_suspension or is_reactivation
+                        else ["preparation.transmit"]
                     ),
                     "resulting_scope_classifications_json": ["INTERNAL_OPERATIONAL"],
                     "command_id": uuid4(),

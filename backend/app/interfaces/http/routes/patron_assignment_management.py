@@ -14,6 +14,7 @@ from app.modules.dce.public.contracts import (
     AmendPatronAssignmentScopeRequest,
     AssignmentCommandResponse,
     CreatePatronCaseAssignmentRequest,
+    ReactivatePatronCaseAssignmentRequest,
     SuspendPatronCaseAssignmentRequest,
 )
 from app.modules.membership.application.patron_assignment import PatronAssignmentManagementService
@@ -112,6 +113,28 @@ def build_patron_assignment_management_router(
         )
         return _dispatch(
             service.suspend,
+            actor=context,
+            command=request.to_command(assignment_id=assignment_id),
+            now=datetime.now(tz=UTC),
+        )
+
+    @router.post(
+        "/assignments/{assignment_id}/reactivations",
+        status_code=status.HTTP_201_CREATED,
+        response_model=AssignmentCommandResponse,
+        responses=_PATRON_ASSIGNMENT_EXTRA_RESPONSES,
+    )
+    def reactivate_case_assignment(
+        assignment_id: UUID,
+        request: ReactivatePatronCaseAssignmentRequest,
+        authorization: str | None = Header(default=None),
+    ) -> AssignmentCommandResponse:
+        context = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        return _dispatch(
+            service.reactivate,
             actor=context,
             command=request.to_command(assignment_id=assignment_id),
             now=datetime.now(tz=UTC),

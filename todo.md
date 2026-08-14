@@ -76,4 +76,11 @@
 - [x] Écrire les tests PostgreSQL et API de suspension : révision, rejeu, état, raisons, tenant, role, journal et absence de fuite.
 - [x] Mesurer le chemin append-only de suspension avec un seuil local de non-régression et confirmer le cycle Alembic jusqu’à la tête `0022`.
 - [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de suspension (commit `2b421cf`, workflow `31847314071` vert).
+- [x] Auditer les invariants de suspension, la machine d’état, le journal append-only, les routes patron et le contrat de fenêtre applicables à `ReactivateCaseAssignment`.
+- [x] Figer le contrat incrémental `PATRON-ASSIGNMENT-REACTIVATE-01`, incluant les motifs fermés, la fenêtre valide, l’audit, l’idempotence et les non-fuites.
+- [x] Mettre à jour le registre et le snapshot OpenAPI avec la route de réactivation, son DTO fermé, ses statuts et ses erreurs publiques.
+- [x] Implémenter `ReactivateCaseAssignment`, son journal append-only, son événement, son outbox et son receipt, avec la migration additive `0023` nécessaire au catalogue fermé de motifs.
+- [x] Écrire les tests PostgreSQL et API de réactivation : révision, rejeu, état, motif, fenêtre, tenant, rôle, journal et absence de fuite.
+- [x] Mesurer le chemin append-only de réactivation avec un seuil local de non-régression et confirmer le cycle Alembic jusqu’à la tête `0023`.
+- [ ] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de réactivation.
 - [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub de l’incrément patron 2 (commit `5054416`, workflow `31844799829` vert).
