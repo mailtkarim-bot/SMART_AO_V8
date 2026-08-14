@@ -20,3 +20,8 @@
 - [x] Ajouter les tests de persistance, tenant, idempotence, append-only et acteur SYSTEM requis.
 - [x] Valider Ruff, pytest, Alembic et les invariants avant commit et push.
 - [x] Committer et pousser CASE-DCE-IMPACT-01 sur `main`.
+- [x] Vérifier le résultat final de la CI GitHub du commit `92259e7` et l’inscrire dans PROJECT_STATE.
+- [x] Identifier le prochain slice backend explicitement présent dans la feuille de route V8 : `COLLAB-ASSIGNMENT-01`.
+- [x] Régénérer `.secrets.baseline` pour corriger l’échec du job Secrets scan.
+- [x] Figer son contrat normatif avant toute nouvelle modification de code.
+- [ ] Implémenter, tester, valider et publier le prochain slice retenu.
