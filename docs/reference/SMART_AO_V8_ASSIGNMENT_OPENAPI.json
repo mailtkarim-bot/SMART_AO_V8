@@ -1,0 +1,2027 @@
+{
+  "components": {
+    "schemas": {
+      "AccessTokenResponse": {
+        "description": "Browser response that deliberately excludes the refresh-token value.",
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "expires_in": {
+            "default": 900,
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "token_type": {
+            "default": "Bearer",
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token"
+        ],
+        "title": "AccessTokenResponse",
+        "type": "object"
+      },
+      "AcknowledgeAssignmentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "expected_revision"
+        ],
+        "title": "AcknowledgeAssignmentRequest",
+        "type": "object"
+      },
+      "AggregateReferenceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregate_id": {
+            "format": "uuid",
+            "title": "Aggregate Id",
+            "type": "string"
+          },
+          "aggregate_revision": {
+            "minimum": 0.0,
+            "title": "Aggregate Revision",
+            "type": "integer"
+          },
+          "aggregate_type": {
+            "title": "Aggregate Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "aggregate_type",
+          "aggregate_id",
+          "aggregate_revision"
+        ],
+        "title": "AggregateReferenceResponse",
+        "type": "object"
+      },
+      "AssignedCaseResponse": {
+        "additionalProperties": false,
+        "description": "Closed Case list item returned after server-side ReBAC filtering.",
+        "properties": {
+          "case_id": {
+            "format": "uuid",
+            "title": "Case Id",
+            "type": "string"
+          },
+          "case_lifecycle": {
+            "title": "Case Lifecycle",
+            "type": "string"
+          },
+          "commercial_stage": {
+            "title": "Commercial Stage",
+            "type": "string"
+          },
+          "dce_availability": {
+            "title": "Dce Availability",
+            "type": "string"
+          },
+          "work_label": {
+            "title": "Work Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "work_label",
+          "case_lifecycle",
+          "commercial_stage",
+          "dce_availability"
+        ],
+        "title": "AssignedCaseResponse",
+        "type": "object"
+      },
+      "AssignmentCommandResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/AggregateReferenceResponse"
+            },
+            "title": "Aggregate Refs",
+            "type": "array"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result_code": {
+            "enum": [
+              "ASSIGNMENT_ACKNOWLEDGED",
+              "ASSIGNMENT_CLARIFICATION_REQUESTED",
+              "ASSIGNMENT_UNAVAILABILITY_REPORTED"
+            ],
+            "title": "Result Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "SUCCEEDED",
+            "default": "SUCCEEDED",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "result_code",
+          "aggregate_refs",
+          "event_ids"
+        ],
+        "title": "AssignmentCommandResponse",
+        "type": "object"
+      },
+      "AssignmentHistoryItemResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assignment_revision": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Revision"
+          },
+          "clarification_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "SCOPE",
+                  "PRIORITY",
+                  "DEADLINE",
+                  "DOCUMENT",
+                  "RESPONSIBILITY",
+                  "OTHER"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification Kind"
+          },
+          "kind": {
+            "enum": [
+              "ACKNOWLEDGEMENT",
+              "CLARIFICATION_REQUEST",
+              "UNAVAILABILITY_REPORT"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "known_deadline_impact": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Deadline Impact"
+          },
+          "operational_state": {
+            "enum": [
+              "RECORDED",
+              "OPEN"
+            ],
+            "title": "Operational State",
+            "type": "string"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "enum": [
+                  "LOW",
+                  "NORMAL",
+                  "HIGH"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "reason_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "SICKNESS",
+                  "LEAVE",
+                  "CAPACITY_CONFLICT",
+                  "SKILL_GAP",
+                  "ACCESS_PROBLEM",
+                  "OTHER"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Kind"
+          },
+          "record_id": {
+            "format": "uuid",
+            "title": "Record Id",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "unavailable_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable From"
+          },
+          "unavailable_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Until"
+          }
+        },
+        "required": [
+          "record_id",
+          "kind",
+          "recorded_at",
+          "operational_state"
+        ],
+        "title": "AssignmentHistoryItemResponse",
+        "type": "object"
+      },
+      "AssignmentHistoryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "case_id": {
+            "format": "uuid",
+            "title": "Case Id",
+            "type": "string"
+          },
+          "case_lifecycle": {
+            "title": "Case Lifecycle",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AssignmentHistoryItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "case_id",
+          "case_lifecycle",
+          "items"
+        ],
+        "title": "AssignmentHistoryResponse",
+        "type": "object"
+      },
+      "CaseDceReadingCountersResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmed": {
+            "minimum": 0.0,
+            "title": "Confirmed",
+            "type": "integer"
+          },
+          "not_applicable": {
+            "minimum": 0.0,
+            "title": "Not Applicable",
+            "type": "integer"
+          },
+          "pending_human_confirmation": {
+            "minimum": 0.0,
+            "title": "Pending Human Confirmation",
+            "type": "integer"
+          },
+          "review_required": {
+            "minimum": 0.0,
+            "title": "Review Required",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "pending_human_confirmation",
+          "confirmed",
+          "review_required",
+          "not_applicable"
+        ],
+        "title": "CaseDceReadingCountersResponse",
+        "type": "object"
+      },
+      "CaseDceReadingDceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis_readiness": {
+            "title": "Analysis Readiness",
+            "type": "string"
+          },
+          "classification_readiness": {
+            "title": "Classification Readiness",
+            "type": "string"
+          },
+          "dce_version_id": {
+            "format": "uuid",
+            "title": "Dce Version Id",
+            "type": "string"
+          },
+          "integrity": {
+            "title": "Integrity",
+            "type": "string"
+          },
+          "lifecycle": {
+            "title": "Lifecycle",
+            "type": "string"
+          },
+          "source_received_at": {
+            "format": "date-time",
+            "title": "Source Received At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dce_version_id",
+          "lifecycle",
+          "integrity",
+          "classification_readiness",
+          "analysis_readiness",
+          "source_received_at"
+        ],
+        "title": "CaseDceReadingDceResponse",
+        "type": "object"
+      },
+      "CaseDceReadingRequirementResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation_outcome": {
+            "title": "Confirmation Outcome",
+            "type": "string"
+          },
+          "directive_signal": {
+            "title": "Directive Signal",
+            "type": "string"
+          },
+          "document_family": {
+            "title": "Document Family",
+            "type": "string"
+          },
+          "requirement_id": {
+            "format": "uuid",
+            "title": "Requirement Id",
+            "type": "string"
+          },
+          "requirement_type": {
+            "title": "Requirement Type",
+            "type": "string"
+          },
+          "source_locator_label": {
+            "title": "Source Locator Label",
+            "type": "string"
+          },
+          "uncertainty_status": {
+            "title": "Uncertainty Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "requirement_id",
+          "requirement_type",
+          "directive_signal",
+          "confirmation_outcome",
+          "uncertainty_status",
+          "document_family",
+          "source_locator_label"
+        ],
+        "title": "CaseDceReadingRequirementResponse",
+        "type": "object"
+      },
+      "CaseDceReadingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "availability": {
+            "const": "AVAILABLE",
+            "title": "Availability",
+            "type": "string"
+          },
+          "case_id": {
+            "format": "uuid",
+            "title": "Case Id",
+            "type": "string"
+          },
+          "case_lifecycle": {
+            "title": "Case Lifecycle",
+            "type": "string"
+          },
+          "commercial_stage": {
+            "title": "Commercial Stage",
+            "type": "string"
+          },
+          "counters": {
+            "$ref": "#/components/schemas/CaseDceReadingCountersResponse"
+          },
+          "dce": {
+            "$ref": "#/components/schemas/CaseDceReadingDceResponse"
+          },
+          "dce_freshness": {
+            "title": "Dce Freshness",
+            "type": "string"
+          },
+          "requirements": {
+            "items": {
+              "$ref": "#/components/schemas/CaseDceReadingRequirementResponse"
+            },
+            "title": "Requirements",
+            "type": "array"
+          },
+          "work_label": {
+            "title": "Work Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "work_label",
+          "case_lifecycle",
+          "commercial_stage",
+          "dce_freshness",
+          "availability",
+          "dce",
+          "counters",
+          "requirements"
+        ],
+        "title": "CaseDceReadingResponse",
+        "type": "object"
+      },
+      "ConsultationProjectionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregate_revision": {
+            "minimum": 0.0,
+            "title": "Aggregate Revision",
+            "type": "integer"
+          },
+          "buyer_legal_name": {
+            "title": "Buyer Legal Name",
+            "type": "string"
+          },
+          "external_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Reference"
+          },
+          "freshness": {
+            "title": "Freshness",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lifecycle": {
+            "title": "Lifecycle",
+            "type": "string"
+          },
+          "location_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Label"
+          },
+          "lots": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
+          "object_label": {
+            "title": "Object Label",
+            "type": "string"
+          },
+          "projection_status": {
+            "enum": [
+              "CURRENT",
+              "REFRESH_PENDING",
+              "PARTIAL"
+            ],
+            "title": "Projection Status",
+            "type": "string"
+          },
+          "tranches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tranches",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "buyer_legal_name",
+          "external_reference",
+          "object_label",
+          "location_label",
+          "lifecycle",
+          "freshness",
+          "aggregate_revision",
+          "lots",
+          "tranches",
+          "projection_status"
+        ],
+        "title": "ConsultationProjectionResponse",
+        "type": "object"
+      },
+      "CreateConsultationCommand": {
+        "additionalProperties": false,
+        "description": "Create a buyer consultation and its durable business identity.",
+        "properties": {
+          "buyer_legal_name": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Buyer Legal Name",
+            "type": "string"
+          },
+          "buyer_normalized_id": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer Normalized Id"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "consultation_id": {
+            "format": "uuid",
+            "title": "Consultation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "external_reference": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Reference"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "location_label": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Label"
+          },
+          "object_label": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Object Label",
+            "type": "string"
+          },
+          "source_channel": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Source Channel",
+            "type": "string"
+          },
+          "source_received_at": {
+            "format": "date-time",
+            "title": "Source Received At",
+            "type": "string"
+          },
+          "source_reference": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Reference"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "consultation_id",
+          "buyer_legal_name",
+          "object_label",
+          "source_channel",
+          "source_received_at"
+        ],
+        "title": "CreateConsultationCommand",
+        "type": "object"
+      },
+      "CreateConsultationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/AggregateReferenceResponse"
+            },
+            "title": "Aggregate Refs",
+            "type": "array"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/ProjectionStatusResponse"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result_code": {
+            "const": "CONSULTATION_CREATED",
+            "title": "Result Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "SUCCEEDED",
+            "default": "SUCCEEDED",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "result_code",
+          "aggregate_refs",
+          "event_ids",
+          "projection"
+        ],
+        "title": "CreateConsultationResponse",
+        "type": "object"
+      },
+      "DceDocumentAdmissionInput": {
+        "additionalProperties": false,
+        "description": "References one server-controlled CLEAN staged object for DCE admission.",
+        "properties": {
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "storage_object_id": {
+            "format": "uuid",
+            "title": "Storage Object Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "storage_object_id"
+        ],
+        "title": "DceDocumentAdmissionInput",
+        "type": "object"
+      },
+      "DceStagingStatusResponse": {
+        "additionalProperties": false,
+        "description": "Public staging state; intentionally excludes private storage locator data.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "state": {
+            "const": "AWAITING_UPLOAD",
+            "title": "State",
+            "type": "string"
+          },
+          "storage_object_id": {
+            "format": "uuid",
+            "title": "Storage Object Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storage_object_id",
+          "state",
+          "expires_at"
+        ],
+        "title": "DceStagingStatusResponse",
+        "type": "object"
+      },
+      "DceVersionMetadataResponse": {
+        "additionalProperties": false,
+        "description": "DCE-READ-01 metadata only; it deliberately excludes documents and provenance.",
+        "properties": {
+          "aggregate_revision": {
+            "minimum": 0.0,
+            "title": "Aggregate Revision",
+            "type": "integer"
+          },
+          "analysis_readiness": {
+            "title": "Analysis Readiness",
+            "type": "string"
+          },
+          "classification_readiness": {
+            "title": "Classification Readiness",
+            "type": "string"
+          },
+          "consultation_id": {
+            "format": "uuid",
+            "title": "Consultation Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "integrity": {
+            "title": "Integrity",
+            "type": "string"
+          },
+          "lifecycle": {
+            "title": "Lifecycle",
+            "type": "string"
+          },
+          "predecessor_dce_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predecessor Dce Version Id"
+          },
+          "source_received_at": {
+            "format": "date-time",
+            "title": "Source Received At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "consultation_id",
+          "predecessor_dce_version_id",
+          "source_received_at",
+          "lifecycle",
+          "integrity",
+          "classification_readiness",
+          "analysis_readiness",
+          "aggregate_revision"
+        ],
+        "title": "DceVersionMetadataResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "additionalProperties": false,
+        "description": "Anonymous credential submission; tenant is selected only before session creation.",
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "tenant_id"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "PrepareDceStagingRequest": {
+        "additionalProperties": false,
+        "description": "Public intent; the server allocates the opaque storage object identity.",
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "consultation_id": {
+            "format": "uuid",
+            "title": "Consultation Id",
+            "type": "string"
+          },
+          "consultation_revision": {
+            "minimum": 0.0,
+            "title": "Consultation Revision",
+            "type": "integer"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "expected_byte_size": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 2000000000.0,
+            "title": "Expected Byte Size",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "original_filename": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Original Filename",
+            "type": "string"
+          },
+          "source_channel": {
+            "pattern": "^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$",
+            "title": "Source Channel",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "consultation_id",
+          "consultation_revision",
+          "original_filename",
+          "expected_byte_size",
+          "source_channel",
+          "expires_at"
+        ],
+        "title": "PrepareDceStagingRequest",
+        "type": "object"
+      },
+      "PrepareDceStagingResponse": {
+        "additionalProperties": false,
+        "description": "DCE-STAGING-01 receipt for a server-keyed staging intent.",
+        "properties": {
+          "aggregate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/AggregateReferenceResponse"
+            },
+            "title": "Aggregate Refs",
+            "type": "array"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result_code": {
+            "const": "DCE_STAGING_PREPARED",
+            "title": "Result Code",
+            "type": "string"
+          },
+          "staging": {
+            "$ref": "#/components/schemas/DceStagingStatusResponse"
+          },
+          "status": {
+            "const": "SUCCEEDED",
+            "default": "SUCCEEDED",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "result_code",
+          "aggregate_refs",
+          "event_ids",
+          "staging"
+        ],
+        "title": "PrepareDceStagingResponse",
+        "type": "object"
+      },
+      "ProjectionStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "refreshed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refreshed At"
+          },
+          "status": {
+            "enum": [
+              "CURRENT",
+              "REFRESH_PENDING",
+              "PARTIAL"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tracking_correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking Correlation Id"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "ProjectionStatusResponse",
+        "type": "object"
+      },
+      "RecordDceRequirementConfirmationRequest": {
+        "additionalProperties": false,
+        "description": "Untrusted HTTP intent; scope and actor stay server-resolved.",
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "confirmation_id": {
+            "format": "uuid",
+            "title": "Confirmation Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "expected_confirmation_revision": {
+            "minimum": 0.0,
+            "title": "Expected Confirmation Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "CONFIRMED",
+              "REVIEW_REQUIRED",
+              "NOT_APPLICABLE"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason_code": {
+            "enum": [
+              "SOURCE_REVIEWED",
+              "AMBIGUOUS_SOURCE",
+              "CONTRADICTORY_DCE",
+              "PATRON_NOT_APPLICABLE",
+              "NEEDS_EXTERNAL_CLARIFICATION"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "confirmation_id",
+          "expected_confirmation_revision",
+          "outcome",
+          "reason_code"
+        ],
+        "title": "RecordDceRequirementConfirmationRequest",
+        "type": "object"
+      },
+      "RecordDceRequirementConfirmationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/AggregateReferenceResponse"
+            },
+            "title": "Aggregate Refs",
+            "type": "array"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result_code": {
+            "const": "DCE_REQUIREMENT_CONFIRMED",
+            "title": "Result Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "SUCCEEDED",
+            "default": "SUCCEEDED",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "result_code",
+          "aggregate_refs",
+          "event_ids"
+        ],
+        "title": "RecordDceRequirementConfirmationResponse",
+        "type": "object"
+      },
+      "RegisterDceVersionCommand": {
+        "additionalProperties": false,
+        "description": "Atomically admit an immutable DCE corpus already staged outside HTTP.",
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "consultation_id": {
+            "format": "uuid",
+            "title": "Consultation Id",
+            "type": "string"
+          },
+          "consultation_revision": {
+            "minimum": 0.0,
+            "title": "Consultation Revision",
+            "type": "integer"
+          },
+          "corpus_hash": {
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-fA-F]{64}$",
+            "title": "Corpus Hash",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "dce_version_id": {
+            "format": "uuid",
+            "title": "Dce Version Id",
+            "type": "string"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DceDocumentAdmissionInput"
+            },
+            "minItems": 1,
+            "title": "Documents",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "provenance_channel": {
+            "pattern": "^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$",
+            "title": "Provenance Channel",
+            "type": "string"
+          },
+          "provenance_reference": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance Reference"
+          },
+          "provenance_url": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance Url"
+          },
+          "source_received_at": {
+            "format": "date-time",
+            "title": "Source Received At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "dce_version_id",
+          "consultation_id",
+          "consultation_revision",
+          "corpus_hash",
+          "provenance_channel",
+          "source_received_at",
+          "documents"
+        ],
+        "title": "RegisterDceVersionCommand",
+        "type": "object"
+      },
+      "RegisterDceVersionResponse": {
+        "additionalProperties": false,
+        "description": "DCE-ADMIT-HTTP-01 success receipt without document or storage metadata.",
+        "properties": {
+          "aggregate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/AggregateReferenceResponse"
+            },
+            "title": "Aggregate Refs",
+            "type": "array"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result_code": {
+            "const": "DCE_VERSION_REGISTERED",
+            "title": "Result Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "SUCCEEDED",
+            "default": "SUCCEEDED",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "result_code",
+          "aggregate_refs",
+          "event_ids"
+        ],
+        "title": "RegisterDceVersionResponse",
+        "type": "object"
+      },
+      "ReportAssignmentUnavailabilityRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "impact_note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact Note"
+          },
+          "known_deadline_impact": {
+            "default": false,
+            "title": "Known Deadline Impact",
+            "type": "boolean"
+          },
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_kind": {
+            "enum": [
+              "SICKNESS",
+              "LEAVE",
+              "CAPACITY_CONFLICT",
+              "SKILL_GAP",
+              "ACCESS_PROBLEM",
+              "OTHER"
+            ],
+            "title": "Reason Kind",
+            "type": "string"
+          },
+          "unavailable_from": {
+            "format": "date-time",
+            "title": "Unavailable From",
+            "type": "string"
+          },
+          "unavailable_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Until"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "expected_revision",
+          "reason_kind",
+          "reason",
+          "unavailable_from"
+        ],
+        "title": "ReportAssignmentUnavailabilityRequest",
+        "type": "object"
+      },
+      "RequestAssignmentClarificationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "clarification_kind": {
+            "enum": [
+              "SCOPE",
+              "PRIORITY",
+              "DEADLINE",
+              "DOCUMENT",
+              "RESPONSIBILITY",
+              "OTHER"
+            ],
+            "title": "Clarification Kind",
+            "type": "string"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "priority": {
+            "default": "NORMAL",
+            "enum": [
+              "LOW",
+              "NORMAL",
+              "HIGH"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "question": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "requested_scope": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Scope"
+          },
+          "subject": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "expected_revision",
+          "clarification_kind",
+          "subject",
+          "question"
+        ],
+        "title": "RequestAssignmentClarificationRequest",
+        "type": "object"
+      },
+      "UploadDceStagedObjectResponse": {
+        "additionalProperties": false,
+        "description": "Safe DCE-UPLOAD-01 success response without storage or scanner internals.",
+        "properties": {
+          "state": {
+            "const": "CLEAN",
+            "title": "State",
+            "type": "string"
+          },
+          "storage_object_id": {
+            "format": "uuid",
+            "title": "Storage Object Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storage_object_id",
+          "state"
+        ],
+        "title": "UploadDceStagedObjectResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "SaaS BTP d'analyse DCE et de décision d'appel d'offres.",
+    "title": "SMART_AO V8",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/assignments/{assignment_id}/acknowledgement": {
+      "post": {
+        "operationId": "acknowledge_assignment_api_v1_assignments__assignment_id__acknowledgement_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgeAssignmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Rejeu idempotent de la commande déjà appliquée."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability ou scope ReBAC insuffisant."
+          },
+          "404": {
+            "description": "Affectation absente ou hors tenant : réponse volontairement neutre."
+          },
+          "409": {
+            "description": "Clé d’idempotence réutilisée ou commande encore en cours."
+          },
+          "422": {
+            "description": "Validation de requête ou rejet métier de la commande."
+          }
+        },
+        "summary": "Acknowledge Assignment",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/assignments/{assignment_id}/clarification-requests": {
+      "post": {
+        "operationId": "request_clarification_api_v1_assignments__assignment_id__clarification_requests_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestAssignmentClarificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Rejeu idempotent de la commande déjà appliquée."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability ou scope ReBAC insuffisant."
+          },
+          "404": {
+            "description": "Affectation absente ou hors tenant : réponse volontairement neutre."
+          },
+          "409": {
+            "description": "Clé d’idempotence réutilisée ou commande encore en cours."
+          },
+          "422": {
+            "description": "Validation de requête ou rejet métier de la commande."
+          }
+        },
+        "summary": "Request Clarification",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/assignments/{assignment_id}/history": {
+      "get": {
+        "operationId": "get_assignment_history_api_v1_assignments__assignment_id__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability ou scope ReBAC insuffisant."
+          },
+          "404": {
+            "description": "Affectation absente ou hors tenant : réponse volontairement neutre."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Assignment History",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/api/v1/assignments/{assignment_id}/unavailability-reports": {
+      "post": {
+        "operationId": "report_unavailability_api_v1_assignments__assignment_id__unavailability_reports_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportAssignmentUnavailabilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Rejeu idempotent de la commande déjà appliquée."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability ou scope ReBAC insuffisant."
+          },
+          "404": {
+            "description": "Affectation absente ou hors tenant : réponse volontairement neutre."
+          },
+          "409": {
+            "description": "Clé d’idempotence réutilisée ou commande encore en cours."
+          },
+          "422": {
+            "description": "Validation de requête ou rejet métier de la commande."
+          }
+        },
+        "summary": "Report Unavailability",
+        "tags": [
+          "assignments"
+        ]
+      }
+    }
+  }
+}

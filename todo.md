@@ -36,7 +36,7 @@
 - [x] Committer et pousser COLLAB-ASSIGNMENT-01 après revue finale du diff.
 - [x] Corriger le faux positif detect-secrets sur l’URL PostgreSQL de test et republier le correctif.
 - [x] Vérifier la CI finale : workflow `31824210865` vert.
-- [ ] Implémenter, tester, valider et publier le prochain slice retenu.
+- [x] Implémenter, tester, valider et publier le prochain slice retenu.
 - [x] Auditer les conventions de routes, DTO, contexte bearer et audit SEC-01 pour les commandes Assignment.
 - [x] Figer le contrat HTTP des trois commandes Assignment et leurs erreurs publiques fermées.
 - [x] Implémenter la façade HTTP auditée et son branchement au bootstrap V8.
@@ -45,3 +45,10 @@
 - [x] Inscrire dans le dépôt la matrice vérifiable de couverture HTTP Assignment et de contrôles ReBAC.
 - [x] Valider Ruff, pytest, Alembic et detect-secrets avant publication de la façade HTTP.
 - [x] Committer et pousser COLLAB-ASSIGNMENT-HTTP-01, puis vérifier la CI GitHub : workflow `31829240985` vert.
+- [x] Auditer les trois historiques Assignment et définir leur projection publique fermée.
+- [x] Figer le contrat CASE-ASSIGNMENT-HISTORY-01 et les règles ReBAC de lecture.
+- [x] Implémenter la query tenant/Case-scopée et la route HTTP d’historique collaborateur.
+- [x] Ajouter les tests API de lecture, ReBAC, neutralité inter-tenant, tri et non-fuite.
+- [x] Générer et vérifier l’OpenAPI des quatre routes Assignment (trois POST et un GET).
+- [x] Préparer le plan contractuel de gestion patron des affectations et la matrice de tests unitaires associée.
+- [ ] Relancer la validation complète, publier CASE-ASSIGNMENT-HISTORY-01 et vérifier la CI GitHub.

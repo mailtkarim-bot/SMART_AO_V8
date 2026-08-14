@@ -17,6 +17,7 @@ import sqlalchemy as sa
 from fastapi import FastAPI
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.interfaces.http.routes.assignment_history import build_assignment_history_router
 from app.interfaces.http.routes.assignment_interactions import (
     build_assignment_interaction_router,
 )
@@ -77,6 +78,7 @@ from app.modules.membership.application.assignment import (
     AssignmentInteractionService,
     assignment_handlers,
 )
+from app.modules.membership.application.assignment_history import AssignmentHistoryService
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
@@ -323,6 +325,10 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        assignment_history_service = AssignmentHistoryService(
+            session_factory=runtime.session_factory,
+            policy=security_policy,
+        )
         app.include_router(
             build_case_dce_reading_router(
                 runtime=runtime,
@@ -362,6 +368,12 @@ def create_app(
         app.include_router(
             build_assignment_interaction_router(
                 service=assignment_interaction_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_assignment_history_router(
+                service=assignment_history_service,
                 security_runtime=security_runtime,
             )
         )

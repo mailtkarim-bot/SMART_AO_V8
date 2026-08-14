@@ -498,3 +498,183 @@ def test_assignment_route_requires_bearer(database_engine: sa.Engine, session_fa
     )
 
     assert response.status_code == 401
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_assignment_history_returns_closed_empty_then_bounded_history(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(database_engine)
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        scope_actions=[
+            "assignment.acknowledge",
+            "assignment.clarify",
+            "assignment.history.read",
+            "assignment.unavailability",
+        ],
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+
+    empty = client.get(f"/api/v1/assignments/{assignment_id}/history", headers=headers)
+    assert empty.status_code == 200
+    assert empty.json()["items"] == []
+
+    acknowledgement = client.post(
+        f"/api/v1/assignments/{assignment_id}/acknowledgement",
+        json=_ack_payload(),
+        headers=headers,
+    )
+    clarification = client.post(
+        f"/api/v1/assignments/{assignment_id}/clarification-requests",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "correlation_id": str(uuid4()),
+            "expected_revision": 1,
+            "clarification_kind": "SCOPE",
+            "subject": "Périmètre",
+            "question": "Quel lot est prioritaire ?",
+            "priority": "NORMAL",
+        },
+        headers=headers,
+    )
+    unavailability = client.post(
+        f"/api/v1/assignments/{assignment_id}/unavailability-reports",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "correlation_id": str(uuid4()),
+            "expected_revision": 1,
+            "reason_kind": "CAPACITY_CONFLICT",
+            "reason": "Détail privé interdit à la lecture.",
+            "unavailable_from": "2026-08-15T12:00:00Z",
+            "known_deadline_impact": False,
+        },
+        headers=headers,
+    )
+    history = client.get(
+        f"/api/v1/assignments/{assignment_id}/history?limit=2",
+        headers=headers,
+    )
+
+    assert acknowledgement.status_code == 201
+    assert clarification.status_code == 201
+    assert unavailability.status_code == 201
+    assert history.status_code == 200
+    body = history.json()
+    assert len(body["items"]) == 2
+    assert {item["kind"] for item in body["items"]} <= {
+        "ACKNOWLEDGEMENT",
+        "CLARIFICATION_REQUEST",
+        "UNAVAILABILITY_REPORT",
+    }
+    prohibited = {
+        "actor_id",
+        "command_id",
+        "correlation_id",
+        "functional_key",
+        "membership_id",
+        "note",
+        "question",
+        "reason",
+        "requested_scope",
+        "tenant_id",
+    }
+    assert not prohibited.intersection(body)
+    assert all(not prohibited.intersection(item) for item in body["items"])
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_assignment_history_scope_denial_is_403_and_audited(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(database_engine)
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        scope_actions=["assignment.acknowledge"],
+    )
+    client, tokens = _client(session_factory)
+
+    response = client.get(
+        f"/api/v1/assignments/{assignment_id}/history",
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "FORBIDDEN"}
+    with session_factory() as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.action == "assignment.history.read",
+            )
+        )
+    assert audit is not None
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_assignment_history_foreign_assignment_is_neutral_404_and_audited(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(database_engine)
+    other_tenant, _, other_membership_id, _ = _seed_principal(database_engine)
+    _, foreign_assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=other_tenant,
+        membership_id=other_membership_id,
+        scope_actions=["assignment.history.read"],
+    )
+    client, tokens = _client(session_factory)
+
+    response = client.get(
+        f"/api/v1/assignments/{foreign_assignment_id}/history",
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
+    with session_factory() as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.action == "assignment.history.read",
+                SecurityAuditEventRecord.reason_code == "NOT_FOUND_OR_FORBIDDEN",
+            )
+        )
+    assert audit is not None
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_assignment_history_requires_bearer(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, _, membership_id, _ = _seed_principal(database_engine)
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        scope_actions=["assignment.history.read"],
+    )
+    client, _ = _client(session_factory)
+
+    response = client.get(f"/api/v1/assignments/{assignment_id}/history")
+
+    assert response.status_code == 401
