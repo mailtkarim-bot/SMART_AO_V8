@@ -51,4 +51,4 @@
 - [x] Ajouter les tests API de lecture, ReBAC, neutralité inter-tenant, tri et non-fuite.
 - [x] Générer et vérifier l’OpenAPI des quatre routes Assignment (trois POST et un GET).
 - [x] Préparer le plan contractuel de gestion patron des affectations et la matrice de tests unitaires associée.
-- [ ] Relancer la validation complète, publier CASE-ASSIGNMENT-HISTORY-01 et vérifier la CI GitHub.
+- [x] Relancer la validation complète, publier CASE-ASSIGNMENT-HISTORY-01 et vérifier la CI GitHub (commit `257ddca`, workflow `31831648517` vert).

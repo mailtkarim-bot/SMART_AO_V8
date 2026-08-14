@@ -1,19 +1,19 @@
 # PROJECT_STATE
 
 ## Slice courant
-`CASE-ASSIGNMENT-HISTORY-01` — committé localement sur `HEAD`, push et CI GitHub en attente. Il ajoute la lecture fermée des trois historiques collaborateur avec bearer réel, tenant/membership-scoping, ReBAC auditée, tri déterministe, borne globale `1..200` et projection sans texte libre, finance, audit ou métadonnées de déduplication. Les trois commandes Assignment restent inchangées. Le raccordement HTTPS frontend reste suspendu jusqu’à la disponibilité d’un VPS.
+`CASE-ASSIGNMENT-HISTORY-01` — publié sur `main` par [`257ddca`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/257ddca) et validé par CI. Il ajoute la lecture fermée des trois historiques collaborateur avec bearer réel, tenant/membership-scoping, ReBAC auditée, tri déterministe, borne globale `1..200` et projection sans texte libre, finance, audit ou métadonnées de déduplication. Les trois commandes Assignment restent inchangées. Le raccordement HTTPS frontend reste suspendu jusqu’à la disponibilité d’un VPS.
 
 ## Dernier état vert
 
 | Élément | État |
 |---|---|
-| Commit en attente de publication | `HEAD` — `feat(collab): add closed assignment history read with ReBAC`. |
+| Commit | CASE-ASSIGNMENT-HISTORY-01 publié par [`257ddca`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/257ddca). |
 | Commit publié de référence | COLLAB-ASSIGNMENT-HTTP-01 publié par [`79fd600`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/79fd600). |
 | Commit précédent | DCE-CLASSIFICATION-01 publié sur `main` : [`e099f2a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e099f2a), contrat normatif, migration `0015`, classifieur déterministe, registre append-only, projection courante historisée et tests dédiés. |
 | Migration Alembic | `20260814_0020` ajoutée pour la révision Assignment et les trois historiques collaborateur ; upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` validés sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Validation locale courante | `git diff --check`, `uv run ruff check .`, secrets scan, `uv run pytest backend/tests -q` : **255 tests verts**, cycle Alembic `upgrade head` / `check` / `downgrade base` verts. Les 4 avertissements restants sont des dépréciations tierces FastAPI/TestClient déjà connues. |
-| CI | Le workflow [#31829240985](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31829240985) du commit `79fd600` est **vert**. Lint, secrets scan, audit dépendances, SAST, smoke tests et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore. |
+| CI | Le workflow [#31831648517](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31831648517) du commit `257ddca` est **vert**. Lint, secrets scan, audit dépendances, SAST, smoke tests et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore. |
 
 ## Ce qui est terminé
 
@@ -65,11 +65,11 @@
 - Correction CI publiée par `0c0de66` puis confirmée par le workflow vert `31822332866` sur `a380bad`. L’échec précédent `31820821308` était un défaut de synchronisation de baseline, pas un échec fonctionnel CASE-DCE-IMPACT-01.
 - `COLLAB-ASSIGNMENT-01` publié : le contrat normatif couvre `AcknowledgeAssignment`, `RequestAssignmentClarification` et `ReportAssignmentUnavailability`. Le slice ne crée ni ne modifie une affectation, n’élargit aucun scope ReBAC et ne touche ni prix, ni marge, ni tâche, ni échéance, ni décision patron. Les tables `case_assignment_acknowledgements`, `assignment_clarification_requests` et `case_assignment_unavailabilities` sont append-only par triggers PostgreSQL. Le faux positif detect-secrets de l’URL PostgreSQL de test a été corrigé dans `30d5ace`.
 - `COLLAB-ASSIGNMENT-HTTP-01` publié par `79fd600` : contrat HTTP, routeur `/api/v1/assignments`, DTO Pydantic fermés, intégration au bootstrap sous le même `AuditedAuthorizationPolicy` que les routes DCE et façade applicative qui audite également les refus avant policy. Les trois routes retournent un reçu minimal `201`/`200`; les ressources étrangères restent `404`, les scopes incomplets `403`, le conflit d’idempotence `409` et les invariants `422`. Les 7 scénarios API ciblés et la régression complète de 251 tests sont verts ; la CI `31829240985` est verte.
-- `CASE-ASSIGNMENT-HISTORY-01` committé localement sur `HEAD` : capability `assignment.history.read`, projections et DTO fermés, lecteur SQLAlchemy borné par source et globalement, service auditant les refus avant policy et route `GET /api/v1/assignments/{assignment_id}/history?limit=1..200`. Les 11 scénarios API Assignment couvrent liste vide, trois types d’historique, borne, bearer, ReBAC, neutralité inter-tenant, audit et non-fuite. Le snapshot OpenAPI reproductible (`scripts/export_assignment_openapi.py`) et son registre Markdown décrivent les trois POST et le GET, y compris les statuts publics. Le plan `PATRON-ASSIGNMENT-MANAGEMENT-01` précise maintenant capability dédiée, scopes fermés, migration append-only et matrice de tests ; aucun de son code n’a été commencé.
+- `CASE-ASSIGNMENT-HISTORY-01` publié par `257ddca` et validé par CI `31831648517` : capability `assignment.history.read`, projections et DTO fermés, lecteur SQLAlchemy borné par source et globalement, service auditant les refus avant policy et route `GET /api/v1/assignments/{assignment_id}/history?limit=1..200`. Les 11 scénarios API Assignment couvrent liste vide, trois types d’historique, borne, bearer, ReBAC, neutralité inter-tenant, audit et non-fuite. Le snapshot OpenAPI reproductible (`scripts/export_assignment_openapi.py`) et son registre Markdown décrivent les trois POST et le GET, y compris les statuts publics. Le plan `PATRON-ASSIGNMENT-MANAGEMENT-01` précise maintenant capability dédiée, scopes fermés, migration append-only et matrice de tests ; aucun de son code n’a été commencé.
 
 ## Prochaine action unique
 
-Pousser le commit local `HEAD` et vérifier la CI GitHub. Le prochain code ne pourra démarrer qu’après le contrat normatif `PATRON-ASSIGNMENT-MANAGEMENT-01`; son plan et sa matrice de tests sont déjà préparés. Le VPS reste requis uniquement pour configurer l’URL HTTPS et tester le parcours navigateur réel.
+Figer le contrat normatif `PATRON-ASSIGNMENT-MANAGEMENT-01` avant toute modification de code. Son plan, ses décisions préparatoires et sa matrice de tests sont déjà documentés. Le VPS reste requis uniquement pour configurer l’URL HTTPS et tester le parcours navigateur réel.
 
 ## Décisions ouvertes
 
