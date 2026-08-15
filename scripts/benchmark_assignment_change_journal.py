@@ -39,10 +39,12 @@ def measure(
         "ASSIGNMENT_SCOPE_AMENDED",
         "ASSIGNMENT_SUSPENDED",
         "ASSIGNMENT_REACTIVATED",
+        "ASSIGNMENT_ENDED",
     }:
         raise ValueError("unsupported assignment journal benchmark event")
     is_suspension = event_type == "ASSIGNMENT_SUSPENDED"
     is_reactivation = event_type == "ASSIGNMENT_REACTIVATED"
+    is_ending = event_type == "ASSIGNMENT_ENDED"
     tenant_id = uuid4()
     patron_identity_id = uuid4()
     patron_membership_id = uuid4()
@@ -137,14 +139,14 @@ def measure(
                     membership_id=collaborator_membership_id,
                     case_id=case_id,
                     aggregate_revision=EVENT_COUNT,
-                    state="ACTIVE",
+                    state="ENDED" if is_ending else "ACTIVE",
                     scope_actions_json=["case.dce.read"],
                     scope_classifications_json=["INTERNAL_OPERATIONAL"],
                     granted_by_membership_id=patron_membership_id,
                     granted_at=NOW,
                     starts_at=NOW,
                     ends_at=None,
-                    ended_at=None,
+                    ended_at=NOW if is_ending else None,
                 )
             )
             rows = [
@@ -159,19 +161,23 @@ def measure(
                     "previous_revision": revision - 1,
                     "resulting_revision": revision,
                     "previous_state": "SUSPENDED" if is_reactivation else "ACTIVE",
-                    "resulting_state": "SUSPENDED" if is_suspension else "ACTIVE",
+                    "resulting_state": (
+                        "SUSPENDED" if is_suspension else "ENDED" if is_ending else "ACTIVE"
+                    ),
                     "reason_code": (
                         "CASE_PAUSED"
                         if is_suspension
                         else "CASE_RESUMED"
                         if is_reactivation
+                        else "PATRON_ENDED"
+                        if is_ending
                         else None
                     ),
                     "previous_scope_actions_json": ["case.dce.read"],
                     "previous_scope_classifications_json": ["INTERNAL_OPERATIONAL"],
                     "resulting_scope_actions_json": (
                         ["case.dce.read"]
-                        if is_suspension or is_reactivation
+                        if is_suspension or is_reactivation or is_ending
                         else ["preparation.transmit"]
                     ),
                     "resulting_scope_classifications_json": ["INTERNAL_OPERATIONAL"],

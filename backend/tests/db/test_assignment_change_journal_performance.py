@@ -38,6 +38,7 @@ def _measure(engine: sa.Engine, *, event_type: str) -> dict[str, float | int | s
         "ASSIGNMENT_SCOPE_AMENDED",
         "ASSIGNMENT_SUSPENDED",
         "ASSIGNMENT_REACTIVATED",
+        "ASSIGNMENT_ENDED",
     ],
 )
 def test_assignment_change_journal_performance_budget(event_type: str) -> None:

@@ -617,6 +617,25 @@ class ReactivateCaseAssignmentCommand(ApplicationCommand):
     reactivation_reason_code: ReactivationReasonCode
 
 
+EndReasonCode = Literal[
+    "PATRON_ENDED",
+    "CASE_STOPPED",
+    "CASE_ARCHIVED",
+    "COLLABORATOR_UNAVAILABLE",
+    "MEMBERSHIP_REVOKED",
+]
+
+
+class EndCaseAssignmentCommand(ApplicationCommand):
+    """Irreversibly end one active or suspended patron-owned assignment."""
+
+    command_type = "EndCaseAssignment"
+
+    assignment_id: UUID
+    expected_revision: int = Field(ge=0)
+    end_reason_code: EndReasonCode
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

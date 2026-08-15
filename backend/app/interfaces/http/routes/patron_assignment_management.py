@@ -14,6 +14,7 @@ from app.modules.dce.public.contracts import (
     AmendPatronAssignmentScopeRequest,
     AssignmentCommandResponse,
     CreatePatronCaseAssignmentRequest,
+    EndPatronCaseAssignmentRequest,
     ReactivatePatronCaseAssignmentRequest,
     SuspendPatronCaseAssignmentRequest,
 )
@@ -135,6 +136,28 @@ def build_patron_assignment_management_router(
         )
         return _dispatch(
             service.reactivate,
+            actor=context,
+            command=request.to_command(assignment_id=assignment_id),
+            now=datetime.now(tz=UTC),
+        )
+
+    @router.post(
+        "/assignments/{assignment_id}/end",
+        status_code=status.HTTP_201_CREATED,
+        response_model=AssignmentCommandResponse,
+        responses=_PATRON_ASSIGNMENT_EXTRA_RESPONSES,
+    )
+    def end_case_assignment(
+        assignment_id: UUID,
+        request: EndPatronCaseAssignmentRequest,
+        authorization: str | None = Header(default=None),
+    ) -> AssignmentCommandResponse:
+        context = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        return _dispatch(
+            service.end,
             actor=context,
             command=request.to_command(assignment_id=assignment_id),
             now=datetime.now(tz=UTC),

@@ -249,7 +249,8 @@
               "CASE_ASSIGNMENT_CREATED",
               "CASE_ASSIGNMENT_SCOPE_AMENDED",
               "CASE_ASSIGNMENT_SUSPENDED",
-              "CASE_ASSIGNMENT_REACTIVATED"
+              "CASE_ASSIGNMENT_REACTIVATED",
+              "CASE_ASSIGNMENT_ENDED"
             ],
             "title": "Result Code",
             "type": "string"
@@ -1108,6 +1109,57 @@
           "aggregate_revision"
         ],
         "title": "DceVersionMetadataResponse",
+        "type": "object"
+      },
+      "EndPatronCaseAssignmentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "end_reason_code": {
+            "enum": [
+              "PATRON_ENDED",
+              "CASE_STOPPED",
+              "CASE_ARCHIVED",
+              "COLLABORATOR_UNAVAILABLE",
+              "MEMBERSHIP_REVOKED"
+            ],
+            "title": "End Reason Code",
+            "type": "string"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "expected_revision",
+          "end_reason_code"
+        ],
+        "title": "EndPatronCaseAssignmentRequest",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2293,6 +2345,90 @@
         "summary": "Report Unavailability",
         "tags": [
           "assignments"
+        ]
+      }
+    },
+    "/api/v1/patron/assignments/{assignment_id}/end": {
+      "post": {
+        "operationId": "end_case_assignment_api_v1_patron_assignments__assignment_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndPatronCaseAssignmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Rejeu idempotent de la commande patron déjà appliquée."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability patron insuffisante."
+          },
+          "404": {
+            "description": "Affaire ou affectation absente ou hors tenant : réponse neutre."
+          },
+          "409": {
+            "description": "Clé d’idempotence réutilisée ou conflit de révision détecté."
+          },
+          "422": {
+            "description": "Validation de requête ou invariant métier refusé."
+          }
+        },
+        "summary": "End Case Assignment",
+        "tags": [
+          "patron-assignments"
         ]
       }
     },

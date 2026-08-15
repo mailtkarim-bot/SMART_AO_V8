@@ -14,6 +14,7 @@ from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.commands import (
     AmendCaseAssignmentScopeCommand,
     CreateCaseAssignmentCommand,
+    EndCaseAssignmentCommand,
     ReactivateCaseAssignmentCommand,
     SuspendCaseAssignmentCommand,
 )
@@ -178,6 +179,39 @@ class PatronAssignmentManagementService:
         *,
         actor: ActorContext,
         command: ReactivateCaseAssignmentCommand,
+        now: datetime,
+    ) -> DispatchResult:
+        self._require_patron(
+            actor=actor,
+            command=command,
+            now=now,
+            resource_type="CASE_ASSIGNMENT",
+            resource_id=command.assignment_id,
+            case_id=None,
+        )
+        assignment = self._resolve_assignment(
+            tenant_id=actor.tenant_id,
+            assignment_id=command.assignment_id,
+        )
+        if assignment is None:
+            self._record_manual_denial(
+                actor=actor,
+                command=command,
+                now=now,
+                reason_code="NOT_FOUND_OR_FORBIDDEN",
+                resource_type="CASE_ASSIGNMENT",
+                resource_id=command.assignment_id,
+                case_id=None,
+            )
+            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+        self._authorize_assignment_management(actor=actor, assignment=assignment, now=now)
+        return self._dispatch(actor=actor, command=command, case_id=assignment.case_id, now=now)
+
+    def end(
+        self,
+        *,
+        actor: ActorContext,
+        command: EndCaseAssignmentCommand,
         now: datetime,
     ) -> DispatchResult:
         self._require_patron(
@@ -389,6 +423,8 @@ class PatronAssignmentManagementHandler:
             return self._suspend(session=session, command=command, context=context)
         if command.command_type == "ReactivateCaseAssignment":
             return self._reactivate(session=session, command=command, context=context)
+        if command.command_type == "EndCaseAssignment":
+            return self._end(session=session, command=command, context=context)
         raise CommandExecutionError(
             f"unsupported patron assignment command: {command.command_type}"
         )
@@ -761,6 +797,80 @@ class PatronAssignmentManagementHandler:
             ),
         )
 
+    @staticmethod
+    def _end(
+        *,
+        session: Session,
+        command: EndCaseAssignmentCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        assignment = session.scalar(
+            sa.select(CaseAssignmentRecord)
+            .where(
+                CaseAssignmentRecord.tenant_id == context.tenant_id,
+                CaseAssignmentRecord.id == command.assignment_id,
+            )
+            .with_for_update()
+        )
+        if assignment is None:
+            raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
+        if assignment.state not in {"ACTIVE", "SUSPENDED"}:
+            raise CommandExecutionError("ASSIGNMENT_NOT_OPEN")
+        if assignment.aggregate_revision != command.expected_revision:
+            raise CommandExecutionError("VERSION_CONFLICT")
+        if context.case_id is not None and context.case_id != assignment.case_id:
+            raise CommandExecutionError("CASE_CONTEXT_MISMATCH")
+
+        previous_state = assignment.state
+        revision = assignment.aggregate_revision + 1
+        scope_actions = list(assignment.scope_actions_json)
+        scope_classifications = list(assignment.scope_classifications_json)
+        assignment.state = "ENDED"
+        assignment.ended_at = context.received_at
+        assignment.aggregate_revision = revision
+        session.add(
+            CaseAssignmentChangeEventRecord(
+                id=uuid4(),
+                tenant_id=context.tenant_id,
+                assignment_id=assignment.id,
+                case_id=assignment.case_id,
+                target_membership_id=assignment.membership_id,
+                author_membership_id=context.membership_id,
+                event_type="ASSIGNMENT_ENDED",
+                previous_revision=revision - 1,
+                resulting_revision=revision,
+                previous_state=previous_state,
+                resulting_state="ENDED",
+                reason_code=command.end_reason_code,
+                previous_scope_actions_json=scope_actions,
+                previous_scope_classifications_json=scope_classifications,
+                resulting_scope_actions_json=scope_actions,
+                resulting_scope_classifications_json=scope_classifications,
+                command_id=command.command_id,
+                correlation_id=command.correlation_id,
+            )
+        )
+        return HandlerOutcome(
+            result_code="CASE_ASSIGNMENT_ENDED",
+            aggregate_refs=(_aggregate_ref(assignment=assignment, revision=revision),),
+            events=(
+                PendingDomainEvent(
+                    aggregate_type="Assignment",
+                    aggregate_id=assignment.id,
+                    aggregate_revision=revision,
+                    event_type="CaseAssignmentEnded",
+                    payload={
+                        "assignment_id": str(assignment.id),
+                        "case_id": str(assignment.case_id),
+                        "previous_revision": revision - 1,
+                        "resulting_revision": revision,
+                        "previous_state": previous_state,
+                        "end_reason_code": command.end_reason_code,
+                    },
+                ),
+            ),
+        )
+
 
 def _change_event_for_creation(
     *,
@@ -817,4 +927,5 @@ def patron_assignment_handlers() -> dict[str, PatronAssignmentManagementHandler]
         "AmendCaseAssignmentScope": handler,
         "SuspendCaseAssignment": handler,
         "ReactivateCaseAssignment": handler,
+        "EndCaseAssignment": handler,
     }

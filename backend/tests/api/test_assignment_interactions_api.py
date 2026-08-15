@@ -321,6 +321,20 @@ def _patron_create_payload(target_membership_id: UUID) -> dict[str, str | int | 
     }
 
 
+def _patron_end_payload(
+    *,
+    expected_revision: int = 0,
+    end_reason_code: str = "PATRON_ENDED",
+) -> dict[str, str | int]:
+    return {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "expected_revision": expected_revision,
+        "end_reason_code": end_reason_code,
+    }
+
+
 @pytest.mark.api
 @pytest.mark.db
 @pytest.mark.security
@@ -1084,6 +1098,155 @@ def test_patron_assignment_reactivation_requires_closed_reason(
             "expected_revision": 1,
             "reactivation_reason_code": "PRICING_REVIEWED",
         },
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_end_returns_closed_receipt_and_replays(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(database_engine, role="PATRON_ADMIN")
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    creation_payload = _patron_create_payload(target_membership_id)
+    creation = client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+    assignment_id = UUID(creation_payload["assignment_id"])
+    end_payload = _patron_end_payload(end_reason_code="CASE_ARCHIVED")
+
+    ending = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/end",
+        json=end_payload,
+        headers=headers,
+    )
+    replay = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/end",
+        json=end_payload,
+        headers=headers,
+    )
+
+    assert creation.status_code == 201
+    assert ending.status_code == 201
+    assert replay.status_code == 200
+    assert ending.json()["result_code"] == "CASE_ASSIGNMENT_ENDED"
+    assert replay.json()["replayed"] is True
+    prohibited = {"tenant_id", "target_membership_id", "end_reason_code", "ended_at"}
+    assert not prohibited.intersection(ending.json())
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_end_rejects_non_patron_and_foreign_resource_neutrally(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(database_engine)
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        scope_actions=["case.dce.read"],
+    )
+    client, tokens = _client(session_factory)
+    payload = _patron_end_payload()
+
+    forbidden = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/end",
+        json=payload,
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert forbidden.status_code == 403
+    assert forbidden.json() == {"detail": "FORBIDDEN"}
+
+    patron_tenant, patron_identity_id, _, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    del patron_tenant
+    neutral = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/end",
+        json=_patron_end_payload(),
+        headers=_headers(
+            tokens,
+            identity_id=patron_identity_id,
+            session_id=patron_session_id,
+        ),
+    )
+
+    assert neutral.status_code == 404
+    assert neutral.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_end_maps_stale_revision_to_conflict(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(database_engine, role="PATRON_ADMIN")
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    creation_payload = _patron_create_payload(target_membership_id)
+    client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+
+    response = client.post(
+        f"/api/v1/patron/assignments/{creation_payload['assignment_id']}/end",
+        json=_patron_end_payload(expected_revision=1),
+        headers=headers,
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "VERSION_CONFLICT"}
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_end_requires_closed_reason(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(database_engine, role="PATRON_ADMIN")
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    creation_payload = _patron_create_payload(target_membership_id)
+    client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+
+    response = client.post(
+        f"/api/v1/patron/assignments/{creation_payload['assignment_id']}/end",
+        json=_patron_end_payload(end_reason_code="PRICING_APPROVED"),
         headers=headers,
     )
 

@@ -83,4 +83,19 @@
 - [x] Écrire les tests PostgreSQL et API de réactivation : révision, rejeu, état, motif, fenêtre, tenant, rôle, journal et absence de fuite.
 - [x] Mesurer le chemin append-only de réactivation avec un seuil local de non-régression et confirmer le cycle Alembic jusqu’à la tête `0023`.
 - [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de réactivation (commit `ca740c6`, workflow `31850271931` vert).
+- [ ] Auditer les états `ACTIVE` et `SUSPENDED`, le journal append-only, le catalogue de motifs, les routes patron et les conventions de fin applicables à `EndCaseAssignment`.
+- [ ] Figer le contrat normatif `PATRON-ASSIGNMENT-END-01` : états admis, motifs fermés, transition irréversible, ReBAC, audit, idempotence, non-fuites et migration éventuelle.
+- [ ] Régénérer et vérifier le snapshot OpenAPI Assignment ; constater explicitement si la route `POST /api/v1/patron/assignments/{assignment_id}/end` n’est pas encore exposée.
+- [ ] Lancer la suite backend de référence et consigner que la route de fin ne peut être testée fonctionnellement qu’après l’implémentation issue du contrat figé.
 - [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub de l’incrément patron 2 (commit `5054416`, workflow `31844799829` vert).
+- [x] Auditer les états `ACTIVE` et `SUSPENDED`, le journal append-only, le catalogue de motifs, les routes patron et les conventions de fin applicables à `EndCaseAssignment`.
+- [x] Figer le contrat normatif `PATRON-ASSIGNMENT-END-01` : états admis, motifs fermés, transition irréversible, ReBAC, audit, idempotence, non-fuites et migration éventuelle.
+- [x] Régénérer et vérifier le snapshot OpenAPI Assignment ; constater explicitement que la route `POST /api/v1/patron/assignments/{assignment_id}/end` n’était pas exposée avant implémentation.
+- [x] Lancer la suite backend de référence et consigner que la route de fin ne pouvait être testée fonctionnellement qu’après l’implémentation issue du contrat figé.
+- [x] Ajouter `EndCaseAssignmentCommand`, son motif fermé et son branchement dans le dispatcher patron.
+- [x] Implémenter le handler transactionnel `EndCaseAssignment` avec verrouillage, contrôle de révision, mutation irréversible, journal `ASSIGNMENT_ENDED`, événement/outbox et receipt idempotent.
+- [x] Ajouter le DTO HTTP fermé et `POST /api/v1/patron/assignments/{assignment_id}/end` sur le runtime bearer réel.
+- [x] Écrire les scénarios PostgreSQL de fin depuis `ACTIVE` et `SUSPENDED`, rejeu, états non terminables, conflit de révision et immutabilité du journal.
+- [x] Écrire les scénarios API couvrant `201`, `200`, `403`, `404`, `409`, `422` et l’absence de fuite de motif ou de données protégées.
+- [x] Étendre le benchmark append-only à `ASSIGNMENT_ENDED`, régénérer l’OpenAPI à neuf opérations et mettre à jour le registre Markdown.
+- [ ] Valider Ruff, pytest, Alembic, scan de secrets, diff, CI GitHub puis publier le slice et l’état durable.
