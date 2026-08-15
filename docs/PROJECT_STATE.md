@@ -3,6 +3,8 @@
 ## Slice courant
 `FINANCIAL-REPORT-PUBLICATION-01` — publié par [`13bc1b2`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/13bc1b2) et validé par la CI GitHub [`31892759666`](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31892759666). La frontière ouvre exclusivement `POST /api/v1/patron/cases/{case_id}/financial-reports/{report_id}/publications` pour basculer un snapshot patron `DRAFT` en `PUBLISHED` sous verrou transactionnel, sans exposer de montant dans le receipt.
 
+> **Vue propriétaire :** lire d’abord [`PROJECT_PROGRESS_REPORT.md`](PROJECT_PROGRESS_REPORT.md) pour la photographie métier globale, les capacités réellement livrées, les limites actuelles et l’ordre de travail recommandé. Lire ensuite ce fichier pour reprendre l’exécution technique d’un slice.
+
 ## Dernier état vert
 
 | Élément | État |

@@ -149,3 +149,5 @@
 - [ ] Vérifier que le handler publie atomiquement, incrémente la révision et ne retourne aucun montant financier dans le receipt.
 - [ ] Afficher uniquement après vérification le code source final de la route POST et du handler SQLAlchemy de publication.
 - [x] Mettre à jour les notes de présentation avec le chemin de contrôle `PATRON_ADMIN → publication → registre immutable`.
+- [x] Produire un rapport global V8 distinguant précisément les capacités publiées, les frontières prêtes mais non démarrées et les dépendances VPS.
+- [ ] Figer la prochaine frontière prioritaire après revue globale : création contrôlée de snapshots financiers `DRAFT` ou cockpit patron web.
