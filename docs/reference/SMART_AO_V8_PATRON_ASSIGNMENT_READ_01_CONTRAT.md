@@ -1,6 +1,6 @@
 # SMART_AO V8 — PATRON-ASSIGNMENT-READ-01 — Contrat normatif
 
-**Statut : implémenté localement, publication en attente de CI GitHub.**
+**Statut : publié par `6df4c55`, CI `31855776751` verte.**
 
 Ce contrat ouvre la première lecture patron des affectations collaborateur et de leur journal de gestion append-only. Il succède à `PATRON-ASSIGNMENT-END-01` et n’ajoute aucune commande, aucune mutation, aucune décision, aucun chiffrage, aucune notification et aucune automatisation métier.
 
@@ -98,4 +98,4 @@ Après implémentation, l’OpenAPI Assignment/patron passe de neuf à **onze op
 | Alembic | `upgrade head`, `alembic check`, `downgrade base`, sans migration nouvelle. |
 | OpenAPI | Snapshot régénéré à onze opérations et registre Markdown détaillé. |
 
-Le slice est prêt à être publié après Ruff, tests query/API PostgreSQL, suite backend complète, cycle Alembic, scan de secrets, `git diff --check` et OpenAPI régénérée. La CI GitHub verte reste la condition de clôture.
+Le slice est publié après Ruff, tests query/API PostgreSQL, suite backend complète, cycle Alembic, scan de secrets, `git diff --check`, OpenAPI régénérée et CI GitHub verte.

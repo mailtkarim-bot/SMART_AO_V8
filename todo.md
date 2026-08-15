@@ -104,4 +104,4 @@
 - [x] Définir les DTO Pydantic fermés et implémenter le lecteur applicatif tenant-scopé des affectations et de leurs journaux patron.
 - [x] Exposer les routes de lecture patron avec bearer réel, capability auditée, projection fermée et OpenAPI détaillée.
 - [x] Écrire les tests d’intégration PostgreSQL/API : liste, détail, journal, tri, borne, `401`, `403`, `404`, `422`, tenant et absence de fuite financière ou sensible.
-- [ ] Régénérer le snapshot OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub.
+- [x] Régénérer le snapshot OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub (commit `6df4c55`, workflow `31855776751` vert).
