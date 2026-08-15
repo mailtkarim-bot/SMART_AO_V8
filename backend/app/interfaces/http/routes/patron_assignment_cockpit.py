@@ -17,11 +17,18 @@ from app.modules.membership.application.patron_assignment_cockpit import (
 from app.modules.membership.public.contracts import (
     PatronAssignmentCockpitItemResponse,
     PatronAssignmentCockpitListResponse,
+    PatronAssignmentInteractionItemResponse,
+    PatronAssignmentInteractionsResponse,
     PatronAssignmentJournalItemResponse,
     PatronAssignmentJournalResponse,
 )
 
 PatronAssignmentState = Literal["ACTIVE", "SUSPENDED", "ENDED", "EXPIRED"]
+PatronAssignmentInteractionKind = Literal[
+    "ACKNOWLEDGEMENT",
+    "CLARIFICATION_REQUEST",
+    "UNAVAILABILITY_REPORT",
+]
 
 _PATRON_ASSIGNMENT_COCKPIT_ERROR_RESPONSES = {
     status.HTTP_401_UNAUTHORIZED: {"description": "Bearer absent, invalide ou expiré."},
@@ -110,6 +117,49 @@ def build_patron_assignment_cockpit_router(
         return PatronAssignmentJournalResponse(
             assignment=PatronAssignmentCockpitItemResponse(**asdict(lookup.assignment)),
             items=[PatronAssignmentJournalItemResponse(**asdict(item)) for item in lookup.items],
+        )
+
+    @router.get(
+        "/assignments/{assignment_id}/interactions",
+        response_model=PatronAssignmentInteractionsResponse,
+        responses=_PATRON_ASSIGNMENT_COCKPIT_ERROR_RESPONSES,
+    )
+    def get_patron_assignment_interactions(
+        assignment_id: UUID,
+        kind: Annotated[PatronAssignmentInteractionKind | None, Query()] = None,
+        limit: Annotated[int, Query(ge=1, le=200)] = 100,
+        authorization: str | None = Header(default=None),
+    ) -> PatronAssignmentInteractionsResponse:
+        context = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        try:
+            lookup = service.get_interactions(
+                actor=context,
+                assignment_id=assignment_id,
+                kind=kind,
+                limit=limit,
+                now=datetime.now(tz=UTC),
+            )
+        except PermissionError as error:
+            if str(error) == "NOT_FOUND_OR_FORBIDDEN":
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="NOT_FOUND_OR_FORBIDDEN",
+                ) from error
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="FORBIDDEN",
+            ) from error
+        return PatronAssignmentInteractionsResponse(
+            assignment_id=lookup.assignment_id,
+            case_id=lookup.case_id,
+            case_lifecycle=lookup.case_lifecycle,
+            items=[
+                PatronAssignmentInteractionItemResponse(**asdict(item))
+                for item in lookup.items
+            ],
         )
 
     return router

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.membership.application.queries import (
     PatronAssignmentCockpitItemProjection,
+    PatronAssignmentInteractionsLookup,
     PatronAssignmentJournalLookup,
 )
 from app.modules.membership.infrastructure.patron_assignment_cockpit_reader import (
@@ -111,6 +112,48 @@ class PatronAssignmentCockpitService:
             resource_type="CASE_ASSIGNMENT_JOURNAL",
             resource_id=assignment_id,
             case_id=lookup.assignment.case_id,
+            now=now,
+        )
+        return lookup
+
+    def get_interactions(
+        self,
+        *,
+        actor: ActorContext,
+        assignment_id: UUID,
+        kind: str | None,
+        limit: int,
+        now: datetime,
+    ) -> PatronAssignmentInteractionsLookup:
+        self._require_patron(
+            actor=actor,
+            resource_type="CASE_ASSIGNMENT_INTERACTIONS",
+            resource_id=assignment_id,
+            case_id=None,
+            now=now,
+        )
+        with self._session_factory() as session:
+            lookup = SqlAlchemyPatronAssignmentCockpitReader(session).get_interactions(
+                tenant_id=actor.tenant_id,
+                assignment_id=assignment_id,
+                kind=kind,
+                limit=limit,
+            )
+        if lookup is None:
+            self._record_manual_denial(
+                actor=actor,
+                resource_type="CASE_ASSIGNMENT_INTERACTIONS",
+                resource_id=assignment_id,
+                case_id=None,
+                now=now,
+                reason_code="NOT_FOUND_OR_FORBIDDEN",
+            )
+            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+        self._authorize(
+            actor=actor,
+            resource_type="CASE_ASSIGNMENT_INTERACTIONS",
+            resource_id=assignment_id,
+            case_id=lookup.case_id,
             now=now,
         )
         return lookup

@@ -9,11 +9,19 @@ from sqlalchemy.orm import Session
 
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.membership.application.queries import (
+    AssignmentHistoryItemProjection,
     PatronAssignmentCockpitItemProjection,
+    PatronAssignmentInteractionsLookup,
     PatronAssignmentJournalItemProjection,
     PatronAssignmentJournalLookup,
 )
-from app.platform.security.models import CaseAssignmentChangeEventRecord, CaseAssignmentRecord
+from app.platform.security.models import (
+    AssignmentClarificationRequestRecord,
+    CaseAssignmentAcknowledgementRecord,
+    CaseAssignmentChangeEventRecord,
+    CaseAssignmentRecord,
+    CaseAssignmentUnavailabilityRecord,
+)
 
 
 class SqlAlchemyPatronAssignmentCockpitReader:
@@ -106,6 +114,127 @@ class SqlAlchemyPatronAssignmentCockpitReader:
                 )
                 for row in rows
             ),
+        )
+
+    def get_interactions(
+        self,
+        *,
+        tenant_id: UUID,
+        assignment_id: UUID,
+        kind: str | None,
+        limit: int,
+    ) -> PatronAssignmentInteractionsLookup | None:
+        assignment = self._session.execute(
+            sa.select(
+                CaseAssignmentRecord.id,
+                CaseAssignmentRecord.case_id,
+                CaseRecord.lifecycle,
+            )
+            .join(
+                CaseRecord,
+                sa.and_(
+                    CaseRecord.tenant_id == CaseAssignmentRecord.tenant_id,
+                    CaseRecord.id == CaseAssignmentRecord.case_id,
+                ),
+            )
+            .where(
+                CaseAssignmentRecord.tenant_id == tenant_id,
+                CaseAssignmentRecord.id == assignment_id,
+            )
+        ).one_or_none()
+        if assignment is None:
+            return None
+        interactions = sa.union_all(
+            self._acknowledgements_statement(tenant_id=tenant_id, assignment_id=assignment_id),
+            self._clarifications_statement(tenant_id=tenant_id, assignment_id=assignment_id),
+            self._unavailabilities_statement(tenant_id=tenant_id, assignment_id=assignment_id),
+        ).subquery()
+        statement = sa.select(interactions)
+        if kind is not None:
+            statement = statement.where(interactions.c.kind == kind)
+        rows = self._session.execute(
+            statement.order_by(
+                interactions.c.recorded_at.desc(),
+                interactions.c.record_id.asc(),
+            ).limit(limit)
+        ).all()
+        return PatronAssignmentInteractionsLookup(
+            assignment_id=assignment.id,
+            case_id=assignment.case_id,
+            case_lifecycle=assignment.lifecycle,
+            items=tuple(
+                AssignmentHistoryItemProjection(
+                    record_id=row.record_id,
+                    kind=row.kind,
+                    recorded_at=row.recorded_at,
+                    assignment_revision=row.assignment_revision,
+                    operational_state=row.operational_state,
+                    clarification_kind=row.clarification_kind,
+                    priority=row.priority,
+                    reason_kind=row.reason_kind,
+                    unavailable_from=row.unavailable_from,
+                    unavailable_until=row.unavailable_until,
+                    known_deadline_impact=row.known_deadline_impact,
+                )
+                for row in rows
+            ),
+        )
+
+    @staticmethod
+    def _acknowledgements_statement(*, tenant_id: UUID, assignment_id: UUID):
+        return sa.select(
+            CaseAssignmentAcknowledgementRecord.id.label("record_id"),
+            CaseAssignmentAcknowledgementRecord.created_at.label("recorded_at"),
+            sa.literal("ACKNOWLEDGEMENT").label("kind"),
+            CaseAssignmentAcknowledgementRecord.assignment_revision,
+            sa.literal("RECORDED").label("operational_state"),
+            sa.cast(sa.null(), sa.String()).label("clarification_kind"),
+            sa.cast(sa.null(), sa.String()).label("priority"),
+            sa.cast(sa.null(), sa.String()).label("reason_kind"),
+            sa.cast(sa.null(), sa.DateTime(timezone=True)).label("unavailable_from"),
+            sa.cast(sa.null(), sa.DateTime(timezone=True)).label("unavailable_until"),
+            sa.cast(sa.null(), sa.Boolean()).label("known_deadline_impact"),
+        ).where(
+            CaseAssignmentAcknowledgementRecord.tenant_id == tenant_id,
+            CaseAssignmentAcknowledgementRecord.assignment_id == assignment_id,
+        )
+
+    @staticmethod
+    def _clarifications_statement(*, tenant_id: UUID, assignment_id: UUID):
+        return sa.select(
+            AssignmentClarificationRequestRecord.id.label("record_id"),
+            AssignmentClarificationRequestRecord.created_at.label("recorded_at"),
+            sa.literal("CLARIFICATION_REQUEST").label("kind"),
+            sa.cast(sa.null(), sa.Integer()).label("assignment_revision"),
+            AssignmentClarificationRequestRecord.state.label("operational_state"),
+            AssignmentClarificationRequestRecord.clarification_kind,
+            AssignmentClarificationRequestRecord.priority,
+            sa.cast(sa.null(), sa.String()).label("reason_kind"),
+            sa.cast(sa.null(), sa.DateTime(timezone=True)).label("unavailable_from"),
+            sa.cast(sa.null(), sa.DateTime(timezone=True)).label("unavailable_until"),
+            sa.cast(sa.null(), sa.Boolean()).label("known_deadline_impact"),
+        ).where(
+            AssignmentClarificationRequestRecord.tenant_id == tenant_id,
+            AssignmentClarificationRequestRecord.assignment_id == assignment_id,
+        )
+
+    @staticmethod
+    def _unavailabilities_statement(*, tenant_id: UUID, assignment_id: UUID):
+        return sa.select(
+            CaseAssignmentUnavailabilityRecord.id.label("record_id"),
+            CaseAssignmentUnavailabilityRecord.created_at.label("recorded_at"),
+            sa.literal("UNAVAILABILITY_REPORT").label("kind"),
+            CaseAssignmentUnavailabilityRecord.assignment_revision,
+            sa.literal("RECORDED").label("operational_state"),
+            sa.cast(sa.null(), sa.String()).label("clarification_kind"),
+            sa.cast(sa.null(), sa.String()).label("priority"),
+            CaseAssignmentUnavailabilityRecord.reason_kind,
+            CaseAssignmentUnavailabilityRecord.unavailable_from,
+            CaseAssignmentUnavailabilityRecord.unavailable_until,
+            CaseAssignmentUnavailabilityRecord.known_deadline_impact,
+        ).where(
+            CaseAssignmentUnavailabilityRecord.tenant_id == tenant_id,
+            CaseAssignmentUnavailabilityRecord.assignment_id == assignment_id,
         )
 
     @staticmethod

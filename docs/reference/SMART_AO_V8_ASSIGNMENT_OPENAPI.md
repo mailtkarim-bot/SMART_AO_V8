@@ -2,7 +2,7 @@
 
 **Statut :** référence générée et vérifiée.
 
-**Périmètre :** les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01` et les deux lectures `PATRON-ASSIGNMENT-READ-01`.
+**Périmètre :** les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01`, les deux lectures `PATRON-ASSIGNMENT-READ-01` et la lecture `PATRON-ASSIGNMENT-INTERACTIONS-READ-01`.
 **Source de vérité exécutable :** `scripts/export_assignment_openapi.py`, qui produit le snapshot [`SMART_AO_V8_ASSIGNMENT_OPENAPI.json`](SMART_AO_V8_ASSIGNMENT_OPENAPI.json) depuis `create_app()` et ses dépendances SEC-01 réelles.
 
 Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et `/api/v1/patron`. Elles résolvent toujours l’acteur depuis le bearer serveur : aucun tenant, membership d’auteur, scope d’autorité, acteur ou contexte de test n’est accepté depuis le corps client.
@@ -20,6 +20,7 @@ Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et 
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/end` | `assignment.manage`, `PATRON_ADMIN` | Fin révisionnée et irréversible d’une affectation ouverte. |
 | `GET` | `/api/v1/patron/assignments?case_id?&state?&limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Liste tenant-scopée, fermée et bornée des affectations d’autorité. |
 | `GET` | `/api/v1/patron/assignments/{assignment_id}/journal?limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Journal patron append-only fermé, tenant-scopé et borné. |
+| `GET` | `/api/v1/patron/assignments/{assignment_id}/interactions?kind?&limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Interactions collaborateur fermées, tenant-scopées et bornées. |
 
 ## Conventions transverses
 
@@ -69,14 +70,17 @@ La fin n’accepte que `PATRON_ENDED`, `CASE_STOPPED`, `CASE_ARCHIVED`, `COLLABO
 
 ## Lectures du cockpit patron
 
-Les deux lectures sont réservées au `PATRON_ADMIN` disposant de `assignment.manage`, avec bearer résolu côté serveur. Elles ne renvoient ni prix, ni marge, ni devis, ni identité cible, ni membership, ni auteur, ni audit, ni commande, ni corrélation, ni texte libre de collaborateur.
+Les trois lectures sont réservées au `PATRON_ADMIN` disposant de `assignment.manage`, avec bearer résolu côté serveur. Elles ne renvoient ni prix, ni marge, ni devis, ni identité cible, ni membership, ni auteur, ni audit, ni commande, ni corrélation, ni texte libre de collaborateur.
 
 | Opération | Paramètres | Réponse `200` | Erreurs publiques |
 |---|---|---|---|
 | `GET /api/v1/patron/assignments` | `case_id?`, `state? = ACTIVE|SUSPENDED|ENDED|EXPIRED`, `limit = 1..200` (100 par défaut). | `PatronAssignmentCockpitListResponse` : lignes avec affaire, état, révision, fenêtre, fin et scope opérationnel fermé. Tri : `case_title ASC`, `assignment_id ASC`. | `401`, `403`, `422`. Une liste sans résultat retourne `items: []`. |
 | `GET /api/v1/patron/assignments/{assignment_id}/journal` | `limit = 1..200` (100 par défaut). | `PatronAssignmentJournalResponse` : en-tête fermé d’affectation et changements `ASSIGNMENT_CREATED`, `ASSIGNMENT_SCOPE_AMENDED`, `ASSIGNMENT_SUSPENDED`, `ASSIGNMENT_REACTIVATED`, `ASSIGNMENT_ENDED`, triés par date décroissante puis ID. | `401`, `403`, `404 NOT_FOUND_OR_FORBIDDEN`, `422`. |
+| `GET /api/v1/patron/assignments/{assignment_id}/interactions` | `kind? = ACKNOWLEDGEMENT|CLARIFICATION_REQUEST|UNAVAILABILITY_REPORT`, `limit = 1..200` (100 par défaut). | `PatronAssignmentInteractionsResponse` : accusés, catégories/priorités de clarification et périodes/motifs fermés d’indisponibilité, triés par date décroissante puis ID. | `401`, `403`, `404 NOT_FOUND_OR_FORBIDDEN`, `422`. |
 
 Le journal expose les états, révisions, motifs fermés et manifests de scope précédents/résultants nécessaires à la direction. Il exclut l’auteur, la cible, les IDs de commande/corrélation, les clés d’idempotence, les données d’audit et tout texte libre. Ces lectures n’écrivent aucun receipt, événement ou outbox.
+
+La lecture des interactions ne reprend jamais la note d’accusé, le sujet, la question, le périmètre demandé, la raison ou la note d’impact. Elle ne donne ni identité, ni membership, ni auteur, ni métadonnée de commande. Le patron lit exclusivement les signaux structurés nécessaires au suivi opérationnel ; un collaborateur standard est refusé avec `403 FORBIDDEN` et ce refus est audité.
 
 ## Lecture fermée d’historique
 
@@ -101,4 +105,4 @@ Le snapshot doit être régénéré dès qu’une route, un DTO ou un code publi
 uv run python scripts/export_assignment_openapi.py
 ```
 
-La validation du slice comprend le contrôle Ruff du script, la régénération du JSON et le harnais API `test_assignment_interactions_api.py`. Celui-ci couvre notamment la liste vide, les trois types d’historique, la borne globale, le refus ReBAC audité, la neutralité inter-tenant, l’absence de bearer, l’absence de champs sensibles dans la projection, ainsi que les receipts, rejeux, motifs fermés, fenêtres de réactivation, fin irréversible et lectures fermées du cockpit patron.
+La validation du slice comprend le contrôle Ruff du script, la régénération du JSON et le harnais API `test_assignment_interactions_api.py`. Celui-ci couvre notamment la liste vide, les trois types d’historique, la borne globale, le refus ReBAC audité, la neutralité inter-tenant, l’absence de bearer, l’absence de champs sensibles dans la projection, ainsi que les receipts, rejeux, motifs fermés, fenêtres de réactivation, fin irréversible, lecture des interactions patron et refus d’un collaborateur standard.

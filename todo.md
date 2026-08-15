@@ -105,3 +105,9 @@
 - [x] Exposer les routes de lecture patron avec bearer réel, capability auditée, projection fermée et OpenAPI détaillée.
 - [x] Écrire les tests d’intégration PostgreSQL/API : liste, détail, journal, tri, borne, `401`, `403`, `404`, `422`, tenant et absence de fuite financière ou sensible.
 - [x] Régénérer le snapshot OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub (commit `6df4c55`, workflow `31855776751` vert).
+- [x] Auditer les trois registres d’interactions collaborateur, leurs projections actuelles, les règles ReBAC et les exclusions de texte libre sensible.
+- [x] Figer le contrat normatif de lecture patron des interactions : routes, projections fermées, ordre, borne, rôles, neutralité et OpenAPI attendue.
+- [x] Ajouter les DTO Pydantic fermés et le lecteur tenant-scopé des accusés, demandes de clarification et indisponibilités utiles au patron.
+- [x] Exposer les routes de lecture patron et vérifier le refus explicite d’un collaborateur standard, sans contourner le bearer réel.
+- [x] Écrire les tests d’intégration patron/collaborateur : liste, filtres, ordre, borne, `200`, `401`, `403`, `404`, `422`, tenant et non-fuites.
+- [ ] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub.

@@ -91,6 +91,16 @@ class PatronAssignmentJournalLookup:
     items: tuple[PatronAssignmentJournalItemProjection, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class PatronAssignmentInteractionsLookup:
+    """One tenant-scoped assignment and its bounded closed collaborator interaction facts."""
+
+    assignment_id: UUID
+    case_id: UUID
+    case_lifecycle: str
+    items: tuple[AssignmentHistoryItemProjection, ...]
+
+
 class PatronAssignmentCockpitReader(Protocol):
     """Read only tenant-owned assignment cockpit projections for a patron."""
 

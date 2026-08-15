@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`PATRON-ASSIGNMENT-READ-01` — publié par [`6df4c55`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/6df4c55) et validé par CI `31855776751`. Le slice ajoute la liste patron tenant-scopée des affectations et la lecture bornée de leur journal append-only, via bearer réel et capability `assignment.manage`, sans donnée financière, identité, texte libre ni audit exposé.
+`PATRON-ASSIGNMENT-INTERACTIONS-READ-01` — implémenté et validé localement, publication GitHub en attente. Le slice ajoute la lecture patron bornée des accusés de réception, demandes de clarification et indisponibilités collaborateur, via bearer réel et capability `assignment.manage`, sans texte libre, identité, audit ni donnée financière exposés.
 
 ## Dernier état vert
 
@@ -12,7 +12,7 @@
 | Commit précédent | DCE-CLASSIFICATION-01 publié sur `main` : [`e099f2a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e099f2a), contrat normatif, migration `0015`, classifieur déterministe, registre append-only, projection courante historisée et tests dédiés. |
 | Migration Alembic | `20260814_0020` ajoutée pour la révision Assignment et les trois historiques collaborateur ; upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` validés sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
-| Validation locale courante | `git diff --check`, Ruff, cycle Alembic `upgrade head` / `check` / `downgrade base` jusqu’à `20260814_0023` et export OpenAPI à onze opérations sont verts. Le harnais API couvre la liste et le journal patron, les filtres, bornes, refus, neutralité inter-tenant et non-fuites ; `uv run pytest backend/tests -q` : **300 tests verts**. Les 4 avertissements restants sont des dépréciations tierces FastAPI/TestClient déjà connus. |
+| Validation locale courante | `git diff --check`, Ruff, cycle Alembic `upgrade head` / `check` / `downgrade base` jusqu’à `20260814_0023` et export OpenAPI à douze opérations sont verts. Le harnais API couvre la liste et le journal patron, les filtres, bornes, refus, neutralité inter-tenant, interactions collaborateur et non-fuites ; `uv run pytest backend/tests -q` : **303 tests verts**. Les 4 avertissements restants sont des dépréciations tierces FastAPI/TestClient déjà connus. |
 | CI | Le workflow [#31855776751](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31855776751) du commit `6df4c55` est **vert**. Lint, secrets scan, audit dépendances, SAST, smoke tests et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore. |
 
 ## Ce qui est terminé
@@ -74,6 +74,8 @@
 - `PATRON-ASSIGNMENT-END-01` publié par `a3fa73a` et validé par CI `31853564951` : `EndCaseAssignmentCommand` ferme l’affectation depuis `ACTIVE` ou `SUSPENDED` avec cinq motifs fermés. Le handler verrouille l’agrégat, contrôle la révision, renseigne `state = ENDED` et `ended_at` côté serveur, conserve Case/cible/scope/fenêtre, puis écrit atomiquement `ASSIGNMENT_ENDED`, `CaseAssignmentEnded`, l’outbox et le receipt. Il n’exige pas que la Case, la cible ou la fenêtre soient encore actives, afin de retirer une autorisation résiduelle. `POST /api/v1/patron/assignments/{assignment_id}/end` utilise le bearer réel, `assignment.manage` auditée et un DTO fermé ; le receipt masque le motif. L’OpenAPI contient neuf opérations. Les tests couvrent `201`, `200`, `403`, `404`, `409`, `422`, les transitions, l’immutabilité du journal et le benchmark de 1 000 fins. Aucune migration `0024` n’est nécessaire : `0021` couvre déjà l’événement et les motifs, et la tête reste `0023`.
 
 - `PATRON-ASSIGNMENT-READ-01` publié par `6df4c55` et validé par CI `31855776751` : le contrat `SMART_AO_V8_PATRON_ASSIGNMENT_READ_01_CONTRAT.md` fixe deux routes GET patron, sans nouvelle migration : `GET /api/v1/patron/assignments?case_id?&state?&limit=1..200` et `GET /api/v1/patron/assignments/{assignment_id}/journal?limit=1..200`. La projection ferme tenant, identité cible, auteur, commandes, corrélation, audit, texte libre, documents et finance. La liste est triée par affaire puis affectation ; le journal est borné et trié par date décroissante puis ID. Les tests couvrent `200`, `401`, `403`, `404`, `422`, filtre, borne, neutralité et audit de refus. Le snapshot OpenAPI contient onze opérations. Aucune migration `0024` n’est nécessaire.
+
+- `PATRON-ASSIGNMENT-INTERACTIONS-READ-01` implémenté localement : le contrat `SMART_AO_V8_PATRON_ASSIGNMENT_INTERACTIONS_READ_01_CONTRAT.md` ouvre `GET /api/v1/patron/assignments/{assignment_id}/interactions?kind?&limit=1..200`, sans migration. La projection fusionne accusé, clarification et indisponibilité en ordre déterministe, puis ferme note, sujet, question, scope demandé, raison, note d’impact, identité, membership, commande, corrélation, audit, documents et finance. `PATRON_ADMIN` peut lire les signaux structurés ; le collaborateur standard reçoit `403` audité ; une affectation étrangère reste `404` neutre. Les tests couvrent `200`, `401`, `403`, `404`, `422`, filtre fermé, borne et non-fuite. L’OpenAPI compte douze opérations.
 
 ## Prochaine action unique
 

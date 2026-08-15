@@ -119,3 +119,45 @@ class PatronAssignmentJournalItemResponse(PublicResponseModel):
 class PatronAssignmentJournalResponse(PublicResponseModel):
     assignment: PatronAssignmentCockpitItemResponse
     items: list[PatronAssignmentJournalItemResponse]
+
+
+PatronAssignmentInteractionKind = Literal[
+    "ACKNOWLEDGEMENT",
+    "CLARIFICATION_REQUEST",
+    "UNAVAILABILITY_REPORT",
+]
+
+
+class PatronAssignmentInteractionItemResponse(PublicResponseModel):
+    record_id: UUID
+    kind: PatronAssignmentInteractionKind
+    recorded_at: datetime
+    assignment_revision: int | None = Field(default=None, ge=0)
+    operational_state: Literal["RECORDED", "OPEN"]
+    clarification_kind: Literal[
+        "SCOPE",
+        "PRIORITY",
+        "DEADLINE",
+        "DOCUMENT",
+        "RESPONSIBILITY",
+        "OTHER",
+    ] | None = None
+    priority: Literal["LOW", "NORMAL", "HIGH"] | None = None
+    reason_kind: Literal[
+        "SICKNESS",
+        "LEAVE",
+        "CAPACITY_CONFLICT",
+        "SKILL_GAP",
+        "ACCESS_PROBLEM",
+        "OTHER",
+    ] | None = None
+    unavailable_from: datetime | None = None
+    unavailable_until: datetime | None = None
+    known_deadline_impact: bool | None = None
+
+
+class PatronAssignmentInteractionsResponse(PublicResponseModel):
+    assignment_id: UUID
+    case_id: UUID
+    case_lifecycle: PatronCaseLifecycle
+    items: list[PatronAssignmentInteractionItemResponse]

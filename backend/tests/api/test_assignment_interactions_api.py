@@ -85,7 +85,10 @@ def _seed_principal(
     identity_id, membership_id, session_id = uuid4(), uuid4(), uuid4()
     with engine.begin() as connection:
         connection.execute(
-            sa.text("INSERT INTO tenants (id, slug, lifecycle) VALUES (:id, :slug, 'ACTIVE')"),
+            sa.text(
+                "INSERT INTO tenants (id, slug, lifecycle) VALUES (:id, :slug, 'ACTIVE') "
+                "ON CONFLICT (id) DO NOTHING"
+            ),
             {"id": tenant_id, "slug": f"tenant-{tenant_id.hex[:12]}"},
         )
         connection.execute(
@@ -1399,3 +1402,206 @@ def test_patron_assignment_cockpit_requires_bearer_and_valid_bounded_parameters(
     assert missing_bearer.status_code == 401
     assert invalid_limit.status_code == 422
     assert invalid_state.status_code == 422
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_reads_closed_collaborator_interactions_with_kind_filter(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, patron_identity_id, _, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    (
+        _,
+        collaborator_identity_id,
+        collaborator_membership_id,
+        collaborator_session_id,
+    ) = _seed_principal(
+        database_engine,
+        tenant_id=tenant_id,
+    )
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=collaborator_membership_id,
+        scope_actions=[
+            "assignment.acknowledge",
+            "assignment.clarify",
+            "assignment.unavailability",
+        ],
+    )
+    client, tokens = _client(session_factory)
+    collaborator_headers = _headers(
+        tokens,
+        identity_id=collaborator_identity_id,
+        session_id=collaborator_session_id,
+    )
+    patron_headers = _headers(
+        tokens,
+        identity_id=patron_identity_id,
+        session_id=patron_session_id,
+    )
+
+    acknowledgement = client.post(
+        f"/api/v1/assignments/{assignment_id}/acknowledgement",
+        json=_ack_payload(),
+        headers=collaborator_headers,
+    )
+    clarification = client.post(
+        f"/api/v1/assignments/{assignment_id}/clarification-requests",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "correlation_id": str(uuid4()),
+            "expected_revision": 1,
+            "clarification_kind": "DEADLINE",
+            "subject": "Date de remise",
+            "question": "La visite reste-t-elle obligatoire ?",
+            "requested_scope": "Lot clos-couvert",
+            "priority": "HIGH",
+        },
+        headers=collaborator_headers,
+    )
+    unavailability = client.post(
+        f"/api/v1/assignments/{assignment_id}/unavailability-reports",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "correlation_id": str(uuid4()),
+            "expected_revision": 1,
+            "reason_kind": "CAPACITY_CONFLICT",
+            "reason": "Conflit de capacité signalé.",
+            "unavailable_from": "2026-08-15T12:00:00Z",
+            "unavailable_until": "2026-08-17T12:00:00Z",
+            "known_deadline_impact": True,
+            "impact_note": "Une vérification patron est utile.",
+        },
+        headers=collaborator_headers,
+    )
+    interactions = client.get(
+        f"/api/v1/patron/assignments/{assignment_id}/interactions",
+        params={"limit": 3},
+        headers=patron_headers,
+    )
+    clarifications = client.get(
+        f"/api/v1/patron/assignments/{assignment_id}/interactions",
+        params={"kind": "CLARIFICATION_REQUEST", "limit": 1},
+        headers=patron_headers,
+    )
+
+    assert acknowledgement.status_code == 201
+    assert clarification.status_code == 201
+    assert unavailability.status_code == 201
+    assert interactions.status_code == 200
+    assert interactions.json()["assignment_id"] == str(assignment_id)
+    assert {item["kind"] for item in interactions.json()["items"]} == {
+        "ACKNOWLEDGEMENT",
+        "CLARIFICATION_REQUEST",
+        "UNAVAILABILITY_REPORT",
+    }
+    assert clarifications.status_code == 200
+    assert clarifications.json()["items"][0]["kind"] == "CLARIFICATION_REQUEST"
+    assert clarifications.json()["items"][0]["clarification_kind"] == "DEADLINE"
+    prohibited = {
+        "tenant_id",
+        "actor_id",
+        "membership_id",
+        "note",
+        "subject",
+        "question",
+        "requested_scope",
+        "reason",
+        "impact_note",
+        "command_id",
+        "correlation_id",
+        "functional_key",
+    }
+    assert not prohibited.intersection(interactions.json())
+    for item in interactions.json()["items"]:
+        assert not prohibited.intersection(item)
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_interactions_read_denies_collaborator_and_hides_foreign_assignment(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(database_engine)
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        scope_actions=["assignment.acknowledge"],
+    )
+    client, tokens = _client(session_factory)
+    collaborator_headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+
+    forbidden = client.get(
+        f"/api/v1/patron/assignments/{assignment_id}/interactions",
+        headers=collaborator_headers,
+    )
+
+    assert forbidden.status_code == 403
+    assert forbidden.json() == {"detail": "FORBIDDEN"}
+    with session_factory() as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.action == "assignment.manage",
+                SecurityAuditEventRecord.resource_type == "CASE_ASSIGNMENT_INTERACTIONS",
+                SecurityAuditEventRecord.reason_code == "ASSIGNMENT_PATRON_REQUIRED",
+            )
+        )
+    assert audit is not None
+
+    _, patron_identity_id, _, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    neutral = client.get(
+        f"/api/v1/patron/assignments/{assignment_id}/interactions",
+        headers=_headers(
+            tokens,
+            identity_id=patron_identity_id,
+            session_id=patron_session_id,
+        ),
+    )
+
+    assert neutral.status_code == 404
+    assert neutral.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_interactions_read_requires_bearer_and_valid_parameters(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        scope_actions=["assignment.acknowledge"],
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    route = f"/api/v1/patron/assignments/{assignment_id}/interactions"
+
+    missing_bearer = client.get(route)
+    invalid_limit = client.get(route, params={"limit": 0}, headers=headers)
+    invalid_kind = client.get(route, params={"kind": "FREE_TEXT"}, headers=headers)
+
+    assert missing_bearer.status_code == 401
+    assert invalid_limit.status_code == 422
+    assert invalid_kind.status_code == 422
