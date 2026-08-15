@@ -1971,3 +1971,160 @@ def test_patron_publishes_draft_financial_report_without_financial_receipt(
     assert snapshot.state == "PUBLISHED"
     assert snapshot.published_at is not None
     assert snapshot.aggregate_revision == 1
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_creates_empty_financial_draft_and_replay_is_closed(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, patron_identity_id, patron_membership_id, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, _ = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=patron_membership_id,
+        scope_actions=["case.dce.read"],
+    )
+    command_id = uuid4()
+    idempotency_key = uuid4()
+    client, tokens = _client(session_factory)
+    route = f"/api/v1/patron/cases/{case_id}/financial-reports/drafts"
+    payload = {
+        "command_id": str(command_id),
+        "idempotency_key": str(idempotency_key),
+        "currency_code": "EUR",
+        "ruleset_version": 1,
+    }
+    headers = _headers(
+        tokens,
+        identity_id=patron_identity_id,
+        session_id=patron_session_id,
+    )
+
+    created = client.post(route, json=payload, headers=headers)
+    replayed = client.post(route, json=payload, headers=headers)
+
+    assert created.status_code == 201, created.text
+    assert replayed.status_code == 200, replayed.text
+    assert created.json()["result_code"] == "FINANCIAL_REPORT_DRAFT_CREATED"
+    assert created.json()["replayed"] is False
+    assert replayed.json()["replayed"] is True
+    assert created.json()["aggregate_refs"] == replayed.json()["aggregate_refs"]
+    assert "amount" not in created.text.lower()
+    assert "margin" not in created.text.lower()
+    report_id = UUID(created.json()["aggregate_refs"][0]["aggregate_id"])
+    with session_factory() as session:
+        snapshots = list(
+            session.scalars(
+                sa.select(FinancialReportSnapshotRecord).where(
+                    FinancialReportSnapshotRecord.tenant_id == tenant_id,
+                    FinancialReportSnapshotRecord.case_id == case_id,
+                )
+            )
+        )
+    assert len(snapshots) == 1
+    snapshot = snapshots[0]
+    assert snapshot.id == report_id
+    assert snapshot.state == "DRAFT"
+    assert snapshot.aggregate_revision == 0
+    assert snapshot.published_at is None
+    assert snapshot.sales_total_minor == 0
+    assert snapshot.gross_margin_minor == 0
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_collaborator_cannot_create_financial_draft_before_case_resolution(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, patron_identity_id, patron_membership_id, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, _ = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=patron_membership_id,
+        scope_actions=["case.dce.read"],
+    )
+    _, collaborator_identity_id, _, collaborator_session_id = _seed_principal(
+        database_engine,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    response = client.post(
+        f"/api/v1/patron/cases/{case_id}/financial-reports/drafts",
+        json={"command_id": str(uuid4()), "idempotency_key": str(uuid4())},
+        headers=_headers(
+            tokens,
+            identity_id=collaborator_identity_id,
+            session_id=collaborator_session_id,
+        ),
+    )
+
+    with session_factory() as session:
+        snapshots = list(session.scalars(sa.select(FinancialReportSnapshotRecord)))
+    assert response.status_code == 403
+    assert response.json() == {"detail": "FORBIDDEN"}
+    assert snapshots == []
+    assert patron_identity_id != collaborator_identity_id
+    assert patron_session_id != collaborator_session_id
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_financial_draft_creation_is_tenant_neutral_and_rejects_financial_payload(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, patron_identity_id, patron_membership_id, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    foreign_tenant_id, _, foreign_membership_id, _ = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    foreign_case_id, _ = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=foreign_tenant_id,
+        membership_id=foreign_membership_id,
+        scope_actions=["case.dce.read"],
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(
+        tokens,
+        identity_id=patron_identity_id,
+        session_id=patron_session_id,
+    )
+    foreign_response = client.post(
+        f"/api/v1/patron/cases/{foreign_case_id}/financial-reports/drafts",
+        json={"command_id": str(uuid4()), "idempotency_key": str(uuid4())},
+        headers=headers,
+    )
+    payload_response = client.post(
+        f"/api/v1/patron/cases/{foreign_case_id}/financial-reports/drafts",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "sales_total_minor": 1,
+        },
+        headers=headers,
+    )
+
+    assert foreign_response.status_code == 404
+    assert foreign_response.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
+    assert payload_response.status_code == 422
+    with session_factory() as session:
+        count = session.scalar(
+            sa.select(sa.func.count()).select_from(FinancialReportSnapshotRecord)
+        )
+    assert count == 0

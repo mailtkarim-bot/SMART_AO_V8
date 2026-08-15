@@ -895,6 +895,51 @@
         "title": "CreateConsultationResponse",
         "type": "object"
       },
+      "CreateFinancialReportDraftRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "currency_code": {
+            "default": "EUR",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "ruleset_version": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Ruleset Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key"
+        ],
+        "title": "CreateFinancialReportDraftRequest",
+        "type": "object"
+      },
       "CreatePatronCaseAssignmentRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1161,6 +1206,62 @@
           "end_reason_code"
         ],
         "title": "EndPatronCaseAssignmentRequest",
+        "type": "object"
+      },
+      "FinancialReportDraftCreationResponse": {
+        "additionalProperties": false,
+        "description": "Closed receipt intentionally excluding every financial value and source.",
+        "properties": {
+          "aggregate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/AggregateReferenceResponse"
+            },
+            "title": "Aggregate Refs",
+            "type": "array"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result_code": {
+            "const": "FINANCIAL_REPORT_DRAFT_CREATED",
+            "title": "Result Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "SUCCEEDED",
+            "default": "SUCCEEDED",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "result_code",
+          "aggregate_refs",
+          "event_ids"
+        ],
+        "title": "FinancialReportDraftCreationResponse",
         "type": "object"
       },
       "FinancialReportPublicationResponse": {
@@ -3930,6 +4031,83 @@
         "summary": "Create Case Assignment",
         "tags": [
           "patron-assignments"
+        ]
+      }
+    },
+    "/api/v1/patron/cases/{case_id}/financial-reports/drafts": {
+      "post": {
+        "operationId": "create_financial_report_draft_api_v1_patron_cases__case_id__financial_reports_drafts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFinancialReportDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rejeu idempotent de la création."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialReportDraftCreationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Création financière réservée au patron."
+          },
+          "404": {
+            "description": "Affaire absente ou hors tenant."
+          },
+          "409": {
+            "description": "Conflit d’idempotence."
+          },
+          "422": {
+            "description": "Invariant de création refusé."
+          }
+        },
+        "summary": "Create Financial Report Draft",
+        "tags": [
+          "patron-financial-reports"
         ]
       }
     },

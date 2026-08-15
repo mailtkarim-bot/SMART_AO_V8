@@ -2,7 +2,7 @@
 
 **Statut :** référence générée et vérifiée.
 
-**Périmètre :** quinze opérations : les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01`, les deux lectures `PATRON-ASSIGNMENT-READ-01`, la lecture `PATRON-ASSIGNMENT-INTERACTIONS-READ-01`, la validation `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01`, la lecture financière patron et la publication financière `FINANCIAL-REPORT-PUBLICATION-01`.
+**Périmètre :** seize opérations : les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01`, les deux lectures `PATRON-ASSIGNMENT-READ-01`, la lecture `PATRON-ASSIGNMENT-INTERACTIONS-READ-01`, la validation `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01`, la lecture financière patron, la publication financière `FINANCIAL-REPORT-PUBLICATION-01` et la création de brouillon `FINANCIAL-REPORT-DRAFT-CREATION-01`.
 **Source de vérité exécutable :** `scripts/export_assignment_openapi.py`, qui produit le snapshot [`SMART_AO_V8_ASSIGNMENT_OPENAPI.json`](SMART_AO_V8_ASSIGNMENT_OPENAPI.json) depuis `create_app()` et ses dépendances SEC-01 réelles.
 
 Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et `/api/v1/patron`. Elles résolvent toujours l’acteur depuis le bearer serveur : aucun tenant, membership d’auteur, scope d’autorité, acteur ou contexte de test n’est accepté depuis le corps client.
@@ -20,6 +20,7 @@ Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et 
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/end` | `assignment.manage`, `PATRON_ADMIN` | Fin révisionnée et irréversible d’une affectation ouverte. |
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/interaction-validations` | `assignment.manage`, `PATRON_ADMIN` | Prise en compte patron append-only d’une interaction collaborateur. |
 | `GET` | `/api/v1/patron/cases/{case_id}/financial-reports/{report_id}` | `financial.report.read`, `PATRON_ADMIN` | Lecture `no-store` d’un snapshot financier publié et tenant-scopé. |
+| `POST` | `/api/v1/patron/cases/{case_id}/financial-reports/drafts` | `financial.report.create`, `PATRON_ADMIN` | Création atomique d’un unique brouillon financier vide, tenant-scopé et confidentiel. |
 | `POST` | `/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/publications` | `financial.report.publish`, `PATRON_ADMIN` | Publication atomique `DRAFT → PUBLISHED`, acte immutable, receipt sans montant. |
 | `GET` | `/api/v1/patron/assignments?case_id?&state?&limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Liste tenant-scopée, fermée et bornée des affectations d’autorité. |
 | `GET` | `/api/v1/patron/assignments/{assignment_id}/journal?limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Journal patron append-only fermé, tenant-scopé et borné. |
@@ -77,6 +78,8 @@ La validation d’interaction n’accepte que les paires `ACKNOWLEDGEMENT/ACKNOW
 La lecture financière ne retourne qu’un snapshot `PUBLISHED` et ferme tenant, auteur, source, audit, stockage, hash et formule. Les rubriques autorisées sont chiffre d’affaires, coûts directs, frais généraux, sous-traitance, provision d’aléas, marge brute et trésorerie prévisionnelle ; chaque montant est un entier `*_minor` et la réponse porte `Cache-Control: no-store`.
 
 La publication financière exige `financial.report.publish`, détenue uniquement par le `PATRON_ADMIN`. Le contrôle patron intervient avant toute résolution du snapshot : un collaborateur reçoit donc `403 FORBIDDEN` sans lecture ni fuite financière. Sous verrou `FOR UPDATE`, seul un snapshot `DRAFT` à la révision attendue peut devenir `PUBLISHED`; l’acte `financial_report_publications`, l’événement et le receipt idempotent sont écrits dans la même transaction. Le receipt expose uniquement les références d’agrégat, les identifiants de commande et d’événements ainsi que `FINANCIAL_REPORT_PUBLISHED`; il exclut tout montant, libellé, source, hash et règle de calcul.
+
+La création de brouillon financier exige `financial.report.create`, détenue uniquement par le `PATRON_ADMIN`. Le contrôle patron intervient avant toute résolution de la Case : un collaborateur reçoit donc `403 FORBIDDEN` sans lecture ni fuite financière. Sous verrou `FOR UPDATE` sur la Case, la frontière crée un snapshot `DRAFT` vide, révision `0`, totaux nuls et publication absente ; l’index unique partiel interdit un second brouillon ouvert pour la même affaire. L’événement, l’outbox et le receipt idempotent sont écrits dans la même transaction. Le receipt `FINANCIAL_REPORT_DRAFT_CREATED` exclut tout montant, total, ligne, libellé, source, hash, formule ou note.
 
 ## Lectures du cockpit patron
 

@@ -692,6 +692,13 @@ class FinancialReportSnapshotRecord(TenantScopedRecord, Base):
             name="publication",
         ),
         sa.Index("ix_financial_snapshot__tenant_case", "tenant_id", "case_id", "created_at"),
+        sa.Index(
+            "uq_financial_snapshot__tenant_case_open_draft",
+            "tenant_id",
+            "case_id",
+            unique=True,
+            postgresql_where=sa.text("state = 'DRAFT'"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)

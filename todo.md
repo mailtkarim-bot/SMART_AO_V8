@@ -150,4 +150,16 @@
 - [ ] Afficher uniquement après vérification le code source final de la route POST et du handler SQLAlchemy de publication.
 - [x] Mettre à jour les notes de présentation avec le chemin de contrôle `PATRON_ADMIN → publication → registre immutable`.
 - [x] Produire un rapport global V8 distinguant précisément les capacités publiées, les frontières prêtes mais non démarrées et les dépendances VPS.
-- [ ] Figer la prochaine frontière prioritaire après revue globale : création contrôlée de snapshots financiers `DRAFT` ou cockpit patron web.
+- [x] Figer la prochaine frontière prioritaire après revue globale : création contrôlée de snapshots financiers `DRAFT` ou cockpit patron web.
+- [x] 1. Figer puis livrer `FINANCIAL-REPORT-DRAFT-CREATION-01` : seul le patron ouvre un brouillon de chiffrage pour une Case.
+- [x] Contrat `SMART_AO_V8_FINANCIAL_REPORT_DRAFT_CREATION_01_CONTRAT.md` validé par le propriétaire avant code.
+- [x] Ajouter la capability fermée `financial.report.create`, la commande Pydantic et les DTO HTTP fermés de création DRAFT.
+- [x] Ajouter l’unicité partielle du seul brouillon `DRAFT` ouvert par affaire et valider le cycle Alembic.
+- [x] Implémenter le handler transactionnel : contrôle patron avant lecture, verrou Case, snapshot vide, événement, outbox et receipt idempotent.
+- [x] Exposer la route patron et écrire les tests `201/200/403/404/409/422`, concurrence et non-fuite financière.
+- [ ] 2. Figer puis livrer l’écriture révisionnée et historisée des lignes financières d’un brouillon `DRAFT`.
+- [ ] 3. Construire le cockpit patron web uniquement après les API financières de création et d’écriture réellement publiées.
+- [ ] 4. Construire la bibliothèque entreprise patron : société, assurances, Kbis, RIB, qualifications, pièces expirables et références.
+- [ ] 5. Construire le wizard collaborateur de préparation : exigences confirmées, preuves, tâches et pièces techniques par affaire.
+- [ ] 6. Construire la génération documentaire et le contrôle de complétude sans déclarer une conformité automatique.
+- [ ] 7. Exécuter la préproduction VPS et DCE réels : Docker, ClamAV, sauvegardes, HTTPS, supervision et parcours complet avant tout client.

@@ -680,6 +680,16 @@ class PublishFinancialReportCommand(ApplicationCommand):
     expected_revision: int = Field(ge=0)
 
 
+class CreateFinancialReportDraftCommand(ApplicationCommand):
+    """Open one empty patron-only DRAFT financial snapshot for a Case."""
+
+    command_type = "CreateFinancialReportDraft"
+
+    case_id: UUID
+    currency_code: str = Field(default="EUR", pattern=r"^[A-Z]{3}$")
+    ruleset_version: int = Field(default=1, ge=1)
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

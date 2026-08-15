@@ -89,6 +89,10 @@ from app.modules.membership.application.assignment import (
 )
 from app.modules.membership.application.assignment_history import AssignmentHistoryService
 from app.modules.membership.application.financial_report import PatronFinancialReportService
+from app.modules.membership.application.financial_report_draft import (
+    CreateFinancialReportDraftHandler,
+    PatronFinancialReportDraftCreationService,
+)
 from app.modules.membership.application.financial_report_publication import (
     PatronFinancialReportPublicationService,
     PublishFinancialReportHandler,
@@ -148,6 +152,7 @@ class AppRuntime:
                     RecordDceRequirementMaterializationRunHandler()
                 ),
                 "RecordDceRequirementConfirmation": RecordDceRequirementConfirmationHandler(),
+                "CreateFinancialReportDraft": CreateFinancialReportDraftHandler(),
                 "PublishFinancialReport": PublishFinancialReportHandler(),
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
@@ -365,6 +370,11 @@ def create_app(
             session_factory=runtime.session_factory,
             policy=security_policy,
         )
+        patron_financial_report_draft_creation_service = PatronFinancialReportDraftCreationService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         patron_financial_report_publication_service = PatronFinancialReportPublicationService(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
@@ -433,6 +443,7 @@ def create_app(
         app.include_router(
             build_patron_financial_report_router(
                 service=patron_financial_report_service,
+                draft_creation_service=patron_financial_report_draft_creation_service,
                 publication_service=patron_financial_report_publication_service,
                 security_runtime=security_runtime,
             )

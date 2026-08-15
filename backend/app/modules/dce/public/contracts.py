@@ -17,6 +17,7 @@ from app.modules.dce.application.commands import (
     AssignmentScopeClassification,
     CreateCaseAssignmentCommand,
     CreateConsultationCommand,
+    CreateFinancialReportDraftCommand,
     EndCaseAssignmentCommand,
     EndReasonCode,
     PublishFinancialReportCommand,
@@ -316,6 +317,29 @@ class FinancialReportPublicationResponse(PublicResponseModel):
     command_id: UUID
     idempotency_key: UUID
     result_code: Literal["FINANCIAL_REPORT_PUBLISHED"]
+    aggregate_refs: list[AggregateReferenceResponse]
+    event_ids: list[UUID]
+    replayed: bool = False
+
+
+class CreateFinancialReportDraftRequest(PublicRequestModel):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    currency_code: str = Field(default="EUR", pattern=r"^[A-Z]{3}$")
+    ruleset_version: int = Field(default=1, ge=1)
+
+    def to_command(self, *, case_id: UUID) -> CreateFinancialReportDraftCommand:
+        return CreateFinancialReportDraftCommand(**self.model_dump(), case_id=case_id)
+
+
+class FinancialReportDraftCreationResponse(PublicResponseModel):
+    """Closed receipt intentionally excluding every financial value and source."""
+
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal["FINANCIAL_REPORT_DRAFT_CREATED"]
     aggregate_refs: list[AggregateReferenceResponse]
     event_ids: list[UUID]
     replayed: bool = False
