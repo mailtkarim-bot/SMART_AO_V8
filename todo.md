@@ -118,3 +118,4 @@
 - [x] Produire un rapport de couverture des 12 opérations OpenAPI Assignment/patron, avec chemins de test et statuts vérifiés.
 - [x] Préparer la spécification technique de la prochaine lecture financière patron, sans exposer ni implémenter de prix ou marge avant contrat figé.
 - [ ] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub.
+- [x] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub (commit `bc41d33`, workflow `31880338075` vert).

@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01` — implémenté et validé localement, publication GitHub en attente. Le slice ajoute la prise en compte patron append-only d’un accusé, d’une clarification ou d’une indisponibilité, sans modifier l’interaction source, l’affectation, la Case ni une donnée financière.
+`PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01` — publié par [`bc41d33`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/bc41d33) et validé par CI `31880338075`. Le slice ajoute la prise en compte patron append-only d’un accusé, d’une clarification ou d’une indisponibilité, sans modifier l’interaction source, l’affectation, la Case ni une donnée financière.
 
 ## Dernier état vert
 

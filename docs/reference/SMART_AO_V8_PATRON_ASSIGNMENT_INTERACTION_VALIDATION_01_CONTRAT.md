@@ -1,6 +1,6 @@
 # SMART_AO V8 — PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01 — Contrat normatif
 
-**Statut : FIGÉ avant code.**
+**Statut : publié par `bc41d33`, CI `31880338075` verte.**
 
 Cette frontière autorise le patron à enregistrer qu’il a pris en compte une interaction collaborateur déjà durable. Elle ne constitue ni une réponse au collaborateur, ni une décision Go/No-Go, ni une validation de prix, ni une approbation de contenu DCE, ni une modification de l’affectation.
 
