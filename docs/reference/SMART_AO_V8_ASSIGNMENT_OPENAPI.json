@@ -1704,6 +1704,165 @@
         "title": "PatronAssignmentJournalResponse",
         "type": "object"
       },
+      "PatronFinancialReportLineResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_minor": {
+            "title": "Amount Minor",
+            "type": "integer"
+          },
+          "category": {
+            "enum": [
+              "SALES",
+              "DIRECT_COST",
+              "OVERHEAD",
+              "SUBCONTRACTING",
+              "CONTINGENCY",
+              "GROSS_MARGIN",
+              "FORECAST_CASHFLOW"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "line_id": {
+            "format": "uuid",
+            "title": "Line Id",
+            "type": "string"
+          },
+          "quantity_decimal": {
+            "title": "Quantity Decimal",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "category",
+          "label",
+          "quantity_decimal",
+          "unit",
+          "amount_minor",
+          "currency_code"
+        ],
+        "title": "PatronFinancialReportLineResponse",
+        "type": "object"
+      },
+      "PatronFinancialReportResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "calculated_at": {
+            "format": "date-time",
+            "title": "Calculated At",
+            "type": "string"
+          },
+          "case_id": {
+            "format": "uuid",
+            "title": "Case Id",
+            "type": "string"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PatronFinancialReportLineResponse"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "report_id": {
+            "format": "uuid",
+            "title": "Report Id",
+            "type": "string"
+          },
+          "ruleset_version": {
+            "minimum": 1.0,
+            "title": "Ruleset Version",
+            "type": "integer"
+          },
+          "status": {
+            "const": "PUBLISHED",
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PatronFinancialReportSummaryResponse"
+          }
+        },
+        "required": [
+          "report_id",
+          "case_id",
+          "status",
+          "currency_code",
+          "calculated_at",
+          "ruleset_version",
+          "summary",
+          "lines"
+        ],
+        "title": "PatronFinancialReportResponse",
+        "type": "object"
+      },
+      "PatronFinancialReportSummaryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "contingency_total_minor": {
+            "title": "Contingency Total Minor",
+            "type": "integer"
+          },
+          "direct_cost_total_minor": {
+            "title": "Direct Cost Total Minor",
+            "type": "integer"
+          },
+          "forecast_cashflow_minor": {
+            "title": "Forecast Cashflow Minor",
+            "type": "integer"
+          },
+          "gross_margin_minor": {
+            "title": "Gross Margin Minor",
+            "type": "integer"
+          },
+          "gross_margin_rate_bps": {
+            "title": "Gross Margin Rate Bps",
+            "type": "integer"
+          },
+          "overhead_total_minor": {
+            "title": "Overhead Total Minor",
+            "type": "integer"
+          },
+          "sales_total_minor": {
+            "title": "Sales Total Minor",
+            "type": "integer"
+          },
+          "subcontracting_total_minor": {
+            "title": "Subcontracting Total Minor",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sales_total_minor",
+          "direct_cost_total_minor",
+          "overhead_total_minor",
+          "subcontracting_total_minor",
+          "contingency_total_minor",
+          "gross_margin_minor",
+          "gross_margin_rate_bps",
+          "forecast_cashflow_minor"
+        ],
+        "title": "PatronFinancialReportSummaryResponse",
+        "type": "object"
+      },
       "PrepareDceStagingRequest": {
         "additionalProperties": false,
         "description": "Public intent; the server allocates the opaque storage object identity.",
@@ -3676,6 +3835,77 @@
         "summary": "Create Case Assignment",
         "tags": [
           "patron-assignments"
+        ]
+      }
+    },
+    "/api/v1/patron/cases/{case_id}/financial-reports/{report_id}": {
+      "get": {
+        "operationId": "get_financial_report_api_v1_patron_cases__case_id__financial_reports__report_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatronFinancialReportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Accès financier patron insuffisant."
+          },
+          "404": {
+            "description": "Rapport absent, non publié ou hors tenant."
+          },
+          "422": {
+            "description": "UUID invalide."
+          }
+        },
+        "summary": "Get Financial Report",
+        "tags": [
+          "patron-financial-reports"
         ]
       }
     }

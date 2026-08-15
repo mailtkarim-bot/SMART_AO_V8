@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+# ruff: noqa: E501
 from datetime import datetime
 from uuid import UUID
 
@@ -667,6 +668,79 @@ class AssignmentInteractionPatronValidationRecord(TenantScopedRecord, Base):
     patron_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
+class FinancialReportSnapshotRecord(TenantScopedRecord, Base):
+    """Immutable patron-owned financial snapshot; only published snapshots are readable."""
+
+    __tablename__ = "financial_report_snapshots"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_financial_snapshot__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "case_id"], ["cases.tenant_id", "cases.id"],
+            name="fk_financial_snapshot__case", ondelete="RESTRICT"
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_financial_snapshot__tenant_id"),
+        sa.CheckConstraint("state IN ('DRAFT', 'PUBLISHED')", name="state"),
+        sa.CheckConstraint("currency_code ~ '^[A-Z]{3}$'", name="currency"),
+        sa.CheckConstraint("ruleset_version >= 1", name="ruleset_version"),
+        sa.CheckConstraint(
+            "(state = 'DRAFT' AND published_at IS NULL) OR "
+            "(state = 'PUBLISHED' AND published_at IS NOT NULL)",
+            name="publication",
+        ),
+        sa.Index("ix_financial_snapshot__tenant_case", "tenant_id", "case_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    currency_code: Mapped[str] = mapped_column(sa.CHAR(3), nullable=False)
+    ruleset_version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    calculated_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    sales_total_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    direct_cost_total_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    overhead_total_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    subcontracting_total_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    contingency_total_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    gross_margin_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    gross_margin_rate_bps: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    forecast_cashflow_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+
+
+class FinancialReportLineRecord(TenantScopedRecord, Base):
+    """Immutable authorized monetary line of one financial report snapshot."""
+
+    __tablename__ = "financial_report_lines"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_financial_line__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "snapshot_id"],
+            ["financial_report_snapshots.tenant_id", "financial_report_snapshots.id"],
+            name="fk_financial_line__snapshot", ondelete="RESTRICT"
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_financial_line__tenant_id"),
+        sa.CheckConstraint(
+            "category IN ('SALES', 'DIRECT_COST', 'OVERHEAD', 'SUBCONTRACTING', "
+            "'CONTINGENCY', 'GROSS_MARGIN', 'FORECAST_CASHFLOW')",
+            name="category",
+        ),
+        sa.CheckConstraint("length(trim(label)) > 0", name="label"),
+        sa.Index("ix_financial_line__tenant_snapshot", "tenant_id", "snapshot_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    snapshot_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    category: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    label: Mapped[str] = mapped_column(sa.String(160), nullable=False)
+    quantity_decimal: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    unit: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    amount_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
 
 
 class AuthSessionRecord(TenantScopedRecord, Base):

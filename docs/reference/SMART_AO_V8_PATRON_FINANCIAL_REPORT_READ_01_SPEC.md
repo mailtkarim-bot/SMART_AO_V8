@@ -47,7 +47,7 @@ Les noms suivants décrivent la future réponse, non un modèle déjà exposé. 
 | DTO cible | Champs autorisés | Exclusions |
 |---|---|---|
 | `PatronFinancialReportResponse` | `report_id`, `case_id`, `status`, `currency_code`, `calculated_at`, `ruleset_version`, `summary`, `lines`. | Tenant, auteur, membership, commande, corrélation, audit, chemin source, hash, fichier, marge cible secrète ou métadonnée de stockage. |
-| `FinancialReportSummaryResponse` | Totaux strictement issus du snapshot : `sales_total_minor`, `direct_cost_total_minor`, `gross_margin_minor`, `gross_margin_rate_bps`, `contingency_total_minor`. | Formules brutes, coefficients internes non validés, détail RH, trésorerie bancaire, prix d’achat fournisseur non autorisé. |
+| `FinancialReportSummaryResponse` | Totaux strictement issus du snapshot : `sales_total_minor`, `direct_cost_total_minor`, `overhead_total_minor`, `subcontracting_total_minor`, `contingency_total_minor`, `gross_margin_minor`, `gross_margin_rate_bps`, `forecast_cashflow_minor`. | Formules brutes, coefficients internes non validés, détail RH, trésorerie bancaire, prix d’achat fournisseur non autorisé. |
 | `FinancialReportLineResponse` | `line_id`, `category`, `label`, `quantity_decimal`, `unit`, `amount_minor`, `currency_code`, `source_status`. | Chemin du fichier Excel, cellules, formules, identifiant fournisseur, note libre ou référence de stockage. |
 
 La visibilité de chaque catégorie de ligne fera partie du snapshot et non d’une logique d’interface. Une version future pourra créer des niveaux d’exposition patron séparés, mais ils ne doivent pas être inférés à partir du rôle collaborateur.

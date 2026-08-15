@@ -16,6 +16,8 @@ from app.platform.security.authentication import AuthenticationService
 from app.platform.security.models import (
     AuthSessionRecord,
     CaseAssignmentRecord,
+    FinancialReportLineRecord,
+    FinancialReportSnapshotRecord,
     IdentityRecord,
     SecurityAuditEventRecord,
     TenantMembershipRecord,
@@ -1747,3 +1749,86 @@ def test_patron_interaction_validation_denies_collaborator_and_hides_foreign_ass
     assert neutral.status_code == 404
     assert neutral.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
     assert invalid_pair.status_code == 422
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_reads_published_financial_report_in_minor_units_and_collaborator_is_denied(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, patron_identity_id, patron_membership_id, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, _ = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=patron_membership_id,
+        scope_actions=["case.dce.read"],
+    )
+    report_id = uuid4()
+    with session_factory.begin() as session:
+        session.add(
+            FinancialReportSnapshotRecord(
+                id=report_id,
+                tenant_id=tenant_id,
+                case_id=case_id,
+                state="PUBLISHED",
+                currency_code="EUR",
+                ruleset_version=1,
+                calculated_at=NOW,
+                published_at=NOW,
+                sales_total_minor=125000,
+                direct_cost_total_minor=70000,
+                overhead_total_minor=10000,
+                subcontracting_total_minor=5000,
+                contingency_total_minor=2500,
+                gross_margin_minor=37500,
+                gross_margin_rate_bps=3000,
+                forecast_cashflow_minor=18000,
+            )
+        )
+        session.flush()
+        session.add(
+            FinancialReportLineRecord(
+                id=uuid4(),
+                tenant_id=tenant_id,
+                snapshot_id=report_id,
+                category="OVERHEAD",
+                label="Frais généraux",
+                quantity_decimal="1",
+                unit="forfait",
+                amount_minor=10000,
+            )
+        )
+    client, tokens = _client(session_factory)
+    route = f"/api/v1/patron/cases/{case_id}/financial-reports/{report_id}"
+    patron_response = client.get(
+        route,
+        headers=_headers(
+            tokens,
+            identity_id=patron_identity_id,
+            session_id=patron_session_id,
+        ),
+    )
+    _, collaborator_identity_id, _, collaborator_session_id = _seed_principal(
+        database_engine,
+        tenant_id=tenant_id,
+    )
+    collaborator_response = client.get(
+        route,
+        headers=_headers(
+            tokens,
+            identity_id=collaborator_identity_id,
+            session_id=collaborator_session_id,
+        ),
+    )
+
+    assert patron_response.status_code == 200
+    assert patron_response.headers["Cache-Control"] == "no-store"
+    assert patron_response.json()["summary"]["overhead_total_minor"] == 10000
+    assert patron_response.json()["lines"][0]["amount_minor"] == 10000
+    assert "tenant_id" not in patron_response.json()
+    assert collaborator_response.status_code == 403

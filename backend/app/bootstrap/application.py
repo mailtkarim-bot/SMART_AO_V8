@@ -42,6 +42,9 @@ from app.interfaces.http.routes.patron_assignment_cockpit import (
 from app.interfaces.http.routes.patron_assignment_management import (
     build_patron_assignment_management_router,
 )
+from app.interfaces.http.routes.patron_financial_reports import (
+    build_patron_financial_report_router,
+)
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
@@ -85,6 +88,7 @@ from app.modules.membership.application.assignment import (
     assignment_handlers,
 )
 from app.modules.membership.application.assignment_history import AssignmentHistoryService
+from app.modules.membership.application.financial_report import PatronFinancialReportService
 from app.modules.membership.application.patron_assignment import (
     PatronAssignmentManagementService,
     patron_assignment_handlers,
@@ -352,6 +356,10 @@ def create_app(
             session_factory=runtime.session_factory,
             policy=security_policy,
         )
+        patron_financial_report_service = PatronFinancialReportService(
+            session_factory=runtime.session_factory,
+            policy=security_policy,
+        )
         app.include_router(
             build_case_dce_reading_router(
                 runtime=runtime,
@@ -409,6 +417,12 @@ def create_app(
         app.include_router(
             build_patron_assignment_cockpit_router(
                 service=patron_assignment_cockpit_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_financial_report_router(
+                service=patron_financial_report_service,
                 security_runtime=security_runtime,
             )
         )

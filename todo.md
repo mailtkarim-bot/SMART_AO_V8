@@ -119,3 +119,18 @@
 - [x] Préparer la spécification technique de la prochaine lecture financière patron, sans exposer ni implémenter de prix ou marge avant contrat figé.
 - [ ] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub.
 - [x] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub (commit `bc41d33`, workflow `31880338075` vert).
+- [ ] Auditer la spécification financière préparatoire, les classifications SEC-01 et les prérequis de snapshot avant toute exposition de montant.
+- [ ] Figer le contrat `FINANCIAL-REPORT-FOUNDATION-01` : snapshots, lignes, publication, autorisation `financial.report.read`, non-fuites et migration.
+- [ ] Intégrer au modèle financier patron les catégories confirmées : coûts directs, frais généraux, sous-traitance, provision d’aléas, marge brute et trésorerie prévisionnelle, toutes en unités mineures.
+- [ ] Créer `financial_report_snapshots` et `financial_report_lines`, leurs FKs tenant/Case, checks de catégories, index et triggers append-only dans une migration additive.
+- [ ] Rendre un snapshot lisible uniquement avec `state=PUBLISHED` et un acte de publication durable ; conserver les snapshots incomplets hors route HTTP.
+- [ ] Construire le lecteur SQLAlchemy tenant-scopé qui retourne uniquement le snapshot publié demandé et ses lignes autorisées.
+- [ ] Implémenter les schémas Pydantic fermés, la persistance append-only et la projection patron d’un rapport financier publié.
+- [ ] Exposer la route financière patron sur bearer réel, avec capability distincte, `no-store` et erreurs neutres.
+- [ ] Vérifier les DTO `extra=forbid`, la présence exclusive d’unités mineures entières et l’absence de float, source, audit ou stockage dans le JSON financier.
+- [ ] Vérifier que la réponse `200` financière porte `Cache-Control: no-store` et que les réponses refusées ne révèlent aucun rapport.
+- [ ] Écrire les tests PostgreSQL/API du rapport financier : patron, collaborateur, tenant, rapport non publié, montants mineurs, redaction et cache.
+- [ ] Régénérer OpenAPI, étendre le rapport de couverture à 13 opérations publiées, valider Ruff/pytest/Alembic/secrets/diff et CI.
+- [ ] Exécuter le contrôle de secrets, mettre à jour l’état durable puis committer, pousser et vérifier la CI de `FINANCIAL-REPORT-FOUNDATION-01`.
+- [ ] Rédiger la spécification de la prochaine écriture patron : publication ou validation explicite d’un snapshot financier sans mutation du calcul.
+- [ ] Préparer puis générer une présentation synthétique de la fondation financière patron et des 14 opérations OpenAPI.

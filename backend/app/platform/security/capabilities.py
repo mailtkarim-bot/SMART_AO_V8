@@ -31,6 +31,7 @@ class Capability(StrEnum):
     SUBMISSION_AUTHORIZE = "submission.authorize"
     SENSITIVE_EXPORT = "export.sensitive"
     AUDIT_READ = "audit.read"
+    FINANCIAL_REPORT_READ = "financial.report.read"
     SYSTEM_JOB_EXECUTE = "system.job.execute"
 
 
@@ -52,6 +53,7 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.SUBMISSION_AUTHORIZE,
         Capability.SENSITIVE_EXPORT,
         Capability.AUDIT_READ,
+        Capability.FINANCIAL_REPORT_READ,
     }
 )
 _COLLABORATOR_CAPABILITIES = frozenset(

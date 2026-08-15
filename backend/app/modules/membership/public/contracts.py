@@ -161,3 +161,46 @@ class PatronAssignmentInteractionsResponse(PublicResponseModel):
     case_id: UUID
     case_lifecycle: PatronCaseLifecycle
     items: list[PatronAssignmentInteractionItemResponse]
+
+
+FinancialReportCategory = Literal[
+    "SALES",
+    "DIRECT_COST",
+    "OVERHEAD",
+    "SUBCONTRACTING",
+    "CONTINGENCY",
+    "GROSS_MARGIN",
+    "FORECAST_CASHFLOW",
+]
+
+
+class PatronFinancialReportLineResponse(PublicResponseModel):
+    line_id: UUID
+    category: FinancialReportCategory
+    label: str
+    quantity_decimal: str
+    unit: str
+    amount_minor: int
+    currency_code: str
+
+
+class PatronFinancialReportSummaryResponse(PublicResponseModel):
+    sales_total_minor: int
+    direct_cost_total_minor: int
+    overhead_total_minor: int
+    subcontracting_total_minor: int
+    contingency_total_minor: int
+    gross_margin_minor: int
+    gross_margin_rate_bps: int
+    forecast_cashflow_minor: int
+
+
+class PatronFinancialReportResponse(PublicResponseModel):
+    report_id: UUID
+    case_id: UUID
+    status: Literal["PUBLISHED"]
+    currency_code: str
+    calculated_at: datetime
+    ruleset_version: int = Field(ge=1)
+    summary: PatronFinancialReportSummaryResponse
+    lines: list[PatronFinancialReportLineResponse]
