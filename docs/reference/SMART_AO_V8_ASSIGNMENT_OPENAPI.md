@@ -2,7 +2,7 @@
 
 **Statut :** référence générée et vérifiée.
 
-**Périmètre :** les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01`, les deux lectures `PATRON-ASSIGNMENT-READ-01` et la lecture `PATRON-ASSIGNMENT-INTERACTIONS-READ-01`.
+**Périmètre :** les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01`, les deux lectures `PATRON-ASSIGNMENT-READ-01`, la lecture `PATRON-ASSIGNMENT-INTERACTIONS-READ-01` et la validation `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01`.
 **Source de vérité exécutable :** `scripts/export_assignment_openapi.py`, qui produit le snapshot [`SMART_AO_V8_ASSIGNMENT_OPENAPI.json`](SMART_AO_V8_ASSIGNMENT_OPENAPI.json) depuis `create_app()` et ses dépendances SEC-01 réelles.
 
 Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et `/api/v1/patron`. Elles résolvent toujours l’acteur depuis le bearer serveur : aucun tenant, membership d’auteur, scope d’autorité, acteur ou contexte de test n’est accepté depuis le corps client.
@@ -18,6 +18,7 @@ Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et 
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/suspensions` | `assignment.manage`, `PATRON_ADMIN` | Suspension révisionnée et temporaire d’une affectation active. |
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/reactivations` | `assignment.manage`, `PATRON_ADMIN` | Réactivation révisionnée d’une affectation suspendue dans sa fenêtre valide. |
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/end` | `assignment.manage`, `PATRON_ADMIN` | Fin révisionnée et irréversible d’une affectation ouverte. |
+| `POST` | `/api/v1/patron/assignments/{assignment_id}/interaction-validations` | `assignment.manage`, `PATRON_ADMIN` | Prise en compte patron append-only d’une interaction collaborateur. |
 | `GET` | `/api/v1/patron/assignments?case_id?&state?&limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Liste tenant-scopée, fermée et bornée des affectations d’autorité. |
 | `GET` | `/api/v1/patron/assignments/{assignment_id}/journal?limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Journal patron append-only fermé, tenant-scopé et borné. |
 | `GET` | `/api/v1/patron/assignments/{assignment_id}/interactions?kind?&limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Interactions collaborateur fermées, tenant-scopées et bornées. |
@@ -59,6 +60,7 @@ Les cinq routes patron utilisent `PATRON_ADMIN` et la capability serveur `assign
 | Suspension | `command_id`, `idempotency_key`, `expected_revision`, `suspension_reason_code` fermé | `CASE_ASSIGNMENT_SUSPENDED` | État `SUSPENDED`, révision +1, journal patron, événement, outbox, receipt. |
 | Réactivation | `command_id`, `idempotency_key`, `expected_revision`, `reactivation_reason_code` fermé | `CASE_ASSIGNMENT_REACTIVATED` | État `ACTIVE`, révision +1, journal patron, événement, outbox, receipt. |
 | Fin | `command_id`, `idempotency_key`, `expected_revision`, `end_reason_code` fermé | `CASE_ASSIGNMENT_ENDED` | État `ENDED`, `ended_at` serveur, révision +1, journal patron, événement, outbox, receipt. |
+| Validation d’interaction | `command_id`, `idempotency_key`, `interaction_id`, `interaction_kind`, `validation_code` fermé | `INTERACTION_VALIDATED` | Registre patron append-only, événement, outbox, receipt ; aucune mutation de la source ou de l’affectation. |
 
 Les listes de scope n’acceptent que les actions collaborateur opérationnelles et `INTERNAL_OPERATIONAL`. Une action financière, une action de décision/dépôt, une valeur inconnue, une classification interdite, un doublon ou un champ supplémentaire échoue avant la transaction. L’amendement sur une affectation absente ou hors tenant est neutre ; une révision obsolète retourne `409 VERSION_CONFLICT`; un scope identique, une affectation fermée ou un invariant métier retourne `422`.
 
@@ -67,6 +69,8 @@ La suspension n’accepte que `PATRON_SUSPENDED`, `WORKLOAD_REALLOCATION`, `CASE
 La réactivation n’accepte que `PATRON_REACTIVATED`, `CASE_RESUMED` ou `ACCESS_REVIEW_CLEARED`. Elle est admise exclusivement depuis `SUSPENDED`, pendant une fenêtre ouverte et si la Case ainsi que la cible collaborateur sont encore actives dans le tenant. Un état actif, terminé ou expiré, une fenêtre future/fermée ou une cible inactive retourne `422` sans modifier le journal. Le motif fermé reste absent du receipt HTTP.
 
 La fin n’accepte que `PATRON_ENDED`, `CASE_STOPPED`, `CASE_ARCHIVED`, `COLLABORATOR_UNAVAILABLE` ou `MEMBERSHIP_REVOKED`. Elle est admise depuis `ACTIVE` ou `SUSPENDED`, y compris lorsque la Case est arrêtée, la cible inactive ou la fenêtre passée, afin de retirer une autorisation résiduelle. Les états `ENDED` et `EXPIRED` retournent `422` sans second journal. Le motif fermé est conservé dans le journal et l’événement domaine, mais reste absent du receipt HTTP.
+
+La validation d’interaction n’accepte que les paires `ACKNOWLEDGEMENT/ACKNOWLEDGEMENT_NOTED`, `CLARIFICATION_REQUEST/CLARIFICATION_NOTED` et `UNAVAILABILITY_REPORT/UNAVAILABILITY_NOTED`. Elle est admise sur une interaction durable de la même affectation même si cette dernière est terminée, hors fenêtre ou si sa cible est inactive. Elle ne répond pas à la clarification, ne résout pas l’indisponibilité et ne modifie jamais la source. Le receipt masque l’interaction, le type et le code de validation ; une seconde validation de la même source retourne `422`.
 
 ## Lectures du cockpit patron
 

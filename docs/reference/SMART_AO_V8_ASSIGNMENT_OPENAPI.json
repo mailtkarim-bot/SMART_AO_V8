@@ -250,7 +250,8 @@
               "CASE_ASSIGNMENT_SCOPE_AMENDED",
               "CASE_ASSIGNMENT_SUSPENDED",
               "CASE_ASSIGNMENT_REACTIVATED",
-              "CASE_ASSIGNMENT_ENDED"
+              "CASE_ASSIGNMENT_ENDED",
+              "INTERACTION_VALIDATED"
             ],
             "title": "Result Code",
             "type": "string"
@@ -2465,6 +2466,65 @@
         "title": "UploadDceStagedObjectResponse",
         "type": "object"
       },
+      "ValidatePatronAssignmentInteractionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "interaction_id": {
+            "format": "uuid",
+            "title": "Interaction Id",
+            "type": "string"
+          },
+          "interaction_kind": {
+            "enum": [
+              "ACKNOWLEDGEMENT",
+              "CLARIFICATION_REQUEST",
+              "UNAVAILABILITY_REPORT"
+            ],
+            "title": "Interaction Kind",
+            "type": "string"
+          },
+          "validation_code": {
+            "enum": [
+              "ACKNOWLEDGEMENT_NOTED",
+              "CLARIFICATION_NOTED",
+              "UNAVAILABILITY_NOTED"
+            ],
+            "title": "Validation Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "interaction_id",
+          "interaction_kind",
+          "validation_code"
+        ],
+        "title": "ValidatePatronAssignmentInteractionRequest",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -3027,6 +3087,90 @@
           }
         },
         "summary": "End Case Assignment",
+        "tags": [
+          "patron-assignments"
+        ]
+      }
+    },
+    "/api/v1/patron/assignments/{assignment_id}/interaction-validations": {
+      "post": {
+        "operationId": "validate_assignment_interaction_api_v1_patron_assignments__assignment_id__interaction_validations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidatePatronAssignmentInteractionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Rejeu idempotent de la commande patron déjà appliquée."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentCommandResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability patron insuffisante."
+          },
+          "404": {
+            "description": "Affaire ou affectation absente ou hors tenant : réponse neutre."
+          },
+          "409": {
+            "description": "Clé d’idempotence réutilisée ou conflit de révision détecté."
+          },
+          "422": {
+            "description": "Validation de requête ou invariant métier refusé."
+          }
+        },
+        "summary": "Validate Assignment Interaction",
         "tags": [
           "patron-assignments"
         ]

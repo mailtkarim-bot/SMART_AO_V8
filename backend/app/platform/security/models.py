@@ -600,6 +600,75 @@ class CaseAssignmentUnavailabilityRecord(TenantScopedRecord, Base):
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
+class AssignmentInteractionPatronValidationRecord(TenantScopedRecord, Base):
+    """Immutable patron acknowledgement of one typed collaborator interaction."""
+
+    __tablename__ = "assignment_interaction_patron_validations"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_assignment_interaction_validation__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "assignment_id"],
+            ["case_assignments.tenant_id", "case_assignments.id"],
+            name="fk_assignment_interaction_validation__assignment",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "case_id"], ["cases.tenant_id", "cases.id"],
+            name="fk_assignment_interaction_validation__case", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "patron_membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_assignment_interaction_validation__patron",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "id",
+            name="uq_assignment_interaction_validation__tenant_id",
+        ),
+        sa.UniqueConstraint(
+            "tenant_id", "interaction_kind", "interaction_id",
+            name="uq_assignment_interaction_validation__source",
+        ),
+        sa.CheckConstraint(
+            "interaction_kind IN "
+            "('ACKNOWLEDGEMENT', 'CLARIFICATION_REQUEST', 'UNAVAILABILITY_REPORT')",
+            name="interaction_kind",
+        ),
+        sa.CheckConstraint(
+            "validation_code IN "
+            "('ACKNOWLEDGEMENT_NOTED', 'CLARIFICATION_NOTED', 'UNAVAILABILITY_NOTED') "
+            "AND ((interaction_kind = 'ACKNOWLEDGEMENT' "
+            "AND validation_code = 'ACKNOWLEDGEMENT_NOTED') "
+            "OR (interaction_kind = 'CLARIFICATION_REQUEST' "
+            "AND validation_code = 'CLARIFICATION_NOTED') "
+            "OR (interaction_kind = 'UNAVAILABILITY_REPORT' "
+            "AND validation_code = 'UNAVAILABILITY_NOTED'))",
+            name="kind_code",
+        ),
+        sa.Index(
+            "ix_assignment_interaction_validation__tenant_assignment",
+            "tenant_id", "assignment_id", "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    assignment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    interaction_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    interaction_kind: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    validation_code: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    patron_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
 class AuthSessionRecord(TenantScopedRecord, Base):
     """A revocable browser session bound to one tenant membership and identity."""
 

@@ -1605,3 +1605,145 @@ def test_patron_interactions_read_requires_bearer_and_valid_parameters(
     assert missing_bearer.status_code == 401
     assert invalid_limit.status_code == 422
     assert invalid_kind.status_code == 422
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_validates_acknowledgement_with_closed_receipt_and_replay(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, patron_identity_id, _, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    (
+        _,
+        collaborator_identity_id,
+        collaborator_membership_id,
+        collaborator_session_id,
+    ) = _seed_principal(database_engine, tenant_id=tenant_id)
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=collaborator_membership_id,
+        scope_actions=["assignment.acknowledge"],
+    )
+    client, tokens = _client(session_factory)
+    collaborator_headers = _headers(
+        tokens,
+        identity_id=collaborator_identity_id,
+        session_id=collaborator_session_id,
+    )
+    patron_headers = _headers(
+        tokens,
+        identity_id=patron_identity_id,
+        session_id=patron_session_id,
+    )
+    acknowledgement = client.post(
+        f"/api/v1/assignments/{assignment_id}/acknowledgement",
+        json=_ack_payload(),
+        headers=collaborator_headers,
+    )
+    interactions = client.get(
+        f"/api/v1/patron/assignments/{assignment_id}/interactions",
+        params={"kind": "ACKNOWLEDGEMENT"},
+        headers=patron_headers,
+    )
+    validation_payload = {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "interaction_id": interactions.json()["items"][0]["record_id"],
+        "interaction_kind": "ACKNOWLEDGEMENT",
+        "validation_code": "ACKNOWLEDGEMENT_NOTED",
+    }
+
+    validation = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/interaction-validations",
+        json=validation_payload,
+        headers=patron_headers,
+    )
+    replay = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/interaction-validations",
+        json=validation_payload,
+        headers=patron_headers,
+    )
+    duplicate = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/interaction-validations",
+        json={
+            **validation_payload,
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+        },
+        headers=patron_headers,
+    )
+
+    assert acknowledgement.status_code == 201
+    assert interactions.status_code == 200
+    assert validation.status_code == 201
+    assert replay.status_code == 200
+    assert validation.json()["result_code"] == "INTERACTION_VALIDATED"
+    assert replay.json()["replayed"] is True
+    assert duplicate.status_code == 422
+    prohibited = {"interaction_id", "interaction_kind", "validation_code", "tenant_id"}
+    assert not prohibited.intersection(validation.json())
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_interaction_validation_denies_collaborator_and_hides_foreign_assignment(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(database_engine)
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        scope_actions=["assignment.acknowledge"],
+    )
+    client, tokens = _client(session_factory)
+    payload = {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "interaction_id": str(uuid4()),
+        "interaction_kind": "ACKNOWLEDGEMENT",
+        "validation_code": "ACKNOWLEDGEMENT_NOTED",
+    }
+
+    forbidden = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/interaction-validations",
+        json=payload,
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+    _, patron_identity_id, _, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    neutral = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/interaction-validations",
+        json=payload,
+        headers=_headers(
+            tokens,
+            identity_id=patron_identity_id,
+            session_id=patron_session_id,
+        ),
+    )
+    invalid_pair = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/interaction-validations",
+        json={**payload, "validation_code": "CLARIFICATION_NOTED"},
+        headers=_headers(
+            tokens,
+            identity_id=patron_identity_id,
+            session_id=patron_session_id,
+        ),
+    )
+
+    assert forbidden.status_code == 403
+    assert forbidden.json() == {"detail": "FORBIDDEN"}
+    assert neutral.status_code == 404
+    assert neutral.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
+    assert invalid_pair.status_code == 422

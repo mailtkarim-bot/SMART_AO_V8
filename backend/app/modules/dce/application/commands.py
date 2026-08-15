@@ -636,6 +636,40 @@ class EndCaseAssignmentCommand(ApplicationCommand):
     end_reason_code: EndReasonCode
 
 
+AssignmentInteractionKind = Literal[
+    "ACKNOWLEDGEMENT",
+    "CLARIFICATION_REQUEST",
+    "UNAVAILABILITY_REPORT",
+]
+AssignmentInteractionValidationCode = Literal[
+    "ACKNOWLEDGEMENT_NOTED",
+    "CLARIFICATION_NOTED",
+    "UNAVAILABILITY_NOTED",
+]
+
+
+class ValidateAssignmentInteractionCommand(ApplicationCommand):
+    """Record a patron's append-only acknowledgement of one collaborator signal."""
+
+    command_type = "ValidateAssignmentInteraction"
+
+    assignment_id: UUID
+    interaction_id: UUID
+    interaction_kind: AssignmentInteractionKind
+    validation_code: AssignmentInteractionValidationCode
+
+    @model_validator(mode="after")
+    def validate_kind_code_pair(self) -> ValidateAssignmentInteractionCommand:
+        expected = {
+            "ACKNOWLEDGEMENT": "ACKNOWLEDGEMENT_NOTED",
+            "CLARIFICATION_REQUEST": "CLARIFICATION_NOTED",
+            "UNAVAILABILITY_REPORT": "UNAVAILABILITY_NOTED",
+        }[self.interaction_kind]
+        if self.validation_code != expected:
+            raise ValueError("interaction validation code must match interaction kind")
+        return self
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

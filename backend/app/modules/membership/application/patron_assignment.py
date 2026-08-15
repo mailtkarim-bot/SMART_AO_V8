@@ -17,6 +17,7 @@ from app.modules.dce.application.commands import (
     EndCaseAssignmentCommand,
     ReactivateCaseAssignmentCommand,
     SuspendCaseAssignmentCommand,
+    ValidateAssignmentInteractionCommand,
 )
 from app.platform.events.dispatcher import (
     CommandContext,
@@ -41,8 +42,12 @@ from app.platform.security.authorization import (
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
 from app.platform.security.models import (
+    AssignmentClarificationRequestRecord,
+    AssignmentInteractionPatronValidationRecord,
+    CaseAssignmentAcknowledgementRecord,
     CaseAssignmentChangeEventRecord,
     CaseAssignmentRecord,
+    CaseAssignmentUnavailabilityRecord,
     TenantMembershipRecord,
 )
 
@@ -240,6 +245,39 @@ class PatronAssignmentManagementService:
         self._authorize_assignment_management(actor=actor, assignment=assignment, now=now)
         return self._dispatch(actor=actor, command=command, case_id=assignment.case_id, now=now)
 
+    def validate_interaction(
+        self,
+        *,
+        actor: ActorContext,
+        command: ValidateAssignmentInteractionCommand,
+        now: datetime,
+    ) -> DispatchResult:
+        self._require_patron(
+            actor=actor,
+            command=command,
+            now=now,
+            resource_type="CASE_ASSIGNMENT_INTERACTION_VALIDATION",
+            resource_id=command.assignment_id,
+            case_id=None,
+        )
+        assignment = self._resolve_assignment(
+            tenant_id=actor.tenant_id,
+            assignment_id=command.assignment_id,
+        )
+        if assignment is None:
+            self._record_manual_denial(
+                actor=actor,
+                command=command,
+                now=now,
+                reason_code="NOT_FOUND_OR_FORBIDDEN",
+                resource_type="CASE_ASSIGNMENT_INTERACTION_VALIDATION",
+                resource_id=command.assignment_id,
+                case_id=None,
+            )
+            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+        self._authorize_assignment_management(actor=actor, assignment=assignment, now=now)
+        return self._dispatch(actor=actor, command=command, case_id=assignment.case_id, now=now)
+
     def _dispatch(
         self,
         *,
@@ -425,6 +463,8 @@ class PatronAssignmentManagementHandler:
             return self._reactivate(session=session, command=command, context=context)
         if command.command_type == "EndCaseAssignment":
             return self._end(session=session, command=command, context=context)
+        if command.command_type == "ValidateAssignmentInteraction":
+            return self._validate_interaction(session=session, command=command, context=context)
         raise CommandExecutionError(
             f"unsupported patron assignment command: {command.command_type}"
         )
@@ -871,6 +911,93 @@ class PatronAssignmentManagementHandler:
             ),
         )
 
+    @staticmethod
+    def _validate_interaction(
+        *,
+        session: Session,
+        command: ValidateAssignmentInteractionCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        assignment = session.scalar(
+            sa.select(CaseAssignmentRecord)
+            .where(
+                CaseAssignmentRecord.tenant_id == context.tenant_id,
+                CaseAssignmentRecord.id == command.assignment_id,
+            )
+            .with_for_update()
+        )
+        if assignment is None:
+            raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
+        if context.case_id is not None and context.case_id != assignment.case_id:
+            raise CommandExecutionError("CASE_CONTEXT_MISMATCH")
+        source_model = {
+            "ACKNOWLEDGEMENT": CaseAssignmentAcknowledgementRecord,
+            "CLARIFICATION_REQUEST": AssignmentClarificationRequestRecord,
+            "UNAVAILABILITY_REPORT": CaseAssignmentUnavailabilityRecord,
+        }[command.interaction_kind]
+        source = session.scalar(
+            sa.select(source_model)
+            .where(
+                source_model.tenant_id == context.tenant_id,
+                source_model.assignment_id == assignment.id,
+                source_model.id == command.interaction_id,
+            )
+            .with_for_update()
+        )
+        if source is None:
+            raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
+        existing = session.scalar(
+            sa.select(AssignmentInteractionPatronValidationRecord)
+            .where(
+                AssignmentInteractionPatronValidationRecord.tenant_id == context.tenant_id,
+                AssignmentInteractionPatronValidationRecord.interaction_kind
+                == command.interaction_kind,
+                AssignmentInteractionPatronValidationRecord.interaction_id
+                == command.interaction_id,
+            )
+            .with_for_update()
+        )
+        if existing is not None:
+            raise CommandExecutionError("INTERACTION_ALREADY_VALIDATED")
+        validation = AssignmentInteractionPatronValidationRecord(
+            id=uuid4(),
+            tenant_id=context.tenant_id,
+            assignment_id=assignment.id,
+            case_id=assignment.case_id,
+            interaction_id=command.interaction_id,
+            interaction_kind=command.interaction_kind,
+            validation_code=command.validation_code,
+            patron_membership_id=context.membership_id,
+            command_id=command.command_id,
+            correlation_id=command.correlation_id,
+        )
+        session.add(validation)
+        return HandlerOutcome(
+            result_code="INTERACTION_VALIDATED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "AssignmentInteractionValidation",
+                    "aggregate_id": str(validation.id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(
+                PendingDomainEvent(
+                    aggregate_type="AssignmentInteractionValidation",
+                    aggregate_id=validation.id,
+                    aggregate_revision=0,
+                    event_type="AssignmentInteractionValidated",
+                    payload={
+                        "validation_id": str(validation.id),
+                        "assignment_id": str(assignment.id),
+                        "case_id": str(assignment.case_id),
+                        "interaction_kind": command.interaction_kind,
+                        "validation_code": command.validation_code,
+                    },
+                ),
+            ),
+        )
+
 
 def _change_event_for_creation(
     *,
@@ -928,4 +1055,5 @@ def patron_assignment_handlers() -> dict[str, PatronAssignmentManagementHandler]
         "SuspendCaseAssignment": handler,
         "ReactivateCaseAssignment": handler,
         "EndCaseAssignment": handler,
+        "ValidateAssignmentInteraction": handler,
     }

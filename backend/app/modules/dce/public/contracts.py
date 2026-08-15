@@ -11,6 +11,8 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 from app.modules.dce.application.commands import (
     AcknowledgeAssignmentCommand,
     AmendCaseAssignmentScopeCommand,
+    AssignmentInteractionKind,
+    AssignmentInteractionValidationCode,
     AssignmentScopeAction,
     AssignmentScopeClassification,
     CreateCaseAssignmentCommand,
@@ -25,6 +27,7 @@ from app.modules.dce.application.commands import (
     RequestAssignmentClarificationCommand,
     SuspendCaseAssignmentCommand,
     SuspensionReasonCode,
+    ValidateAssignmentInteractionCommand,
 )
 
 
@@ -284,6 +287,7 @@ class AssignmentCommandResponse(PublicResponseModel):
         "CASE_ASSIGNMENT_SUSPENDED",
         "CASE_ASSIGNMENT_REACTIVATED",
         "CASE_ASSIGNMENT_ENDED",
+        "INTERACTION_VALIDATED",
     ]
     aggregate_refs: list[AggregateReferenceResponse]
     event_ids: list[UUID]
@@ -368,6 +372,32 @@ class EndPatronCaseAssignmentRequest(PublicRequestModel):
 
     def to_command(self, *, assignment_id: UUID) -> EndCaseAssignmentCommand:
         return EndCaseAssignmentCommand(**self.model_dump(), assignment_id=assignment_id)
+
+
+class ValidatePatronAssignmentInteractionRequest(PublicRequestModel):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    interaction_id: UUID
+    interaction_kind: AssignmentInteractionKind
+    validation_code: AssignmentInteractionValidationCode
+
+    @model_validator(mode="after")
+    def validate_kind_code_pair(self) -> ValidatePatronAssignmentInteractionRequest:
+        expected = {
+            "ACKNOWLEDGEMENT": "ACKNOWLEDGEMENT_NOTED",
+            "CLARIFICATION_REQUEST": "CLARIFICATION_NOTED",
+            "UNAVAILABILITY_REPORT": "UNAVAILABILITY_NOTED",
+        }[self.interaction_kind]
+        if self.validation_code != expected:
+            raise ValueError("interaction validation code must match interaction kind")
+        return self
+
+    def to_command(self, *, assignment_id: UUID) -> ValidateAssignmentInteractionCommand:
+        return ValidateAssignmentInteractionCommand(
+            **self.model_dump(),
+            assignment_id=assignment_id,
+        )
 
 
 class RecordDceRequirementConfirmationRequest(PublicResponseModel):

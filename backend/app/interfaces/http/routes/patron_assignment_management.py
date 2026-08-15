@@ -17,6 +17,7 @@ from app.modules.dce.public.contracts import (
     EndPatronCaseAssignmentRequest,
     ReactivatePatronCaseAssignmentRequest,
     SuspendPatronCaseAssignmentRequest,
+    ValidatePatronAssignmentInteractionRequest,
 )
 from app.modules.membership.application.patron_assignment import PatronAssignmentManagementService
 from app.platform.events.dispatcher import (
@@ -158,6 +159,28 @@ def build_patron_assignment_management_router(
         )
         return _dispatch(
             service.end,
+            actor=context,
+            command=request.to_command(assignment_id=assignment_id),
+            now=datetime.now(tz=UTC),
+        )
+
+    @router.post(
+        "/assignments/{assignment_id}/interaction-validations",
+        status_code=status.HTTP_201_CREATED,
+        response_model=AssignmentCommandResponse,
+        responses=_PATRON_ASSIGNMENT_EXTRA_RESPONSES,
+    )
+    def validate_assignment_interaction(
+        assignment_id: UUID,
+        request: ValidatePatronAssignmentInteractionRequest,
+        authorization: str | None = Header(default=None),
+    ) -> AssignmentCommandResponse:
+        context = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        return _dispatch(
+            service.validate_interaction,
             actor=context,
             command=request.to_command(assignment_id=assignment_id),
             now=datetime.now(tz=UTC),

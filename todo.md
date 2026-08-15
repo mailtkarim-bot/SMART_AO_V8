@@ -111,3 +111,10 @@
 - [x] Exposer les routes de lecture patron et vérifier le refus explicite d’un collaborateur standard, sans contourner le bearer réel.
 - [x] Écrire les tests d’intégration patron/collaborateur : liste, filtres, ordre, borne, `200`, `401`, `403`, `404`, `422`, tenant et non-fuites.
 - [x] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub (commit `3bc7772`, workflow `31879239096` vert).
+- [x] Auditer le cycle de vie actuel des demandes de clarification et déterminer les validations patron qui restent non ambiguës, sans inventer de réponse ou décision métier.
+- [x] Figer le contrat `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01` : commande, idempotence, projection fermée, audit, non-fuites, migrations et OpenAPI.
+- [x] Implémenter la validation patron directe autorisée par le contrat, son registre append-only, son événement/outbox et sa route HTTP Bearer réelle.
+- [x] Écrire les tests d’intégration de validation patron : succès, rejeu, rôles, tenant, état, révision, payload fermé et absence de fuite.
+- [x] Produire un rapport de couverture des 12 opérations OpenAPI Assignment/patron, avec chemins de test et statuts vérifiés.
+- [x] Préparer la spécification technique de la prochaine lecture financière patron, sans exposer ni implémenter de prix ou marge avant contrat figé.
+- [ ] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub.
