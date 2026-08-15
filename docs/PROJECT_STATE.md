@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`PATRON-ASSIGNMENT-INTERACTIONS-READ-01` — implémenté et validé localement, publication GitHub en attente. Le slice ajoute la lecture patron bornée des accusés de réception, demandes de clarification et indisponibilités collaborateur, via bearer réel et capability `assignment.manage`, sans texte libre, identité, audit ni donnée financière exposés.
+`PATRON-ASSIGNMENT-INTERACTIONS-READ-01` — publié par [`3bc7772`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/3bc7772) et validé par CI `31879239096`. Le slice ajoute la lecture patron bornée des accusés de réception, demandes de clarification et indisponibilités collaborateur, via bearer réel et capability `assignment.manage`, sans texte libre, identité, audit ni donnée financière exposés.
 
 ## Dernier état vert
 
@@ -13,7 +13,7 @@
 | Migration Alembic | `20260814_0020` ajoutée pour la révision Assignment et les trois historiques collaborateur ; upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` validés sur PostgreSQL local. |
 | Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
 | Validation locale courante | `git diff --check`, Ruff, cycle Alembic `upgrade head` / `check` / `downgrade base` jusqu’à `20260814_0023` et export OpenAPI à douze opérations sont verts. Le harnais API couvre la liste et le journal patron, les filtres, bornes, refus, neutralité inter-tenant, interactions collaborateur et non-fuites ; `uv run pytest backend/tests -q` : **303 tests verts**. Les 4 avertissements restants sont des dépréciations tierces FastAPI/TestClient déjà connus. |
-| CI | Le workflow [#31855776751](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31855776751) du commit `6df4c55` est **vert**. Lint, secrets scan, audit dépendances, SAST, smoke tests et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore. |
+| CI | Le workflow [#31879239096](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/31879239096) du commit `3bc7772` est **vert**. Lint, secrets scan, audit dépendances, SAST, smoke tests et image-security sont terminés avec succès. L’image de déploiement reste non construite/scannée car aucun Dockerfile n’existe encore. |
 
 ## Ce qui est terminé
 
@@ -75,7 +75,7 @@
 
 - `PATRON-ASSIGNMENT-READ-01` publié par `6df4c55` et validé par CI `31855776751` : le contrat `SMART_AO_V8_PATRON_ASSIGNMENT_READ_01_CONTRAT.md` fixe deux routes GET patron, sans nouvelle migration : `GET /api/v1/patron/assignments?case_id?&state?&limit=1..200` et `GET /api/v1/patron/assignments/{assignment_id}/journal?limit=1..200`. La projection ferme tenant, identité cible, auteur, commandes, corrélation, audit, texte libre, documents et finance. La liste est triée par affaire puis affectation ; le journal est borné et trié par date décroissante puis ID. Les tests couvrent `200`, `401`, `403`, `404`, `422`, filtre, borne, neutralité et audit de refus. Le snapshot OpenAPI contient onze opérations. Aucune migration `0024` n’est nécessaire.
 
-- `PATRON-ASSIGNMENT-INTERACTIONS-READ-01` implémenté localement : le contrat `SMART_AO_V8_PATRON_ASSIGNMENT_INTERACTIONS_READ_01_CONTRAT.md` ouvre `GET /api/v1/patron/assignments/{assignment_id}/interactions?kind?&limit=1..200`, sans migration. La projection fusionne accusé, clarification et indisponibilité en ordre déterministe, puis ferme note, sujet, question, scope demandé, raison, note d’impact, identité, membership, commande, corrélation, audit, documents et finance. `PATRON_ADMIN` peut lire les signaux structurés ; le collaborateur standard reçoit `403` audité ; une affectation étrangère reste `404` neutre. Les tests couvrent `200`, `401`, `403`, `404`, `422`, filtre fermé, borne et non-fuite. L’OpenAPI compte douze opérations.
+- `PATRON-ASSIGNMENT-INTERACTIONS-READ-01` publié par `3bc7772` et validé par CI `31879239096` : le contrat `SMART_AO_V8_PATRON_ASSIGNMENT_INTERACTIONS_READ_01_CONTRAT.md` ouvre `GET /api/v1/patron/assignments/{assignment_id}/interactions?kind?&limit=1..200`, sans migration. La projection fusionne accusé, clarification et indisponibilité en ordre déterministe, puis ferme note, sujet, question, scope demandé, raison, note d’impact, identité, membership, commande, corrélation, audit, documents et finance. `PATRON_ADMIN` peut lire les signaux structurés ; le collaborateur standard reçoit `403` audité ; une affectation étrangère reste `404` neutre. Les tests couvrent `200`, `401`, `403`, `404`, `422`, filtre fermé, borne et non-fuite. L’OpenAPI compte douze opérations.
 
 ## Prochaine action unique
 

@@ -110,4 +110,4 @@
 - [x] Ajouter les DTO Pydantic fermés et le lecteur tenant-scopé des accusés, demandes de clarification et indisponibilités utiles au patron.
 - [x] Exposer les routes de lecture patron et vérifier le refus explicite d’un collaborateur standard, sans contourner le bearer réel.
 - [x] Écrire les tests d’intégration patron/collaborateur : liste, filtres, ordre, borne, `200`, `401`, `403`, `404`, `422`, tenant et non-fuites.
-- [ ] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub.
+- [x] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub (commit `3bc7772`, workflow `31879239096` vert).

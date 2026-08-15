@@ -1,6 +1,6 @@
 # SMART_AO V8 — PATRON-ASSIGNMENT-INTERACTIONS-READ-01 — Contrat normatif
 
-**Statut : implémenté localement, publication en attente de CI GitHub.**
+**Statut : publié par `3bc7772`, CI `31879239096` verte.**
 
 Cette frontière permet au patron de lire les trois faits opérationnels produits par les collaborateurs sur une affectation : accusé de réception, demande de clarification et indisponibilité. Elle ne crée, ne répond, ne modifie et ne clôture aucune interaction ; elle ne calcule ni priorité, ni action patron, ni impact, ni réaffectation.
 
@@ -74,4 +74,4 @@ Après implémentation, le snapshot OpenAPI Assignment/patron passe de onze à *
 | Persistance | Aucun UPDATE/DELETE/INSERT sur les trois registres pendant une lecture ; aucune migration nouvelle. |
 | OpenAPI | Snapshot à douze opérations et registre Markdown détaillant paramètres, réponses et exclusions. |
 
-Le slice est prêt à être publié après Ruff, tests API/PostgreSQL, suite backend complète, cycle Alembic, scan de secrets, `git diff --check` et OpenAPI régénérée. La CI GitHub verte reste la condition de clôture.
+Le slice est publié après Ruff, tests API/PostgreSQL, suite backend complète, cycle Alembic, scan de secrets, `git diff --check`, OpenAPI régénérée et CI GitHub verte.
