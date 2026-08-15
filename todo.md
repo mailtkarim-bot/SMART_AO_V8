@@ -99,3 +99,9 @@
 - [x] Écrire les scénarios API couvrant `201`, `200`, `403`, `404`, `409`, `422` et l’absence de fuite de motif ou de données protégées.
 - [x] Étendre le benchmark append-only à `ASSIGNMENT_ENDED`, régénérer l’OpenAPI à neuf opérations et mettre à jour le registre Markdown.
 - [x] Valider Ruff, pytest, Alembic, scan de secrets, diff, CI GitHub puis publier le slice et l’état durable (commit `a3fa73a`, workflow `31853564951` vert).
+- [x] Auditer les projections Assignment existantes, les capacités patron, les journaux append-only et les conventions HTTP/ReBAC applicables au cockpit patron.
+- [x] Figer le contrat normatif du cockpit patron de lecture : vues de liste/détail, données autorisées, non-fuites, pagination/borne, filtres et erreurs publiques.
+- [x] Définir les DTO Pydantic fermés et implémenter le lecteur applicatif tenant-scopé des affectations et de leurs journaux patron.
+- [x] Exposer les routes de lecture patron avec bearer réel, capability auditée, projection fermée et OpenAPI détaillée.
+- [x] Écrire les tests d’intégration PostgreSQL/API : liste, détail, journal, tri, borne, `401`, `403`, `404`, `422`, tenant et absence de fuite financière ou sensible.
+- [ ] Régénérer le snapshot OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub.

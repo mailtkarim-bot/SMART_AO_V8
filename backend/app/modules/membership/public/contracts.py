@@ -46,3 +46,76 @@ class AssignmentHistoryResponse(PublicResponseModel):
     case_id: UUID
     case_lifecycle: str
     items: list[AssignmentHistoryItemResponse]
+
+
+PatronAssignmentScopeAction = Literal[
+    "case.dce.read",
+    "dce.requirement.confirm",
+    "document.administrative.read",
+    "preparation.transmit",
+    "assignment.acknowledge",
+    "assignment.clarify",
+    "assignment.history.read",
+    "assignment.unavailability",
+]
+PatronAssignmentState = Literal["ACTIVE", "SUSPENDED", "ENDED", "EXPIRED"]
+PatronCaseLifecycle = Literal["ACTIVE", "STOPPED", "ARCHIVED"]
+PatronAssignmentJournalEventType = Literal[
+    "ASSIGNMENT_CREATED",
+    "ASSIGNMENT_SCOPE_AMENDED",
+    "ASSIGNMENT_SUSPENDED",
+    "ASSIGNMENT_REACTIVATED",
+    "ASSIGNMENT_ENDED",
+]
+PatronAssignmentReasonCode = Literal[
+    "PATRON_SUSPENDED",
+    "WORKLOAD_REALLOCATION",
+    "CASE_PAUSED",
+    "ACCESS_REVIEW",
+    "PATRON_ENDED",
+    "CASE_STOPPED",
+    "CASE_ARCHIVED",
+    "COLLABORATOR_UNAVAILABLE",
+    "MEMBERSHIP_REVOKED",
+    "PATRON_REACTIVATED",
+    "CASE_RESUMED",
+    "ACCESS_REVIEW_CLEARED",
+]
+
+
+class PatronAssignmentCockpitItemResponse(PublicResponseModel):
+    assignment_id: UUID
+    case_id: UUID
+    case_title: str
+    case_lifecycle: PatronCaseLifecycle
+    state: PatronAssignmentState
+    aggregate_revision: int = Field(ge=0)
+    starts_at: datetime
+    ends_at: datetime | None = None
+    ended_at: datetime | None = None
+    scope_actions: list[PatronAssignmentScopeAction]
+    scope_classifications: list[Literal["INTERNAL_OPERATIONAL"]]
+
+
+class PatronAssignmentCockpitListResponse(PublicResponseModel):
+    items: list[PatronAssignmentCockpitItemResponse]
+
+
+class PatronAssignmentJournalItemResponse(PublicResponseModel):
+    record_id: UUID
+    recorded_at: datetime
+    event_type: PatronAssignmentJournalEventType
+    previous_revision: int | None = Field(default=None, ge=0)
+    resulting_revision: int = Field(ge=0)
+    previous_state: PatronAssignmentState | None = None
+    resulting_state: PatronAssignmentState
+    reason_code: PatronAssignmentReasonCode | None = None
+    previous_scope_actions: list[PatronAssignmentScopeAction] | None = None
+    previous_scope_classifications: list[Literal["INTERNAL_OPERATIONAL"]] | None = None
+    resulting_scope_actions: list[PatronAssignmentScopeAction]
+    resulting_scope_classifications: list[Literal["INTERNAL_OPERATIONAL"]]
+
+
+class PatronAssignmentJournalResponse(PublicResponseModel):
+    assignment: PatronAssignmentCockpitItemResponse
+    items: list[PatronAssignmentJournalItemResponse]

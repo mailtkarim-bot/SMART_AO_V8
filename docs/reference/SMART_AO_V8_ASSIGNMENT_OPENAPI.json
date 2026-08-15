@@ -1205,6 +1205,324 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "PatronAssignmentCockpitItemResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregate_revision": {
+            "minimum": 0.0,
+            "title": "Aggregate Revision",
+            "type": "integer"
+          },
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "case_id": {
+            "format": "uuid",
+            "title": "Case Id",
+            "type": "string"
+          },
+          "case_lifecycle": {
+            "enum": [
+              "ACTIVE",
+              "STOPPED",
+              "ARCHIVED"
+            ],
+            "title": "Case Lifecycle",
+            "type": "string"
+          },
+          "case_title": {
+            "title": "Case Title",
+            "type": "string"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "scope_actions": {
+            "items": {
+              "enum": [
+                "case.dce.read",
+                "dce.requirement.confirm",
+                "document.administrative.read",
+                "preparation.transmit",
+                "assignment.acknowledge",
+                "assignment.clarify",
+                "assignment.history.read",
+                "assignment.unavailability"
+              ],
+              "type": "string"
+            },
+            "title": "Scope Actions",
+            "type": "array"
+          },
+          "scope_classifications": {
+            "items": {
+              "const": "INTERNAL_OPERATIONAL",
+              "type": "string"
+            },
+            "title": "Scope Classifications",
+            "type": "array"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "ENDED",
+              "EXPIRED"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "case_id",
+          "case_title",
+          "case_lifecycle",
+          "state",
+          "aggregate_revision",
+          "starts_at",
+          "scope_actions",
+          "scope_classifications"
+        ],
+        "title": "PatronAssignmentCockpitItemResponse",
+        "type": "object"
+      },
+      "PatronAssignmentCockpitListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PatronAssignmentCockpitItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PatronAssignmentCockpitListResponse",
+        "type": "object"
+      },
+      "PatronAssignmentJournalItemResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "event_type": {
+            "enum": [
+              "ASSIGNMENT_CREATED",
+              "ASSIGNMENT_SCOPE_AMENDED",
+              "ASSIGNMENT_SUSPENDED",
+              "ASSIGNMENT_REACTIVATED",
+              "ASSIGNMENT_ENDED"
+            ],
+            "title": "Event Type",
+            "type": "string"
+          },
+          "previous_revision": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Revision"
+          },
+          "previous_scope_actions": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "case.dce.read",
+                    "dce.requirement.confirm",
+                    "document.administrative.read",
+                    "preparation.transmit",
+                    "assignment.acknowledge",
+                    "assignment.clarify",
+                    "assignment.history.read",
+                    "assignment.unavailability"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Scope Actions"
+          },
+          "previous_scope_classifications": {
+            "anyOf": [
+              {
+                "items": {
+                  "const": "INTERNAL_OPERATIONAL",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Scope Classifications"
+          },
+          "previous_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ACTIVE",
+                  "SUSPENDED",
+                  "ENDED",
+                  "EXPIRED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous State"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "enum": [
+                  "PATRON_SUSPENDED",
+                  "WORKLOAD_REALLOCATION",
+                  "CASE_PAUSED",
+                  "ACCESS_REVIEW",
+                  "PATRON_ENDED",
+                  "CASE_STOPPED",
+                  "CASE_ARCHIVED",
+                  "COLLABORATOR_UNAVAILABLE",
+                  "MEMBERSHIP_REVOKED",
+                  "PATRON_REACTIVATED",
+                  "CASE_RESUMED",
+                  "ACCESS_REVIEW_CLEARED"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "record_id": {
+            "format": "uuid",
+            "title": "Record Id",
+            "type": "string"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "resulting_revision": {
+            "minimum": 0.0,
+            "title": "Resulting Revision",
+            "type": "integer"
+          },
+          "resulting_scope_actions": {
+            "items": {
+              "enum": [
+                "case.dce.read",
+                "dce.requirement.confirm",
+                "document.administrative.read",
+                "preparation.transmit",
+                "assignment.acknowledge",
+                "assignment.clarify",
+                "assignment.history.read",
+                "assignment.unavailability"
+              ],
+              "type": "string"
+            },
+            "title": "Resulting Scope Actions",
+            "type": "array"
+          },
+          "resulting_scope_classifications": {
+            "items": {
+              "const": "INTERNAL_OPERATIONAL",
+              "type": "string"
+            },
+            "title": "Resulting Scope Classifications",
+            "type": "array"
+          },
+          "resulting_state": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "ENDED",
+              "EXPIRED"
+            ],
+            "title": "Resulting State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "record_id",
+          "recorded_at",
+          "event_type",
+          "resulting_revision",
+          "resulting_state",
+          "resulting_scope_actions",
+          "resulting_scope_classifications"
+        ],
+        "title": "PatronAssignmentJournalItemResponse",
+        "type": "object"
+      },
+      "PatronAssignmentJournalResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assignment": {
+            "$ref": "#/components/schemas/PatronAssignmentCockpitItemResponse"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PatronAssignmentJournalItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "assignment",
+          "items"
+        ],
+        "title": "PatronAssignmentJournalResponse",
+        "type": "object"
+      },
       "PrepareDceStagingRequest": {
         "additionalProperties": false,
         "description": "Public intent; the server allocates the opaque storage object identity.",
@@ -2348,6 +2666,108 @@
         ]
       }
     },
+    "/api/v1/patron/assignments": {
+      "get": {
+        "operationId": "list_patron_assignments_api_v1_patron_assignments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "case_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Case Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ACTIVE",
+                    "SUSPENDED",
+                    "ENDED",
+                    "EXPIRED"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatronAssignmentCockpitListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability patron insuffisante."
+          },
+          "404": {
+            "description": "Affectation absente ou hors tenant : réponse neutre."
+          },
+          "422": {
+            "description": "Paramètre de lecture invalide ou hors borne."
+          }
+        },
+        "summary": "List Patron Assignments",
+        "tags": [
+          "patron-assignments"
+        ]
+      }
+    },
     "/api/v1/patron/assignments/{assignment_id}/end": {
       "post": {
         "operationId": "end_case_assignment_api_v1_patron_assignments__assignment_id__end_post",
@@ -2427,6 +2847,79 @@
           }
         },
         "summary": "End Case Assignment",
+        "tags": [
+          "patron-assignments"
+        ]
+      }
+    },
+    "/api/v1/patron/assignments/{assignment_id}/journal": {
+      "get": {
+        "operationId": "get_patron_assignment_journal_api_v1_patron_assignments__assignment_id__journal_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatronAssignmentJournalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Capability patron insuffisante."
+          },
+          "404": {
+            "description": "Affectation absente ou hors tenant : réponse neutre."
+          },
+          "422": {
+            "description": "Paramètre de lecture invalide ou hors borne."
+          }
+        },
+        "summary": "Get Patron Assignment Journal",
         "tags": [
           "patron-assignments"
         ]

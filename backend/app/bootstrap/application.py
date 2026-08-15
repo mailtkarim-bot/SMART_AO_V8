@@ -36,6 +36,9 @@ from app.interfaces.http.routes.dce_requirement_confirmations import (
 )
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
+from app.interfaces.http.routes.patron_assignment_cockpit import (
+    build_patron_assignment_cockpit_router,
+)
 from app.interfaces.http.routes.patron_assignment_management import (
     build_patron_assignment_management_router,
 )
@@ -85,6 +88,9 @@ from app.modules.membership.application.assignment_history import AssignmentHist
 from app.modules.membership.application.patron_assignment import (
     PatronAssignmentManagementService,
     patron_assignment_handlers,
+)
+from app.modules.membership.application.patron_assignment_cockpit import (
+    PatronAssignmentCockpitService,
 )
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
@@ -342,6 +348,10 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        patron_assignment_cockpit_service = PatronAssignmentCockpitService(
+            session_factory=runtime.session_factory,
+            policy=security_policy,
+        )
         app.include_router(
             build_case_dce_reading_router(
                 runtime=runtime,
@@ -393,6 +403,12 @@ def create_app(
         app.include_router(
             build_patron_assignment_management_router(
                 service=patron_assignment_management_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_assignment_cockpit_router(
+                service=patron_assignment_cockpit_service,
                 security_runtime=security_runtime,
             )
         )

@@ -1251,3 +1251,151 @@ def test_patron_assignment_end_requires_closed_reason(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_cockpit_lists_filtered_assignments_and_closed_journal(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(database_engine, role="PATRON_ADMIN")
+    case_id, target_membership_id = _seed_patron_case_and_target(
+        session_factory,
+        tenant_id=tenant_id,
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(tokens, identity_id=identity_id, session_id=session_id)
+    creation_payload = _patron_create_payload(target_membership_id)
+    creation = client.post(
+        f"/api/v1/patron/cases/{case_id}/assignments",
+        json=creation_payload,
+        headers=headers,
+    )
+    assignment_id = UUID(creation_payload["assignment_id"])
+
+    active_list = client.get(
+        "/api/v1/patron/assignments",
+        params={"case_id": str(case_id), "state": "ACTIVE", "limit": 1},
+        headers=headers,
+    )
+    ending = client.post(
+        f"/api/v1/patron/assignments/{assignment_id}/end",
+        json=_patron_end_payload(end_reason_code="CASE_STOPPED"),
+        headers=headers,
+    )
+    ended_list = client.get(
+        "/api/v1/patron/assignments",
+        params={"case_id": str(case_id), "state": "ENDED", "limit": 1},
+        headers=headers,
+    )
+    journal = client.get(
+        f"/api/v1/patron/assignments/{assignment_id}/journal",
+        params={"limit": 2},
+        headers=headers,
+    )
+
+    assert creation.status_code == 201
+    assert active_list.status_code == 200
+    assert active_list.json()["items"][0]["assignment_id"] == str(assignment_id)
+    assert active_list.json()["items"][0]["state"] == "ACTIVE"
+    assert ending.status_code == 201
+    assert ended_list.status_code == 200
+    assert ended_list.json()["items"][0]["state"] == "ENDED"
+    assert ended_list.json()["items"][0]["ended_at"] is not None
+    assert journal.status_code == 200
+    assert journal.json()["assignment"]["state"] == "ENDED"
+    assert {item["event_type"] for item in journal.json()["items"]} == {
+        "ASSIGNMENT_CREATED",
+        "ASSIGNMENT_ENDED",
+    }
+    prohibited_assignment = {
+        "tenant_id",
+        "membership_id",
+        "granted_by_membership_id",
+        "command_id",
+        "correlation_id",
+    }
+    prohibited_journal = prohibited_assignment | {"author_membership_id", "target_membership_id"}
+    assert not prohibited_assignment.intersection(ended_list.json()["items"][0])
+    assert not prohibited_journal.intersection(journal.json()["items"][0])
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_cockpit_denies_collaborator_and_hides_foreign_journal(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, membership_id, session_id = _seed_principal(database_engine)
+    _, assignment_id = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=membership_id,
+        scope_actions=["case.dce.read"],
+    )
+    client, tokens = _client(session_factory)
+
+    forbidden = client.get(
+        "/api/v1/patron/assignments",
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert forbidden.status_code == 403
+    assert forbidden.json() == {"detail": "FORBIDDEN"}
+    with session_factory() as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.event_type == "AUTHZ_DENIED",
+                SecurityAuditEventRecord.action == "assignment.manage",
+                SecurityAuditEventRecord.reason_code == "ASSIGNMENT_PATRON_REQUIRED",
+            )
+        )
+    assert audit is not None
+
+    patron_tenant, patron_identity_id, _, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    del patron_tenant
+    neutral = client.get(
+        f"/api/v1/patron/assignments/{assignment_id}/journal",
+        headers=_headers(
+            tokens,
+            identity_id=patron_identity_id,
+            session_id=patron_session_id,
+        ),
+    )
+
+    assert neutral.status_code == 404
+    assert neutral.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_assignment_cockpit_requires_bearer_and_valid_bounded_parameters(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, identity_id, _, session_id = _seed_principal(database_engine, role="PATRON_ADMIN")
+    del tenant_id
+    client, tokens = _client(session_factory)
+
+    missing_bearer = client.get("/api/v1/patron/assignments")
+    invalid_limit = client.get(
+        "/api/v1/patron/assignments",
+        params={"limit": 0},
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+    invalid_state = client.get(
+        "/api/v1/patron/assignments",
+        params={"state": "PENDING_REVIEW"},
+        headers=_headers(tokens, identity_id=identity_id, session_id=session_id),
+    )
+
+    assert missing_bearer.status_code == 401
+    assert invalid_limit.status_code == 422
+    assert invalid_state.status_code == 422
