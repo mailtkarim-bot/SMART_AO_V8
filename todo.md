@@ -98,4 +98,4 @@
 - [x] Écrire les scénarios PostgreSQL de fin depuis `ACTIVE` et `SUSPENDED`, rejeu, états non terminables, conflit de révision et immutabilité du journal.
 - [x] Écrire les scénarios API couvrant `201`, `200`, `403`, `404`, `409`, `422` et l’absence de fuite de motif ou de données protégées.
 - [x] Étendre le benchmark append-only à `ASSIGNMENT_ENDED`, régénérer l’OpenAPI à neuf opérations et mettre à jour le registre Markdown.
-- [ ] Valider Ruff, pytest, Alembic, scan de secrets, diff, CI GitHub puis publier le slice et l’état durable.
+- [x] Valider Ruff, pytest, Alembic, scan de secrets, diff, CI GitHub puis publier le slice et l’état durable (commit `a3fa73a`, workflow `31853564951` vert).
