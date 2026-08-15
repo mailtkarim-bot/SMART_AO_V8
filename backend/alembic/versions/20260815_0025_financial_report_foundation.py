@@ -52,12 +52,14 @@ def upgrade() -> None:
     )
     op.create_index("ix_financial_report_lines_tenant_id", "financial_report_lines", ["tenant_id"])
     op.create_index("ix_financial_line__tenant_snapshot", "financial_report_lines", ["tenant_id", "snapshot_id", "created_at"])
-    for table in ("financial_report_snapshots", "financial_report_lines"):
-        op.execute(f"CREATE TRIGGER trg_{table}_append_only BEFORE UPDATE OR DELETE ON {table} FOR EACH ROW EXECUTE FUNCTION prevent_case_assignment_history_mutation()")
+    op.execute(
+        "CREATE TRIGGER trg_financial_report_lines_append_only BEFORE UPDATE OR DELETE "
+        "ON financial_report_lines FOR EACH ROW "
+        "EXECUTE FUNCTION prevent_case_assignment_history_mutation()"
+    )
 
 
 def downgrade() -> None:
-    for table in ("financial_report_lines", "financial_report_snapshots"):
-        op.execute(f"DROP TRIGGER IF EXISTS trg_{table}_append_only ON {table}")
+    op.execute("DROP TRIGGER IF EXISTS trg_financial_report_lines_append_only ON financial_report_lines")
     op.drop_table("financial_report_lines")
     op.drop_table("financial_report_snapshots")

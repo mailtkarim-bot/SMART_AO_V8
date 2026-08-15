@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01` — publié par [`bc41d33`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/bc41d33) et validé par CI `31880338075`. Le slice ajoute la prise en compte patron append-only d’un accusé, d’une clarification ou d’une indisponibilité, sans modifier l’interaction source, l’affectation, la Case ni une donnée financière.
+`FINANCIAL-REPORT-PUBLICATION-01` — implémenté et validé localement, en attente de commit puis de CI GitHub. La frontière ouvre exclusivement `POST /api/v1/patron/cases/{case_id}/financial-reports/{report_id}/publications` pour basculer un snapshot patron `DRAFT` en `PUBLISHED` sous verrou transactionnel, sans exposer de montant dans le receipt.
 
 ## Dernier état vert
 
@@ -78,10 +78,11 @@
 - `PATRON-ASSIGNMENT-INTERACTIONS-READ-01` publié par `3bc7772` et validé par CI `31879239096` : le contrat `SMART_AO_V8_PATRON_ASSIGNMENT_INTERACTIONS_READ_01_CONTRAT.md` ouvre `GET /api/v1/patron/assignments/{assignment_id}/interactions?kind?&limit=1..200`, sans migration. La projection fusionne accusé, clarification et indisponibilité en ordre déterministe, puis ferme note, sujet, question, scope demandé, raison, note d’impact, identité, membership, commande, corrélation, audit, documents et finance. `PATRON_ADMIN` peut lire les signaux structurés ; le collaborateur standard reçoit `403` audité ; une affectation étrangère reste `404` neutre. Les tests couvrent `200`, `401`, `403`, `404`, `422`, filtre fermé, borne et non-fuite. L’OpenAPI compte douze opérations.
 
 - `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01` implémenté localement : `POST /api/v1/patron/assignments/{assignment_id}/interaction-validations` accepte exclusivement les trois paires type/code fermées. Le handler verrouille l’affectation et la source tenant-scopées, écrit `assignment_interaction_patron_validations` append-only, émet `AssignmentInteractionValidated` et retourne un receipt sans source, code ni texte libre. La migration `0024` ajoute les FKs, unicité de source, checks type/code, index tenant et trigger anti-update/delete. Le snapshot OpenAPI compte treize opérations. Le rapport de couverture de la base douze opérations et la spécification préparatoire financière sont dans `docs/reference/`.
+- `FINANCIAL-REPORT-PUBLICATION-01` est validé localement : la capability fermée `financial.report.publish` est attribuée au seul `PATRON_ADMIN`; le service refuse un collaborateur avec `403 FORBIDDEN` avant toute résolution de snapshot. Le handler verrouille le snapshot tenant-scopé avec `FOR UPDATE`, exige `DRAFT` et la révision attendue, crée l’acte `financial_report_publications`, passe le snapshot à `PUBLISHED`, renseigne l’horodatage serveur et incrémente sa révision dans la transaction `snapshot + publication + événement + outbox + receipt`. La migration `0026` crée le registre immutable avec unicités snapshot/commande; seules les lignes financières restent append-only, car le snapshot doit autoriser sa transition unique de publication. Le receipt `FINANCIAL_REPORT_PUBLISHED` ne contient ni montant, ni libellé, ni source, ni hash ni règle de calcul. L’OpenAPI contient quinze opérations. Validation locale : `git diff --check`, Ruff, detect-secrets et **308 tests backend verts**; quatre avertissements tiers de dépréciation sont connus. La CI GitHub précédente (`0859ca2`) est verte, mais une CI propre à cette frontière doit encore être déclenchée par le prochain push.
 
 ## Prochaine action unique
 
-Ouvrir la frontière de lecture du cockpit patron des affectations et de leurs journaux. Le VPS reste requis uniquement pour configurer l’URL HTTPS et tester le parcours navigateur réel.
+Commiter puis pousser `FINANCIAL-REPORT-PUBLICATION-01`, attendre la CI GitHub et inscrire son identifiant vert. Après cette preuve, choisir la prochaine frontière entre la création patron de snapshots `DRAFT` et le wizard frontend du cockpit patron. Le VPS reste requis uniquement pour configurer l’URL HTTPS et tester le parcours navigateur réel.
 
 ## Décisions ouvertes
 

@@ -89,6 +89,10 @@ from app.modules.membership.application.assignment import (
 )
 from app.modules.membership.application.assignment_history import AssignmentHistoryService
 from app.modules.membership.application.financial_report import PatronFinancialReportService
+from app.modules.membership.application.financial_report_publication import (
+    PatronFinancialReportPublicationService,
+    PublishFinancialReportHandler,
+)
 from app.modules.membership.application.patron_assignment import (
     PatronAssignmentManagementService,
     patron_assignment_handlers,
@@ -144,6 +148,7 @@ class AppRuntime:
                     RecordDceRequirementMaterializationRunHandler()
                 ),
                 "RecordDceRequirementConfirmation": RecordDceRequirementConfirmationHandler(),
+                "PublishFinancialReport": PublishFinancialReportHandler(),
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
                 **assignment_handlers(),
@@ -360,6 +365,11 @@ def create_app(
             session_factory=runtime.session_factory,
             policy=security_policy,
         )
+        patron_financial_report_publication_service = PatronFinancialReportPublicationService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         app.include_router(
             build_case_dce_reading_router(
                 runtime=runtime,
@@ -423,6 +433,7 @@ def create_app(
         app.include_router(
             build_patron_financial_report_router(
                 service=patron_financial_report_service,
+                publication_service=patron_financial_report_publication_service,
                 security_runtime=security_runtime,
             )
         )

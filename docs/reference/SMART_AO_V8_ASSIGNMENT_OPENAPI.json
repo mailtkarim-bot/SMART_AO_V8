@@ -1163,6 +1163,62 @@
         "title": "EndPatronCaseAssignmentRequest",
         "type": "object"
       },
+      "FinancialReportPublicationResponse": {
+        "additionalProperties": false,
+        "description": "Closed receipt intentionally excluding every financial value and source.",
+        "properties": {
+          "aggregate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/AggregateReferenceResponse"
+            },
+            "title": "Aggregate Refs",
+            "type": "array"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result_code": {
+            "const": "FINANCIAL_REPORT_PUBLISHED",
+            "title": "Result Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "SUCCEEDED",
+            "default": "SUCCEEDED",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "result_code",
+          "aggregate_refs",
+          "event_ids"
+        ],
+        "title": "FinancialReportPublicationResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2036,6 +2092,45 @@
           "status"
         ],
         "title": "ProjectionStatusResponse",
+        "type": "object"
+      },
+      "PublishFinancialReportRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "expected_revision"
+        ],
+        "title": "PublishFinancialReportRequest",
         "type": "object"
       },
       "ReactivatePatronCaseAssignmentRequest": {
@@ -3904,6 +3999,93 @@
           }
         },
         "summary": "Get Financial Report",
+        "tags": [
+          "patron-financial-reports"
+        ]
+      }
+    },
+    "/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/publications": {
+      "post": {
+        "operationId": "publish_financial_report_api_v1_patron_cases__case_id__financial_reports__report_id__publications_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishFinancialReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rejeu idempotent de la publication."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialReportPublicationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Publication financière réservée au patron."
+          },
+          "404": {
+            "description": "Rapport absent ou hors tenant."
+          },
+          "409": {
+            "description": "Conflit de révision ou d’idempotence."
+          },
+          "422": {
+            "description": "Invariant de publication refusé."
+          }
+        },
+        "summary": "Publish Financial Report",
         "tags": [
           "patron-financial-reports"
         ]

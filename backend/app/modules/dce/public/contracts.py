@@ -19,6 +19,7 @@ from app.modules.dce.application.commands import (
     CreateConsultationCommand,
     EndCaseAssignmentCommand,
     EndReasonCode,
+    PublishFinancialReportCommand,
     ReactivateCaseAssignmentCommand,
     ReactivationReasonCode,
     RecordDceRequirementConfirmationCommand,
@@ -289,6 +290,32 @@ class AssignmentCommandResponse(PublicResponseModel):
         "CASE_ASSIGNMENT_ENDED",
         "INTERACTION_VALIDATED",
     ]
+    aggregate_refs: list[AggregateReferenceResponse]
+    event_ids: list[UUID]
+    replayed: bool = False
+
+
+class PublishFinancialReportRequest(PublicRequestModel):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    expected_revision: int = Field(ge=0)
+
+    def to_command(self, *, case_id: UUID, report_id: UUID) -> PublishFinancialReportCommand:
+        return PublishFinancialReportCommand(
+            **self.model_dump(),
+            case_id=case_id,
+            report_id=report_id,
+        )
+
+
+class FinancialReportPublicationResponse(PublicResponseModel):
+    """Closed receipt intentionally excluding every financial value and source."""
+
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal["FINANCIAL_REPORT_PUBLISHED"]
     aggregate_refs: list[AggregateReferenceResponse]
     event_ids: list[UUID]
     replayed: bool = False

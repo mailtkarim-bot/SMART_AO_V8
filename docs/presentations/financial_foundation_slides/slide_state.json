@@ -1,0 +1,122 @@
+{
+  "project_info": {
+    "title": "Fondation financière patron",
+    "created": 1786794874.74,
+    "last_updated": 1786794954.336,
+    "total_slides": 10
+  },
+  "slides": [
+    {
+      "id": "cover",
+      "state": "edited",
+      "pageNum": 1
+    },
+    {
+      "id": "confidentiality",
+      "state": "edited",
+      "pageNum": 2
+    },
+    {
+      "id": "snapshots",
+      "state": "edited",
+      "pageNum": 3
+    },
+    {
+      "id": "categories",
+      "state": "edited",
+      "pageNum": 4
+    },
+    {
+      "id": "financial_route",
+      "state": "edited",
+      "pageNum": 5
+    },
+    {
+      "id": "redaction",
+      "state": "edited",
+      "pageNum": 6
+    },
+    {
+      "id": "openapi",
+      "state": "edited",
+      "pageNum": 7
+    },
+    {
+      "id": "validation",
+      "state": "edited",
+      "pageNum": 8
+    },
+    {
+      "id": "next",
+      "state": "edited",
+      "pageNum": 9
+    },
+    {
+      "id": "closing",
+      "state": "edited",
+      "pageNum": 10
+    }
+  ],
+  "outline": [
+    {
+      "id": "cover",
+      "title": "Fondation financière patron",
+      "summary": "Titre et sous-titre de la synthèse architecturale.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "confidentiality",
+      "title": "Une confidentialité sans compromis",
+      "summary": "Patron uniquement, pas de décision automatique, aucune visibilité collaborateur.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "snapshots",
+      "title": "Le snapshot sépare calcul et consultation",
+      "summary": "Deux registres immuables : en-tête et lignes financières.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "categories",
+      "title": "Sept rubriques, un format monétaire",
+      "summary": "Rubriques financières et unités mineures sans float.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "financial_route",
+      "title": "Une route strictement patronale",
+      "summary": "Route GET, capability dédiée et neutralité tenant.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "redaction",
+      "title": "Aucune trace exploitable",
+      "summary": "Projection fermée, no-store et audit redigé.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "openapi",
+      "title": "14 opérations OpenAPI contrôlées",
+      "summary": "Répartition et rôle de la nouvelle lecture financière.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "validation",
+      "title": "Validation technique locale",
+      "summary": "Migration, accès, montants et tests verts.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "next",
+      "title": "Prochaine frontière : publier le snapshot",
+      "summary": "Spécification de publication patron append-only.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "closing",
+      "title": "Un cockpit de contrôle patron",
+      "summary": "Conclusion sur la précision et la confidentialité.",
+      "image_plan": "Use a suitable image if needed"
+    }
+  ]
+}

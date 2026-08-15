@@ -699,6 +699,7 @@ class FinancialReportSnapshotRecord(TenantScopedRecord, Base):
     state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
     currency_code: Mapped[str] = mapped_column(sa.CHAR(3), nullable=False)
     ruleset_version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    aggregate_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     calculated_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     sales_total_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
@@ -709,6 +710,37 @@ class FinancialReportSnapshotRecord(TenantScopedRecord, Base):
     gross_margin_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     gross_margin_rate_bps: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     forecast_cashflow_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+
+
+class FinancialReportPublicationRecord(TenantScopedRecord, Base):
+    """One immutable patron act that makes a financial snapshot readable."""
+
+    __tablename__ = "financial_report_publications"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "snapshot_id"],
+            ["financial_report_snapshots.tenant_id", "financial_report_snapshots.id"],
+            name="fk_financial_publication__snapshot",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "patron_membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_financial_publication__patron",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "snapshot_id", name="uq_financial_publication__snapshot"),
+        sa.UniqueConstraint("tenant_id", "command_id", name="uq_financial_publication__command"),
+        sa.Index("ix_financial_publication__tenant_snapshot", "tenant_id", "snapshot_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    snapshot_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    patron_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    published_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
 
 
 class FinancialReportLineRecord(TenantScopedRecord, Base):

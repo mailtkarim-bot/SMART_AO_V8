@@ -2,7 +2,7 @@
 
 **Statut :** référence générée et vérifiée.
 
-**Périmètre :** les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01`, les deux lectures `PATRON-ASSIGNMENT-READ-01`, la lecture `PATRON-ASSIGNMENT-INTERACTIONS-READ-01` et la validation `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01`.
+**Périmètre :** quinze opérations : les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01`, les deux lectures `PATRON-ASSIGNMENT-READ-01`, la lecture `PATRON-ASSIGNMENT-INTERACTIONS-READ-01`, la validation `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01`, la lecture financière patron et la publication financière `FINANCIAL-REPORT-PUBLICATION-01`.
 **Source de vérité exécutable :** `scripts/export_assignment_openapi.py`, qui produit le snapshot [`SMART_AO_V8_ASSIGNMENT_OPENAPI.json`](SMART_AO_V8_ASSIGNMENT_OPENAPI.json) depuis `create_app()` et ses dépendances SEC-01 réelles.
 
 Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et `/api/v1/patron`. Elles résolvent toujours l’acteur depuis le bearer serveur : aucun tenant, membership d’auteur, scope d’autorité, acteur ou contexte de test n’est accepté depuis le corps client.
@@ -20,6 +20,7 @@ Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et 
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/end` | `assignment.manage`, `PATRON_ADMIN` | Fin révisionnée et irréversible d’une affectation ouverte. |
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/interaction-validations` | `assignment.manage`, `PATRON_ADMIN` | Prise en compte patron append-only d’une interaction collaborateur. |
 | `GET` | `/api/v1/patron/cases/{case_id}/financial-reports/{report_id}` | `financial.report.read`, `PATRON_ADMIN` | Lecture `no-store` d’un snapshot financier publié et tenant-scopé. |
+| `POST` | `/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/publications` | `financial.report.publish`, `PATRON_ADMIN` | Publication atomique `DRAFT → PUBLISHED`, acte immutable, receipt sans montant. |
 | `GET` | `/api/v1/patron/assignments?case_id?&state?&limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Liste tenant-scopée, fermée et bornée des affectations d’autorité. |
 | `GET` | `/api/v1/patron/assignments/{assignment_id}/journal?limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Journal patron append-only fermé, tenant-scopé et borné. |
 | `GET` | `/api/v1/patron/assignments/{assignment_id}/interactions?kind?&limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Interactions collaborateur fermées, tenant-scopées et bornées. |
@@ -74,6 +75,8 @@ La fin n’accepte que `PATRON_ENDED`, `CASE_STOPPED`, `CASE_ARCHIVED`, `COLLABO
 La validation d’interaction n’accepte que les paires `ACKNOWLEDGEMENT/ACKNOWLEDGEMENT_NOTED`, `CLARIFICATION_REQUEST/CLARIFICATION_NOTED` et `UNAVAILABILITY_REPORT/UNAVAILABILITY_NOTED`. Elle est admise sur une interaction durable de la même affectation même si cette dernière est terminée, hors fenêtre ou si sa cible est inactive. Elle ne répond pas à la clarification, ne résout pas l’indisponibilité et ne modifie jamais la source. Le receipt masque l’interaction, le type et le code de validation ; une seconde validation de la même source retourne `422`.
 
 La lecture financière ne retourne qu’un snapshot `PUBLISHED` et ferme tenant, auteur, source, audit, stockage, hash et formule. Les rubriques autorisées sont chiffre d’affaires, coûts directs, frais généraux, sous-traitance, provision d’aléas, marge brute et trésorerie prévisionnelle ; chaque montant est un entier `*_minor` et la réponse porte `Cache-Control: no-store`.
+
+La publication financière exige `financial.report.publish`, détenue uniquement par le `PATRON_ADMIN`. Le contrôle patron intervient avant toute résolution du snapshot : un collaborateur reçoit donc `403 FORBIDDEN` sans lecture ni fuite financière. Sous verrou `FOR UPDATE`, seul un snapshot `DRAFT` à la révision attendue peut devenir `PUBLISHED`; l’acte `financial_report_publications`, l’événement et le receipt idempotent sont écrits dans la même transaction. Le receipt expose uniquement les références d’agrégat, les identifiants de commande et d’événements ainsi que `FINANCIAL_REPORT_PUBLISHED`; il exclut tout montant, libellé, source, hash et règle de calcul.
 
 ## Lectures du cockpit patron
 

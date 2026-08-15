@@ -134,3 +134,18 @@
 - [ ] Exécuter le contrôle de secrets, mettre à jour l’état durable puis committer, pousser et vérifier la CI de `FINANCIAL-REPORT-FOUNDATION-01`.
 - [ ] Rédiger la spécification de la prochaine écriture patron : publication ou validation explicite d’un snapshot financier sans mutation du calcul.
 - [ ] Préparer puis générer une présentation synthétique de la fondation financière patron et des 14 opérations OpenAPI.
+- [ ] Ajouter `financial.report.publish`, la commande Pydantic, le registre de publication append-only, l’événement/outbox et la route patron `DRAFT → PUBLISHED`.
+- [ ] Ajouter la révision d’agrégat du snapshot, verrouiller `DRAFT` avant publication et écrire `financial_report_publications` sans montant ni formule.
+- [x] Valider explicitement que le collaborateur standard obtient `403 FORBIDDEN` avant toute résolution ou fuite de snapshot financier.
+- [x] Écrire les tests d’intégration de publication : succès, rejeu, révision, double publication, tenant, refus collaborateur et non-fuite de montant.
+- [x] Générer les notes détaillées de la présentation financière patron et présenter à nouveau le deck avec script.
+- [ ] Régénérer le snapshot à quinze opérations après publication financière, contrôler les secrets, exécuter la suite complète et vérifier la CI GitHub.
+- [x] Créer l’acte immutable de publication, basculer exclusivement un snapshot `DRAFT` vers `PUBLISHED` et conserver le receipt sans montant.
+- [ ] Publier le commit de la route de publication financière seulement après CI verte couvrant les quinze opérations OpenAPI.
+- [x] Vérifier dans un même harnais que la publication réussit pour le patron et que le collaborateur est refusé sans lire le snapshot.
+- [x] Implémenter `PublishFinancialReportCommand`, son dispatcher, la mutation atomique du snapshot et l’acte `financial_report_publications` append-only.
+- [ ] Vérifier le handler et la route POST contre les cas `201`, `200`, `403`, `404`, `409` et `422` avant la CI.
+- [ ] Ne committer qu’après exécution locale des six codes de réponse et scan de secrets sans nouveau secret détecté.
+- [ ] Vérifier que le handler publie atomiquement, incrémente la révision et ne retourne aucun montant financier dans le receipt.
+- [ ] Afficher uniquement après vérification le code source final de la route POST et du handler SQLAlchemy de publication.
+- [x] Mettre à jour les notes de présentation avec le chemin de contrôle `PATRON_ADMIN → publication → registre immutable`.

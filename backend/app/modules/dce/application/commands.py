@@ -670,6 +670,16 @@ class ValidateAssignmentInteractionCommand(ApplicationCommand):
         return self
 
 
+class PublishFinancialReportCommand(ApplicationCommand):
+    """Make one immutable DRAFT financial snapshot readable to its patron."""
+
+    command_type = "PublishFinancialReport"
+
+    case_id: UUID
+    report_id: UUID
+    expected_revision: int = Field(ge=0)
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

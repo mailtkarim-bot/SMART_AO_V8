@@ -1832,3 +1832,142 @@ def test_patron_reads_published_financial_report_in_minor_units_and_collaborator
     assert patron_response.json()["lines"][0]["amount_minor"] == 10000
     assert "tenant_id" not in patron_response.json()
     assert collaborator_response.status_code == 403
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_collaborator_cannot_publish_draft_financial_report(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, patron_identity_id, patron_membership_id, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, _ = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=patron_membership_id,
+        scope_actions=["case.dce.read"],
+    )
+    report_id = uuid4()
+    with session_factory.begin() as session:
+        session.add(
+            FinancialReportSnapshotRecord(
+                id=report_id,
+                tenant_id=tenant_id,
+                case_id=case_id,
+                state="DRAFT",
+                currency_code="EUR",
+                ruleset_version=1,
+                aggregate_revision=0,
+                calculated_at=NOW,
+                published_at=None,
+                sales_total_minor=125000,
+                direct_cost_total_minor=70000,
+                overhead_total_minor=10000,
+                subcontracting_total_minor=5000,
+                contingency_total_minor=2500,
+                gross_margin_minor=37500,
+                gross_margin_rate_bps=3000,
+                forecast_cashflow_minor=18000,
+            )
+        )
+    client, tokens = _client(session_factory)
+    _, collaborator_identity_id, _, collaborator_session_id = _seed_principal(
+        database_engine,
+        tenant_id=tenant_id,
+    )
+    response = client.post(
+        f"/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/publications",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "expected_revision": 0,
+        },
+        headers=_headers(
+            tokens,
+            identity_id=collaborator_identity_id,
+            session_id=collaborator_session_id,
+        ),
+    )
+
+    with session_factory() as session:
+        snapshot = session.get(FinancialReportSnapshotRecord, report_id)
+    assert response.status_code == 403
+    assert response.json() == {"detail": "FORBIDDEN"}
+    assert snapshot is not None
+    assert snapshot.state == "DRAFT"
+    assert snapshot.published_at is None
+    assert snapshot.aggregate_revision == 0
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_publishes_draft_financial_report_without_financial_receipt(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, patron_identity_id, patron_membership_id, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, _ = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=patron_membership_id,
+        scope_actions=["case.dce.read"],
+    )
+    report_id = uuid4()
+    with session_factory.begin() as session:
+        session.add(
+            FinancialReportSnapshotRecord(
+                id=report_id,
+                tenant_id=tenant_id,
+                case_id=case_id,
+                state="DRAFT",
+                currency_code="EUR",
+                ruleset_version=1,
+                aggregate_revision=0,
+                calculated_at=NOW,
+                published_at=None,
+                sales_total_minor=125000,
+                direct_cost_total_minor=70000,
+                overhead_total_minor=10000,
+                subcontracting_total_minor=5000,
+                contingency_total_minor=2500,
+                gross_margin_minor=37500,
+                gross_margin_rate_bps=3000,
+                forecast_cashflow_minor=18000,
+            )
+        )
+    command_id = uuid4()
+    idempotency_key = uuid4()
+    client, tokens = _client(session_factory)
+    response = client.post(
+        f"/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/publications",
+        json={
+            "command_id": str(command_id),
+            "idempotency_key": str(idempotency_key),
+            "expected_revision": 0,
+        },
+        headers=_headers(
+            tokens,
+            identity_id=patron_identity_id,
+            session_id=patron_session_id,
+        ),
+    )
+
+    with session_factory() as session:
+        snapshot = session.get(FinancialReportSnapshotRecord, report_id)
+    assert response.status_code == 201, response.text
+    assert response.json()["result_code"] == "FINANCIAL_REPORT_PUBLISHED"
+    assert response.json()["replayed"] is False
+    assert "amount_minor" not in response.text
+    assert "gross_margin" not in response.text
+    assert snapshot is not None
+    assert snapshot.state == "PUBLISHED"
+    assert snapshot.published_at is not None
+    assert snapshot.aggregate_revision == 1
