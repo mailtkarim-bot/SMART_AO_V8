@@ -157,6 +157,7 @@
 - [x] Ajouter l’unicité partielle du seul brouillon `DRAFT` ouvert par affaire et valider le cycle Alembic.
 - [x] Implémenter le handler transactionnel : contrôle patron avant lecture, verrou Case, snapshot vide, événement, outbox et receipt idempotent.
 - [x] Exposer la route patron et écrire les tests `201/200/403/404/409/422`, concurrence et non-fuite financière.
+- [x] Publier `FINANCIAL-REPORT-DRAFT-CREATION-01` et vérifier la CI GitHub `31899212603` verte.
 - [ ] 2. Figer puis livrer l’écriture révisionnée et historisée des lignes financières d’un brouillon `DRAFT`.
 - [ ] 3. Construire le cockpit patron web uniquement après les API financières de création et d’écriture réellement publiées.
 - [ ] 4. Construire la bibliothèque entreprise patron : société, assurances, Kbis, RIB, qualifications, pièces expirables et références.
