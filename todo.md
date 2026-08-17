@@ -170,4 +170,5 @@
 - [x] 6. Construire la génération documentaire et le contrôle de complétude sans déclarer une conformité automatique : `PREPARATION-COMPLETENESS-01` implémenté, testé localement et prêt à publication/CI.
 - [ ] 7. Exécuter la préproduction VPS et DCE réels : Docker, ClamAV, sauvegardes, HTTPS, supervision et parcours complet avant tout client.
 - [x] 7a. Préparer et auditer le template Docker/Caddy/ClamAV et le runbook non destructif de préproduction ; Caddy est le seul service public, aucun déploiement VPS réel n’est encore effectué.
-- [ ] 7b. Ajouter health endpoint applicatif, sauvegardes/restauration testées, logs rotatifs, supervision, secrets runtime et pinning d’images par digest.
+- [x] 7b-a. Ajouter les health endpoints applicatifs, les healthchecks Compose et le pinning des images par digest ; commit `109e54a`, PR `#10`, CI `32061635363` verte.
+- [ ] 7b-b. Exécuter sur le VPS réel les sauvegardes/restauration testées, logs rotatifs, supervision, rotation des secrets runtime, build Docker, ClamAV/EICAR et HTTPS.
