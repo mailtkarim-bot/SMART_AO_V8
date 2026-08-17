@@ -166,9 +166,10 @@
 - [x] 5a. Figer et livrer `ENTERPRISE-CAPABILITY-FOUNDATION-01` : qualifications, références, capacités, preuves versionnées, validité et droits d’usage patronaux ; commit `b41668e`, PR `#9`, CI `32054755005` verte.
 - [x] 5b. Figer et livrer `COLLAB-EVIDENCE-CAPABILITY-01` : `ProposeCapabilityForCase` et `ReportCapabilityGap`, ReBAC, idempotence, append-only et non-fuite financière ; commit `453bbc7`, CI `32055928042` verte, **374 tests backend verts**.
 - [x] 5c. Étendre le readiness aux preuves manquantes, expirées, non autorisées et aux écarts bloquants ; commit `0b451df`, CI `32064390327` verte, **382 tests backend verts**.
-- [ ] 5d. Figer ensuite les revues versionnées, corrections ciblées et brouillons de réponse technique.
+- [x] 5d. Figer les revues versionnées, corrections ciblées et brouillons de réponse technique ; migration `20260817_0035`, commit `392ab01`, CI `32068934417` verte, **387 tests backend verts** après le slice 7b.
 - [x] 6. Construire la génération documentaire et le contrôle de complétude sans déclarer une conformité automatique : `PREPARATION-COMPLETENESS-01` implémenté, testé localement et prêt à publication/CI.
-- [ ] 7. Exécuter la préproduction VPS et DCE réels : Docker, ClamAV, sauvegardes, HTTPS, supervision et parcours complet avant tout client.
+- [ ] 7. Exécuter la préproduction VPS et DCE réels : Docker, ClamAV, sauvegardes, HTTPS, supervision et parcours complet avant tout client. Le code et le runbook sont publiés ; l’exécution distante reste ouverte.
 - [x] 7a. Préparer et auditer le template Docker/Caddy/ClamAV et le runbook non destructif de préproduction ; Caddy est le seul service public, aucun déploiement VPS réel n’est encore effectué.
 - [x] 7b-a. Ajouter les health endpoints applicatifs, les healthchecks Compose et le pinning des images par digest ; commit `109e54a`, PR `#10`, CI `32061635363` verte.
-- [ ] 7b-b. Exécuter sur le VPS réel les sauvegardes/restauration testées, logs rotatifs, supervision, rotation des secrets runtime, build Docker, ClamAV/EICAR et HTTPS.
+- [x] 7b-b. Automatiser les sauvegardes/restauration isolée, manifest SHA-256, healthcheck, rotation des logs, timers systemd et rotation JWT manuelle ; commit `8965a43`, CI `32070896704` verte, **387 tests backend verts**.
+- [ ] 7b-c. Exécuter sur le VPS réel les sauvegardes/restauration testées, logs rotatifs, supervision externe, rotation des secrets runtime, build Docker, ClamAV/EICAR et HTTPS.
