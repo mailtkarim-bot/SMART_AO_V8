@@ -26,9 +26,7 @@ from test_dce_rc_analysis import (  # noqa: E402
     NOW,
     _extract_then_analyze,
     _seed_admitted_document,
-    database_engine,
     isolate_rc_analysis_records,
-    session_factory,
 )
 
 

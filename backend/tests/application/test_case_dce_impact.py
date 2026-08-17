@@ -36,7 +36,6 @@ sys.path.append(str(Path(__file__).parent))
 
 from test_dce_rc_analysis import (  # noqa: E402, F401
     NOW,
-    database_engine,
     isolate_rc_analysis_records,
 )
 

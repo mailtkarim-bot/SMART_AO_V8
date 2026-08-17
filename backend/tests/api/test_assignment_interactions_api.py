@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from app.bootstrap.application import AppRuntime, create_app
 from app.interfaces.http.routes.authentication import AuthenticationHttpRuntime
 from app.modules.case.infrastructure.models.case import CaseRecord
@@ -26,15 +22,6 @@ from app.platform.security.tokens import JwtAccessTokenCodec
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv("SMART_AO_TEST_DATABASE_URL") or (
-    "postgresql+psycopg://"
-    + "smart_ao"
-    + ":"
-    + "smart_ao"
-    + "@127.0.0.1:5432/smart_ao"
-)
 NOW = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
 
 
@@ -53,22 +40,8 @@ class UnusedTokenGenerator:
         return "unused-refresh-token"
 
 
-@pytest.fixture(scope="module")
-def database_engine() -> sa.Engine:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        command.downgrade(config, "base")
 
 
-@pytest.fixture
-def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
-    return sessionmaker(bind=database_engine, expire_on_commit=False)
 
 
 @pytest.fixture(autouse=True)

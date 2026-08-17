@@ -1,4 +1,3 @@
-import os
 import sys
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -7,8 +6,6 @@ from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from app.modules.membership.application.collab_info_blockers import (
     CollaboratorInfoBlockerService,
     collaborator_info_blocker_handlers,
@@ -32,38 +29,16 @@ from app.platform.security.models import (
     CollaboratorTaskBlockerRecord,
 )
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import Session, sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_collab_work_task import _create as _create_task  # noqa: E402
 from test_collab_work_task import _seed  # noqa: E402
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv("SMART_AO_TEST_DATABASE_URL") or (
-    "postgresql+psycopg://" + "smart_ao" + ":" + "smart_ao" + "@127.0.0.1:5432/smart_ao"
-)
 NOW = datetime(2026, 8, 17, 12, 0, tzinfo=UTC)
 
 
-@pytest.fixture(scope="module")
-def database_engine() -> sa.Engine:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        command.downgrade(config, "base")
 
 
-@pytest.fixture
-def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
-    with database_engine.begin() as connection:
-        connection.execute(sa.text("TRUNCATE TABLE tenants, identities CASCADE"))
-    return sessionmaker(bind=database_engine, expire_on_commit=False)
 
 
 def _task_service(factory):

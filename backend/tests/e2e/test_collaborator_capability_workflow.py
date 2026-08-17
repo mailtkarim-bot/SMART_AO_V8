@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from app.platform.security.models import CaseCapabilityGapRecord, CaseCapabilityProposalRecord
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -20,32 +17,6 @@ from test_collaborator_capability_api import (  # noqa: E402
     _client,
     _headers,
 )
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv("SMART_AO_TEST_DATABASE_URL") or (
-    "postgresql+psycopg://" + "smart_ao" + ":" + "smart_ao" + "@127.0.0.1:5432/smart_ao"
-)
-
-
-@pytest.fixture(scope="module")
-def database_engine() -> sa.Engine:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        command.downgrade(config, "base")
-
-
-@pytest.fixture
-def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
-    with database_engine.begin() as connection:
-        connection.execute(sa.text("TRUNCATE TABLE tenants, identities CASCADE"))
-    return sessionmaker(bind=database_engine, expire_on_commit=False)
 
 
 @pytest.mark.e2e

@@ -1,21 +1,10 @@
-import os
 from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
 
 import pytest
 import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv("SMART_AO_TEST_DATABASE_URL") or (
-    "postgresql+psycopg://"
-    + "smart_ao"
-    + ":"
-    + "smart_ao"
-    + "@127.0.0.1:5432/smart_ao"
-)
+from tests.support.database import ALEMBIC_INI, DATABASE_URL, REPOSITORY_ROOT
 
 MAX_INSERT_MILLISECONDS = 5_000
 MAX_RECENT_READ_MILLISECONDS = 500
