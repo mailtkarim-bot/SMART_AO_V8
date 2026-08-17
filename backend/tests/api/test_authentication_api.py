@@ -230,6 +230,29 @@ def test_login_failure_is_neutral_and_never_sets_authentication_cookies(
 @pytest.mark.api
 @pytest.mark.db
 @pytest.mark.security
+def test_login_is_rate_limited_after_repeated_failures(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id = _insert_tenant(database_engine)
+    client, _ = _client(session_factory)
+    payload = {
+        "email": "unknown@example.test",
+        "password": "Wrong#Pass123",
+        "tenant_id": str(tenant_id),
+    }
+
+    responses = [client.post("/api/v1/auth/login", json=payload) for _ in range(6)]
+
+    assert [response.status_code for response in responses[:5]] == [401] * 5
+    assert responses[5].status_code == 429
+    assert responses[5].json() == {"detail": "RATE_LIMITED"}
+    assert int(responses[5].headers["Retry-After"]) >= 1
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
 def test_refresh_requires_matching_csrf_then_rotates_cookies_and_access_token(
     database_engine: sa.Engine,
     session_factory: sessionmaker[Session],

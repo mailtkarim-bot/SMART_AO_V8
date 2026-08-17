@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
 from uuid import UUID
@@ -13,7 +14,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.platform.security.audit import SecurityAuditWriter
+from app.platform.security.audit import (
+    AuditEventType,
+    AuditOutcome,
+    AuditSeverity,
+    SecurityAuditEntry,
+    SecurityAuditWriter,
+)
 from app.platform.security.authenticated_context import (
     AuthenticationContextResolver,
     UnauthenticatedError,
@@ -24,6 +31,7 @@ from app.platform.security.authentication import (
     InvalidCredentialsError,
     RefreshRejectedError,
 )
+from app.platform.security.rate_limit import LoginRateLimiter
 from app.platform.security.tokens import JwtAccessTokenCodec
 
 _REFRESH_COOKIE_NAME = "smart_ao_refresh"
@@ -53,6 +61,7 @@ class AuthenticationHttpRuntime:
     csrf_token_generator: CsrfTokenGenerator
     clock: Clock
     context_resolver: AuthenticationContextResolver
+    rate_limiter: LoginRateLimiter = field(default_factory=LoginRateLimiter.from_environment)
 
     @classmethod
     def create(
@@ -63,6 +72,7 @@ class AuthenticationHttpRuntime:
         access_tokens: JwtAccessTokenCodec,
         csrf_token_generator: CsrfTokenGenerator,
         clock: Clock,
+        rate_limiter: LoginRateLimiter | None = None,
     ) -> AuthenticationHttpRuntime:
         audited_service = (
             authentication_service
@@ -85,6 +95,7 @@ class AuthenticationHttpRuntime:
                 access_tokens=access_tokens,
                 clock=clock,
             ),
+            rate_limiter=rate_limiter or LoginRateLimiter.from_environment(),
         )
 
 
@@ -111,7 +122,21 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
     router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 
     @router.post("/login", response_model=AccessTokenResponse)
-    def login(request: LoginRequest) -> JSONResponse:
+    def login(request: LoginRequest, http_request: Request) -> JSONResponse:
+        source_ip = _source_ip(http_request)
+        decision = runtime.rate_limiter.check(
+            namespace="login",
+            identity=request.email,
+            source_ip=source_ip,
+        )
+        if not decision.allowed:
+            _record_rate_limit_denial(
+                runtime=runtime,
+                event_type=AuditEventType.AUTH_LOGIN_DENIED,
+                action="auth.login",
+                source_ip=source_ip,
+            )
+            raise _rate_limited(decision.retry_after_seconds)
         try:
             result = runtime.authentication_service.login(
                 email=request.email,
@@ -119,11 +144,21 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
                 tenant_id=request.tenant_id,
             )
         except InvalidCredentialsError as error:
+            runtime.rate_limiter.record_failure(
+                namespace="login",
+                identity=request.email,
+                source_ip=source_ip,
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="INVALID_CREDENTIALS",
             ) from error
 
+        runtime.rate_limiter.record_success(
+            namespace="login",
+            identity=request.email,
+            source_ip=source_ip,
+        )
         access_token = runtime.access_tokens.issue(
             identity_id=result.identity_id,
             session_id=result.session_id,
@@ -146,18 +181,49 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
         request: Request,
         csrf_header: str | None = Header(default=None, alias=_CSRF_HEADER_NAME),
     ) -> JSONResponse:
-        _require_csrf(request=request, csrf_header=csrf_header)
-        refresh_token = request.cookies.get(_REFRESH_COOKIE_NAME)
-        if refresh_token is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="REFRESH_REJECTED")
+        source_ip = _source_ip(request)
+        decision = runtime.rate_limiter.check(
+            namespace="refresh",
+            identity=None,
+            source_ip=source_ip,
+        )
+        if not decision.allowed:
+            _record_rate_limit_denial(
+                runtime=runtime,
+                event_type=AuditEventType.AUTH_REFRESH_DENIED,
+                action="auth.refresh",
+                source_ip=source_ip,
+            )
+            raise _rate_limited(decision.retry_after_seconds)
         try:
+            _require_csrf(request=request, csrf_header=csrf_header)
+            refresh_token = request.cookies.get(_REFRESH_COOKIE_NAME)
+            if refresh_token is None:
+                raise RefreshRejectedError
             result = runtime.authentication_service.refresh(refresh_token=refresh_token)
+        except HTTPException:
+            runtime.rate_limiter.record_failure(
+                namespace="refresh",
+                identity=None,
+                source_ip=source_ip,
+            )
+            raise
         except RefreshRejectedError as error:
+            runtime.rate_limiter.record_failure(
+                namespace="refresh",
+                identity=None,
+                source_ip=source_ip,
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="REFRESH_REJECTED",
             ) from error
 
+        runtime.rate_limiter.record_success(
+            namespace="refresh",
+            identity=None,
+            source_ip=source_ip,
+        )
         access_token = runtime.access_tokens.issue(
             identity_id=result.identity_id,
             session_id=result.session_id,
@@ -195,6 +261,55 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
         return response
 
     return router
+
+
+def _source_ip(request: Request) -> str:
+    return request.client.host if request.client is not None else "unknown"
+
+
+def _rate_limited(retry_after_seconds: int) -> HTTPException:
+    error = HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="RATE_LIMITED",
+    )
+    error.headers = {"Retry-After": str(max(1, retry_after_seconds))}
+    return error
+
+
+def _record_rate_limit_denial(
+    *,
+    runtime: AuthenticationHttpRuntime,
+    event_type: AuditEventType,
+    action: str,
+    source_ip: str,
+) -> None:
+    with runtime.session_factory.begin() as session:
+        SecurityAuditWriter().record(
+            session=session,
+            entry=SecurityAuditEntry(
+                occurred_at=runtime.clock.now(),
+                tenant_id=None,
+                actor_id=None,
+                identity_id=None,
+                session_id=None,
+                actor_kind=None,
+                auth_strength=None,
+                event_type=event_type,
+                outcome=AuditOutcome.DENIED,
+                severity=AuditSeverity.WARNING,
+                action=action,
+                resource_type="AUTHENTICATION",
+                resource_id=None,
+                case_id=None,
+                correlation_id=None,
+                command_id=None,
+                request_id=None,
+                source_ip_hash=hashlib.sha256(source_ip.encode("utf-8")).hexdigest(),
+                user_agent_family=None,
+                reason_code="RATE_LIMITED",
+                metadata={"channel": "http", "reason_class": "THROTTLE"},
+            ),
+        )
 
 
 def _resolve_authenticated_context(
