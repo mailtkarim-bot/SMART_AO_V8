@@ -258,9 +258,7 @@ class CaseAssignmentRecord(TenantScopedRecord, Base):
             ondelete="RESTRICT",
         ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_assignments__tenant_id"),
-        sa.CheckConstraint(
-            "state IN ('ACTIVE', 'SUSPENDED', 'ENDED', 'EXPIRED')", name="state"
-        ),
+        sa.CheckConstraint("state IN ('ACTIVE', 'SUSPENDED', 'ENDED', 'EXPIRED')", name="state"),
         sa.CheckConstraint(
             "jsonb_typeof(scope_actions_json) = 'array' "
             "AND jsonb_array_length(scope_actions_json) > 0",
@@ -619,8 +617,10 @@ class AssignmentInteractionPatronValidationRecord(TenantScopedRecord, Base):
             ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
-            ["tenant_id", "case_id"], ["cases.tenant_id", "cases.id"],
-            name="fk_assignment_interaction_validation__case", ondelete="RESTRICT"
+            ["tenant_id", "case_id"],
+            ["cases.tenant_id", "cases.id"],
+            name="fk_assignment_interaction_validation__case",
+            ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["tenant_id", "patron_membership_id"],
@@ -634,7 +634,9 @@ class AssignmentInteractionPatronValidationRecord(TenantScopedRecord, Base):
             name="uq_assignment_interaction_validation__tenant_id",
         ),
         sa.UniqueConstraint(
-            "tenant_id", "interaction_kind", "interaction_id",
+            "tenant_id",
+            "interaction_kind",
+            "interaction_id",
             name="uq_assignment_interaction_validation__source",
         ),
         sa.CheckConstraint(
@@ -655,7 +657,9 @@ class AssignmentInteractionPatronValidationRecord(TenantScopedRecord, Base):
         ),
         sa.Index(
             "ix_assignment_interaction_validation__tenant_assignment",
-            "tenant_id", "assignment_id", "created_at",
+            "tenant_id",
+            "assignment_id",
+            "created_at",
         ),
     )
 
@@ -679,8 +683,10 @@ class FinancialReportSnapshotRecord(TenantScopedRecord, Base):
             ["tenant_id"], ["tenants.id"], name="fk_financial_snapshot__tenant", ondelete="RESTRICT"
         ),
         sa.ForeignKeyConstraint(
-            ["tenant_id", "case_id"], ["cases.tenant_id", "cases.id"],
-            name="fk_financial_snapshot__case", ondelete="RESTRICT"
+            ["tenant_id", "case_id"],
+            ["cases.tenant_id", "cases.id"],
+            name="fk_financial_snapshot__case",
+            ondelete="RESTRICT",
         ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_financial_snapshot__tenant_id"),
         sa.CheckConstraint("state IN ('DRAFT', 'PUBLISHED')", name="state"),
@@ -761,7 +767,8 @@ class FinancialReportLineRecord(TenantScopedRecord, Base):
         sa.ForeignKeyConstraint(
             ["tenant_id", "snapshot_id"],
             ["financial_report_snapshots.tenant_id", "financial_report_snapshots.id"],
-            name="fk_financial_line__snapshot", ondelete="RESTRICT"
+            name="fk_financial_line__snapshot",
+            ondelete="RESTRICT",
         ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_financial_line__tenant_id"),
         sa.CheckConstraint(
@@ -1078,7 +1085,10 @@ class EnterpriseDocumentRecord(TenantScopedRecord, Base):
     __tablename__ = "enterprise_documents"
     __table_args__ = (
         sa.ForeignKeyConstraint(
-            ["tenant_id"], ["tenants.id"], name="fk_enterprise_document__tenant", ondelete="RESTRICT"
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_enterprise_document__tenant",
+            ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["tenant_id", "company_id"],
@@ -1094,9 +1104,7 @@ class EnterpriseDocumentRecord(TenantScopedRecord, Base):
         ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_enterprise_document__tenant_id"),
         sa.UniqueConstraint("tenant_id", "command_id", name="uq_enterprise_document__command"),
-        sa.CheckConstraint(
-            "document_kind IN ('INSURANCE', 'KBIS', 'RIB')", name="document_kind"
-        ),
+        sa.CheckConstraint("document_kind IN ('INSURANCE', 'KBIS', 'RIB')", name="document_kind"),
         sa.CheckConstraint(
             "verification_status IN ('PENDING', 'VALIDATED', 'EXPIRED', 'REJECTED')",
             name="verification_status",
@@ -1109,7 +1117,10 @@ class EnterpriseDocumentRecord(TenantScopedRecord, Base):
         ),
         sa.Index(
             "ix_enterprise_document__tenant_company_kind_expiry",
-            "tenant_id", "company_id", "document_kind", "expires_at",
+            "tenant_id",
+            "company_id",
+            "document_kind",
+            "expires_at",
         ),
     )
 
@@ -1140,20 +1151,21 @@ class EnterpriseDocumentUploadRecord(TenantScopedRecord, Base):
         sa.ForeignKeyConstraint(
             ["tenant_id", "company_id"],
             ["enterprise_companies.tenant_id", "enterprise_companies.id"],
-            name="fk_enterprise_upload__company", ondelete="RESTRICT",
+            name="fk_enterprise_upload__company",
+            ondelete="RESTRICT",
         ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_enterprise_upload__tenant_id"),
         sa.UniqueConstraint("storage_key", name="uq_enterprise_upload__storage_key"),
         sa.UniqueConstraint("tenant_id", "document_id", name="uq_enterprise_upload__document"),
-        sa.CheckConstraint(
-            "document_kind IN ('INSURANCE', 'KBIS', 'RIB')", name="document_kind"
-        ),
+        sa.CheckConstraint("document_kind IN ('INSURANCE', 'KBIS', 'RIB')", name="document_kind"),
         sa.CheckConstraint(
             "state IN ('AWAITING_UPLOAD', 'UPLOADING', 'QUARANTINED', 'CLEAN', 'REJECTED', 'EXPIRED')",
             name="state",
         ),
         sa.CheckConstraint("expected_byte_size > 0", name="expected_byte_size_positive"),
-        sa.CheckConstraint("actual_byte_size IS NULL OR actual_byte_size > 0", name="actual_byte_size_positive"),
+        sa.CheckConstraint(
+            "actual_byte_size IS NULL OR actual_byte_size > 0", name="actual_byte_size_positive"
+        ),
         sa.CheckConstraint("sha256 IS NULL OR sha256 ~ '^[0-9a-f]{64}$'", name="sha256_lowercase"),
         sa.CheckConstraint(
             "scan_verdict IS NULL OR scan_verdict IN ('CLEAN', 'INFECTED', 'ERROR')",
@@ -1190,8 +1202,15 @@ class EnterpriseDocumentUploadRecord(TenantScopedRecord, Base):
     command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
-    created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now())
-    updated_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
+    )
 
 
 class EnterpriseDocumentVerificationRecord(TenantScopedRecord, Base):
@@ -1200,20 +1219,27 @@ class EnterpriseDocumentVerificationRecord(TenantScopedRecord, Base):
     __tablename__ = "enterprise_document_verifications"
     __table_args__ = (
         sa.ForeignKeyConstraint(
-            ["tenant_id"], ["tenants.id"], name="fk_enterprise_verification__tenant", ondelete="RESTRICT"
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_enterprise_verification__tenant",
+            ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["tenant_id", "document_id"],
             ["enterprise_documents.tenant_id", "enterprise_documents.id"],
-            name="fk_enterprise_verification__document", ondelete="RESTRICT",
+            name="fk_enterprise_verification__document",
+            ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["tenant_id", "membership_id"],
             ["tenant_memberships.tenant_id", "tenant_memberships.id"],
-            name="fk_enterprise_verification__membership", ondelete="RESTRICT",
+            name="fk_enterprise_verification__membership",
+            ondelete="RESTRICT",
         ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_enterprise_verification__tenant_id"),
-        sa.UniqueConstraint("tenant_id", "document_id", "revision", name="uq_enterprise_verification__revision"),
+        sa.UniqueConstraint(
+            "tenant_id", "document_id", "revision", name="uq_enterprise_verification__revision"
+        ),
         sa.CheckConstraint("revision >= 0", name="revision_nonnegative"),
         sa.CheckConstraint("outcome IN ('VALIDATED', 'REJECTED')", name="outcome"),
         sa.CheckConstraint(
@@ -1222,7 +1248,9 @@ class EnterpriseDocumentVerificationRecord(TenantScopedRecord, Base):
         ),
         sa.Index(
             "ix_enterprise_verification__tenant_document",
-            "tenant_id", "document_id", "revision",
+            "tenant_id",
+            "document_id",
+            "revision",
         ),
     )
 
@@ -1235,4 +1263,121 @@ class EnterpriseDocumentVerificationRecord(TenantScopedRecord, Base):
     command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
-    created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    )
+
+
+class CollaboratorTaskRecord(TenantScopedRecord, Base):
+    """Mutable operational task bounded by one active collaborator assignment."""
+
+    __tablename__ = "collaborator_tasks"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_collab_tasks__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "case_id"],
+            ["cases.tenant_id", "cases.id"],
+            name="fk_collab_tasks__case",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "assignment_id"],
+            ["case_assignments.tenant_id", "case_assignments.id"],
+            name="fk_collab_tasks__assignment",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "requirement_id"],
+            ["dce_requirements.tenant_id", "dce_requirements.id"],
+            name="fk_collab_tasks__requirement",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_collab_tasks__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "assignment_id", "functional_key", name="uq_collab_task__functional"
+        ),
+        sa.CheckConstraint(
+            "state IN ('READY', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'ABANDONED')", name="state"
+        ),
+        sa.CheckConstraint("aggregate_revision >= 0", name="aggregate_revision"),
+        sa.CheckConstraint("priority IN ('LOW', 'NORMAL', 'HIGH', 'CRITICAL')", name="priority"),
+        sa.Index(
+            "ix_collab_tasks__tenant_assignment_state",
+            "tenant_id",
+            "assignment_id",
+            "state",
+            "created_at",
+        ),
+        sa.Index(
+            "ix_collab_tasks__tenant_case_state",
+            "tenant_id",
+            "case_id",
+            "state",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    assignment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    requirement_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    task_kind: Mapped[str] = mapped_column(sa.String(48), nullable=False)
+    title: Mapped[str] = mapped_column(sa.String(240), nullable=False)
+    objective: Mapped[str] = mapped_column(sa.String(2_000), nullable=False)
+    priority: Mapped[str] = mapped_column(sa.String(16), nullable=False, server_default="NORMAL")
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False, server_default="READY")
+    functional_key: Mapped[str] = mapped_column(sa.String(500), nullable=False)
+    due_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    aggregate_revision: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=0, server_default="0"
+    )
+    claimed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+
+class CollaboratorTaskResultRecord(TenantScopedRecord, Base):
+    """Append-only operational result history for one collaborator task."""
+
+    __tablename__ = "collaborator_task_results"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_collab_task_results__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "task_id"],
+            ["collaborator_tasks.tenant_id", "collaborator_tasks.id"],
+            name="fk_collab_task_results__task",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_collab_task_results__membership",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_collab_task_results__tenant_id"),
+        sa.CheckConstraint(
+            "outcome IN ('RECORDED', 'NOT_APPLICABLE', 'UNABLE_TO_COMPLETE')", name="outcome"
+        ),
+        sa.CheckConstraint("task_revision >= 0", name="task_revision"),
+        sa.CheckConstraint("length(trim(result_text)) > 0", name="result_text_nonempty"),
+        sa.Index(
+            "ix_collab_task_results__tenant_task_revision", "tenant_id", "task_id", "task_revision"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    task_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    task_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    outcome: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    result_text: Mapped[str] = mapped_column(sa.String(8_000), nullable=False)
+    source_locator: Mapped[str | None] = mapped_column(sa.String(500))
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))

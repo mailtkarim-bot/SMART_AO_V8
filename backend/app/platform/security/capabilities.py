@@ -20,6 +20,8 @@ class Capability(StrEnum):
     ASSIGNMENT_CLARIFY = "assignment.clarify"
     ASSIGNMENT_HISTORY_READ = "assignment.history.read"
     ASSIGNMENT_UNAVAILABILITY = "assignment.unavailability"
+    WORK_TASK_READ = "work.task.read"
+    WORK_TASK_WRITE = "work.task.write"
     ASSIGNMENT_MANAGE = "assignment.manage"
     DOCUMENT_ADMIN_READ = "document.administrative.read"
     PREPARATION_TRANSMIT = "preparation.transmit"
@@ -76,6 +78,8 @@ _COLLABORATOR_CAPABILITIES = frozenset(
         Capability.ASSIGNMENT_CLARIFY,
         Capability.ASSIGNMENT_HISTORY_READ,
         Capability.ASSIGNMENT_UNAVAILABILITY,
+        Capability.WORK_TASK_READ,
+        Capability.WORK_TASK_WRITE,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
     }
@@ -87,6 +91,8 @@ _DELEGABLE_CAPABILITIES = frozenset(
         Capability.CASE_DCE_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.DOCUMENT_ADMIN_READ,
+        Capability.WORK_TASK_READ,
+        Capability.WORK_TASK_WRITE,
         Capability.PREPARATION_TRANSMIT,
         Capability.DECISION_FINALIZE,
         Capability.SUBMISSION_AUTHORIZE,
