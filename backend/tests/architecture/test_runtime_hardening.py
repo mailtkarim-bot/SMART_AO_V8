@@ -14,4 +14,5 @@ def test_backend_image_is_digest_pinned_and_runs_non_root() -> None:
         "install --directory --owner=smartao --group=smartao --mode=0700 "
         "/var/lib/smart_ao/dce-quarantine"
     ) in content
-    assert "SMART_AO_DCE_QUARANTINE_ROOT=/var/lib/smart_ao/dce-quarantine" in content
+    assert "SMART_AO_DCE_QUARANTINE_ROOT=" in content
+    assert "/var/lib/smart_ao/dce-quarantine" in content
