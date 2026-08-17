@@ -333,3 +333,76 @@ def test_published_financial_snapshot_rejects_new_line(
             session.scalar(sa.select(sa.func.count()).select_from(FinancialReportLineRecord))
             == 0
         )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_incorrect_revision_after_existing_line_does_not_create_a_second_line(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, case_id, report_id, _ = _seed_draft(session_factory)
+    service = _service(session_factory)
+    first = service.add_line(
+        actor=actor,
+        command=_command(case_id, report_id),
+        now=NOW,
+    )
+
+    with pytest.raises(CommandExecutionError, match="VERSION_CONFLICT"):
+        service.add_line(
+            actor=actor,
+            command=_command(case_id, report_id, expected_revision=0),
+            now=NOW,
+        )
+
+    assert first.result_code == "FINANCIAL_REPORT_LINE_ADDED"
+    with session_factory() as session:
+        snapshot = session.get(FinancialReportSnapshotRecord, report_id)
+        assert snapshot is not None
+        assert snapshot.aggregate_revision == 1
+        assert snapshot.sales_total_minor == 125_000
+        assert (
+            session.scalar(sa.select(sa.func.count()).select_from(FinancialReportLineRecord))
+            == 1
+        )
+        assert session.scalar(sa.select(sa.func.count()).select_from(DomainEventRecord)) == 1
+        assert session.scalar(sa.select(sa.func.count()).select_from(OutboxMessageRecord)) == 1
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_published_snapshot_rejects_line_after_existing_draft_write(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, case_id, report_id, _ = _seed_draft(session_factory)
+    service = _service(session_factory)
+    service.add_line(
+        actor=actor,
+        command=_command(case_id, report_id),
+        now=NOW,
+    )
+    with session_factory.begin() as session:
+        snapshot = session.get(FinancialReportSnapshotRecord, report_id)
+        assert snapshot is not None
+        snapshot.state = "PUBLISHED"
+        snapshot.published_at = NOW
+
+    with pytest.raises(CommandExecutionError, match="FINANCIAL_REPORT_NOT_DRAFT"):
+        service.add_line(
+            actor=actor,
+            command=_command(case_id, report_id, expected_revision=1),
+            now=NOW,
+        )
+
+    with session_factory() as session:
+        snapshot = session.get(FinancialReportSnapshotRecord, report_id)
+        assert snapshot is not None
+        assert snapshot.state == "PUBLISHED"
+        assert snapshot.aggregate_revision == 1
+        assert snapshot.sales_total_minor == 125_000
+        assert (
+            session.scalar(sa.select(sa.func.count()).select_from(FinancialReportLineRecord))
+            == 1
+        )
+        assert session.scalar(sa.select(sa.func.count()).select_from(DomainEventRecord)) == 1
+        assert session.scalar(sa.select(sa.func.count()).select_from(OutboxMessageRecord)) == 1
