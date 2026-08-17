@@ -204,3 +204,17 @@ class PatronFinancialReportResponse(PublicResponseModel):
     ruleset_version: int = Field(ge=1)
     summary: PatronFinancialReportSummaryResponse
     lines: list[PatronFinancialReportLineResponse]
+
+
+class PatronFinancialReportDraftResponse(PublicResponseModel):
+    """Closed patron-only projection of one mutable financial DRAFT."""
+
+    report_id: UUID
+    case_id: UUID
+    status: Literal["DRAFT"]
+    aggregate_revision: int = Field(ge=0)
+    currency_code: str
+    calculated_at: datetime
+    ruleset_version: int = Field(ge=1)
+    summary: PatronFinancialReportSummaryResponse
+    lines: list[PatronFinancialReportLineResponse]

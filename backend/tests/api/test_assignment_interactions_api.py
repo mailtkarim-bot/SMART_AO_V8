@@ -2128,3 +2128,89 @@ def test_financial_draft_creation_is_tenant_neutral_and_rejects_financial_payloa
             sa.select(sa.func.count()).select_from(FinancialReportSnapshotRecord)
         )
     assert count == 0
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_creates_draft_adds_line_and_reads_draft_end_to_end(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, patron_identity_id, patron_membership_id, patron_session_id = _seed_principal(
+        database_engine,
+        role="PATRON_ADMIN",
+    )
+    case_id, _ = _seed_case_and_assignment(
+        session_factory,
+        tenant_id=tenant_id,
+        membership_id=patron_membership_id,
+        scope_actions=["case.dce.read"],
+    )
+    client, tokens = _client(session_factory)
+    headers = _headers(
+        tokens,
+        identity_id=patron_identity_id,
+        session_id=patron_session_id,
+    )
+
+    create_response = client.post(
+        f"/api/v1/patron/cases/{case_id}/financial-reports/drafts",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "currency_code": "EUR",
+            "ruleset_version": 1,
+        },
+        headers=headers,
+    )
+
+    assert create_response.status_code == 201, create_response.text
+    report_id = UUID(create_response.json()["aggregate_refs"][0]["aggregate_id"])
+    add_response = client.post(
+        f"/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/lines",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "expected_revision": 0,
+            "category": "SALES",
+            "label": "Chiffre d'affaires prévisionnel",
+            "quantity_decimal": "1",
+            "unit": "forfait",
+            "amount_minor": 125000,
+        },
+        headers=headers,
+    )
+
+    assert add_response.status_code == 201, add_response.text
+    assert add_response.json()["result_code"] == "FINANCIAL_REPORT_LINE_ADDED"
+    assert "amount_minor" not in add_response.text
+    draft_response = client.get(
+        f"/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/draft",
+        headers=headers,
+    )
+
+    assert draft_response.status_code == 200, draft_response.text
+    assert draft_response.headers["Cache-Control"] == "no-store"
+    draft = draft_response.json()
+    assert draft["status"] == "DRAFT"
+    assert draft["aggregate_revision"] == 1
+    assert draft["summary"]["sales_total_minor"] == 125000
+    assert len(draft["lines"]) == 1
+    assert draft["lines"][0]["category"] == "SALES"
+    assert draft["lines"][0]["amount_minor"] == 125000
+
+    _, collaborator_identity_id, _, collaborator_session_id = _seed_principal(
+        database_engine,
+        tenant_id=tenant_id,
+    )
+    collaborator_response = client.get(
+        f"/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/draft",
+        headers=_headers(
+            tokens,
+            identity_id=collaborator_identity_id,
+            session_id=collaborator_session_id,
+        ),
+    )
+    assert collaborator_response.status_code == 403
+    assert collaborator_response.json() == {"detail": "FORBIDDEN"}

@@ -10,6 +10,7 @@ from alembic import command
 from alembic.config import Config
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.commands import AddFinancialReportLineCommand
+from app.modules.membership.application.financial_report import PatronFinancialReportService
 from app.modules.membership.application.financial_report_lines import (
     PatronFinancialReportLineService,
     financial_report_line_handlers,
@@ -406,3 +407,34 @@ def test_published_snapshot_rejects_line_after_existing_draft_write(
         )
         assert session.scalar(sa.select(sa.func.count()).select_from(DomainEventRecord)) == 1
         assert session.scalar(sa.select(sa.func.count()).select_from(OutboxMessageRecord)) == 1
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_patron_reads_current_financial_draft_projection_after_line_write(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, case_id, report_id, _ = _seed_draft(session_factory)
+    line_service = _service(session_factory)
+    line_service.add_line(
+        actor=actor,
+        command=_command(case_id, report_id),
+        now=NOW,
+    )
+
+    projection = PatronFinancialReportService(
+        session_factory=session_factory,
+        policy=AuthorizationPolicy(),
+    ).get_draft(
+        actor=actor,
+        case_id=case_id,
+        report_id=report_id,
+        now=NOW,
+    )
+
+    assert projection.status == "DRAFT"
+    assert projection.aggregate_revision == 1
+    assert projection.summary["sales_total_minor"] == 125_000
+    assert len(projection.lines) == 1
+    assert projection.lines[0].category == "SALES"
+    assert projection.lines[0].amount_minor == 125_000

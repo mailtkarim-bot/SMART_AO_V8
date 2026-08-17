@@ -93,6 +93,10 @@ from app.modules.membership.application.financial_report_draft import (
     CreateFinancialReportDraftHandler,
     PatronFinancialReportDraftCreationService,
 )
+from app.modules.membership.application.financial_report_lines import (
+    PatronFinancialReportLineService,
+    financial_report_line_handlers,
+)
 from app.modules.membership.application.financial_report_publication import (
     PatronFinancialReportPublicationService,
     PublishFinancialReportHandler,
@@ -154,6 +158,7 @@ class AppRuntime:
                 "RecordDceRequirementConfirmation": RecordDceRequirementConfirmationHandler(),
                 "CreateFinancialReportDraft": CreateFinancialReportDraftHandler(),
                 "PublishFinancialReport": PublishFinancialReportHandler(),
+                **financial_report_line_handlers(),
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
                 **assignment_handlers(),
@@ -370,6 +375,11 @@ def create_app(
             session_factory=runtime.session_factory,
             policy=security_policy,
         )
+        patron_financial_report_line_service = PatronFinancialReportLineService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         patron_financial_report_draft_creation_service = PatronFinancialReportDraftCreationService(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
@@ -443,6 +453,7 @@ def create_app(
         app.include_router(
             build_patron_financial_report_router(
                 service=patron_financial_report_service,
+                line_service=patron_financial_report_line_service,
                 draft_creation_service=patron_financial_report_draft_creation_service,
                 publication_service=patron_financial_report_publication_service,
                 security_runtime=security_runtime,
