@@ -165,7 +165,7 @@
 - [ ] 5. Étendre le wizard collaborateur de préparation : revues ciblées, preuves structurées, dépendances de tâches et pièces techniques par affaire.
 - [x] 5a. Figer et livrer `ENTERPRISE-CAPABILITY-FOUNDATION-01` : qualifications, références, capacités, preuves versionnées, validité et droits d’usage patronaux ; commit `b41668e`, PR `#9`, CI `32054755005` verte.
 - [x] 5b. Figer et livrer `COLLAB-EVIDENCE-CAPABILITY-01` : `ProposeCapabilityForCase` et `ReportCapabilityGap`, ReBAC, idempotence, append-only et non-fuite financière ; commit `453bbc7`, CI `32055928042` verte, **374 tests backend verts**.
-- [ ] 5c. Étendre le readiness aux preuves manquantes, expirées, non autorisées et aux écarts bloquants.
+- [x] 5c. Étendre le readiness aux preuves manquantes, expirées, non autorisées et aux écarts bloquants ; commit `0b451df`, CI `32064390327` verte, **382 tests backend verts**.
 - [ ] 5d. Figer ensuite les revues versionnées, corrections ciblées et brouillons de réponse technique.
 - [x] 6. Construire la génération documentaire et le contrôle de complétude sans déclarer une conformité automatique : `PREPARATION-COMPLETENESS-01` implémenté, testé localement et prêt à publication/CI.
 - [ ] 7. Exécuter la préproduction VPS et DCE réels : Docker, ClamAV, sauvegardes, HTTPS, supervision et parcours complet avant tout client.
