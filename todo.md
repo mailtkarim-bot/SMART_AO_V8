@@ -163,5 +163,11 @@
 - [x] 4. Construire le premier incrément de bibliothèque entreprise patron : société, assurances, Kbis et RIB comme registre tenant-scoped append-only. Restent les qualifications, pièces expirables génériques, références, vérification et succession documentaire.
 - [x] 4a. Exposer la bibliothèque entreprise par HTTP patronal : création société, enregistrement `INSURANCE/KBIS/RIB`, lecture projetée, idempotence, révision optimiste et refus collaborateur.
 - [ ] 5. Étendre le wizard collaborateur de préparation : revues ciblées, preuves structurées, dépendances de tâches et pièces techniques par affaire.
+- [ ] 5a. Figer `ENTERPRISE-CAPABILITY-FOUNDATION-01` : qualifications, références, capacités, preuves versionnées, validité et droits d’usage patronaux.
+- [ ] 5b. Figer puis livrer `COLLAB-EVIDENCE-CAPABILITY-01` : `ProposeCapabilityForCase` et `ReportCapabilityGap`, ReBAC, idempotence, append-only et non-fuite financière.
+- [ ] 5c. Étendre le readiness aux preuves manquantes, expirées, non autorisées et aux écarts bloquants.
+- [ ] 5d. Figer ensuite les revues versionnées, corrections ciblées et brouillons de réponse technique.
 - [x] 6. Construire la génération documentaire et le contrôle de complétude sans déclarer une conformité automatique : `PREPARATION-COMPLETENESS-01` implémenté, testé localement et prêt à publication/CI.
 - [ ] 7. Exécuter la préproduction VPS et DCE réels : Docker, ClamAV, sauvegardes, HTTPS, supervision et parcours complet avant tout client.
+- [x] 7a. Préparer le template Docker/Caddy/ClamAV et le runbook non destructif de préproduction ; aucun déploiement VPS réel n’est encore effectué.
+- [ ] 7b. Ajouter health endpoint applicatif, sauvegardes/restauration testées, logs rotatifs, supervision, secrets runtime et pinning d’images par digest.
