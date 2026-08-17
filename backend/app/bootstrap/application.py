@@ -42,6 +42,9 @@ from app.interfaces.http.routes.patron_assignment_cockpit import (
 from app.interfaces.http.routes.patron_assignment_management import (
     build_patron_assignment_management_router,
 )
+from app.interfaces.http.routes.patron_enterprise_library import (
+    build_patron_enterprise_library_router,
+)
 from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
 )
@@ -88,6 +91,10 @@ from app.modules.membership.application.assignment import (
     assignment_handlers,
 )
 from app.modules.membership.application.assignment_history import AssignmentHistoryService
+from app.modules.membership.application.enterprise_library import (
+    EnterpriseLibraryService,
+    enterprise_library_handlers,
+)
 from app.modules.membership.application.financial_report import PatronFinancialReportService
 from app.modules.membership.application.financial_report_draft import (
     CreateFinancialReportDraftHandler,
@@ -159,6 +166,7 @@ class AppRuntime:
                 "CreateFinancialReportDraft": CreateFinancialReportDraftHandler(),
                 "PublishFinancialReport": PublishFinancialReportHandler(),
                 **financial_report_line_handlers(),
+                **enterprise_library_handlers(),
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
                 **assignment_handlers(),
@@ -390,6 +398,11 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        enterprise_library_service = EnterpriseLibraryService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         app.include_router(
             build_case_dce_reading_router(
                 runtime=runtime,
@@ -456,6 +469,12 @@ def create_app(
                 line_service=patron_financial_report_line_service,
                 draft_creation_service=patron_financial_report_draft_creation_service,
                 publication_service=patron_financial_report_publication_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_enterprise_library_router(
+                service=enterprise_library_service,
                 security_runtime=security_runtime,
             )
         )

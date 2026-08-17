@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
@@ -28,6 +29,32 @@ from app.platform.security.context import ActorContext, ActorKind, DataClassific
 from app.platform.security.models import EnterpriseCompanyRecord, EnterpriseDocumentRecord
 
 
+@dataclass(frozen=True, slots=True)
+class EnterpriseDocumentProjection:
+    document_id: UUID
+    document_kind: str
+    document_label: str
+    issued_at: datetime
+    expires_at: datetime | None
+    verification_status: str
+
+
+@dataclass(frozen=True, slots=True)
+class EnterpriseCompanyProjection:
+    company_id: UUID
+    aggregate_revision: int
+    legal_name: str
+    trade_name: str | None
+    siren: str
+    siret: str
+    vat_number: str
+    address_line1: str
+    postal_code: str
+    city: str
+    country_code: str
+    documents: tuple[EnterpriseDocumentProjection, ...]
+
+
 class EnterpriseLibraryService:
     """Authorize patron-owned company and document writes before any private lookup."""
 
@@ -41,6 +68,66 @@ class EnterpriseLibraryService:
         self._session_factory = session_factory
         self._dispatcher = dispatcher
         self._policy = policy
+
+    def read_company(
+        self,
+        *,
+        actor: ActorContext,
+        now: datetime,
+    ) -> EnterpriseCompanyProjection:
+        self._authorize(
+            actor=actor,
+            resource_id=actor.tenant_id,
+            now=now,
+            capability=Capability.ENTERPRISE_LIBRARY_READ,
+        )
+        with self._session_factory() as session:
+            company = session.scalar(
+                sa.select(EnterpriseCompanyRecord).where(
+                    EnterpriseCompanyRecord.tenant_id == actor.tenant_id,
+                )
+            )
+            if company is None:
+                raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+            rows = session.execute(
+                sa.select(
+                    EnterpriseDocumentRecord.id,
+                    EnterpriseDocumentRecord.document_kind,
+                    EnterpriseDocumentRecord.document_label,
+                    EnterpriseDocumentRecord.issued_at,
+                    EnterpriseDocumentRecord.expires_at,
+                    EnterpriseDocumentRecord.verification_status,
+                )
+                .where(
+                    EnterpriseDocumentRecord.tenant_id == actor.tenant_id,
+                    EnterpriseDocumentRecord.company_id == company.id,
+                )
+                .order_by(EnterpriseDocumentRecord.created_at, EnterpriseDocumentRecord.id)
+            ).all()
+        return EnterpriseCompanyProjection(
+            company_id=company.id,
+            aggregate_revision=company.aggregate_revision,
+            legal_name=company.legal_name,
+            trade_name=company.trade_name,
+            siren=company.siren,
+            siret=company.siret,
+            vat_number=company.vat_number,
+            address_line1=company.address_line1,
+            postal_code=company.postal_code,
+            city=company.city,
+            country_code=company.country_code,
+            documents=tuple(
+                EnterpriseDocumentProjection(
+                    document_id=row.id,
+                    document_kind=row.document_kind,
+                    document_label=row.document_label,
+                    issued_at=row.issued_at,
+                    expires_at=row.expires_at,
+                    verification_status=row.verification_status,
+                )
+                for row in rows
+            ),
+        )
 
     def create_company(
         self,
@@ -94,13 +181,14 @@ class EnterpriseLibraryService:
         resource_id: UUID,
         now: datetime,
         classification: DataClassification = DataClassification.PERSONAL_OR_ADMINISTRATIVE,
+        capability: Capability = Capability.ENTERPRISE_LIBRARY_WRITE,
     ) -> None:
         if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
             raise PermissionError("ENTERPRISE_LIBRARY_PATRON_REQUIRED")
         decision = self._policy.authorize(
             context=actor,
             request=AuthorizationRequest(
-                action=Capability.ENTERPRISE_LIBRARY_WRITE,
+                action=capability,
                 resource=AuthorizationResource(
                     resource_type="ENTERPRISE_LIBRARY",
                     resource_id=resource_id,
