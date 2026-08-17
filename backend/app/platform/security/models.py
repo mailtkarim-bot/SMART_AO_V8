@@ -1666,3 +1666,144 @@ class GeneratedTechnicalDocumentRecord(TenantScopedRecord, Base):
     membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class EnterpriseCapabilityRecord(TenantScopedRecord, Base):
+    """Patron-owned reusable capability root, separate from any Case assessment."""
+
+    __tablename__ = "enterprise_capabilities"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_enterprise_capability__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "company_id"],
+            ["enterprise_companies.tenant_id", "enterprise_companies.id"],
+            name="fk_enterprise_capability__company",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_enterprise_capability__tenant_id"),
+        sa.UniqueConstraint("tenant_id", "command_id", name="uq_enterprise_capability__command"),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "company_id",
+            "capability_kind",
+            "name",
+            name="uq_enterprise_capability__identity",
+        ),
+        sa.Index(
+            "ix_enterprise_capabilities__tenant_company_kind_state",
+            "tenant_id",
+            "company_id",
+            "capability_kind",
+            "state",
+        ),
+        sa.CheckConstraint(
+            "capability_kind IN ('QUALIFICATION', 'REFERENCE', 'EQUIPMENT', 'TEAM', 'METHOD')",
+            name="capability_kind",
+        ),
+        sa.CheckConstraint("state IN ('ACTIVE', 'SUSPENDED', 'RETIRED')", name="state"),
+        sa.CheckConstraint("aggregate_revision >= 0", name="aggregate_revision"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    company_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    aggregate_revision: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=0, server_default="0"
+    )
+    capability_kind: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    name: Mapped[str] = mapped_column(sa.String(240), nullable=False)
+    summary: Mapped[str] = mapped_column(sa.String(1000), nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class EnterpriseCapabilityVersionRecord(TenantScopedRecord, Base):
+    """Immutable dated version of one enterprise capability."""
+
+    __tablename__ = "enterprise_capability_versions"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "capability_id"],
+            ["enterprise_capabilities.tenant_id", "enterprise_capabilities.id"],
+            name="fk_enterprise_capability_version__capability",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "created_by_membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_enterprise_capability_version__membership",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_enterprise_capability_version__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "command_id", name="uq_enterprise_capability_version__command"
+        ),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "capability_id",
+            "version_number",
+            name="uq_enterprise_capability_version__number",
+        ),
+        sa.Index(
+            "ix_enterprise_capability_versions__tenant_capability_validity",
+            "tenant_id",
+            "capability_id",
+            "valid_until",
+        ),
+        sa.CheckConstraint("version_number > 0", name="version_number"),
+        sa.CheckConstraint("valid_until IS NULL OR valid_until > valid_from", name="validity"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    capability_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    version_number: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    title: Mapped[str] = mapped_column(sa.String(240), nullable=False)
+    description: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    valid_from: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    valid_until: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    usage_scope: Mapped[str] = mapped_column(sa.String(500), nullable=False)
+    created_by_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class EnterpriseCapabilityProofLinkRecord(TenantScopedRecord, Base):
+    """Immutable link from a capability version to an enterprise document proof."""
+
+    __tablename__ = "enterprise_capability_proof_links"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "capability_version_id"],
+            ["enterprise_capability_versions.tenant_id", "enterprise_capability_versions.id"],
+            name="fk_enterprise_capability_proof_link__version",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "document_id"],
+            ["enterprise_documents.tenant_id", "enterprise_documents.id"],
+            name="fk_enterprise_capability_proof_link__document",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint(
+            "tenant_id", "id", name="uq_enterprise_capability_proof_link__tenant_id"
+        ),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "capability_version_id",
+            "document_id",
+            name="uq_enterprise_capability_proof_link__identity",
+        ),
+        sa.CheckConstraint("length(trim(relation_label)) > 0", name="relation_label"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    capability_version_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    document_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    relation_label: Mapped[str] = mapped_column(sa.String(240), nullable=False)

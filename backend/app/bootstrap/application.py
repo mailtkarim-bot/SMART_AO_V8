@@ -48,6 +48,9 @@ from app.interfaces.http.routes.patron_assignment_cockpit import (
 from app.interfaces.http.routes.patron_assignment_management import (
     build_patron_assignment_management_router,
 )
+from app.interfaces.http.routes.patron_enterprise_capabilities import (
+    build_patron_enterprise_capability_router,
+)
 from app.interfaces.http.routes.patron_enterprise_library import (
     build_patron_enterprise_library_router,
 )
@@ -105,6 +108,10 @@ from app.modules.membership.application.collab_info_blockers import (
 from app.modules.membership.application.collab_work_task import (
     CollaboratorWorkTaskService,
     collaborator_work_task_handlers,
+)
+from app.modules.membership.application.enterprise_capability import (
+    EnterpriseCapabilityService,
+    enterprise_capability_handlers,
 )
 from app.modules.membership.application.enterprise_library import (
     EnterpriseLibraryService,
@@ -194,6 +201,7 @@ class AppRuntime:
                 "CreateFinancialReportDraft": CreateFinancialReportDraftHandler(),
                 "PublishFinancialReport": PublishFinancialReportHandler(),
                 **financial_report_line_handlers(),
+                **enterprise_capability_handlers(),
                 **enterprise_library_handlers(),
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
@@ -473,6 +481,11 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        enterprise_capability_service = EnterpriseCapabilityService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         enterprise_upload_service = _default_enterprise_private_upload_service(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
@@ -569,6 +582,12 @@ def create_app(
             build_patron_enterprise_library_router(
                 service=enterprise_library_service,
                 upload_service=enterprise_upload_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_enterprise_capability_router(
+                service=enterprise_capability_service,
                 security_runtime=security_runtime,
             )
         )
