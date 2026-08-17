@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.bootstrap.application import AppRuntime, create_app
 from app.interfaces.http.routes.authentication import AuthenticationHttpRuntime
+from app.platform.observability.logging import configure_structured_logging
 from app.platform.security.authentication import (
     Argon2idPasswordVerifier,
     AuthenticationService,
@@ -24,6 +25,7 @@ def _required(name: str) -> str:
 
 
 def build_production_app():
+    configure_structured_logging()
     database_url = _required("SMART_AO_DATABASE_URL")
     signing_key = _required("SMART_AO_JWT_SIGNING_KEY")
     issuer = _required("SMART_AO_JWT_ISSUER")

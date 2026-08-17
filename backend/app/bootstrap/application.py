@@ -47,6 +47,7 @@ from app.interfaces.http.routes.dce_requirement_confirmations import (
 )
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
+from app.interfaces.http.routes.observability import build_observability_router
 from app.interfaces.http.routes.patron_assignment_cockpit import (
     build_patron_assignment_cockpit_router,
 )
@@ -162,6 +163,7 @@ from app.modules.preparation.infrastructure.document_storage import (
     LocalGeneratedDocumentStorage,
 )
 from app.platform.events.dispatcher import CommandDispatcher
+from app.platform.observability.http import RequestObservabilityMiddleware
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
 
@@ -419,6 +421,8 @@ def create_app(
         version="0.1.0",
         description="SaaS BTP d'analyse DCE et de décision d'appel d'offres.",
     )
+    app.add_middleware(RequestObservabilityMiddleware)
+    app.include_router(build_observability_router())
 
     @app.get("/healthz", tags=["system"])
     def healthcheck() -> dict[str, str]:
