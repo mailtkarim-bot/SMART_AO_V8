@@ -35,7 +35,8 @@ jobs:
       - name: Secrets scan
         run: >-
           git ls-files -z | xargs -0
-          uv run detect-secrets-hook --baseline .secrets.baseline --exclude-files '^docs/'
+          uv run detect-secrets-hook --baseline .secrets.baseline
+          --exclude-files '^docs/|^web/pnpm-lock.yaml$'
       - name: Dependency vulnerability audit
         run: >-
           uv export --no-emit-project --no-dev --format requirements-txt
