@@ -160,7 +160,7 @@
 - [x] Publier `FINANCIAL-REPORT-DRAFT-CREATION-01` et vérifier la CI GitHub `31899212603` verte.
 - [x] 2. Figer puis livrer l’écriture révisionnée et historisée des lignes financières d’un brouillon `DRAFT`.
 - [x] 3. Construire le premier cockpit patron web après les API financières de création, d’écriture et de lecture réellement publiées.
-- [ ] 4. Construire la bibliothèque entreprise patron : société, assurances, Kbis, RIB, qualifications, pièces expirables et références.
+- [x] 4. Construire le premier incrément de bibliothèque entreprise patron : société, assurances, Kbis et RIB comme registre tenant-scoped append-only. Restent les qualifications, pièces expirables génériques, références, upload HTTP, vérification et succession documentaire.
 - [ ] 5. Construire le wizard collaborateur de préparation : exigences confirmées, preuves, tâches et pièces techniques par affaire.
 - [ ] 6. Construire la génération documentaire et le contrôle de complétude sans déclarer une conformité automatique.
 - [ ] 7. Exécuter la préproduction VPS et DCE réels : Docker, ClamAV, sauvegardes, HTTPS, supervision et parcours complet avant tout client.
