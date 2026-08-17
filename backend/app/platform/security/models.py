@@ -1537,3 +1537,132 @@ class CollaboratorTaskBlockerRecord(TenantScopedRecord, Base):
     membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class PreparationPackageRecord(TenantScopedRecord, Base):
+    """Mutable preparation package owned by one case assignment and DCE version."""
+
+    __tablename__ = "preparation_packages"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_prep_packages__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "assignment_id"],
+            ["case_assignments.tenant_id", "case_assignments.id"],
+            name="fk_prep_packages__assignment",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_prep_packages__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "case_id",
+            "assignment_id",
+            "dce_version_id",
+            name="uq_prep_package_identity",
+        ),
+        sa.CheckConstraint(
+            "state IN ('IN_PREPARATION', 'A_REVIEW', 'READY', 'BLOCKED', 'GENERATED')", name="state"
+        ),
+        sa.CheckConstraint("aggregate_revision >= 0", name="aggregate_revision"),
+        sa.Index("ix_prep_packages__tenant_case_state", "tenant_id", "case_id", "state"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    assignment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    dce_version_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    state: Mapped[str] = mapped_column(
+        sa.String(24), nullable=False, server_default="IN_PREPARATION"
+    )
+    aggregate_revision: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=0, server_default="0"
+    )
+    created_by_actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+
+
+class PreparationReadinessRecord(TenantScopedRecord, Base):
+    """Append-only deterministic completeness evaluation."""
+
+    __tablename__ = "preparation_readiness"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_prep_readiness__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "package_id"],
+            ["preparation_packages.tenant_id", "preparation_packages.id"],
+            name="fk_prep_readiness__package",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_prep_readiness__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "package_id", "revision", name="uq_prep_readiness_revision"
+        ),
+        sa.CheckConstraint("revision > 0", name="revision_positive"),
+        sa.CheckConstraint("state IN ('READY', 'READY_WITH_WARNINGS', 'BLOCKED')", name="state"),
+        sa.CheckConstraint("checked_requirement_count >= 0", name="requirements_nonnegative"),
+        sa.CheckConstraint("checked_task_count >= 0", name="tasks_nonnegative"),
+        sa.Index(
+            "ix_prep_readiness__tenant_package_revision", "tenant_id", "package_id", "revision"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    package_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    blocker_codes_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    warning_codes_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    checked_requirement_count: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    checked_task_count: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    input_manifest_sha256: Mapped[str] = mapped_column(sa.CHAR(64), nullable=False)
+    evaluator_id: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    evaluator_version: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class GeneratedTechnicalDocumentRecord(TenantScopedRecord, Base):
+    """Immutable generated technical document metadata; content stays private."""
+
+    __tablename__ = "generated_technical_documents"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_generated_docs__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "package_id"],
+            ["preparation_packages.tenant_id", "preparation_packages.id"],
+            name="fk_generated_docs__package",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "readiness_id"],
+            ["preparation_readiness.tenant_id", "preparation_readiness.id"],
+            name="fk_generated_docs__readiness",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_generated_docs__tenant_id"),
+        sa.UniqueConstraint("tenant_id", "package_id", "version", name="uq_generated_doc_version"),
+        sa.CheckConstraint("version > 0", name="version_positive"),
+        sa.CheckConstraint("document_kind IN ('TECHNICAL_RESPONSE')", name="document_kind"),
+        sa.CheckConstraint("state IN ('GENERATED', 'FAILED_SAFE')", name="state"),
+        sa.Index("ix_generated_docs__tenant_package_version", "tenant_id", "package_id", "version"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    package_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    readiness_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    document_kind: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(sa.CHAR(64), nullable=False)
+    storage_key: Mapped[str] = mapped_column(sa.String(700), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))

@@ -54,6 +54,7 @@ from app.interfaces.http.routes.patron_enterprise_library import (
 from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
 )
+from app.interfaces.http.routes.preparation import build_preparation_router
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
@@ -133,6 +134,10 @@ from app.modules.membership.application.patron_assignment import (
 from app.modules.membership.application.patron_assignment_cockpit import (
     PatronAssignmentCockpitService,
 )
+from app.modules.preparation.application.service import PreparationService, preparation_handlers
+from app.modules.preparation.infrastructure.document_storage import (
+    LocalGeneratedDocumentStorage,
+)
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
@@ -156,6 +161,7 @@ class AppRuntime:
     session_factory: sessionmaker[Session]
     dispatcher: CommandDispatcher
     dce_upload_service: DceUploadService
+    preparation_storage: LocalGeneratedDocumentStorage
 
     @classmethod
     def create(
@@ -164,6 +170,9 @@ class AppRuntime:
         session_factory: sessionmaker[Session],
         dce_upload_service_factory: Callable[[CommandDispatcher], DceUploadService] | None = None,
     ) -> AppRuntime:
+        preparation_storage = LocalGeneratedDocumentStorage(
+            root=Path(os.getenv("SMART_AO_DCE_QUARANTINE_ROOT", "/var/lib/smart_ao/dce-quarantine"))
+        )
         dispatcher = CommandDispatcher(
             session_factory=session_factory,
             handlers={
@@ -192,6 +201,7 @@ class AppRuntime:
                 **collaborator_work_task_handlers(),
                 **collaborator_info_blocker_handlers(),
                 **patron_assignment_handlers(),
+                **preparation_handlers(storage=preparation_storage),
             },
         )
         upload_service = (
@@ -203,6 +213,7 @@ class AppRuntime:
             session_factory=session_factory,
             dispatcher=dispatcher,
             dce_upload_service=upload_service,
+            preparation_storage=preparation_storage,
         )
 
     def get_dce_staged_object_upload_target(
@@ -419,6 +430,12 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        preparation_service = PreparationService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+            storage=runtime.preparation_storage,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -512,6 +529,12 @@ def create_app(
         app.include_router(
             build_collaborator_info_blocker_router(
                 service=collaborator_info_blocker_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_preparation_router(
+                service=preparation_service,
                 security_runtime=security_runtime,
             )
         )

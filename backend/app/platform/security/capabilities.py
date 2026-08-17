@@ -25,6 +25,8 @@ class Capability(StrEnum):
     ASSIGNMENT_MANAGE = "assignment.manage"
     DOCUMENT_ADMIN_READ = "document.administrative.read"
     PREPARATION_TRANSMIT = "preparation.transmit"
+    PREPARATION_READINESS_WRITE = "preparation.readiness.write"
+    PREPARATION_DOCUMENT_WRITE = "preparation.document.write"
     MEMBERSHIP_MANAGE = "membership.manage"
     TENANT_MANAGE = "tenant.manage"
     DECISION_FINALIZE = "decision.finalize"
@@ -49,9 +51,11 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
+        Capability.ASSIGNMENT_MANAGE,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
-        Capability.ASSIGNMENT_MANAGE,
+        Capability.PREPARATION_READINESS_WRITE,
+        Capability.PREPARATION_DOCUMENT_WRITE,
         Capability.MEMBERSHIP_MANAGE,
         Capability.TENANT_MANAGE,
         Capability.DECISION_FINALIZE,
@@ -76,12 +80,14 @@ _COLLABORATOR_CAPABILITIES = frozenset(
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.ASSIGNMENT_ACKNOWLEDGE,
         Capability.ASSIGNMENT_CLARIFY,
-        Capability.ASSIGNMENT_HISTORY_READ,
         Capability.ASSIGNMENT_UNAVAILABILITY,
+        Capability.ASSIGNMENT_HISTORY_READ,
         Capability.WORK_TASK_READ,
         Capability.WORK_TASK_WRITE,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
+        Capability.PREPARATION_READINESS_WRITE,
+        Capability.PREPARATION_DOCUMENT_WRITE,
     }
 )
 _DELEGABLE_CAPABILITIES = frozenset(
@@ -94,6 +100,8 @@ _DELEGABLE_CAPABILITIES = frozenset(
         Capability.WORK_TASK_READ,
         Capability.WORK_TASK_WRITE,
         Capability.PREPARATION_TRANSMIT,
+        Capability.PREPARATION_READINESS_WRITE,
+        Capability.PREPARATION_DOCUMENT_WRITE,
         Capability.DECISION_FINALIZE,
         Capability.SUBMISSION_AUTHORIZE,
         Capability.SENSITIVE_EXPORT,

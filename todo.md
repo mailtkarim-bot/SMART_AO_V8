@@ -162,6 +162,6 @@
 - [x] 3. Construire le premier cockpit patron web après les API financières de création, d’écriture et de lecture réellement publiées.
 - [x] 4. Construire le premier incrément de bibliothèque entreprise patron : société, assurances, Kbis et RIB comme registre tenant-scoped append-only. Restent les qualifications, pièces expirables génériques, références, vérification et succession documentaire.
 - [x] 4a. Exposer la bibliothèque entreprise par HTTP patronal : création société, enregistrement `INSURANCE/KBIS/RIB`, lecture projetée, idempotence, révision optimiste et refus collaborateur.
-- [ ] 5. Construire le wizard collaborateur de préparation : exigences confirmées, preuves, tâches et pièces techniques par affaire.
-- [ ] 6. Construire la génération documentaire et le contrôle de complétude sans déclarer une conformité automatique.
+- [ ] 5. Étendre le wizard collaborateur de préparation : revues ciblées, preuves structurées, dépendances de tâches et pièces techniques par affaire.
+- [x] 6. Construire la génération documentaire et le contrôle de complétude sans déclarer une conformité automatique : `PREPARATION-COMPLETENESS-01` implémenté, testé localement et prêt à publication/CI.
 - [ ] 7. Exécuter la préproduction VPS et DCE réels : Docker, ClamAV, sauvegardes, HTTPS, supervision et parcours complet avant tout client.
