@@ -162,7 +162,7 @@
 - [x] 3. Construire le premier cockpit patron web après les API financières de création, d’écriture et de lecture réellement publiées.
 - [x] 4. Construire le premier incrément de bibliothèque entreprise patron : société, assurances, Kbis et RIB comme registre tenant-scoped append-only. Restent les qualifications, pièces expirables génériques, références, vérification et succession documentaire.
 - [x] 4a. Exposer la bibliothèque entreprise par HTTP patronal : création société, enregistrement `INSURANCE/KBIS/RIB`, lecture projetée, idempotence, révision optimiste et refus collaborateur.
-- [ ] 5. Étendre le wizard collaborateur de préparation : revues ciblées, preuves structurées, dépendances de tâches et pièces techniques par affaire.
+- [x] 5. Étendre le wizard collaborateur de préparation : revues ciblées, preuves structurées, dépendances de tâches et pièces techniques par affaire ; fondations 5a–5d livrées, raccordement UI complet encore distinct.
 - [x] 5a. Figer et livrer `ENTERPRISE-CAPABILITY-FOUNDATION-01` : qualifications, références, capacités, preuves versionnées, validité et droits d’usage patronaux ; commit `b41668e`, PR `#9`, CI `32054755005` verte.
 - [x] 5b. Figer et livrer `COLLAB-EVIDENCE-CAPABILITY-01` : `ProposeCapabilityForCase` et `ReportCapabilityGap`, ReBAC, idempotence, append-only et non-fuite financière ; commit `453bbc7`, CI `32055928042` verte, **374 tests backend verts**.
 - [x] 5c. Étendre le readiness aux preuves manquantes, expirées, non autorisées et aux écarts bloquants ; commit `0b451df`, CI `32064390327` verte, **382 tests backend verts**.
@@ -173,3 +173,10 @@
 - [x] 7b-a. Ajouter les health endpoints applicatifs, les healthchecks Compose et le pinning des images par digest ; commit `109e54a`, PR `#10`, CI `32061635363` verte.
 - [x] 7b-b. Automatiser les sauvegardes/restauration isolée, manifest SHA-256, healthcheck, rotation des logs, timers systemd et rotation JWT manuelle ; commit `8965a43`, CI `32070896704` verte, **387 tests backend verts**.
 - [ ] 7b-c. Exécuter sur le VPS réel les sauvegardes/restauration testées, logs rotatifs, supervision externe, rotation des secrets runtime, build Docker, ClamAV/EICAR et HTTPS.
+
+## Tâches restantes consolidées après les slices publiés
+
+- [ ] Exécuter le gate VPS réel : installer le stack, builder les images digest-pinnées, vérifier Caddy/HTTPS, ClamAV avec EICAR, `/healthz/ready`, backup hors VPS, restauration isolée et supervision externe.
+- [ ] Raccorder le frontend à l’API publiée et figer `VITE_API_BASE_URL` uniquement après vérification d’une URL HTTPS backend réelle.
+- [ ] Produire le rapport opérateur de restauration et conserver les preuves de backup, hashes, logs, supervision et rotation JWT.
+- [ ] Nettoyer les anciennes lignes historiques non cochées de cette checklist qui correspondent à des slices déjà publiés, notamment les placeholders financiers et Assignment, afin de conserver une checklist SSoT non ambiguë.
