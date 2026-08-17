@@ -27,6 +27,8 @@ class Capability(StrEnum):
     PREPARATION_TRANSMIT = "preparation.transmit"
     PREPARATION_READINESS_WRITE = "preparation.readiness.write"
     PREPARATION_DOCUMENT_WRITE = "preparation.document.write"
+    PREPARATION_CAPABILITY_PROPOSE = "preparation.capability.propose"
+    PREPARATION_CAPABILITY_GAP_REPORT = "preparation.capability.gap.report"
     MEMBERSHIP_MANAGE = "membership.manage"
     TENANT_MANAGE = "tenant.manage"
     DECISION_FINALIZE = "decision.finalize"
@@ -92,6 +94,8 @@ _COLLABORATOR_CAPABILITIES = frozenset(
         Capability.PREPARATION_TRANSMIT,
         Capability.PREPARATION_READINESS_WRITE,
         Capability.PREPARATION_DOCUMENT_WRITE,
+        Capability.PREPARATION_CAPABILITY_PROPOSE,
+        Capability.PREPARATION_CAPABILITY_GAP_REPORT,
     }
 )
 _DELEGABLE_CAPABILITIES = frozenset(

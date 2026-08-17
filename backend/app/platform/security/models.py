@@ -1807,3 +1807,171 @@ class EnterpriseCapabilityProofLinkRecord(TenantScopedRecord, Base):
     capability_version_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     document_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     relation_label: Mapped[str] = mapped_column(sa.String(240), nullable=False)
+
+
+class CaseCapabilityProposalRecord(TenantScopedRecord, Base):
+    """Collaborator candidate use of an enterprise capability for one Case."""
+
+    __tablename__ = "case_capability_proposals"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "case_id"],
+            ["cases.tenant_id", "cases.id"],
+            name="fk_case_capability_proposal__case",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "assignment_id"],
+            ["case_assignments.tenant_id", "case_assignments.id"],
+            name="fk_case_capability_proposal__assignment",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "capability_id"],
+            ["enterprise_capabilities.tenant_id", "enterprise_capabilities.id"],
+            name="fk_case_capability_proposal__capability",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "capability_version_id"],
+            ["enterprise_capability_versions.tenant_id", "enterprise_capability_versions.id"],
+            name="fk_case_capability_proposal__version",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "requirement_id"],
+            ["dce_requirements.tenant_id", "dce_requirements.id"],
+            name="fk_case_capability_proposal__requirement",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "task_id"],
+            ["collaborator_tasks.tenant_id", "collaborator_tasks.id"],
+            name="fk_case_capability_proposal__task",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "proposed_by_membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_case_capability_proposal__membership",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_case_capability_proposal__tenant_id"),
+        sa.UniqueConstraint("tenant_id", "command_id", name="uq_case_capability_proposal__command"),
+        sa.UniqueConstraint(
+            "tenant_id", "functional_key", name="uq_case_capability_proposal__functional"
+        ),
+        sa.CheckConstraint("state IN ('PROPOSED', 'TO_REVIEW')", name="state"),
+        sa.CheckConstraint(
+            "validity_state IN ('CURRENT', 'EXPIRED', 'UNKNOWN')", name="validity_state"
+        ),
+        sa.CheckConstraint(
+            "requirement_id IS NOT NULL OR task_id IS NOT NULL", name="source_required"
+        ),
+        sa.Index(
+            "ix_case_capability_proposals__tenant_case_state",
+            "tenant_id",
+            "case_id",
+            "state",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    assignment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    capability_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    capability_version_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    requirement_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    task_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False, server_default="PROPOSED")
+    validity_state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    justification: Mapped[str] = mapped_column(sa.String(2000), nullable=False)
+    source_locator: Mapped[str | None] = mapped_column(sa.String(500))
+    functional_key: Mapped[str] = mapped_column(sa.String(700), nullable=False)
+    proposed_by_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class CaseCapabilityGapRecord(TenantScopedRecord, Base):
+    """Collaborator finding that a Case capability/proof is missing or unusable."""
+
+    __tablename__ = "case_capability_gaps"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "case_id"],
+            ["cases.tenant_id", "cases.id"],
+            name="fk_case_capability_gap__case",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "assignment_id"],
+            ["case_assignments.tenant_id", "case_assignments.id"],
+            name="fk_case_capability_gap__assignment",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "capability_id"],
+            ["enterprise_capabilities.tenant_id", "enterprise_capabilities.id"],
+            name="fk_case_capability_gap__capability",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "requirement_id"],
+            ["dce_requirements.tenant_id", "dce_requirements.id"],
+            name="fk_case_capability_gap__requirement",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "task_id"],
+            ["collaborator_tasks.tenant_id", "collaborator_tasks.id"],
+            name="fk_case_capability_gap__task",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "reported_by_membership_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.id"],
+            name="fk_case_capability_gap__membership",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_case_capability_gap__tenant_id"),
+        sa.UniqueConstraint("tenant_id", "command_id", name="uq_case_capability_gap__command"),
+        sa.UniqueConstraint(
+            "tenant_id", "functional_key", name="uq_case_capability_gap__functional"
+        ),
+        sa.CheckConstraint(
+            "gap_kind IN ('MISSING', 'EXPIRED', 'UNAUTHORIZED', 'INSUFFICIENT')", name="gap_kind"
+        ),
+        sa.CheckConstraint(
+            "severity IN ('INFORMATIONAL', 'IMPORTANT', 'BLOCKING')", name="severity"
+        ),
+        sa.CheckConstraint(
+            "requirement_id IS NOT NULL OR task_id IS NOT NULL", name="source_required"
+        ),
+        sa.Index(
+            "ix_case_capability_gaps__tenant_case_severity",
+            "tenant_id",
+            "case_id",
+            "severity",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    assignment_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    capability_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    requirement_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    task_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    gap_kind: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    severity: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    reason: Mapped[str] = mapped_column(sa.String(2000), nullable=False)
+    source_locator: Mapped[str | None] = mapped_column(sa.String(500))
+    recommended_action: Mapped[str] = mapped_column(sa.String(1000), nullable=False)
+    functional_key: Mapped[str] = mapped_column(sa.String(700), nullable=False)
+    reported_by_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
