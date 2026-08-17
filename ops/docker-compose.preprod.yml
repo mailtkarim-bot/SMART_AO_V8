@@ -2,7 +2,7 @@ name: smart-ao-preprod
 
 services:
   caddy:
-    image: caddy:2.10-alpine
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     restart: unless-stopped
     init: true
     environment:
@@ -19,7 +19,7 @@ services:
       frontend:
         condition: service_started
       backend:
-        condition: service_started
+        condition: service_healthy
     networks:
       - edge
       - internal
@@ -68,7 +68,7 @@ services:
       test:
         - CMD-SHELL
         - >-
-          python -c "import socket; s=socket.create_connection(('127.0.0.1',8000),2); s.close()"
+          python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz/ready', timeout=3).read()"
       interval: 15s
       timeout: 5s
       retries: 10
@@ -102,7 +102,7 @@ services:
       - no-new-privileges:true
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
     init: true
     environment:
@@ -124,7 +124,7 @@ services:
       - no-new-privileges:true
 
   clamav:
-    image: clamav/clamav:1.4_base
+    image: clamav/clamav:1.4_base@sha256:1b6920e8c32cca47ea33b1e2611d9a4740ccc622cf13b30b29f8283d60175e39
     restart: unless-stopped
     init: true
     environment:

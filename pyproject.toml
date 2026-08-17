@@ -54,6 +54,7 @@ markers = [
   "concurrency: deux sessions et retries",
   "security: tenant isolation et confidentialité",
   "process: Process Managers, outbox et déduplication",
+  "e2e: parcours de bout en bout multi-module",
 ]
 
 [tool.coverage.run]

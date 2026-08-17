@@ -8,6 +8,7 @@ transition or directly queries an ORM record from a route.
 from __future__ import annotations
 
 import os
+import socket
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.interfaces.http.routes.assignment_history import build_assignment_history_router
@@ -413,6 +415,46 @@ def create_app(
     @app.get("/healthz", tags=["system"])
     def healthcheck() -> dict[str, str]:
         return {"status": "ok", "service": "smart-ao-v8"}
+
+    @app.get("/healthz/live", tags=["system"])
+    def liveness() -> dict[str, object]:
+        return {"status": "ok", "service": "smart-ao-v8", "checks": {"process": "ok"}}
+
+    @app.get("/healthz/ready", tags=["system"])
+    def readiness() -> JSONResponse:
+        checks: dict[str, str] = {"database": "unknown", "clamav": "unknown"}
+        if runtime is None:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "service": "smart-ao-v8", "checks": checks},
+            )
+        try:
+            with runtime.session_factory() as session:
+                session.execute(sa.text("SELECT 1"))
+            checks["database"] = "ok"
+        except sa.exc.SQLAlchemyError:
+            checks["database"] = "failed"
+        try:
+            with socket.create_connection(
+                (
+                    os.getenv("SMART_AO_CLAMD_HOST", "clamav"),
+                    int(os.getenv("SMART_AO_CLAMD_PORT", "3310")),
+                ),
+                timeout=float(os.getenv("SMART_AO_CLAMD_TIMEOUT_SECONDS", "3")),
+            ):
+                pass
+            checks["clamav"] = "ok"
+        except (OSError, ValueError):
+            checks["clamav"] = "failed"
+        ready = all(value == "ok" for value in checks.values())
+        return JSONResponse(
+            status_code=200 if ready else 503,
+            content={
+                "status": "ok" if ready else "not_ready",
+                "service": "smart-ao-v8",
+                "checks": checks,
+            },
+        )
 
     if authentication_runtime is not None:
         app.include_router(build_authentication_router(runtime=authentication_runtime))
