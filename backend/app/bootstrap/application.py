@@ -27,6 +27,9 @@ from app.interfaces.http.routes.authentication import (
 )
 from app.interfaces.http.routes.case_assigned import build_assigned_case_router
 from app.interfaces.http.routes.case_dce_reading import build_case_dce_reading_router
+from app.interfaces.http.routes.collaborator_info_blockers import (
+    build_collaborator_info_blocker_router,
+)
 from app.interfaces.http.routes.collaborator_work_tasks import (
     build_collaborator_work_task_router,
 )
@@ -94,6 +97,10 @@ from app.modules.membership.application.assignment import (
     assignment_handlers,
 )
 from app.modules.membership.application.assignment_history import AssignmentHistoryService
+from app.modules.membership.application.collab_info_blockers import (
+    CollaboratorInfoBlockerService,
+    collaborator_info_blocker_handlers,
+)
 from app.modules.membership.application.collab_work_task import (
     CollaboratorWorkTaskService,
     collaborator_work_task_handlers,
@@ -183,6 +190,7 @@ class AppRuntime:
                 "RegisterDceVersion": RegisterDceVersionHandler(),
                 **assignment_handlers(),
                 **collaborator_work_task_handlers(),
+                **collaborator_info_blocker_handlers(),
                 **patron_assignment_handlers(),
             },
         )
@@ -406,6 +414,11 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        collaborator_info_blocker_service = CollaboratorInfoBlockerService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -493,6 +506,12 @@ def create_app(
         app.include_router(
             build_collaborator_work_task_router(
                 service=collaborator_work_task_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_collaborator_info_blocker_router(
+                service=collaborator_info_blocker_service,
                 security_runtime=security_runtime,
             )
         )

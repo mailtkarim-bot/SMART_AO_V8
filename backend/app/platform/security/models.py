@@ -1381,3 +1381,159 @@ class CollaboratorTaskResultRecord(TenantScopedRecord, Base):
     membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class CollaboratorInformationRequestRecord(TenantScopedRecord, Base):
+    """Operational information request bounded by one collaborator task."""
+
+    __tablename__ = "collaborator_information_requests"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_collab_info_requests__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "task_id"],
+            ["collaborator_tasks.tenant_id", "collaborator_tasks.id"],
+            name="fk_collab_info_requests__task",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_collab_info_requests__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "task_id", "functional_key", name="uq_collab_info_request__functional"
+        ),
+        sa.CheckConstraint(
+            "request_kind IN ('MISSING_SOURCE', 'CLARIFICATION', 'OWNER_CONFIRMATION', 'DEADLINE_CONFIRMATION')",
+            name="request_kind",
+        ),
+        sa.CheckConstraint("priority IN ('LOW', 'NORMAL', 'HIGH', 'CRITICAL')", name="priority"),
+        sa.CheckConstraint("state IN ('OPEN', 'ANSWERED', 'CLOSED', 'CANCELLED')", name="state"),
+        sa.CheckConstraint("aggregate_revision >= 0", name="aggregate_revision"),
+        sa.Index(
+            "ix_collab_info_requests__tenant_task_state",
+            "tenant_id",
+            "task_id",
+            "state",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    task_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    request_kind: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    subject: Mapped[str] = mapped_column(sa.String(240), nullable=False)
+    question: Mapped[str] = mapped_column(sa.String(4_000), nullable=False)
+    requested_object: Mapped[str] = mapped_column(sa.String(1_000), nullable=False)
+    reason: Mapped[str] = mapped_column(sa.String(2_000), nullable=False)
+    priority: Mapped[str] = mapped_column(sa.String(16), nullable=False, server_default="NORMAL")
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False, server_default="OPEN")
+    functional_key: Mapped[str] = mapped_column(sa.String(700), nullable=False)
+    due_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    aggregate_revision: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=0, server_default="0"
+    )
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class CollaboratorInformationResponseRecord(TenantScopedRecord, Base):
+    """Append-only versioned response for one information request."""
+
+    __tablename__ = "collaborator_information_responses"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_collab_info_responses__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "request_id"],
+            ["collaborator_information_requests.tenant_id", "collaborator_information_requests.id"],
+            name="fk_collab_info_responses__request",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_collab_info_responses__tenant_id"),
+        sa.CheckConstraint(
+            "outcome IN ('ANSWERED', 'NOT_AVAILABLE', 'NEEDS_CLARIFICATION')", name="outcome"
+        ),
+        sa.CheckConstraint("request_revision >= 0", name="request_revision"),
+        sa.CheckConstraint("length(trim(response_text)) > 0", name="response_text_nonempty"),
+        sa.Index(
+            "ix_collab_info_responses__tenant_request_revision",
+            "tenant_id",
+            "request_id",
+            "request_revision",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    request_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    request_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    outcome: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    response_text: Mapped[str] = mapped_column(sa.String(8_000), nullable=False)
+    source_locator: Mapped[str | None] = mapped_column(sa.String(500))
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class CollaboratorTaskBlockerRecord(TenantScopedRecord, Base):
+    """Mutable blocker state owned by a collaborator task."""
+
+    __tablename__ = "collaborator_task_blockers"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_collab_task_blockers__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "task_id"],
+            ["collaborator_tasks.tenant_id", "collaborator_tasks.id"],
+            name="fk_collab_task_blockers__task",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_collab_task_blockers__tenant_id"),
+        sa.CheckConstraint(
+            "blocker_kind IN ('MISSING_INFORMATION', 'EXTERNAL_DEPENDENCY', 'SOURCE_CONFLICT', 'REVIEW_REQUIRED')",
+            name="blocker_kind",
+        ),
+        sa.CheckConstraint(
+            "resolution_owner IN ('COLLABORATEUR', 'PATRON_ADMIN', 'EXTERNAL_PARTY')",
+            name="resolution_owner",
+        ),
+        sa.CheckConstraint("state IN ('OPEN', 'RESOLVED')", name="state"),
+        sa.CheckConstraint(
+            "state <> 'RESOLVED' OR (resolution_note IS NOT NULL AND resolved_at IS NOT NULL)",
+            name="resolution_fields",
+        ),
+        sa.Index(
+            "ix_collab_task_blockers__tenant_task_state",
+            "tenant_id",
+            "task_id",
+            "state",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    task_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    task_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    blocker_kind: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    description: Mapped[str] = mapped_column(sa.String(4_000), nullable=False)
+    source_locator: Mapped[str | None] = mapped_column(sa.String(500))
+    resolution_owner: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False, server_default="OPEN")
+    resolution_note: Mapped[str | None] = mapped_column(sa.String(4_000))
+    resolved_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
