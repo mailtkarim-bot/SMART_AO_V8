@@ -19,6 +19,7 @@ dist/
 .env
 .env.*
 !.env.example
+!ops/.env.preprod.example
 *.sqlite3
 postgres_data/
 minio_data/
