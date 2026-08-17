@@ -19,7 +19,7 @@ Le serveur résout tenant, acteur, membership, affaire, affectation et version D
 
 Le calcul est déterministe et sourcé. Une exigence actuelle avec confirmation `CONFIRMED` ou `NOT_APPLICABLE` est admissible. Une exigence `PENDING_HUMAN_CONFIRMATION` ou une confirmation `REVIEW_REQUIRED` ajoute un blocker. Une tâche `BLOCKED` ajoute un blocker. Une tâche opérationnelle active sans résultat admissible ajoute un warning; elle ne rend pas automatiquement la préparation conforme.
 
-Le résultat contient des codes fermés : `REQUIREMENT_UNCONFIRMED`, `TASK_BLOCKED`, `TASK_RESULT_MISSING`, `DCE_NOT_READY`, `NO_BLOCKER`. Les listes sont triées et persistées avec l’empreinte des entrées contrôlées. Le système ne prétend jamais qu’un corpus incomplet est complet.
+Le résultat contient des codes fermés : `REQUIREMENT_UNCONFIRMED`, `TASK_BLOCKED`, `TASK_RESULT_MISSING`, `DCE_NOT_READY`, `CAPABILITY_PROOF_MISSING`, `CAPABILITY_PROOF_EXPIRED`, `CAPABILITY_PROOF_UNAUTHORIZED`, `CAPABILITY_GAP_BLOCKING`, `CAPABILITY_GAP_IMPORTANT`, `NO_BLOCKER`. Une preuve liée à une capacité doit appartenir à la même société, être vérifiée `VALIDATED`, être dans sa période de validité et provenir d’un lien serveur tenant-scoped ; sinon elle est respectivement manquante, expirée ou non autorisée. Un gap `BLOCKING` bloque la préparation ; un gap `IMPORTANT` reste un warning. Les listes sont triées et persistées avec l’empreinte des entrées contrôlées. Le système ne prétend jamais qu’un corpus incomplet est complet.
 
 | État | Génération technique |
 |---|---|

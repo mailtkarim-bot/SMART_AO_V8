@@ -36,8 +36,14 @@ from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
 from app.platform.security.models import (
     CaseAssignmentRecord,
+    CaseCapabilityGapRecord,
+    CaseCapabilityProposalRecord,
     CollaboratorTaskRecord,
     CollaboratorTaskResultRecord,
+    EnterpriseCapabilityProofLinkRecord,
+    EnterpriseCapabilityRecord,
+    EnterpriseCapabilityVersionRecord,
+    EnterpriseDocumentRecord,
     GeneratedTechnicalDocumentRecord,
     PreparationPackageRecord,
     PreparationReadinessRecord,
@@ -335,6 +341,99 @@ class PreparationHandler:
                 )
                 if not has_result:
                     warning_codes.add("TASK_RESULT_MISSING")
+
+        proposals = list(
+            session.scalars(
+                sa.select(CaseCapabilityProposalRecord).where(
+                    CaseCapabilityProposalRecord.tenant_id == context.tenant_id,
+                    CaseCapabilityProposalRecord.case_id == package.case_id,
+                    CaseCapabilityProposalRecord.assignment_id == package.assignment_id,
+                )
+            ).all()
+        )
+        proposal_proof_manifest: list[dict[str, object]] = []
+        for proposal in proposals:
+            capability = session.scalar(
+                sa.select(EnterpriseCapabilityRecord).where(
+                    EnterpriseCapabilityRecord.tenant_id == context.tenant_id,
+                    EnterpriseCapabilityRecord.id == proposal.capability_id,
+                )
+            )
+            version = session.scalar(
+                sa.select(EnterpriseCapabilityVersionRecord).where(
+                    EnterpriseCapabilityVersionRecord.tenant_id == context.tenant_id,
+                    EnterpriseCapabilityVersionRecord.id == proposal.capability_version_id,
+                    EnterpriseCapabilityVersionRecord.capability_id == proposal.capability_id,
+                )
+            )
+            links = list(
+                session.scalars(
+                    sa.select(EnterpriseCapabilityProofLinkRecord).where(
+                        EnterpriseCapabilityProofLinkRecord.tenant_id == context.tenant_id,
+                        EnterpriseCapabilityProofLinkRecord.capability_version_id
+                        == proposal.capability_version_id,
+                    )
+                ).all()
+            )
+            proof_states: list[str] = []
+            eligible_proof = False
+            for link in links:
+                document = session.scalar(
+                    sa.select(EnterpriseDocumentRecord).where(
+                        EnterpriseDocumentRecord.tenant_id == context.tenant_id,
+                        EnterpriseDocumentRecord.id == link.document_id,
+                    )
+                )
+                if (
+                    document is None
+                    or capability is None
+                    or document.company_id != capability.company_id
+                ):
+                    proof_states.append("UNAUTHORIZED")
+                    continue
+                if document.verification_status != "VALIDATED":
+                    proof_states.append("UNAUTHORIZED")
+                    continue
+                if document.expires_at is not None and document.expires_at <= context.received_at:
+                    proof_states.append("EXPIRED")
+                    continue
+                eligible_proof = True
+                proof_states.append("CURRENT")
+            if capability is None or version is None or capability.state != "ACTIVE":
+                blocker_codes.add("CAPABILITY_PROOF_UNAUTHORIZED")
+            elif version.valid_from > context.received_at or (
+                version.valid_until is not None and version.valid_until <= context.received_at
+            ) or proposal.validity_state == "EXPIRED":
+                blocker_codes.add("CAPABILITY_PROOF_EXPIRED")
+            elif not links:
+                blocker_codes.add("CAPABILITY_PROOF_MISSING")
+            elif not eligible_proof:
+                if "EXPIRED" in proof_states:
+                    blocker_codes.add("CAPABILITY_PROOF_EXPIRED")
+                else:
+                    blocker_codes.add("CAPABILITY_PROOF_UNAUTHORIZED")
+            proposal_proof_manifest.append(
+                {
+                    "proposal_id": str(proposal.id),
+                    "capability_version_id": str(proposal.capability_version_id),
+                    "proof_states": sorted(proof_states),
+                }
+            )
+
+        gaps = list(
+            session.scalars(
+                sa.select(CaseCapabilityGapRecord).where(
+                    CaseCapabilityGapRecord.tenant_id == context.tenant_id,
+                    CaseCapabilityGapRecord.case_id == package.case_id,
+                    CaseCapabilityGapRecord.assignment_id == package.assignment_id,
+                )
+            ).all()
+        )
+        if any(gap.severity == "BLOCKING" for gap in gaps):
+            blocker_codes.add("CAPABILITY_GAP_BLOCKING")
+        elif any(gap.severity == "IMPORTANT" for gap in gaps):
+            warning_codes.add("CAPABILITY_GAP_IMPORTANT")
+
         state = "BLOCKED" if blocker_codes else "READY_WITH_WARNINGS" if warning_codes else "READY"
         revision = package.aggregate_revision + 1
         manifest = {
@@ -343,6 +442,15 @@ class PreparationHandler:
             "dce_version_id": str(package.dce_version_id),
             "requirements": sorted(str(item.id) for item in requirements),
             "tasks": sorted(str(item.id) for item in tasks),
+            "capability_assessments": proposal_proof_manifest,
+            "gaps": sorted(
+                {
+                    "gap_id": str(gap.id),
+                    "gap_kind": gap.gap_kind,
+                    "severity": gap.severity,
+                }
+                for gap in gaps
+            ),
             "blockers": sorted(blocker_codes),
             "warnings": sorted(warning_codes),
         }

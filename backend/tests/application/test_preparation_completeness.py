@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -23,7 +24,12 @@ from app.platform.security.capabilities import Capability
 from app.platform.security.context import AssignmentScope, DataClassification
 from app.platform.security.models import (
     CaseAssignmentRecord,
+    CaseCapabilityGapRecord,
+    CaseCapabilityProposalRecord,
     CollaboratorTaskRecord,
+    EnterpriseCapabilityProofLinkRecord,
+    EnterpriseCapabilityRecord,
+    EnterpriseDocumentRecord,
     GeneratedTechnicalDocumentRecord,
     PreparationPackageRecord,
     PreparationReadinessRecord,
@@ -31,6 +37,7 @@ from app.platform.security.models import (
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.orm import Session, sessionmaker
 
+from tests.application.test_collab_capability import _seed as _seed_capability
 from tests.application.test_collab_work_task import NOW, _seed
 
 pytest_plugins = ("tests.application.test_collab_work_task",)
@@ -285,6 +292,197 @@ def test_blocked_readiness_and_wrong_revision_cannot_generate(
             ),
             now=NOW,
         )
+
+
+def _seed_capability_assessment(
+    session_factory: sessionmaker[Session],
+    *,
+    proof_status: str | None = None,
+    proof_expires_at=None,
+):
+    (
+        actor,
+        assignment_id,
+        case_id,
+        requirement_id,
+        capability_id,
+        version_id,
+    ) = _seed_capability(session_factory)
+    actor = _enable_preparation_scope(session_factory, actor, assignment_id)
+    _confirm_requirement(session_factory, actor=actor, requirement_id=requirement_id)
+    with session_factory.begin() as session:
+        company_id = session.scalar(
+            sa.select(EnterpriseCapabilityRecord.company_id).where(
+                EnterpriseCapabilityRecord.tenant_id == actor.tenant_id,
+                EnterpriseCapabilityRecord.id == capability_id,
+            )
+        )
+        if proof_status is not None:
+            document_id = uuid4()
+            session.add(
+                EnterpriseDocumentRecord(
+                    id=document_id,
+                    tenant_id=actor.tenant_id,
+                    company_id=company_id,
+                    document_kind="INSURANCE",
+                    document_label="Attestation de test",
+                    storage_object_id=uuid4(),
+                    original_filename="preuve-test.pdf",
+                    issued_at=NOW - timedelta(days=30),
+                    expires_at=proof_expires_at,
+                    sha256="a" * 64,
+                    verification_status=proof_status,
+                    registered_by_membership_id=actor.membership_id,
+                    command_id=uuid4(),
+                    idempotency_key=uuid4(),
+                    correlation_id=uuid4(),
+                )
+            )
+            session.flush()
+            session.add(
+                EnterpriseCapabilityProofLinkRecord(
+                    id=uuid4(),
+                    tenant_id=actor.tenant_id,
+                    capability_version_id=version_id,
+                    document_id=document_id,
+                    relation_label="preuve de qualification",
+                )
+            )
+        session.add(
+            CaseCapabilityProposalRecord(
+                id=uuid4(),
+                tenant_id=actor.tenant_id,
+                case_id=case_id,
+                assignment_id=assignment_id,
+                capability_id=capability_id,
+                capability_version_id=version_id,
+                requirement_id=requirement_id,
+                task_id=None,
+                state="PROPOSED",
+                validity_state="CURRENT",
+                justification="Proposition de preuve opérationnelle.",
+                source_locator="RC p. 8",
+                functional_key=f"proposal-{uuid4()}",
+                proposed_by_membership_id=actor.membership_id,
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=uuid4(),
+            )
+        )
+    return actor, assignment_id, case_id, requirement_id, version_id
+
+
+@pytest.mark.db
+@pytest.mark.security
+@pytest.mark.parametrize(
+    ("proof_status", "proof_expires_at", "expected_code"),
+    [
+        (None, None, "CAPABILITY_PROOF_MISSING"),
+        ("VALIDATED", NOW - timedelta(days=1), "CAPABILITY_PROOF_EXPIRED"),
+        ("REJECTED", NOW + timedelta(days=30), "CAPABILITY_PROOF_UNAUTHORIZED"),
+    ],
+)
+def test_readiness_blocks_missing_expired_or_unauthorized_capability_proof(
+    preparation_service: PreparationService,
+    session_factory: sessionmaker[Session],
+    proof_status: str | None,
+    proof_expires_at,
+    expected_code: str,
+) -> None:
+    actor, assignment_id, case_id, _, _ = _seed_capability_assessment(
+        session_factory,
+        proof_status=proof_status,
+        proof_expires_at=proof_expires_at,
+    )
+    dce_version_id = _dce_version_id(session_factory, actor.tenant_id)
+    package_id = uuid4()
+    preparation_service.execute(
+        actor=actor,
+        command=_readiness_command(
+            actor=actor,
+            assignment_id=assignment_id,
+            case_id=case_id,
+            dce_version_id=dce_version_id,
+            package_id=package_id,
+            expected_revision=0,
+        ),
+        now=NOW,
+    )
+    readiness = _latest_readiness(session_factory, actor.tenant_id, package_id)
+    assert readiness.state == "BLOCKED"
+    assert expected_code in readiness.blocker_codes_json
+    assert set(readiness.blocker_codes_json) <= {
+        "REQUIREMENT_UNCONFIRMED",
+        "TASK_BLOCKED",
+        "DCE_NOT_READY",
+        "CAPABILITY_PROOF_MISSING",
+        "CAPABILITY_PROOF_EXPIRED",
+        "CAPABILITY_PROOF_UNAUTHORIZED",
+        "CAPABILITY_GAP_BLOCKING",
+    }
+
+
+@pytest.mark.db
+@pytest.mark.security
+@pytest.mark.parametrize(
+    ("severity", "expected_state", "expected_code"),
+    [
+        ("IMPORTANT", "READY_WITH_WARNINGS", "CAPABILITY_GAP_IMPORTANT"),
+        ("BLOCKING", "BLOCKED", "CAPABILITY_GAP_BLOCKING"),
+    ],
+)
+def test_readiness_consumes_capability_gap_severity(
+    preparation_service: PreparationService,
+    session_factory: sessionmaker[Session],
+    severity: str,
+    expected_state: str,
+    expected_code: str,
+) -> None:
+    actor, assignment_id, case_id, requirement_id, capability_id, _ = _seed_capability(
+        session_factory
+    )
+    actor = _enable_preparation_scope(session_factory, actor, assignment_id)
+    _confirm_requirement(session_factory, actor=actor, requirement_id=requirement_id)
+    with session_factory.begin() as session:
+        session.add(
+            CaseCapabilityGapRecord(
+                id=uuid4(),
+                tenant_id=actor.tenant_id,
+                case_id=case_id,
+                assignment_id=assignment_id,
+                capability_id=capability_id,
+                requirement_id=requirement_id,
+                task_id=None,
+                gap_kind="MISSING",
+                severity=severity,
+                reason="La preuve opérationnelle doit être complétée.",
+                source_locator="RC p. 9",
+                recommended_action="Demander une preuve au patron.",
+                functional_key=f"gap-{uuid4()}",
+                reported_by_membership_id=actor.membership_id,
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=uuid4(),
+            )
+        )
+    dce_version_id = _dce_version_id(session_factory, actor.tenant_id)
+    package_id = uuid4()
+    preparation_service.execute(
+        actor=actor,
+        command=_readiness_command(
+            actor=actor,
+            assignment_id=assignment_id,
+            case_id=case_id,
+            dce_version_id=dce_version_id,
+            package_id=package_id,
+            expected_revision=0,
+        ),
+        now=NOW,
+    )
+    readiness = _latest_readiness(session_factory, actor.tenant_id, package_id)
+    assert readiness.state == expected_state
+    code_collection = readiness.blocker_codes_json + readiness.warning_codes_json
+    assert expected_code in code_collection
 
 
 def _enable_preparation_scope(session_factory, actor, assignment_id):
