@@ -16,7 +16,12 @@ Cette configuration est un **template de préproduction**. Elle ne contient aucu
 | `ops/nginx/frontend.conf` | Fallback SPA et endpoint interne `/healthz`. |
 | `ops/Caddyfile` | TLS automatique, en-têtes de sécurité, reverse proxy same-origin. |
 | `ops/.env.preprod.example` | Variables documentées ; à copier puis compléter hors Git. |
-| `ops/deploy-preprod.sh` | Déploiement verrouillé : validation, backup, pull/build pinné, migration, démarrage et smoke HTTPS. |
+| `ops/deploy-preprod.sh` | Déploiement verrouillé : validation, backup, pull/build pinné, migration, démarrage, smoke et opérations 7b. |
+| `ops/backup-preprod.sh` | Backup PostgreSQL, quarantaine privée et volumes Caddy avec manifest SHA-256 et rétention. |
+| `ops/restore-preprod.sh` | Restauration vérifiée dans une base PostgreSQL isolée temporaire ; aucune écriture de la base active. |
+| `ops/healthcheck-preprod.sh` | Supervision HTTPS, live/ready, dépendances healthy, port ClamAV et fraîcheur backup. |
+| `ops/rotate-jwt-key-preprod.sh` | Rotation JWT manuelle, confirmée et atomique pendant une fenêtre de maintenance. |
+| `ops/systemd/` | Service/timer de backup quotidien et healthcheck périodique avec alerte journalisée. |
 | `docs/reference/SMART_AO_V8_ARCHITECTURE_INFRASTRUCTURE_REFERENCE.md` | Cible d’architecture, sauvegarde, réseau et observabilité. |
 
 ## 3. Pré-requis VPS
@@ -73,7 +78,7 @@ curl --fail --silent --show-error \
   "https://${SMART_AO_PUBLIC_HOST}/healthz/ready"
 ```
 
-Le démarrage n’est considéré comme valide que lorsque PostgreSQL et ClamAV sont `healthy`, que `/healthz/live` répond, que `/healthz/ready` confirme PostgreSQL et ClamAV, que Caddy obtient un certificat valide et que le frontend répond via HTTPS. Le port `3310` de ClamAV ne doit jamais apparaître dans la liste des ports publiés. Le test antivirus réel doit utiliser un fichier EICAR de test dans la quarantaine de préproduction, puis vérifier le rejet, l’absence de publication et la traçabilité de l’état `REJECTED`; ce fichier ne doit jamais être utilisé dans un environnement client.
+Le démarrage n’est considéré comme valide que lorsque PostgreSQL et ClamAV sont `healthy`, que `/healthz/live` répond, que `/healthz/ready` confirme PostgreSQL et ClamAV, que Caddy obtient un certificat valide et que le frontend répond via HTTPS. Le contrôle automatisé est `ops/deploy-preprod.sh healthcheck`; il vérifie aussi la fraîcheur d’un backup SQL et l’absence de publication du port ClamAV. Le port `3310` de ClamAV ne doit jamais apparaître dans la liste des ports publiés. Le test antivirus réel doit utiliser un fichier EICAR de test dans la quarantaine de préproduction, puis vérifier le rejet, l’absence de publication et la traçabilité de l’état `REJECTED`; ce fichier ne doit jamais être utilisé dans un environnement client.
 
 ## 6. Migrations et rollback
 
@@ -91,8 +96,12 @@ Le rollback applicatif privilégie la remise en place de l’image précédente 
 
 La préproduction doit disposer d’un job externe ou d’un service opérateur pour sauvegarder PostgreSQL quotidiennement et avant migration, les volumes documentaires selon la politique de rétention, la configuration versionnée et les volumes Caddy nécessaires aux certificats. Les sauvegardes doivent être chiffrées, transférées hors VPS et contrôlées par hash.
 
-Avant toute ouverture client, restaurer une base et un échantillon de documents sur un environnement isolé, appliquer ou non les migrations selon la version sauvegardée, vérifier les droits tenant, vérifier les hashes des objets, contrôler les jobs d’outbox et produire un rapport de restauration. Une sauvegarde jamais restaurée n’est pas une preuve de continuité.
+Avant toute ouverture client, exécuter `ops/deploy-preprod.sh restore /var/backups/smart-ao/smart_ao_<timestamp>.sql.gz`. Le script vérifie le manifest SHA-256, restaure dans une base isolée temporaire, vérifie les tables `tenants`, `command_receipts` et `outbox_messages`, puis détruit la base temporaire. L’opérateur doit compléter ce contrôle par un échantillon de documents, les droits tenant, les hashes des objets et un rapport de restauration. Une sauvegarde jamais restaurée n’est pas une preuve de continuité.
+
+Installer les unités `ops/systemd/smart-ao-backup.{service,timer}`, `smart-ao-healthcheck.{service,timer}` et `smart-ao-health-alert.service` sous `/etc/systemd/system/`, puis activer les timers. Les journaux Docker utilisent une rotation `json-file` bornée ; Caddy écrit aussi un access log JSON avec rétention bornée. Un agent externe doit agréger les alertes du journal système et surveiller l’absence de timer, l’échec du healthcheck et l’âge du dernier backup.
+
+La rotation JWT n’est pas automatique : après sauvegarde de l’environnement, saisir une nouvelle clé hors historique, lancer `SMART_AO_CONFIRM_ROTATE=YES ops/rotate-jwt-key-preprod.sh` pendant une fenêtre de maintenance, redémarrer le stack et vérifier l’authentification. Cette version n’implémente pas de chevauchement multi-clés `kid`; la rotation invalide donc les sessions émises avec l’ancienne clé et doit être planifiée.
 
 ## 8. Points encore bloquants pour S12
 
-Le template fournit désormais un script de déploiement, des healthchecks live/ready détaillés et un pinning par digest. Restent requis avant un premier client : job de sauvegarde hors VPS, supervision/alerte, rotation des logs, firewall automatisé, rotation de secrets et exercice de restauration. Le sandbox ne possède pas Docker et aucun VPS réel n’a encore exécuté le script.
+Le template fournit désormais le script de déploiement, les scripts backup/restore/healthcheck/rotation, les timers systemd, la rotation des logs, les healthchecks live/ready détaillés et le pinning par digest. Restent requis avant un premier client : exécution sur un VPS réel, transfert des backups hors VPS, supervision externe, firewall administré, test EICAR ClamAV, rotation de secrets avec fenêtre validée et rapport de restauration. Le sandbox ne possède pas Docker et aucun VPS réel n’a encore exécuté le stack.

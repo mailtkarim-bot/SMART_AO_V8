@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily SMART AO backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=smart-ao-backup.service
+
+[Install]
+WantedBy=timers.target

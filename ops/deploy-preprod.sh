@@ -10,13 +10,17 @@ LOCK_FILE="${SMART_AO_DEPLOY_LOCK:-/var/lock/smart-ao-preprod-deploy.lock}"
 
 usage() {
   cat <<'EOF'
-Usage: ops/deploy-preprod.sh <config|deploy|smoke|status>
+Usage: ops/deploy-preprod.sh <config|deploy|smoke|status|backup|restore|healthcheck|rotate-key>
 
 Commands:
   config  validate the env file and resolved Compose configuration
   deploy  validate, backup PostgreSQL, pull/build pinned images, migrate and start services
   smoke   verify public live/readiness endpoints and private service health
   status  show the Compose service state
+  backup  create PostgreSQL, private volume and checksum backups
+  restore verify one backup in an isolated temporary PostgreSQL database
+  healthcheck run HTTPS, dependency, port exposure and backup freshness checks
+  rotate-key rotate the JWT key only after explicit operator confirmation
 
 The script never performs an automatic database downgrade. A failed release leaves
 its backup and logs available for an explicit, reviewed rollback procedure.
@@ -71,12 +75,7 @@ wait_postgres() {
 }
 
 backup_database() {
-  install -d -m 700 "${BACKUP_DIR}"
-  local backup_file
-  backup_file="${BACKUP_DIR}/smart_ao_$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
-  compose exec -T postgres pg_dump --clean --if-exists --no-owner --no-privileges -U "${POSTGRES_USER}" "${POSTGRES_DB}" | gzip -9 >"${backup_file}"
-  chmod 600 "${backup_file}"
-  printf 'PostgreSQL backup: %s\n' "${backup_file}"
+  "${OPS_DIR}/backup-preprod.sh"
 }
 
 smoke() {
@@ -125,6 +124,19 @@ case "${1:-}" in
     ;;
   status)
     status
+    ;;
+  backup)
+    "${OPS_DIR}/backup-preprod.sh"
+    ;;
+  restore)
+    [[ -n "${2:-}" ]] || fail "restore requires a .sql.gz backup path"
+    "${OPS_DIR}/restore-preprod.sh" "$2"
+    ;;
+  healthcheck)
+    "${OPS_DIR}/healthcheck-preprod.sh"
+    ;;
+  rotate-key)
+    "${OPS_DIR}/rotate-jwt-key-preprod.sh"
     ;;
   *)
     usage

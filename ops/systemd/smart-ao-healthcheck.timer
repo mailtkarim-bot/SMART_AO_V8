@@ -1,0 +1,12 @@
+[Unit]
+Description=Frequent SMART AO healthcheck
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30s
+Persistent=true
+Unit=smart-ao-healthcheck.service
+
+[Install]
+WantedBy=timers.target

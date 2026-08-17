@@ -1,9 +1,16 @@
 name: smart-ao-preprod
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "${SMART_AO_LOG_MAX_SIZE:-50m}"
+    max-file: "${SMART_AO_LOG_MAX_FILES:-5}"
+
 services:
   caddy:
     image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     restart: unless-stopped
+    logging: *default-logging
     init: true
     environment:
       SMART_AO_PUBLIC_HOST: ${SMART_AO_PUBLIC_HOST:?SMART_AO_PUBLIC_HOST is required}
@@ -15,6 +22,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+      - caddy_logs:/var/log/caddy
     depends_on:
       frontend:
         condition: service_started
@@ -31,6 +39,7 @@ services:
       context: ..
       dockerfile: ops/docker/frontend.Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     init: true
     expose:
       - "80"
@@ -45,6 +54,7 @@ services:
       context: ..
       dockerfile: ops/docker/backend.Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     init: true
     env_file:
       - .env.preprod
@@ -82,6 +92,7 @@ services:
       dockerfile: ops/docker/backend.Dockerfile
     command: python -m app.workers.dce_retention
     restart: unless-stopped
+    logging: *default-logging
     init: true
     env_file:
       - .env.preprod
@@ -104,6 +115,7 @@ services:
   postgres:
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
+    logging: *default-logging
     init: true
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
@@ -126,6 +138,7 @@ services:
   clamav:
     image: clamav/clamav:1.4_base@sha256:1b6920e8c32cca47ea33b1e2611d9a4740ccc622cf13b30b29f8283d60175e39
     restart: unless-stopped
+    logging: *default-logging
     init: true
     environment:
       CLAMAV_NO_MILTERD: "true"
@@ -148,6 +161,7 @@ volumes:
   clamav_database:
   caddy_data:
   caddy_config:
+  caddy_logs:
 
 networks:
   edge:
