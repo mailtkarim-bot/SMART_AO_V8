@@ -27,10 +27,48 @@ class GenerateTechnicalDocumentRequest(PreparationCommandRequest):
     document_kind: Literal["TECHNICAL_RESPONSE"]
 
 
+class RequestPreparationReviewRequest(PreparationCommandRequest):
+    expected_package_revision: int = Field(ge=0)
+    review_id: UUID
+    target_document_id: UUID
+    target_version: int = Field(gt=0)
+
+
+class DecidePreparationReviewRequest(PreparationCommandRequest):
+    expected_review_revision: int = Field(ge=1)
+    review_id: UUID
+    target_document_id: UUID
+    decision_code: Literal["ACCEPTED", "CORRECTIONS_REQUIRED", "REJECTED"]
+    decision_note: str | None = Field(default=None, max_length=2000)
+
+
+class AddPreparationCorrectionRequest(PreparationCommandRequest):
+    review_id: UUID
+    target_document_id: UUID
+    correction_code: Literal[
+        "SOURCE_MISSING", "SOURCE_WRONG", "SECTION_INCOMPLETE", "WORDING_UNCLEAR"
+    ]
+    instruction: str = Field(min_length=1, max_length=2000)
+    source_locator: str | None = Field(default=None, max_length=500)
+
+
+class CreateTechnicalResponseDraftRequest(PreparationCommandRequest):
+    expected_package_revision: int = Field(ge=0)
+    draft_id: UUID
+    source_document_id: UUID
+    section_codes: list[str] = Field(min_length=1, max_length=32)
+    source_refs: list[UUID] = Field(min_length=1, max_length=64)
+
+
 class PreparationAggregateReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    aggregate_type: Literal["PreparationPackage", "GeneratedTechnicalDocument"]
+    aggregate_type: Literal[
+        "PreparationPackage",
+        "GeneratedTechnicalDocument",
+        "PreparationReview",
+        "TechnicalResponseDraft",
+    ]
     aggregate_id: UUID
     aggregate_revision: int = Field(ge=0)
 
@@ -41,7 +79,14 @@ class PreparationCommandResponse(BaseModel):
     status: Literal["SUCCEEDED"] = "SUCCEEDED"
     command_id: UUID
     idempotency_key: UUID
-    result_code: Literal["PREPARATION_READINESS_EVALUATED", "TECHNICAL_DOCUMENT_GENERATED"]
+    result_code: Literal[
+        "PREPARATION_READINESS_EVALUATED",
+        "TECHNICAL_DOCUMENT_GENERATED",
+        "PREPARATION_REVIEW_REQUESTED",
+        "PREPARATION_REVIEW_DECIDED",
+        "PREPARATION_CORRECTION_ADDED",
+        "TECHNICAL_RESPONSE_DRAFT_CREATED",
+    ]
     aggregate_refs: list[PreparationAggregateReference]
     event_ids: list[UUID]
     replayed: bool = False

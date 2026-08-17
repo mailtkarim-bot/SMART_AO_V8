@@ -62,7 +62,10 @@ from app.interfaces.http.routes.patron_enterprise_library import (
 from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
 )
-from app.interfaces.http.routes.preparation import build_preparation_router
+from app.interfaces.http.routes.preparation import (
+    build_preparation_review_router,
+    build_preparation_router,
+)
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
@@ -150,6 +153,10 @@ from app.modules.membership.application.patron_assignment import (
 from app.modules.membership.application.patron_assignment_cockpit import (
     PatronAssignmentCockpitService,
 )
+from app.modules.preparation.application.review import (
+    PreparationReviewService,
+    preparation_review_handlers,
+)
 from app.modules.preparation.application.service import PreparationService, preparation_handlers
 from app.modules.preparation.infrastructure.document_storage import (
     LocalGeneratedDocumentStorage,
@@ -220,6 +227,7 @@ class AppRuntime:
                 **collaborator_info_blocker_handlers(),
                 **patron_assignment_handlers(),
                 **preparation_handlers(storage=preparation_storage),
+                **preparation_review_handlers(storage=preparation_storage),
             },
         )
         upload_service = (
@@ -499,6 +507,12 @@ def create_app(
             policy=security_policy,
             storage=runtime.preparation_storage,
         )
+        preparation_review_service = PreparationReviewService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+            storage=runtime.preparation_storage,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -609,6 +623,12 @@ def create_app(
         app.include_router(
             build_preparation_router(
                 service=preparation_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_preparation_review_router(
+                service=preparation_review_service,
                 security_runtime=security_runtime,
             )
         )

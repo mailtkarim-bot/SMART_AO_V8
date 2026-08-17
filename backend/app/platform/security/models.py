@@ -1975,3 +1975,165 @@ class CaseCapabilityGapRecord(TenantScopedRecord, Base):
     command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class PreparationReviewRecord(TenantScopedRecord, Base):
+    """Immutable state transition for a versioned preparation target review."""
+
+    __tablename__ = "preparation_reviews"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_preparation_review__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "package_id"],
+            ["preparation_packages.tenant_id", "preparation_packages.id"],
+            name="fk_preparation_review__package",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "target_document_id"],
+            ["generated_technical_documents.tenant_id", "generated_technical_documents.id"],
+            name="fk_preparation_review__document",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_preparation_review__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "review_id", "revision", name="uq_preparation_review__revision"
+        ),
+        sa.CheckConstraint(
+            "state IN ('REQUESTED', 'ACCEPTED', 'RETURNED_WITH_CORRECTIONS', 'REJECTED')",
+            name="state",
+        ),
+        sa.CheckConstraint("revision > 0", name="revision_positive"),
+        sa.CheckConstraint("target_version > 0", name="target_version_positive"),
+        sa.CheckConstraint(
+            "decision_code IS NULL OR decision_code IN ('ACCEPTED', 'CORRECTIONS_REQUIRED', 'REJECTED')",
+            name="decision_code",
+        ),
+        sa.Index(
+            "ix_preparation_reviews__tenant_target", "tenant_id", "target_document_id", "revision"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    review_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    package_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    target_document_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    target_version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    decision_code: Mapped[str | None] = mapped_column(sa.String(32))
+    decision_note: Mapped[str | None] = mapped_column(sa.String(2000))
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class PreparationReviewCorrectionRecord(TenantScopedRecord, Base):
+    """Immutable targeted correction attached to a review transition."""
+
+    __tablename__ = "preparation_review_corrections"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_preparation_correction__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "review_id", "review_revision"],
+            [
+                "preparation_reviews.tenant_id",
+                "preparation_reviews.review_id",
+                "preparation_reviews.revision",
+            ],
+            name="fk_preparation_correction__review",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "target_document_id"],
+            ["generated_technical_documents.tenant_id", "generated_technical_documents.id"],
+            name="fk_preparation_correction__document",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_preparation_correction__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "review_id", "revision", name="uq_preparation_correction__revision"
+        ),
+        sa.CheckConstraint("revision > 0", name="revision_positive"),
+        sa.CheckConstraint("review_revision > 0", name="review_revision_positive"),
+        sa.CheckConstraint(
+            "correction_code IN ('SOURCE_MISSING', 'SOURCE_WRONG', 'SECTION_INCOMPLETE', 'WORDING_UNCLEAR')",
+            name="correction_code",
+        ),
+        sa.Index("ix_preparation_corrections__tenant_review", "tenant_id", "review_id", "revision"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    review_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    review_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    target_document_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    correction_code: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    instruction: Mapped[str] = mapped_column(sa.String(2000), nullable=False)
+    source_locator: Mapped[str | None] = mapped_column(sa.String(500))
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class TechnicalResponseDraftRecord(TenantScopedRecord, Base):
+    """Immutable, non-financial, versioned response draft metadata."""
+
+    __tablename__ = "technical_response_drafts"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_technical_draft__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "package_id"],
+            ["preparation_packages.tenant_id", "preparation_packages.id"],
+            name="fk_technical_draft__package",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "source_document_id"],
+            ["generated_technical_documents.tenant_id", "generated_technical_documents.id"],
+            name="fk_technical_draft__document",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_technical_draft__tenant_id"),
+        sa.UniqueConstraint("tenant_id", "draft_id", "version", name="uq_technical_draft__version"),
+        sa.CheckConstraint("version > 0", name="version_positive"),
+        sa.CheckConstraint(
+            "state IN ('DRAFT', 'SUBMITTED_FOR_REVIEW', 'RETURNED_WITH_CORRECTIONS', 'ACCEPTED_CANDIDATE')",
+            name="state",
+        ),
+        sa.CheckConstraint(
+            "responsible_role IN ('COLLABORATEUR', 'PATRON_REVIEWER')",
+            name="responsible_role",
+        ),
+        sa.Index("ix_technical_drafts__tenant_package", "tenant_id", "package_id", "version"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    draft_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    package_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    source_document_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    section_codes_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    source_refs_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    responsible_role: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(sa.CHAR(64), nullable=False)
+    storage_key: Mapped[str] = mapped_column(sa.String(700), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))

@@ -29,6 +29,8 @@ class Capability(StrEnum):
     PREPARATION_DOCUMENT_WRITE = "preparation.document.write"
     PREPARATION_CAPABILITY_PROPOSE = "preparation.capability.propose"
     PREPARATION_CAPABILITY_GAP_REPORT = "preparation.capability.gap.report"
+    PREPARATION_REVIEW_REQUEST = "preparation.review.request"
+    PREPARATION_REVIEW_DECIDE = "preparation.review.decide"
     MEMBERSHIP_MANAGE = "membership.manage"
     TENANT_MANAGE = "tenant.manage"
     DECISION_FINALIZE = "decision.finalize"
@@ -76,6 +78,7 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.ENTERPRISE_LIBRARY_WRITE,
         Capability.ENTERPRISE_CAPABILITY_READ,
         Capability.ENTERPRISE_CAPABILITY_WRITE,
+        Capability.PREPARATION_REVIEW_DECIDE,
     }
 )
 _COLLABORATOR_CAPABILITIES = frozenset(
@@ -96,6 +99,7 @@ _COLLABORATOR_CAPABILITIES = frozenset(
         Capability.PREPARATION_DOCUMENT_WRITE,
         Capability.PREPARATION_CAPABILITY_PROPOSE,
         Capability.PREPARATION_CAPABILITY_GAP_REPORT,
+        Capability.PREPARATION_REVIEW_REQUEST,
     }
 )
 _DELEGABLE_CAPABILITIES = frozenset(
