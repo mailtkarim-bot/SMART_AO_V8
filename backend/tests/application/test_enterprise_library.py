@@ -23,6 +23,7 @@ from app.platform.security.context import ActorContext, ActorKind, MembershipSta
 from app.platform.security.models import (
     EnterpriseCompanyRecord,
     EnterpriseDocumentRecord,
+    EnterpriseDocumentUploadRecord,
     IdentityRecord,
     TenantMembershipRecord,
 )
@@ -31,11 +32,7 @@ from sqlalchemy.orm import Session, sessionmaker
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
 DATABASE_URL = os.getenv("SMART_AO_TEST_DATABASE_URL") or (
-    "postgresql+psycopg://"
-    + "smart_ao"
-    + ":"
-    + "smart_ao"
-    + "@127.0.0.1:5432/smart_ao"
+    "postgresql+psycopg://" + "smart_ao" + ":" + "smart_ao" + "@127.0.0.1:5432/smart_ao"
 )
 NOW = datetime(2026, 8, 17, 12, 0, tzinfo=UTC)
 
@@ -162,6 +159,40 @@ def _document_command(
     )
 
 
+def _seed_clean_upload(
+    session_factory: sessionmaker[Session],
+    actor: ActorContext,
+    command: RegisterEnterpriseDocumentCommand,
+) -> None:
+    with session_factory.begin() as session:
+        session.add(
+            EnterpriseDocumentUploadRecord(
+                id=command.storage_object_id,
+                tenant_id=actor.tenant_id,
+                company_id=command.company_id,
+                document_id=command.document_id,
+                document_kind=command.document_kind,
+                document_label=command.document_label,
+                original_filename=command.original_filename,
+                storage_key=f"{actor.tenant_id}/{command.document_id}/{command.storage_object_id}.bin",
+                expected_byte_size=10,
+                actual_byte_size=10,
+                sha256=command.sha256,
+                media_type="application/pdf",
+                state="CLEAN",
+                scan_verdict="CLEAN",
+                scanner_name="test-scanner",
+                scanner_signature_version="test-1",
+                scanned_at=NOW,
+                expires_at=NOW + timedelta(hours=1),
+                created_by_membership_id=actor.membership_id,
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=command.correlation_id,
+            )
+        )
+
+
 @pytest.mark.db
 @pytest.mark.security
 def test_patron_creates_company_and_registers_enterprise_documents(
@@ -178,18 +209,14 @@ def test_patron_creates_company_and_registers_enterprise_documents(
     )
     documents = []
     for expected_revision, kind in enumerate(("INSURANCE", "KBIS", "RIB")):
-        documents.append(
-            service.register_document(
-                actor=actor,
-                command=_document_command(
-                    company_id=company_id,
-                    document_id=uuid4(),
-                    kind=kind,
-                    expected_revision=expected_revision,
-                ),
-                now=NOW,
-            )
+        document_command = _document_command(
+            company_id=company_id,
+            document_id=uuid4(),
+            kind=kind,
+            expected_revision=expected_revision,
         )
+        _seed_clean_upload(session_factory, actor, document_command)
+        documents.append(service.register_document(actor=actor, command=document_command, now=NOW))
 
     assert created.result_code == "ENTERPRISE_COMPANY_CREATED"
     assert [item.result_code for item in documents] == [
@@ -240,6 +267,7 @@ def test_company_revision_conflict_does_not_register_second_document(
     service = _service(session_factory)
     service.create_company(actor=actor, command=_company_command(company_id=company_id), now=NOW)
     document = _document_command(company_id=company_id, document_id=uuid4(), kind="KBIS")
+    _seed_clean_upload(session_factory, actor, document)
     stale = document.model_copy(update={"expected_revision": 99})
 
     with pytest.raises(CommandExecutionError, match="VERSION_CONFLICT"):

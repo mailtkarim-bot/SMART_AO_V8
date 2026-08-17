@@ -95,6 +95,10 @@ from app.modules.membership.application.enterprise_library import (
     EnterpriseLibraryService,
     enterprise_library_handlers,
 )
+from app.modules.membership.application.enterprise_upload import (
+    EnterprisePrivateUploadService,
+    enterprise_upload_handlers,
+)
 from app.modules.membership.application.financial_report import PatronFinancialReportService
 from app.modules.membership.application.financial_report_draft import (
     CreateFinancialReportDraftHandler,
@@ -149,6 +153,7 @@ class AppRuntime:
         dispatcher = CommandDispatcher(
             session_factory=session_factory,
             handlers={
+                **enterprise_upload_handlers(),
                 "ClaimDceStagedObjectUpload": ClaimDceStagedObjectUploadHandler(),
                 "CreateConsultation": CreateConsultationHandler(),
                 "ExpireDceStagedObject": ExpireDceStagedObjectHandler(),
@@ -329,6 +334,28 @@ def _default_dce_upload_service(*, dispatcher: CommandDispatcher) -> DceUploadSe
     )
 
 
+def _default_enterprise_private_upload_service(
+    *, session_factory: sessionmaker[Session], dispatcher: CommandDispatcher, policy
+) -> EnterprisePrivateUploadService:
+    storage = LocalQuarantineStorageAdapter(
+        root=Path(os.getenv("SMART_AO_DCE_QUARANTINE_ROOT", "/var/lib/smart_ao/dce-quarantine"))
+    )
+    return EnterprisePrivateUploadService(
+        session_factory=session_factory,
+        dispatcher=dispatcher,
+        policy=policy,
+        storage=storage,
+        inspector=PythonMagicContentInspectionAdapter(storage=storage),
+        scanner=ClamdTcpMalwareScanAdapter(
+            storage=storage,
+            host=os.getenv("SMART_AO_CLAMD_HOST", "clamav"),
+            port=int(os.getenv("SMART_AO_CLAMD_PORT", "3310")),
+            timeout_seconds=float(os.getenv("SMART_AO_CLAMD_TIMEOUT_SECONDS", "30")),
+        ),
+        allowed_media_types=_ALLOWED_DCE_MEDIA_TYPES,
+    )
+
+
 def create_app(
     *,
     runtime: AppRuntime | None = None,
@@ -399,6 +426,11 @@ def create_app(
             policy=security_policy,
         )
         enterprise_library_service = EnterpriseLibraryService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        enterprise_upload_service = _default_enterprise_private_upload_service(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
             policy=security_policy,
@@ -475,6 +507,7 @@ def create_app(
         app.include_router(
             build_patron_enterprise_library_router(
                 service=enterprise_library_service,
+                upload_service=enterprise_upload_service,
                 security_runtime=security_runtime,
             )
         )

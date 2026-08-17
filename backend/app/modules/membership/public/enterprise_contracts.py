@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime
 from typing import Literal
 from uuid import NAMESPACE_URL, UUID, uuid5
@@ -40,6 +38,33 @@ class CreateEnterpriseCompanyRequest(EnterprisePublicRequest):
         )
 
 
+class PrepareEnterpriseDocumentUploadRequest(EnterprisePublicRequest):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    document_kind: Literal["INSURANCE", "KBIS", "RIB"]
+    document_label: str = Field(min_length=1, max_length=240)
+    original_filename: str = Field(min_length=1, max_length=500)
+    expected_byte_size: int = Field(gt=0, le=2_000_000_000)
+    expires_at: datetime
+
+    def to_command(self, *, company_id: UUID) -> object:
+        from app.modules.membership.application.enterprise_upload_commands import (
+            PrepareEnterpriseDocumentUploadCommand,
+        )
+
+        upload_id = uuid5(NAMESPACE_URL, f"enterprise-upload:{self.command_id}")
+        document_id = uuid5(NAMESPACE_URL, f"enterprise-document:{self.command_id}")
+        storage_key = f"{company_id}/{document_id}/{upload_id}.bin"
+        return PrepareEnterpriseDocumentUploadCommand(
+            **self.model_dump(),
+            upload_id=upload_id,
+            company_id=company_id,
+            document_id=document_id,
+            storage_key=storage_key,
+        )
+
+
 class RegisterEnterpriseDocumentRequest(EnterprisePublicRequest):
     command_id: UUID
     idempotency_key: UUID
@@ -51,7 +76,6 @@ class RegisterEnterpriseDocumentRequest(EnterprisePublicRequest):
     original_filename: str = Field(min_length=1, max_length=500)
     issued_at: datetime
     expires_at: datetime | None = None
-    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     verification_status: Literal["PENDING"] = "PENDING"
 
     def to_command(self, *, company_id: UUID) -> object:
@@ -63,6 +87,31 @@ class RegisterEnterpriseDocumentRequest(EnterprisePublicRequest):
             **self.model_dump(),
             company_id=company_id,
             document_id=uuid5(NAMESPACE_URL, f"enterprise-document:{self.command_id}"),
+            sha256="0" * 64,
+        )
+
+
+class VerifyEnterpriseDocumentRequest(EnterprisePublicRequest):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    expected_verification_revision: int = Field(ge=0)
+    outcome: Literal["VALIDATED", "REJECTED"]
+    reason_code: Literal[
+        "DOCUMENT_ACCEPTED",
+        "DOCUMENT_ILLEGIBLE",
+        "DOCUMENT_EXPIRED",
+        "DOCUMENT_MISMATCH",
+        "DOCUMENT_DUPLICATE",
+    ]
+
+    def to_command(self, *, company_id: UUID, document_id: UUID) -> object:
+        from app.modules.membership.application.enterprise_upload_commands import (
+            VerifyEnterpriseDocumentCommand,
+        )
+
+        return VerifyEnterpriseDocumentCommand(
+            **self.model_dump(), company_id=company_id, document_id=document_id
         )
 
 
@@ -74,6 +123,11 @@ class EnterpriseReceiptResponse(EnterprisePublicResponse):
     aggregate_refs: list[dict[str, object]]
     event_ids: list[UUID]
     replayed: bool
+
+
+class EnterpriseUploadResponse(EnterprisePublicResponse):
+    upload_id: UUID
+    state: Literal["CLEAN"]
 
 
 class EnterpriseDocumentResponse(EnterprisePublicResponse):

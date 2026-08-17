@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import pytest
 import sqlalchemy as sa
@@ -14,6 +14,7 @@ from app.interfaces.http.routes.authentication import AuthenticationHttpRuntime
 from app.platform.security.authentication import AuthenticationService
 from app.platform.security.models import (
     AuthSessionRecord,
+    EnterpriseDocumentUploadRecord,
     IdentityRecord,
     TenantMembershipRecord,
 )
@@ -24,11 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
 DATABASE_URL = os.getenv("SMART_AO_TEST_DATABASE_URL") or (
-    "postgresql+psycopg://"
-    + "smart_ao"
-    + ":"
-    + "smart_ao"
-    + "@127.0.0.1:5432/smart_ao"
+    "postgresql+psycopg://" + "smart_ao" + ":" + "smart_ao" + "@127.0.0.1:5432/smart_ao"
 )
 NOW = datetime(2026, 8, 17, 12, 0, tzinfo=UTC)
 
@@ -198,14 +195,55 @@ def _document_payload(*, kind: str, expected_revision: int) -> dict[str, object]
         "original_filename": f"{kind.lower()}.pdf",
         "issued_at": NOW.isoformat(),
         "expires_at": None if kind == "RIB" else (NOW + timedelta(days=365)).isoformat(),
-        "sha256": "a" * 64,
         "verification_status": "PENDING",
     }
 
 
+def _seed_clean_upload(
+    session_factory: sessionmaker[Session],
+    tenant_id: UUID,
+    identity_id: UUID,
+    company_id: UUID,
+    payload: dict[str, object],
+) -> None:
+    document_id = uuid5(NAMESPACE_URL, f"enterprise-document:{payload['command_id']}")
+    with session_factory.begin() as session:
+        membership_id = session.scalar(
+            sa.select(TenantMembershipRecord.id).where(
+                TenantMembershipRecord.tenant_id == tenant_id,
+                TenantMembershipRecord.identity_id == identity_id,
+            )
+        )
+        session.add(
+            EnterpriseDocumentUploadRecord(
+                id=UUID(str(payload["storage_object_id"])),
+                tenant_id=tenant_id,
+                company_id=company_id,
+                document_id=document_id,
+                document_kind=str(payload["document_kind"]),
+                document_label=str(payload["document_label"]),
+                original_filename=str(payload["original_filename"]),
+                storage_key=f"{tenant_id}/{document_id}/{payload['storage_object_id']}.bin",
+                expected_byte_size=10,
+                actual_byte_size=10,
+                sha256="a" * 64,
+                media_type="application/pdf",
+                state="CLEAN",
+                scan_verdict="CLEAN",
+                scanner_name="test-scanner",
+                scanner_signature_version="test-1",
+                scanned_at=NOW,
+                expires_at=NOW + timedelta(hours=1),
+                created_by_membership_id=membership_id,
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=UUID(str(payload["correlation_id"])),
+            )
+        )
+
+
 @pytest.mark.api
 @pytest.mark.db
-@pytest.mark.security
 def test_patron_creates_reads_and_registers_enterprise_documents_without_sensitive_leaks(
     database_engine: sa.Engine,
     session_factory: sessionmaker[Session],
@@ -223,9 +261,11 @@ def test_patron_creates_reads_and_registers_enterprise_documents_without_sensiti
     company_id = created.json()["aggregate_refs"][0]["aggregate_id"]
 
     for revision, kind in enumerate(("INSURANCE", "KBIS", "RIB")):
+        payload = _document_payload(kind=kind, expected_revision=revision)
+        _seed_clean_upload(session_factory, tenant_id, identity_id, UUID(company_id), payload)
         response = client.post(
             f"/api/v1/patron/enterprise/companies/{company_id}/documents",
-            json=_document_payload(kind=kind, expected_revision=revision),
+            json=payload,
             headers=headers,
         )
         assert response.status_code == 201
@@ -290,9 +330,7 @@ def test_enterprise_document_route_returns_neutral_conflict_and_collaborator_ref
         database_engine, role="COLLABORATEUR", tenant_id=tenant_id
     )
     client, tokens = _client(session_factory)
-    patron_headers = _headers(
-        tokens, identity_id=patron_identity_id, session_id=patron_session_id
-    )
+    patron_headers = _headers(tokens, identity_id=patron_identity_id, session_id=patron_session_id)
     collaborator_headers = _headers(
         tokens,
         identity_id=collaborator_identity_id,
@@ -305,9 +343,13 @@ def test_enterprise_document_route_returns_neutral_conflict_and_collaborator_ref
         headers=patron_headers,
     )
     company_id = created.json()["aggregate_refs"][0]["aggregate_id"]
+    stale_payload = _document_payload(kind="KBIS", expected_revision=9)
+    _seed_clean_upload(
+        session_factory, tenant_id, patron_identity_id, UUID(company_id), stale_payload
+    )
     stale = client.post(
         f"/api/v1/patron/enterprise/companies/{company_id}/documents",
-        json=_document_payload(kind="KBIS", expected_revision=9),
+        json=stale_payload,
         headers=patron_headers,
     )
     forbidden_read = client.get(

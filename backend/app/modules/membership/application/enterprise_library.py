@@ -26,7 +26,12 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import EnterpriseCompanyRecord, EnterpriseDocumentRecord
+from app.platform.security.models import (
+    EnterpriseCompanyRecord,
+    EnterpriseDocumentRecord,
+    EnterpriseDocumentUploadRecord,
+    EnterpriseDocumentVerificationRecord,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +102,17 @@ class EnterpriseLibraryService:
                     EnterpriseDocumentRecord.issued_at,
                     EnterpriseDocumentRecord.expires_at,
                     EnterpriseDocumentRecord.verification_status,
+                    sa.select(EnterpriseDocumentVerificationRecord.outcome)
+                    .where(
+                        EnterpriseDocumentVerificationRecord.tenant_id
+                        == EnterpriseDocumentRecord.tenant_id,
+                        EnterpriseDocumentVerificationRecord.document_id
+                        == EnterpriseDocumentRecord.id,
+                    )
+                    .order_by(EnterpriseDocumentVerificationRecord.revision.desc())
+                    .limit(1)
+                    .scalar_subquery()
+                    .label("latest_verification"),
                 )
                 .where(
                     EnterpriseDocumentRecord.tenant_id == actor.tenant_id,
@@ -123,7 +139,7 @@ class EnterpriseLibraryService:
                     document_label=row.document_label,
                     issued_at=row.issued_at,
                     expires_at=row.expires_at,
-                    verification_status=row.verification_status,
+                    verification_status=row.latest_verification or row.verification_status,
                 )
                 for row in rows
             ),
@@ -167,8 +183,27 @@ class EnterpriseLibraryService:
                     EnterpriseCompanyRecord.id == command.company_id,
                 )
             )
+            upload = session.scalar(
+                sa.select(EnterpriseDocumentUploadRecord).where(
+                    EnterpriseDocumentUploadRecord.tenant_id == actor.tenant_id,
+                    EnterpriseDocumentUploadRecord.id == command.storage_object_id,
+                    EnterpriseDocumentUploadRecord.company_id == command.company_id,
+                    EnterpriseDocumentUploadRecord.state == "CLEAN",
+                )
+            )
         if exists is None:
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+        if upload is None:
+            raise PermissionError("DOCUMENT_UPLOAD_NOT_CLEAN")
+        command = command.model_copy(
+            update={
+                "document_id": upload.document_id,
+                "document_kind": upload.document_kind,
+                "document_label": upload.document_label,
+                "original_filename": upload.original_filename,
+                "sha256": upload.sha256,
+            }
+        )
         return self._dispatcher.dispatch(
             command=command,
             context=self._context(actor=actor, now=now),
@@ -302,6 +337,20 @@ class RegisterEnterpriseDocumentHandler:
             raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
         if company.aggregate_revision != command.expected_revision:
             raise CommandExecutionError("VERSION_CONFLICT")
+        upload = session.scalar(
+            sa.select(EnterpriseDocumentUploadRecord)
+            .where(
+                EnterpriseDocumentUploadRecord.tenant_id == context.tenant_id,
+                EnterpriseDocumentUploadRecord.id == command.storage_object_id,
+                EnterpriseDocumentUploadRecord.company_id == command.company_id,
+                EnterpriseDocumentUploadRecord.document_id == command.document_id,
+                EnterpriseDocumentUploadRecord.state == "CLEAN",
+            )
+            .with_for_update()
+        )
+        if upload is None:
+            raise CommandExecutionError("DOCUMENT_UPLOAD_NOT_CLEAN")
+        command.sha256 = upload.sha256
         session.add(
             EnterpriseDocumentRecord(
                 id=command.document_id,
