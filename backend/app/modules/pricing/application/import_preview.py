@@ -82,7 +82,7 @@ class PricingImportPreviewService:
             raise ValueError("IMPORT_CONTENT_TYPE_REJECTED")
         try:
             with ZipFile(BytesIO(payload)) as archive:
-                if any(name.lower().endswith("vbaProject.bin") for name in archive.namelist()):
+                if any(name.lower().endswith("vbaproject.bin") for name in archive.namelist()):
                     raise ValueError("IMPORT_MACROS_REJECTED")
                 if sum(info.file_size for info in archive.infolist()) > MAX_UNCOMPRESSED_BYTES:
                     raise ValueError("IMPORT_ARCHIVE_TOO_LARGE")
