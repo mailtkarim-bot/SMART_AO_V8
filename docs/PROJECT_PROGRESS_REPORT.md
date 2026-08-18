@@ -2,9 +2,9 @@
 
 **Date de mise à jour :** 18 août 2026
 **Branche de référence :** `ops/vps-deploy-health-digests-01`
-**Dernier commit publié :** [`63fd68a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/63fd68af21f02249b9e96fe4e11dac8f18ca79c6)
-**Dernière CI verte :** [workflow `32133559630`](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32133559630)
-**Validation intégrée courante :** 414 tests backend verts, 85 % de couverture branchée avec seuil CI à 85 %, Ruff, Alembic, detect-secrets et build frontend TypeScript strict verts.
+**Dernier commit publié :** [`9b8b7c1`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/9b8b7c14723df7c4b80cb240b78ceb0760624154)
+**Dernière CI verte :** [workflow `32150099196`](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32150099196)
+**Validation intégrée courante :** 435 tests backend verts, couverture branchée **85,04 %** avec seuil CI à 85 %, Ruff, Alembic, detect-secrets, SAST, audit de dépendances et build frontend TypeScript strict verts.
 
 ## 1. Position honnête du produit
 
@@ -22,9 +22,9 @@ La séparation fondamentale reste obligatoire : le collaborateur prépare et rem
 | Analyse DCE | Livrée dans un périmètre déterministe | Analyse lexicale RC, classification, exigences atomiques, preuves sourcées, confirmations humaines et impact de rectificatif. | OCR, plans, formats supplémentaires et analyse IA complète restent hors périmètre. |
 | Entreprise | Livrée dans son premier incrément | Société, assurances/Kbis/RIB, uploads privés, vérification humaine, qualifications, références, capacités et preuves versionnées. | Les workflows métier plus riches de bibliothèque et d’usage des preuves restent à étendre. |
 | Collaboration | Fondations avancées | Affectations, interactions, tâches, demandes d’information, blocages, readiness, revues, corrections et brouillons techniques. | Le parcours complet de production de l’offre technique n’est pas encore assemblé. |
-| Finance patronale | Fondation sécurisée étendue | Snapshots, lignes en unités mineures, publication contrôlée, lecture patronale, scénarios privés versionnés et confidentialité financière. | Import Excel/DPGF/BPU, calcul opérationnel complet et sélection/archivage des scénarios restent à étendre. |
+| Finance patronale | Fondation sécurisée étendue | Snapshots, lignes en unités mineures, publication contrôlée, lecture patronale, scénarios privés versionnés, sélection/archivage et prévisualisation d’import DPGF/BPU/Excel sécurisé. | L’import ne persiste encore qu’une prévisualisation ; rapprochement métier complet, calcul opérationnel et écriture durable des lignes importées restent à étendre. |
 | Génération documentaire | Livrée dans un périmètre contrôlé | Assembleur déterministe avec `TechnicalDocumentFacts`, exigences DCE structurées, versions append-only, readiness et stockage privé. | Les modèles métier finaux et l’assemblage exhaustif des pièces RC restent à étendre. |
-| Cockpit patron | Étendu | React/Vite consomme les API d’affectations, journaux, interactions, Actions patron, Dossier décision, scénarios privés et finance confidentielle. | Navigation unifiée vers préparation, bibliothèque entreprise, paquet, preuve de dépôt et wizard collaborateur reste à construire. |
+| Cockpit patron | Unifié dans le périmètre courant | React/Vite consomme les API d’affectations, journaux, interactions, Actions patron, Dossier décision, scénarios privés, paquet, preuve de dépôt et navigation métier. | Les écrans finaux de bibliothèque et la profondeur complète du workspace patron restent à enrichir. |
 | Dépôt | Préparation et preuve manuelle livrées | `submission` produit un paquet tenant-scoped idempotent, manifest JSONB hashé, contrôles de versions publiées, preuve manuelle hashée append-only et `external_submission` permanent `NOT_PERFORMED`. | Transmission électronique réelle, accusé externe vérifié et intégration portail restent hors code et ne doivent pas être simulés. |
 | Déploiement | Préparé, non exécuté sur VPS | Factory production, Caddy, healthchecks, pinning digest, sauvegarde/restauration isolée, timers et rotation des secrets. | Gate VPS réel, HTTPS, EICAR, supervision externe et rapport opérateur. |
 
@@ -55,7 +55,7 @@ Cette conformité doit être lue comme une conformité vérifiée sur les fronti
 
 Le parcours cible est : **DCE reçu → DCE sécurisé → lecture/confirmation → préparation collaborative → revue patronale → chiffrage → génération des pièces → paquet de dépôt → transmission**.
 
-Les étapes DCE, préparation collaborative, génération technique, cockpit patron initial et préparation contrôlée du paquet sont codées et validées. La suite immédiate est une réconciliation finale de la suite, de l’architecture et de la documentation, puis le gate VPS. Un éventuel connecteur de transmission restera ultérieur et le dépôt électronique ne devra jamais être simulé comme réussi sans preuve externe.
+Les étapes DCE, préparation collaborative, génération technique, cockpit patron, navigation unifiée, wizard collaborateur, scénarios pricing, import sécurisé et préparation contrôlée du paquet sont codées et validées par CI. La suite immédiate est le gate VPS, désormais seule frontière opérationnelle ouverte. Un éventuel connecteur de transmission restera ultérieur et le dépôt électronique ne devra jamais être simulé comme réussi sans preuve externe.
 
 ## 6. Ordre de travail avant VPS
 
@@ -64,13 +64,14 @@ Les étapes DCE, préparation collaborative, génération technique, cockpit pat
 | 1 | Génération documentaire contrôlée | Livrée dans le périmètre actuel ; étendre ultérieurement les modèles et pièces RC finales. |
 | 2 | Cockpit patron | Première tranche livrée ; réunir progressivement préparation, revue, bibliothèque et paquet. |
 | 3 | Préparation du dépôt et preuve | Livrée : paquet immutable, manifest hashé, contrôles de versions, preuve manuelle append-only et `NOT_PERFORMED`. |
-| 4 | Frontend patron et parcours intégrés | Première extension livrée : file d’Actions et cartes pricing ; le wizard collaborateur et la navigation complète restent à construire. |
-| 5 | Réconciliation finale | Livrée pour les slices publiés : suite complète, architecture, documentation, secrets, couverture et build strict validés. |
-| 6 | Gate VPS | Après disponibilité d’un VPS : Docker, Caddy, ClamAV réel, EICAR, HTTPS, backups hors hôte, restauration isolée, supervision et rapport opérateur. |
+| 4 | Frontend patron et parcours intégrés | Livrés dans le périmètre courant : navigation métier, Dossier décision, preuve de dépôt, wizard collaborateur et actions de préparation. |
+| 5 | Import pricing sécurisé | Livré en prévisualisation patronale : DPGF/BPU/Excel `.xlsx`, contrôles anti-macro/anti-bombe, colonnes normalisées, centimes déterministes et erreurs par ligne. |
+| 6 | Réconciliation finale | Livrée : 435 tests, couverture 85,04 %, architecture, documentation, secrets, audit, SAST et build strict validés par CI. |
+| 7 | Gate VPS | Après disponibilité d’un VPS : Docker, Caddy, ClamAV réel, EICAR, HTTPS, backups hors hôte, restauration isolée, supervision et rapport opérateur. |
 
 ## 7. Limites explicitement conservées
 
-MinIO sans contrat de stockage stabilisé, Redis/sharding/tracing distribué spéculatifs, DAST/Semgrep déjà couverts par les contrôles existants et tests de charge nécessitant un environnement dédié ne sont pas ajoutés artificiellement. Les formats documentaires non pris en charge restent explicitement `UNSUPPORTED` plutôt que de produire une fausse analyse.
+MinIO sans contrat de stockage stabilisé, Redis/sharding/tracing distribué spéculatifs, DAST/Semgrep déjà couverts par les contrôles existants et tests de charge nécessitant un environnement dédié ne sont pas ajoutés artificiellement. L’import métier actuel reste une prévisualisation contrôlée ; les fichiers non `.xlsx`, les macros, les archives surdimensionnées et les classeurs malformés sont rejetés plutôt que traités implicitement. Les formats documentaires non pris en charge restent explicitement `UNSUPPORTED` plutôt que de produire une fausse analyse.
 
 ## 8. Références internes
 
