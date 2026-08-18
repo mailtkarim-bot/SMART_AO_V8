@@ -1668,6 +1668,54 @@ class GeneratedTechnicalDocumentRecord(TenantScopedRecord, Base):
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
 
 
+class PricingScenarioRecord(TenantScopedRecord, Base):
+    """Private patron pricing scenario derived from one published snapshot."""
+
+    __tablename__ = "pricing_scenarios"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_pricing_scenarios__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "source_snapshot_id"],
+            ["financial_report_snapshots.tenant_id", "financial_report_snapshots.id"],
+            name="fk_pricing_scenarios__snapshot",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_pricing_scenarios__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "case_id", "scenario_key", "version", name="uq_pricing_scenario_version"
+        ),
+        sa.CheckConstraint("version > 0", name="version_positive"),
+        sa.CheckConstraint(
+            "state IN ('DRAFT', 'SELECTED', 'ARCHIVED')", name="state"
+        ),
+        sa.CheckConstraint(
+            "scenario_type IN ('BASE', 'PRUDENT', 'CUSTOM')", name="scenario_type"
+        ),
+        sa.Index("ix_pricing_scenarios__tenant_case", "tenant_id", "case_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    source_snapshot_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    scenario_key: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    scenario_type: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    assumptions_json: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    sales_total_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    total_cost_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    gross_margin_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    gross_margin_rate_bps: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    source_snapshot_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
 class PatronActionRecord(TenantScopedRecord, Base):
     """Current patron action projection; every write is command-durable and versioned."""
 

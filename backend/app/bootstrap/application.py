@@ -65,6 +65,7 @@ from app.interfaces.http.routes.patron_enterprise_library import (
 from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
 )
+from app.interfaces.http.routes.patron_pricing import build_patron_pricing_router
 from app.interfaces.http.routes.patron_submission import build_patron_submission_router
 from app.interfaces.http.routes.preparation import (
     build_preparation_review_router,
@@ -181,6 +182,10 @@ from app.modules.preparation.infrastructure.dce_preparation_reader import (
 from app.modules.preparation.infrastructure.document_storage import (
     LocalGeneratedDocumentStorage,
 )
+from app.modules.pricing.application.service import (
+    PricingScenarioService,
+    pricing_scenario_handlers,
+)
 from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.observability.http import RequestObservabilityMiddleware
@@ -254,6 +259,7 @@ class AppRuntime:
                 ),
                 **preparation_transmission_handlers(action_writer=PatronActionWriter()),
                 **patron_action_handlers(),
+                **pricing_scenario_handlers(),
                 **preparation_review_handlers(storage=preparation_storage),
                 **submission_handlers(),
             },
@@ -557,6 +563,11 @@ def create_app(
             session_factory=runtime.session_factory,
             policy=security_policy,
         )
+        pricing_scenario_service = PricingScenarioService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -696,6 +707,12 @@ def create_app(
         app.include_router(
             build_patron_decision_router(
                 service=patron_decision_dossier_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_pricing_router(
+                service=pricing_scenario_service,
                 security_runtime=security_runtime,
             )
         )
