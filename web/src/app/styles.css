@@ -183,3 +183,10 @@ input:focus, select:focus, textarea:focus { border-color: #8096fc; box-shadow: 0
 .enterprise-pricing-heading { margin-top: 24px; }
 @media (max-width: 900px) { .enterprise-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .enterprise-library-grid { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .enterprise-form-grid, .enterprise-facts { grid-template-columns: 1fr; } .enterprise-document-row { align-items: flex-start; flex-direction: column; } }
+
+.enterprise-upload-panel { margin-top: 14px; padding-bottom: 18px; }
+.enterprise-upload-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 0 22px 16px; }
+.enterprise-upload-panel > .primary-button { margin: 0 22px; }
+.enterprise-upload-panel input[type="file"] { padding: 8px; font-size: 10px; }
+@media (max-width: 900px) { .enterprise-upload-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .enterprise-upload-grid { grid-template-columns: 1fr; } }

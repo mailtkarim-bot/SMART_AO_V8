@@ -11,6 +11,7 @@ import type {
   PatronDecisionDossier,
   PricingScenario,
   EnterpriseCompany,
+  EnterpriseDocumentKind,
 } from "../shared/types";
 import "./styles.css";
 
@@ -67,6 +68,13 @@ function App() {
     city: "",
     country_code: "FR",
   });
+  const [enterpriseDocumentForm, setEnterpriseDocumentForm] = useState({
+    document_kind: "KBIS" as EnterpriseDocumentKind,
+    document_label: "",
+    expires_at: "",
+  });
+  const [enterpriseFile, setEnterpriseFile] = useState<File | null>(null);
+  const [enterpriseUploading, setEnterpriseUploading] = useState(false);
   const [preparationPackageId, setPreparationPackageId] = useState("");
   const [preparationRevision, setPreparationRevision] = useState("1");
   const [submissionPackageId, setSubmissionPackageId] = useState("");
@@ -192,6 +200,41 @@ function App() {
       setMessage({ tone: "success", text: "Fiche entreprise créée dans le périmètre patronal." });
     } catch (error) {
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de créer la fiche entreprise." });
+    }
+  }
+
+  async function uploadEnterpriseDocument() {
+    if (
+      !enterpriseCompany ||
+      !enterpriseFile ||
+      !enterpriseDocumentForm.document_label.trim() ||
+      !enterpriseDocumentForm.expires_at
+    ) {
+      setMessage({ tone: "error", text: "Renseignez le document, son libellé et sa date d’expiration." });
+      return;
+    }
+    setEnterpriseUploading(true);
+    try {
+      const prepared = await api.prepareEnterpriseDocumentUpload(enterpriseCompany.company_id, {
+        document_kind: enterpriseDocumentForm.document_kind,
+        document_label: enterpriseDocumentForm.document_label.trim(),
+        original_filename: enterpriseFile.name,
+        expected_byte_size: enterpriseFile.size,
+        expires_at: new Date(`${enterpriseDocumentForm.expires_at}T23:59:59Z`).toISOString(),
+      });
+      const uploadReference = prepared.aggregate_refs.find(
+        (reference) => reference.aggregate_type === "EnterpriseDocumentUpload",
+      );
+      if (!uploadReference?.aggregate_id) throw new Error("Le serveur n’a pas retourné l’upload opaque.");
+      await api.uploadEnterpriseDocumentContent(enterpriseCompany.company_id, uploadReference.aggregate_id, enterpriseFile);
+      setEnterpriseFile(null);
+      setEnterpriseDocumentForm({ ...enterpriseDocumentForm, document_label: "" });
+      setMessage({ tone: "success", text: "Document contrôlé, enregistré et prêt pour vérification humaine." });
+      await refreshEnterpriseCompany();
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "L’upload entreprise a échoué." });
+    } finally {
+      setEnterpriseUploading(false);
     }
   }
 
@@ -549,6 +592,7 @@ function App() {
         <section className="section-block" id="library-section">
           <div className="section-heading"><div><span className="section-kicker">BIBLIOTHÈQUE PATRONALE</span><h2>Entreprise & prix privés</h2></div><span className="count-pill">{enterpriseCompany?.documents.length ?? 0} pièce{(enterpriseCompany?.documents.length ?? 0) > 1 ? "s" : ""}</span></div>
           {!enterpriseCompany ? <div className="detail-panel enterprise-company-panel"><div className="panel-heading"><div><h3>Créer la fiche entreprise</h3><p>La société légale est tenant-scopée et reste accessible au patron uniquement.</p></div><span className="rule-tag">PATRON</span></div><div className="enterprise-form-grid"><label><span>Raison sociale</span><input required value={enterpriseCompanyForm.legal_name} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, legal_name: event.target.value })} placeholder="Entreprise BTP" /></label><label><span>Nom commercial</span><input value={enterpriseCompanyForm.trade_name} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, trade_name: event.target.value })} placeholder="Optionnel" /></label><label><span>SIREN</span><input required pattern="[0-9]{9}" value={enterpriseCompanyForm.siren} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, siren: event.target.value })} placeholder="9 chiffres" /></label><label><span>SIRET</span><input required pattern="[0-9]{14}" value={enterpriseCompanyForm.siret} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, siret: event.target.value })} placeholder="14 chiffres" /></label><label><span>TVA intracommunautaire</span><input required value={enterpriseCompanyForm.vat_number} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, vat_number: event.target.value.toUpperCase() })} placeholder="FR..." /></label><label><span>Adresse</span><input required value={enterpriseCompanyForm.address_line1} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, address_line1: event.target.value })} /></label><label><span>Code postal</span><input required value={enterpriseCompanyForm.postal_code} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, postal_code: event.target.value })} /></label><label><span>Ville</span><input required value={enterpriseCompanyForm.city} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, city: event.target.value })} /></label><label><span>Pays</span><input required pattern="[A-Z]{2}" maxLength={2} value={enterpriseCompanyForm.country_code} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, country_code: event.target.value.toUpperCase() })} /></label></div><button className="primary-button" type="button" onClick={() => void createEnterpriseCompany()}>Créer la fiche entreprise <span>→</span></button></div> : <div className="enterprise-library-grid"><div className="detail-panel enterprise-company-panel"><div className="panel-heading"><div><h3>{enterpriseCompany.legal_name}</h3><p>{enterpriseCompany.trade_name ?? "Fiche légale patronale"}</p></div><span className="state-badge state-active">RÉVISION {enterpriseCompany.aggregate_revision}</span></div><div className="enterprise-facts"><span><small>SIREN</small><strong>{enterpriseCompany.siren}</strong></span><span><small>SIRET</small><strong>{enterpriseCompany.siret}</strong></span><span><small>TVA</small><strong>{enterpriseCompany.vat_number}</strong></span><span><small>Adresse</small><strong>{enterpriseCompany.address_line1}, {enterpriseCompany.postal_code} {enterpriseCompany.city}</strong></span></div></div><div className="detail-panel enterprise-company-panel"><div className="panel-heading"><div><h3>Pièces de l’entreprise</h3><p>Documents versionnés, statuts de vérification et dates de validité.</p></div><span className="rule-tag">{enterpriseCompany.documents.length} pièce{enterpriseCompany.documents.length > 1 ? "s" : ""}</span></div>{enterpriseCompany.documents.length === 0 ? <p className="panel-empty">Aucune pièce enregistrée. Le parcours d’upload privé reste piloté par les routes sécurisées.</p> : <div className="enterprise-document-list">{enterpriseCompany.documents.map((document) => <div className="enterprise-document-row" key={document.document_id}><div><strong>{document.document_kind} · {document.document_label}</strong><small>Émis le {formatDate(document.issued_at)}{document.expires_at ? ` · Expire le ${formatDate(document.expires_at)}` : ""}</small></div><span className={`state-badge state-${document.verification_status.toLowerCase()}`}>{document.verification_status}</span></div>)}</div>}</div></div>}
+          {enterpriseCompany && <div className="detail-panel enterprise-upload-panel"><div className="panel-heading"><div><h3>Ajouter une pièce</h3><p>Le binaire est envoyé uniquement vers la quarantaine privée ; le serveur calcule hash, MIME et verdict ClamAV.</p></div><span className="secure-pill"><span className="status-dot" />CONFIDENTIEL</span></div><div className="enterprise-upload-grid"><label><span>Type de pièce</span><select value={enterpriseDocumentForm.document_kind} onChange={(event) => setEnterpriseDocumentForm({ ...enterpriseDocumentForm, document_kind: event.target.value as EnterpriseDocumentKind })}><option value="KBIS">Kbis</option><option value="INSURANCE">Assurance</option><option value="RIB">RIB</option></select></label><label><span>Libellé</span><input required value={enterpriseDocumentForm.document_label} onChange={(event) => setEnterpriseDocumentForm({ ...enterpriseDocumentForm, document_label: event.target.value })} placeholder="Kbis 2026" /></label><label><span>Expiration</span><input required type="date" value={enterpriseDocumentForm.expires_at} onChange={(event) => setEnterpriseDocumentForm({ ...enterpriseDocumentForm, expires_at: event.target.value })} /></label><label><span>Fichier</span><input required type="file" accept=".pdf,.docx,.xlsx,.txt" onChange={(event) => setEnterpriseFile(event.target.files?.[0] ?? null)} /></label></div><button className="primary-button" type="button" onClick={() => void uploadEnterpriseDocument()} disabled={enterpriseUploading || !enterpriseFile}>{enterpriseUploading ? "Contrôle en cours…" : "Téléverser et enregistrer"}<span>→</span></button><small className="invariant-note">Après CLEAN, le document est créé en statut <strong>PENDING</strong> ; la vérification humaine reste une action séparée.</small></div>}
           <div className="section-heading enterprise-pricing-heading"><div><span className="section-kicker">SCÉNARIOS PRIVÉS</span><h2>Options de prix</h2></div><span className="count-pill">{scenarios.length} scénario{scenarios.length > 1 ? "s" : ""}</span></div>
           {scenarios.length === 0 ? <div className="empty-card"><strong>Aucun scénario chargé</strong><p>Sélectionnez une affectation patronale pour consulter les scénarios privés autorisés.</p></div> : <div className="summary-grid">{scenarios.slice(0, 4).map((scenario) => <div className="summary-card green" key={scenario.scenario_id}><span>{scenario.scenario_key} · v{scenario.version}</span><strong>{formatMoney(scenario.gross_margin_minor)}</strong><small>Marge { (scenario.gross_margin_rate_bps / 100).toFixed(1) } % · {scenario.state}</small></div>)}</div>}
         </section>
