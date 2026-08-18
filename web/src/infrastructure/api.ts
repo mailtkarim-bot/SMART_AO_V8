@@ -13,6 +13,8 @@ import type {
   SubmissionPackageReceipt,
   CollaboratorTaskList,
   PreparationPackage,
+  CommitPricingImportRequest,
+  PricingImportCommitReceipt,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -65,6 +67,25 @@ export function createApiClient(baseUrl: string, token: string) {
     listPricingScenarios: (caseId: string) =>
       request<PricingScenario[]>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/pricing-scenarios`,
+      ),
+    commitPricingImport: (
+      caseId: string,
+      batchId: string,
+      input: Omit<CommitPricingImportRequest, "command_id" | "idempotency_key"> & {
+        command_id?: string;
+        idempotency_key?: string;
+      },
+    ) =>
+      request<PricingImportCommitReceipt>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/pricing-import/${encodeURIComponent(batchId)}/commit`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: input.command_id ?? makeId(),
+            idempotency_key: input.idempotency_key ?? makeId(),
+            ...input,
+          }),
+        },
       ),
     prepareSubmissionPackage: (preparationPackageId: string, expectedRevision: number) =>
       request<SubmissionPackageReceipt>(

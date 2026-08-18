@@ -155,6 +155,29 @@ export type PricingScenario = {
   source_snapshot_revision: number;
 };
 
+export type CommitPricingImportRequest = {
+  command_id: string;
+  idempotency_key: string;
+  correlation_id?: string;
+  report_id: string;
+  expected_batch_revision: number;
+  expected_report_revision: number;
+};
+
+export type PricingImportCommitReceipt = {
+  status: "SUCCEEDED";
+  command_id: string;
+  idempotency_key: string;
+  result_code: "PRICING_IMPORT_COMMITTED";
+  aggregate_refs: Array<{
+    aggregate_type: string;
+    aggregate_id: string;
+    aggregate_revision: number;
+  }>;
+  event_ids: string[];
+  replayed: boolean;
+};
+
 export type SubmissionPackageReceipt = CommandReceipt & {
   result_code: "SUBMISSION_PACKAGE_PREPARED";
 };
