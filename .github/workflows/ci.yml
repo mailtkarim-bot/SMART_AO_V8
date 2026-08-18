@@ -44,8 +44,8 @@ jobs:
           && uv run pip-audit --strict -r /tmp/smart_ao_requirements.txt
       - name: Python SAST
         run: uv run bandit -q -r backend/app -ll
-      - name: Smoke tests
-        run: uv run pytest backend/tests -q
+      - name: Tests and coverage gate
+        run: uv run pytest backend/tests -q --cov=app --cov-report=term-missing --cov-fail-under=85
 
   frontend:
     runs-on: ubuntu-latest

@@ -60,3 +60,6 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["backend/app"]
+
+[tool.coverage.report]
+fail_under = 85
