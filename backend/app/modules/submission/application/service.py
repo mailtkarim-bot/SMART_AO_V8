@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import json
+import tempfile
 import zipfile
 from datetime import datetime
 from uuid import UUID, uuid4
@@ -112,17 +112,23 @@ class SubmissionPackageService:
             if document is None:
                 raise CommandExecutionError("TECHNICAL_DOCUMENT_REQUIRED")
             technical_bytes = self._storage.read(storage_key=document.storage_key)
-        archive = io.BytesIO()
-        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
-            for name, content in (
-                ("manifest.json", manifest_bytes),
-                ("technical-response.md", technical_bytes),
-            ):
-                info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-                info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = 0o600 << 16
-                bundle.writestr(info, content)
-        archive_bytes = archive.getvalue()
+        with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b") as archive:
+            with zipfile.ZipFile(
+                archive,
+                "w",
+                compression=zipfile.ZIP_DEFLATED,
+                compresslevel=6,
+            ) as bundle:
+                for name, content in (
+                    ("manifest.json", manifest_bytes),
+                    ("technical-response.md", technical_bytes),
+                ):
+                    info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    info.external_attr = 0o600 << 16
+                    bundle.writestr(info, content)
+            archive.seek(0)
+            archive_bytes = archive.read()
         archive_sha256 = hashlib.sha256(archive_bytes).hexdigest()
         event_id = uuid4()
         payload = {
