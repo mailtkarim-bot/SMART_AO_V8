@@ -15,6 +15,12 @@ import type {
   PreparationPackage,
   CommitPricingImportRequest,
   PricingImportCommitReceipt,
+  EnterpriseCompany,
+  EnterpriseCompanyInput,
+  EnterpriseDocumentUploadInput,
+  EnterpriseDocumentVerificationInput,
+  EnterpriseReceipt,
+  EnterpriseUploadReceipt,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -67,6 +73,69 @@ export function createApiClient(baseUrl: string, token: string) {
     listPricingScenarios: (caseId: string) =>
       request<PricingScenario[]>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/pricing-scenarios`,
+      ),
+    getEnterpriseCompany: () =>
+      request<EnterpriseCompany>("/api/v1/patron/enterprise/company"),
+    createEnterpriseCompany: (input: EnterpriseCompanyInput) =>
+      request<EnterpriseReceipt>("/api/v1/patron/enterprise/company", {
+        method: "POST",
+        body: JSON.stringify({
+          command_id: makeId(),
+          idempotency_key: makeId(),
+          ...input,
+        }),
+      }),
+    prepareEnterpriseDocumentUpload: (companyId: string, input: EnterpriseDocumentUploadInput) =>
+      request<EnterpriseReceipt>(
+        `/api/v1/patron/enterprise/companies/${encodeURIComponent(companyId)}/documents/upload`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            ...input,
+          }),
+        },
+      ),
+    uploadEnterpriseDocumentContent: async (
+      companyId: string,
+      uploadId: string,
+      file: File,
+    ): Promise<EnterpriseUploadReceipt> => {
+      const headers = new Headers();
+      headers.set("Accept", "application/json");
+      headers.set("Idempotency-Key", makeId());
+      if (token.trim()) headers.set("Authorization", `Bearer ${token.trim()}`);
+      const response = await fetch(
+        `${root}/api/v1/patron/enterprise/companies/${encodeURIComponent(companyId)}/documents/uploads/${encodeURIComponent(uploadId)}/content`,
+        { method: "PUT", headers, body: file },
+      );
+      const body = await response.text();
+      const parsed = body ? JSON.parse(body) : undefined;
+      if (!response.ok) {
+        throw new Error(
+          typeof parsed?.detail === "string"
+            ? parsed.detail
+            : `Le téléversement a échoué (${response.status}).`,
+        );
+      }
+      return parsed as EnterpriseUploadReceipt;
+    },
+    verifyEnterpriseDocument: (
+      companyId: string,
+      documentId: string,
+      input: EnterpriseDocumentVerificationInput,
+    ) =>
+      request<EnterpriseReceipt>(
+        `/api/v1/patron/enterprise/companies/${encodeURIComponent(companyId)}/documents/${encodeURIComponent(documentId)}/verification`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            ...input,
+          }),
+        },
       ),
     commitPricingImport: (
       caseId: string,

@@ -10,6 +10,7 @@ import type {
   PatronAction,
   PatronDecisionDossier,
   PricingScenario,
+  EnterpriseCompany,
 } from "../shared/types";
 import "./styles.css";
 
@@ -54,6 +55,18 @@ function App() {
   const [actions, setActions] = useState<PatronAction[]>([]);
   const [scenarios, setScenarios] = useState<PricingScenario[]>([]);
   const [decisionDossier, setDecisionDossier] = useState<PatronDecisionDossier | null>(null);
+  const [enterpriseCompany, setEnterpriseCompany] = useState<EnterpriseCompany | null>(null);
+  const [enterpriseCompanyForm, setEnterpriseCompanyForm] = useState({
+    legal_name: "",
+    trade_name: "",
+    siren: "",
+    siret: "",
+    vat_number: "",
+    address_line1: "",
+    postal_code: "",
+    city: "",
+    country_code: "FR",
+  });
   const [preparationPackageId, setPreparationPackageId] = useState("");
   const [preparationRevision, setPreparationRevision] = useState("1");
   const [submissionPackageId, setSubmissionPackageId] = useState("");
@@ -107,6 +120,7 @@ function App() {
     void refreshCases();
     void refreshAssignments();
     void refreshActions();
+    void refreshEnterpriseCompany();
   }, []);
 
   useEffect(() => {
@@ -152,6 +166,32 @@ function App() {
       setDecisionDossier(await api.getDecisionDossier(caseId));
     } catch {
       setDecisionDossier(null);
+    }
+  }
+
+  async function refreshEnterpriseCompany() {
+    if (!token.trim()) return;
+    try {
+      setEnterpriseCompany(await api.getEnterpriseCompany());
+    } catch {
+      setEnterpriseCompany(null);
+    }
+  }
+
+  async function createEnterpriseCompany() {
+    if (!enterpriseCompanyForm.legal_name.trim()) {
+      setMessage({ tone: "error", text: "Renseignez au minimum la raison sociale de l’entreprise." });
+      return;
+    }
+    try {
+      await api.createEnterpriseCompany({
+        ...enterpriseCompanyForm,
+        trade_name: enterpriseCompanyForm.trade_name || undefined,
+      });
+      await refreshEnterpriseCompany();
+      setMessage({ tone: "success", text: "Fiche entreprise créée dans le périmètre patronal." });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de créer la fiche entreprise." });
     }
   }
 
@@ -507,7 +547,9 @@ function App() {
         </section>
 
         <section className="section-block" id="library-section">
-          <div className="section-heading"><div><span className="section-kicker">SCÉNARIOS PRIVÉS</span><h2>Options de prix</h2></div><span className="count-pill">{scenarios.length} scénario{scenarios.length > 1 ? "s" : ""}</span></div>
+          <div className="section-heading"><div><span className="section-kicker">BIBLIOTHÈQUE PATRONALE</span><h2>Entreprise & prix privés</h2></div><span className="count-pill">{enterpriseCompany?.documents.length ?? 0} pièce{(enterpriseCompany?.documents.length ?? 0) > 1 ? "s" : ""}</span></div>
+          {!enterpriseCompany ? <div className="detail-panel enterprise-company-panel"><div className="panel-heading"><div><h3>Créer la fiche entreprise</h3><p>La société légale est tenant-scopée et reste accessible au patron uniquement.</p></div><span className="rule-tag">PATRON</span></div><div className="enterprise-form-grid"><label><span>Raison sociale</span><input required value={enterpriseCompanyForm.legal_name} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, legal_name: event.target.value })} placeholder="Entreprise BTP" /></label><label><span>Nom commercial</span><input value={enterpriseCompanyForm.trade_name} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, trade_name: event.target.value })} placeholder="Optionnel" /></label><label><span>SIREN</span><input required pattern="[0-9]{9}" value={enterpriseCompanyForm.siren} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, siren: event.target.value })} placeholder="9 chiffres" /></label><label><span>SIRET</span><input required pattern="[0-9]{14}" value={enterpriseCompanyForm.siret} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, siret: event.target.value })} placeholder="14 chiffres" /></label><label><span>TVA intracommunautaire</span><input required value={enterpriseCompanyForm.vat_number} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, vat_number: event.target.value.toUpperCase() })} placeholder="FR..." /></label><label><span>Adresse</span><input required value={enterpriseCompanyForm.address_line1} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, address_line1: event.target.value })} /></label><label><span>Code postal</span><input required value={enterpriseCompanyForm.postal_code} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, postal_code: event.target.value })} /></label><label><span>Ville</span><input required value={enterpriseCompanyForm.city} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, city: event.target.value })} /></label><label><span>Pays</span><input required pattern="[A-Z]{2}" maxLength={2} value={enterpriseCompanyForm.country_code} onChange={(event) => setEnterpriseCompanyForm({ ...enterpriseCompanyForm, country_code: event.target.value.toUpperCase() })} /></label></div><button className="primary-button" type="button" onClick={() => void createEnterpriseCompany()}>Créer la fiche entreprise <span>→</span></button></div> : <div className="enterprise-library-grid"><div className="detail-panel enterprise-company-panel"><div className="panel-heading"><div><h3>{enterpriseCompany.legal_name}</h3><p>{enterpriseCompany.trade_name ?? "Fiche légale patronale"}</p></div><span className="state-badge state-active">RÉVISION {enterpriseCompany.aggregate_revision}</span></div><div className="enterprise-facts"><span><small>SIREN</small><strong>{enterpriseCompany.siren}</strong></span><span><small>SIRET</small><strong>{enterpriseCompany.siret}</strong></span><span><small>TVA</small><strong>{enterpriseCompany.vat_number}</strong></span><span><small>Adresse</small><strong>{enterpriseCompany.address_line1}, {enterpriseCompany.postal_code} {enterpriseCompany.city}</strong></span></div></div><div className="detail-panel enterprise-company-panel"><div className="panel-heading"><div><h3>Pièces de l’entreprise</h3><p>Documents versionnés, statuts de vérification et dates de validité.</p></div><span className="rule-tag">{enterpriseCompany.documents.length} pièce{enterpriseCompany.documents.length > 1 ? "s" : ""}</span></div>{enterpriseCompany.documents.length === 0 ? <p className="panel-empty">Aucune pièce enregistrée. Le parcours d’upload privé reste piloté par les routes sécurisées.</p> : <div className="enterprise-document-list">{enterpriseCompany.documents.map((document) => <div className="enterprise-document-row" key={document.document_id}><div><strong>{document.document_kind} · {document.document_label}</strong><small>Émis le {formatDate(document.issued_at)}{document.expires_at ? ` · Expire le ${formatDate(document.expires_at)}` : ""}</small></div><span className={`state-badge state-${document.verification_status.toLowerCase()}`}>{document.verification_status}</span></div>)}</div>}</div></div>}
+          <div className="section-heading enterprise-pricing-heading"><div><span className="section-kicker">SCÉNARIOS PRIVÉS</span><h2>Options de prix</h2></div><span className="count-pill">{scenarios.length} scénario{scenarios.length > 1 ? "s" : ""}</span></div>
           {scenarios.length === 0 ? <div className="empty-card"><strong>Aucun scénario chargé</strong><p>Sélectionnez une affectation patronale pour consulter les scénarios privés autorisés.</p></div> : <div className="summary-grid">{scenarios.slice(0, 4).map((scenario) => <div className="summary-card green" key={scenario.scenario_id}><span>{scenario.scenario_key} · v{scenario.version}</span><strong>{formatMoney(scenario.gross_margin_minor)}</strong><small>Marge { (scenario.gross_margin_rate_bps / 100).toFixed(1) } % · {scenario.state}</small></div>)}</div>}
         </section>
 

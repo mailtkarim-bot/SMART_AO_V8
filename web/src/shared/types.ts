@@ -155,6 +155,70 @@ export type PricingScenario = {
   source_snapshot_revision: number;
 };
 
+export type EnterpriseDocumentKind = "INSURANCE" | "KBIS" | "RIB";
+
+export type EnterpriseDocument = {
+  document_id: string;
+  document_kind: EnterpriseDocumentKind;
+  document_label: string;
+  issued_at: string;
+  expires_at: string | null;
+  verification_status: "PENDING" | "VALIDATED" | "EXPIRED" | "REJECTED";
+};
+
+export type EnterpriseCompany = {
+  company_id: string;
+  aggregate_revision: number;
+  legal_name: string;
+  trade_name: string | null;
+  siren: string;
+  siret: string;
+  vat_number: string;
+  address_line1: string;
+  postal_code: string;
+  city: string;
+  country_code: string;
+  documents: EnterpriseDocument[];
+};
+
+export type EnterpriseReceipt = CommandReceipt;
+
+export type EnterpriseUploadReceipt = {
+  upload_id: string;
+  state: "CLEAN";
+};
+
+export type EnterpriseCompanyInput = {
+  legal_name: string;
+  trade_name?: string;
+  siren: string;
+  siret: string;
+  vat_number: string;
+  address_line1: string;
+  postal_code: string;
+  city: string;
+  country_code: string;
+};
+
+export type EnterpriseDocumentUploadInput = {
+  document_kind: EnterpriseDocumentKind;
+  document_label: string;
+  original_filename: string;
+  expected_byte_size: number;
+  expires_at: string;
+};
+
+export type EnterpriseDocumentVerificationInput = {
+  expected_verification_revision: number;
+  outcome: "VALIDATED" | "REJECTED";
+  reason_code:
+    | "DOCUMENT_ACCEPTED"
+    | "DOCUMENT_ILLEGIBLE"
+    | "DOCUMENT_EXPIRED"
+    | "DOCUMENT_MISMATCH"
+    | "DOCUMENT_DUPLICATE";
+};
+
 export type CommitPricingImportRequest = {
   command_id: string;
   idempotency_key: string;
