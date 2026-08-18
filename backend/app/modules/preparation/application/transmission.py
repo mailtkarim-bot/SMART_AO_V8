@@ -8,6 +8,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.modules.patron_action.public.ports import PatronActionWriter
 from app.modules.preparation.application.transmission_commands import (
     CreatePreparationSnapshotCommand,
     TransmitPreparationSnapshotCommand,
@@ -101,6 +102,9 @@ class PreparationTransmissionService:
 
 class PreparationTransmissionHandler:
     """Own immutable snapshots and append-only patron transmissions."""
+
+    def __init__(self, action_writer: PatronActionWriter | None = None) -> None:
+        self._action_writer = action_writer
 
     def execute(self, *, session: Session, command, context: CommandContext) -> HandlerOutcome:
         if context.actor_kind != ActorKind.COLLABORATEUR.value or context.membership_id is None:
@@ -334,8 +338,49 @@ class PreparationTransmissionHandler:
             correlation_id=command.correlation_id,
         )
         session.add(transmission)
+        action = None
+        if self._action_writer is not None:
+            action = self._action_writer.create_from_preparation_transmission(
+                session=session,
+                context=context,
+                case_id=package.case_id,
+                package_id=package.id,
+                transmission_id=transmission.id,
+                command_id=command.command_id,
+                idempotency_key=command.idempotency_key,
+            )
         package.aggregate_revision += 1
         package.state = "A_REVIEW"
+        events = [
+            PendingDomainEvent(
+                aggregate_type="PreparationTransmission",
+                aggregate_id=transmission.id,
+                aggregate_revision=package.aggregate_revision,
+                event_type="PreparationTransmittedToPatron",
+                payload={
+                    "transmission_id": str(transmission.id),
+                    "snapshot_id": str(snapshot.id),
+                    "package_id": str(package.id),
+                    "state": transmission.state,
+                },
+            )
+        ]
+        if action is not None:
+            events.append(
+                PendingDomainEvent(
+                    aggregate_type="PatronAction",
+                    aggregate_id=action.id,
+                    aggregate_revision=action.aggregate_revision,
+                    event_type="PatronActionCreated",
+                    payload={
+                        "action_id": str(action.id),
+                        "case_id": str(action.case_id),
+                        "action_type": action.action_type,
+                        "severity": action.severity,
+                        "state": action.state,
+                    },
+                )
+            )
         return HandlerOutcome(
             result_code="PREPARATION_TRANSMITTED_TO_PATRON",
             aggregate_refs=(
@@ -345,25 +390,14 @@ class PreparationTransmissionHandler:
                     "aggregate_revision": package.aggregate_revision,
                 },
             ),
-            events=(
-                PendingDomainEvent(
-                    aggregate_type="PreparationTransmission",
-                    aggregate_id=transmission.id,
-                    aggregate_revision=package.aggregate_revision,
-                    event_type="PreparationTransmittedToPatron",
-                    payload={
-                        "transmission_id": str(transmission.id),
-                        "snapshot_id": str(snapshot.id),
-                        "package_id": str(package.id),
-                        "state": transmission.state,
-                    },
-                ),
-            ),
+            events=tuple(events),
         )
 
 
-def preparation_transmission_handlers() -> dict[str, PreparationTransmissionHandler]:
-    handler = PreparationTransmissionHandler()
+def preparation_transmission_handlers(
+    *, action_writer: PatronActionWriter | None = None
+) -> dict[str, PreparationTransmissionHandler]:
+    handler = PreparationTransmissionHandler(action_writer=action_writer)
     return {
         CreatePreparationSnapshotCommand.command_type: handler,
         TransmitPreparationSnapshotCommand.command_type: handler,

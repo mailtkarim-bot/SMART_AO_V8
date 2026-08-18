@@ -48,6 +48,7 @@ from app.interfaces.http.routes.dce_requirement_confirmations import (
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
 from app.interfaces.http.routes.observability import build_observability_router
+from app.interfaces.http.routes.patron_actions import build_patron_action_router
 from app.interfaces.http.routes.patron_assignment_cockpit import (
     build_patron_assignment_cockpit_router,
 )
@@ -158,6 +159,11 @@ from app.modules.membership.application.patron_assignment import (
 from app.modules.membership.application.patron_assignment_cockpit import (
     PatronAssignmentCockpitService,
 )
+from app.modules.patron_action.application.service import (
+    PatronActionService,
+    PatronActionWriter,
+    patron_action_handlers,
+)
 from app.modules.preparation.application.review import (
     PreparationReviewService,
     preparation_review_handlers,
@@ -244,7 +250,8 @@ class AppRuntime:
                     storage=preparation_storage,
                     dce_reader=SqlAlchemyPreparationDceReader(),
                 ),
-                **preparation_transmission_handlers(),
+                **preparation_transmission_handlers(action_writer=PatronActionWriter()),
+                **patron_action_handlers(),
                 **preparation_review_handlers(storage=preparation_storage),
                 **submission_handlers(),
             },
@@ -539,6 +546,11 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        patron_action_service = PatronActionService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -666,6 +678,12 @@ def create_app(
         app.include_router(
             build_preparation_transmission_router(
                 service=preparation_transmission_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_action_router(
+                service=patron_action_service,
                 security_runtime=security_runtime,
             )
         )

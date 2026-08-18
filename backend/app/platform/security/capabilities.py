@@ -37,6 +37,8 @@ class Capability(StrEnum):
     PRICING_READ = "pricing.read"
     PRICING_WRITE = "pricing.write"
     SUBMISSION_AUTHORIZE = "submission.authorize"
+    PATRON_ACTION_READ = "patron.action.read"
+    PATRON_ACTION_WRITE = "patron.action.write"
     SENSITIVE_EXPORT = "export.sensitive"
     AUDIT_READ = "audit.read"
     FINANCIAL_REPORT_READ = "financial.report.read"
@@ -68,6 +70,8 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.PRICING_READ,
         Capability.PRICING_WRITE,
         Capability.SUBMISSION_AUTHORIZE,
+        Capability.PATRON_ACTION_READ,
+        Capability.PATRON_ACTION_WRITE,
         Capability.SENSITIVE_EXPORT,
         Capability.AUDIT_READ,
         Capability.FINANCIAL_REPORT_READ,
