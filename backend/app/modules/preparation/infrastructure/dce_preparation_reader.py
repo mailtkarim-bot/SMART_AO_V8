@@ -42,6 +42,8 @@ class SqlAlchemyPreparationDceReader:
         requirements = tuple(
             PreparationRequirementInput(
                 requirement_id=requirement.id,
+                requirement_type=requirement.requirement_type,
+                directive_signal=requirement.directive_signal,
                 confirmation_outcome=(
                     confirmation.outcome
                     if (

@@ -13,6 +13,10 @@ from app.modules.preparation.application.commands import (
     EvaluatePreparationReadinessCommand,
     GenerateTechnicalDocumentCommand,
 )
+from app.modules.preparation.application.document_content import (
+    TechnicalDocumentFacts,
+    build_technical_document,
+)
 from app.modules.preparation.application.ports import PreparationDceReader
 from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
 from app.platform.events.dispatcher import (
@@ -521,6 +525,15 @@ class PreparationHandler:
             raise CommandExecutionError("READINESS_NOT_FOUND")
         if readiness.state == "BLOCKED":
             raise CommandExecutionError("PREPARATION_BLOCKED")
+        dce = self._dce_reader.read(
+            session=session,
+            tenant_id=context.tenant_id,
+            dce_version_id=package.dce_version_id,
+            as_of=context.received_at,
+        )
+        if dce is None:
+            raise CommandExecutionError("DCE_NOT_FOUND_OR_FORBIDDEN")
+        requirements = dce.requirements
         version = (
             session.scalar(
                 sa.select(
@@ -532,20 +545,18 @@ class PreparationHandler:
             )
             + 1
         )
-        lines = [
-            "# Réponse technique — préparation contrôlée",
-            f"Affaire: {package.case_id}",
-            f"Version DCE: {package.dce_version_id}",
-            f"Readiness: {readiness.state}",
-            f"Version du document: {version}",
-            "",
-            "## Contrôle de complétude",
-            "Blockers: " + (", ".join(readiness.blocker_codes_json) or "aucun"),
-            "Warnings: " + (", ".join(readiness.warning_codes_json) or "aucun"),
-            "",
-            "Ce document est un brouillon technique versionné, réservé au contrôle opérationnel.",
-        ]
-        content = "\n".join(lines).encode("utf-8")
+        content = build_technical_document(
+            TechnicalDocumentFacts(
+                case_id=package.case_id,
+                dce_version_id=package.dce_version_id,
+                readiness_state=readiness.state,
+                readiness_revision=readiness.revision,
+                document_version=version,
+                requirements=requirements,
+                blocker_codes=tuple(sorted(readiness.blocker_codes_json)),
+                warning_codes=tuple(sorted(readiness.warning_codes_json)),
+            )
+        ).encode("utf-8")
         if contains_forbidden_text(content.decode("utf-8")):
             raise CommandExecutionError("FINANCIAL_DATA_FORBIDDEN")
         storage_key = (

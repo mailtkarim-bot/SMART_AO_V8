@@ -12,9 +12,11 @@ from sqlalchemy.orm import Session
 
 @dataclass(frozen=True, slots=True)
 class PreparationRequirementInput:
-    """Minimal DCE requirement facts used by deterministic readiness."""
+    """Minimal DCE requirement facts used by deterministic readiness and generation."""
 
     requirement_id: UUID
+    requirement_type: str
+    directive_signal: str
     confirmation_outcome: str | None
 
 
