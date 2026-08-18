@@ -107,3 +107,50 @@ export type PatronAssignmentInteractions = {
 };
 
 export type ApiError = Error & { status?: number; detail?: string };
+
+export type PatronAction = {
+  action_id: string;
+  case_id: string | null;
+  functional_key: string;
+  action_type: "REVIEW_PREPARATION" | "CONTROL_SUBMISSION" | "VALIDATE_PRICE" | "DECIDE_GO_NO_GO";
+  severity: "URGENT" | "BLOCKING" | "AT_RISK" | "MONITOR";
+  state: "OPEN" | "IN_PROGRESS" | "WAITING" | "COMPLETED" | "ABANDONED";
+  title: string;
+  why_now: string;
+  impact: string;
+  recommended_action: string;
+  due_at: string | null;
+  source_refs: string[];
+  aggregate_revision: number;
+};
+
+export type PatronDecisionDossier = {
+  decision_id: string;
+  case_id: string;
+  decision_type: string;
+  lifecycle: string;
+  outcome: string;
+  validity: string;
+  context_status: string;
+  final_justification: string | null;
+  known: unknown[];
+  unknowns: unknown[];
+  risks: unknown[];
+  conditions: Array<{ condition_id: string; label: string; status: string; due_at: string | null; failure_consequence: string }>;
+  sources: Array<{ aggregate_type: string; aggregate_id: string; aggregate_revision: number; role: string }>;
+};
+
+export type PricingScenario = {
+  scenario_id: string;
+  case_id: string;
+  scenario_key: string;
+  scenario_type: string;
+  version: number;
+  state: "DRAFT" | "SELECTED" | "ARCHIVED";
+  assumptions: Record<string, unknown>;
+  sales_total_minor: number;
+  total_cost_minor: number;
+  gross_margin_minor: number;
+  gross_margin_rate_bps: number;
+  source_snapshot_revision: number;
+};

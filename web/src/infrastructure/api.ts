@@ -6,6 +6,9 @@ import type {
   PatronAssignment,
   PatronAssignmentInteractions,
   PatronAssignmentJournalItem,
+  PatronAction,
+  PatronDecisionDossier,
+  PricingScenario,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -48,6 +51,16 @@ export function createApiClient(baseUrl: string, token: string) {
     getAssignmentInteractions: (assignmentId: string) =>
       request<PatronAssignmentInteractions>(
         `/api/v1/patron/assignments/${encodeURIComponent(assignmentId)}/interactions`,
+      ),
+    listPatronActions: () =>
+      request<{ items: PatronAction[]; open_count: number }>("/api/v1/patron/actions"),
+    getDecisionDossier: (caseId: string) =>
+      request<PatronDecisionDossier>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decision-dossier`,
+      ),
+    listPricingScenarios: (caseId: string) =>
+      request<PricingScenario[]>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/pricing-scenarios`,
       ),
     createDraft: (caseId: string) =>
       request<CommandReceipt>(

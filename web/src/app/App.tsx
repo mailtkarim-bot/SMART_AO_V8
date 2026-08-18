@@ -7,6 +7,8 @@ import type {
   PatronAssignment,
   PatronAssignmentInteractions,
   PatronAssignmentJournalItem,
+  PatronAction,
+  PricingScenario,
 } from "../shared/types";
 import "./styles.css";
 
@@ -48,6 +50,8 @@ function App() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState("");
   const [journal, setJournal] = useState<PatronAssignmentJournalItem[]>([]);
   const [interactions, setInteractions] = useState<PatronAssignmentInteractions | null>(null);
+  const [actions, setActions] = useState<PatronAction[]>([]);
+  const [scenarios, setScenarios] = useState<PricingScenario[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState("");
   const [reportId, setReportId] = useState("");
   const [draft, setDraft] = useState<DraftReport | null>(null);
@@ -77,6 +81,7 @@ function App() {
     if (!token.trim()) return;
     void refreshCases();
     void refreshAssignments();
+    void refreshActions();
   }, []);
 
   async function refreshCases() {
@@ -91,6 +96,23 @@ function App() {
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de charger les affaires." });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function refreshActions() {
+    try {
+      const result = await api.listPatronActions();
+      setActions(result.items);
+    } catch {
+      setActions([]);
+    }
+  }
+
+  async function refreshScenarios(caseId: string) {
+    try {
+      setScenarios(await api.listPricingScenarios(caseId));
+    } catch {
+      setScenarios([]);
     }
   }
 
@@ -132,7 +154,7 @@ function App() {
   async function selectAssignment(assignment: PatronAssignment) {
     setSelectedAssignmentId(assignment.assignment_id);
     setSelectedCaseId(assignment.case_id);
-    await loadAssignmentDetails(assignment.assignment_id);
+    await Promise.all([loadAssignmentDetails(assignment.assignment_id), refreshScenarios(assignment.case_id)]);
   }
 
   async function createDraft() {
@@ -229,6 +251,16 @@ function App() {
         </header>
 
         {message && <div className={`notice ${message.tone}`} role="status"><span>{message.tone === "success" ? "✓" : "!"}</span>{message.text}</div>}
+
+        <section className="section-block command-center-section">
+          <div className="section-heading"><div><span className="section-kicker">COMMAND CENTER</span><h2>Actions à traiter</h2></div><span className="count-pill">{actions.length} ouverte{actions.length > 1 ? "s" : ""}</span></div>
+          {actions.length === 0 ? <div className="empty-card"><strong>Aucune action patronale ouverte</strong><p>Les transmissions et contrôles autorisés alimenteront cette file tenant-scopée.</p></div> : <div className="action-grid">{actions.slice(0, 6).map((action) => <article className="action-card" key={action.action_id}><div className="case-top"><span className={`state-badge state-${action.severity.toLowerCase()}`}>{action.severity}</span><span className="rule-tag">{action.state}</span></div><h3>{action.title}</h3><p>{action.why_now}</p><small>{action.recommended_action}</small></article>)}</div>}
+        </section>
+
+        <section className="section-block">
+          <div className="section-heading"><div><span className="section-kicker">SCÉNARIOS PRIVÉS</span><h2>Options de prix</h2></div><span className="count-pill">{scenarios.length} scénario{scenarios.length > 1 ? "s" : ""}</span></div>
+          {scenarios.length === 0 ? <div className="empty-card"><strong>Aucun scénario chargé</strong><p>Sélectionnez une affectation patronale pour consulter les scénarios privés autorisés.</p></div> : <div className="summary-grid">{scenarios.slice(0, 4).map((scenario) => <div className="summary-card green" key={scenario.scenario_id}><span>{scenario.scenario_key} · v{scenario.version}</span><strong>{formatMoney(scenario.gross_margin_minor)}</strong><small>Marge { (scenario.gross_margin_rate_bps / 100).toFixed(1) } % · {scenario.state}</small></div>)}</div>}
+        </section>
 
         <section className="hero-grid">
           <div className="hero-card"><div className="hero-copy"><span className="hero-kicker">CETTE SEMAINE</span><h2>Décider avec la<br /><strong>bonne information.</strong></h2><p>Retrouvez vos affaires actives et reprenez chaque chiffrage là où vous l’avez laissé.</p><button className="primary-button" onClick={() => document.getElementById("draft-section")?.scrollIntoView({ behavior: "smooth" })}>Ouvrir un chiffrage <span>→</span></button></div><div className="hero-orbit"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit-core">AO<br /><small>V8</small></div></div></div>

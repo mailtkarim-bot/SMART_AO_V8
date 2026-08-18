@@ -113,6 +113,11 @@ input:focus, select:focus, textarea:focus { border-color: #8096fc; box-shadow: 0
 .add-line-form { grid-template-columns: 1fr 1fr; }.form-title, .add-button { grid-column: span 2; }.footer { display: block; line-height: 1.8; } }
 @media (max-width: 480px) { .case-grid, .summary-grid, .metric-stack { grid-template-columns: 1fr; }.hero-card h2 { font-size: 28px; }.hero-orbit { right: -80px; }.secure-pill { display: none; }.add-line-form { grid-template-columns: 1fr; }.form-title, .add-button { grid-column: span 1; } }
 
+.action-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.action-card { min-height: 150px; padding: 18px; border: 1px solid #e0e7f0; border-radius: 12px; background: #fff; box-shadow: 0 7px 22px #1c335108; }
+.action-card h3 { margin-top: 18px; color: #1a263b; font-size: 15px; line-height: 1.35; }
+.action-card p { margin-top: 8px; color: #71809a; font-size: 12px; line-height: 1.5; }
+.action-card small { display: block; margin-top: 12px; color: #43526b; line-height: 1.45; }
 .assignment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .assignment-card { min-height: 155px; padding: 18px; border: 1px solid #e0e7f0; border-radius: 12px; background: #fff; color: #1a263b; text-align: left; box-shadow: 0 7px 22px #1c335108; transition: .2s ease; }
 .assignment-card:hover, .assignment-card.selected { border-color: #91a4ff; box-shadow: 0 9px 25px #506be71b; transform: translateY(-2px); }
