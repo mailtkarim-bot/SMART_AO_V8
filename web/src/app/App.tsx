@@ -70,6 +70,7 @@ function App() {
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [showConnection, setShowConnection] = useState(false);
+  const [activeNav, setActiveNav] = useState("overview");
   const [lineForm, setLineForm] = useState({
     category: "SALES" as FinancialCategory,
     label: "",
@@ -287,6 +288,11 @@ function App() {
     }
   }
 
+  function navigateTo(sectionId: string, navKey: string) {
+    setActiveNav(navKey);
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function saveConnection(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     localStorage.setItem("smart-ao-api-url", baseUrl);
@@ -302,10 +308,12 @@ function App() {
         <div className="brand"><span className="brand-mark">S</span><span>SMART_AO <em>V8</em></span></div>
         <div className="workspace-label">ESPACE PATRON</div>
         <nav className="nav-list" aria-label="Navigation principale">
-          <button className="nav-item active"><span className="nav-icon">▦</span>Vue d’ensemble</button>
-          <button className="nav-item"><span className="nav-icon">◇</span>Mes affaires</button>
-          <button className="nav-item"><span className="nav-icon">◌</span>Actions à traiter</button>
-          <button className="nav-item"><span className="nav-icon">▤</span>Bibliothèque</button>
+          <button className={`nav-item ${activeNav === "overview" ? "active" : ""}`} onClick={() => navigateTo("overview-section", "overview")}><span className="nav-icon">▦</span>Vue d’ensemble</button>
+          <button className={`nav-item ${activeNav === "preparation" ? "active" : ""}`} onClick={() => navigateTo("preparation-section", "preparation")}><span className="nav-icon">◇</span>Préparation</button>
+          <button className={`nav-item ${activeNav === "review" ? "active" : ""}`} onClick={() => navigateTo("review-section", "review")}><span className="nav-icon">◌</span>Revue</button>
+          <button className={`nav-item ${activeNav === "library" ? "active" : ""}`} onClick={() => navigateTo("library-section", "library")}><span className="nav-icon">▤</span>Bibliothèque</button>
+          <button className={`nav-item ${activeNav === "decision" ? "active" : ""}`} onClick={() => navigateTo("decision-section", "decision")}><span className="nav-icon">◇</span>Décision</button>
+          <button className={`nav-item ${activeNav === "submission" ? "active" : ""}`} onClick={() => navigateTo("submission-section", "submission")}><span className="nav-icon">↗</span>Dépôt</button>
         </nav>
         <div className="sidebar-bottom">
           <button className="nav-item" onClick={() => setShowConnection(true)}><span className="nav-icon">⚙</span>Connexion API</button>
@@ -321,22 +329,22 @@ function App() {
 
         {message && <div className={`notice ${message.tone}`} role="status"><span>{message.tone === "success" ? "✓" : "!"}</span>{message.text}</div>}
 
-        <section className="section-block command-center-section">
+        <section className="section-block command-center-section" id="overview-section">
           <div className="section-heading"><div><span className="section-kicker">COMMAND CENTER</span><h2>Actions à traiter</h2></div><span className="count-pill">{actions.length} ouverte{actions.length > 1 ? "s" : ""}</span></div>
           {actions.length === 0 ? <div className="empty-card"><strong>Aucune action patronale ouverte</strong><p>Les transmissions et contrôles autorisés alimenteront cette file tenant-scopée.</p></div> : <div className="action-grid">{actions.slice(0, 6).map((action) => <article className="action-card" key={action.action_id}><div className="case-top"><span className={`state-badge state-${action.severity.toLowerCase()}`}>{action.severity}</span><span className="rule-tag">{action.state}</span></div><h3>{action.title}</h3><p>{action.why_now}</p><small>{action.recommended_action}</small></article>)}</div>}
         </section>
 
-        <section className="section-block">
+        <section className="section-block" id="library-section">
           <div className="section-heading"><div><span className="section-kicker">SCÉNARIOS PRIVÉS</span><h2>Options de prix</h2></div><span className="count-pill">{scenarios.length} scénario{scenarios.length > 1 ? "s" : ""}</span></div>
           {scenarios.length === 0 ? <div className="empty-card"><strong>Aucun scénario chargé</strong><p>Sélectionnez une affectation patronale pour consulter les scénarios privés autorisés.</p></div> : <div className="summary-grid">{scenarios.slice(0, 4).map((scenario) => <div className="summary-card green" key={scenario.scenario_id}><span>{scenario.scenario_key} · v{scenario.version}</span><strong>{formatMoney(scenario.gross_margin_minor)}</strong><small>Marge { (scenario.gross_margin_rate_bps / 100).toFixed(1) } % · {scenario.state}</small></div>)}</div>}
         </section>
 
-        <section className="hero-grid">
+        <section className="hero-grid" id="preparation-section">
           <div className="hero-card"><div className="hero-copy"><span className="hero-kicker">CETTE SEMAINE</span><h2>Décider avec la<br /><strong>bonne information.</strong></h2><p>Retrouvez vos affaires actives et reprenez chaque chiffrage là où vous l’avez laissé.</p><button className="primary-button" onClick={() => document.getElementById("draft-section")?.scrollIntoView({ behavior: "smooth" })}>Ouvrir un chiffrage <span>→</span></button></div><div className="hero-orbit"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit-core">AO<br /><small>V8</small></div></div></div>
           <div className="metric-stack"><div className="small-metric"><span className="metric-label">AFFAIRES ACTIVES</span><strong>{cases.length.toString().padStart(2, "0")}</strong><span className="metric-meta">dans votre périmètre</span></div><div className="small-metric"><span className="metric-label">ÉTAT DE LA CONNEXION</span><strong className={token.trim() ? "text-green" : "text-amber"}>{token.trim() ? "Prête" : "À configurer"}</strong><span className="metric-meta">{baseUrl}</span></div></div>
         </section>
 
-        <section className="section-block"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Configurez votre Bearer token puis actualisez pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
+        <section className="section-block" id="review-section"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Configurez votre Bearer token puis actualisez pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
 
         <section className="section-block cockpit-section">
           <div className="section-heading"><div><span className="section-kicker">PILOTAGE OPÉRATIONNEL</span><h2>Affectations et signaux</h2></div><span className="count-pill">{assignments.length} affectation{assignments.length > 1 ? "s" : ""}</span></div>
@@ -344,7 +352,7 @@ function App() {
           {selectedAssignmentId && <div className="assignment-detail-grid"><div className="detail-panel"><div className="panel-heading"><div><h3>Journal de l’affectation</h3><p>Historique append-only projeté par le serveur.</p></div><span className="rule-tag">{journal.length} événement{journal.length > 1 ? "s" : ""}</span></div>{journal.length === 0 ? <p className="panel-empty">Aucun événement journalisé.</p> : <div className="timeline">{journal.slice(0, 6).map((entry) => <div className="timeline-row" key={entry.record_id}><span className="timeline-dot" /><div><strong>{entry.event_type}</strong><small>{entry.resulting_state} · Révision {entry.resulting_revision}</small></div></div>)}</div>}</div><div className="detail-panel"><div className="panel-heading"><div><h3>Interactions récentes</h3><p>Signaux collaborateur structurés, sans texte sensible.</p></div><span className="rule-tag">{interactions?.items.length ?? 0} signal{(interactions?.items.length ?? 0) > 1 ? "s" : ""}</span></div>{!interactions?.items.length ? <p className="panel-empty">Aucune interaction enregistrée.</p> : <div className="interaction-list">{interactions.items.slice(0, 6).map((item) => <div className="interaction-row" key={item.record_id}><span className={`interaction-kind kind-${item.operational_state.toLowerCase()}`}>{item.operational_state}</span><div><strong>{item.kind}</strong><small>{item.priority ?? item.reason_kind ?? item.clarification_kind ?? "Signal opérationnel"}</small></div></div>)}</div>}</div></div>}
         </section>
 
-        <section className="section-block decision-section">
+        <section className="section-block decision-section" id="decision-section">
           <div className="section-heading"><div><span className="section-kicker">DOSSIER DE DÉCISION</span><h2>Décider sur des faits contrôlés</h2></div><span className="count-pill">{decisionDossier?.validity ?? "À charger"}</span></div>
           {!decisionDossier ? <div className="empty-card"><strong>Aucun dossier de décision disponible</strong><p>Sélectionnez une affaire et actualisez pour projeter le contexte, les inconnus, les risques et les conditions autorisées.</p></div> : <div className="decision-grid">
             <div className="detail-panel decision-summary"><div className="panel-heading"><div><h3>{decisionDossier.decision_type}</h3><p>Affaire {decisionDossier.case_id}</p></div><span className="state-badge state-active">{decisionDossier.outcome}</span></div><div className="decision-facts"><span><small>Cycle</small><strong>{decisionDossier.lifecycle}</strong></span><span><small>Contexte</small><strong>{decisionDossier.context_status}</strong></span><span><small>Validité</small><strong>{decisionDossier.validity}</strong></span></div>{decisionDossier.final_justification && <blockquote>{decisionDossier.final_justification}</blockquote>}</div>
@@ -354,7 +362,7 @@ function App() {
           </div>}
         </section>
 
-        <section className="section-block submission-section">
+        <section className="section-block submission-section" id="submission-section">
           <div className="section-heading"><div><span className="section-kicker">PRÉPARATION & DÉPÔT</span><h2>Contrôler le paquet et conserver la preuve</h2></div><span className="secure-pill"><span className="status-dot" />Dépôt externe non effectué</span></div>
           <div className="submission-grid">
             <div className="detail-panel"><div className="panel-heading"><div><h3>Préparer le paquet</h3><p>La préparation est une commande patronale révisée et idempotente.</p></div></div><label><span>Identifiant de préparation</span><input value={preparationPackageId} onChange={(event) => setPreparationPackageId(event.target.value)} placeholder="UUID du package de préparation" /></label><label><span>Révision attendue</span><input type="number" min="1" step="1" value={preparationRevision} onChange={(event) => setPreparationRevision(event.target.value)} /></label><button className="primary-button" type="button" onClick={() => void prepareSubmissionPackage()}>Préparer le paquet <span>→</span></button></div>
