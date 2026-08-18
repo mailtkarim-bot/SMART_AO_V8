@@ -24,6 +24,7 @@ from app.platform.security.capabilities import capabilities_for
 from app.platform.security.context import ActorKind
 from app.platform.security.models import (
     FinancialReportSnapshotRecord,
+    SecurityAuditEventRecord,
     SubmissionPackageRecord,
 )
 from sqlalchemy.orm import Session, sessionmaker
@@ -198,16 +199,77 @@ def test_submission_package_is_hashed_idempotent_and_append_only(services, sessi
                 DomainEventRecord.tenant_id == actor.tenant_id,
                 DomainEventRecord.aggregate_id == record.id,
             )
-        ) == 1
+        ) == 2
         assert session.scalar(
             sa.select(sa.func.count()).where(OutboxMessageRecord.tenant_id == actor.tenant_id)
-        ) >= 1
+        ) >= 2
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord).where(
+                SecurityAuditEventRecord.tenant_id == actor.tenant_id,
+                SecurityAuditEventRecord.action == "submission.export",
+            )
+        )
+        notification = session.scalar(
+            sa.select(OutboxMessageRecord).where(
+                OutboxMessageRecord.tenant_id == actor.tenant_id,
+                OutboxMessageRecord.topic == "submission.package.exported",
+            )
+        )
+        assert audit is not None
+        assert audit.event_type == "SUBMISSION_PACKAGE_EXPORTED"
+        assert audit.metadata_json == {"channel": "download"}
+        assert notification is not None
+        assert notification.payload_json["archive_sha256"]
+
 
     with pytest.raises(sa.exc.ProgrammingError), session_factory.begin() as session:
         session.execute(
             sa.update(SubmissionPackageRecord)
             .where(SubmissionPackageRecord.tenant_id == actor.tenant_id)
             .values(state="AUTORISE_DEPOT")
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_submission_export_rejects_missing_unauthorized_unconfigured_and_corrupt_inputs(
+    services, session_factory
+) -> None:
+    _, submission = services
+    actor, preparation_package_id, case_id = _prepare_generated_document(services, session_factory)
+    _publish_snapshot(session_factory, tenant_id=actor.tenant_id, case_id=case_id)
+    with pytest.raises(PermissionError, match="NOT_FOUND_OR_FORBIDDEN"):
+        submission.export(actor=actor, submission_package_id=uuid4(), now=NOW)
+
+    collaborator = replace(actor, actor_kind=ActorKind.COLLABORATEUR)
+    with pytest.raises(PermissionError, match="SUBMISSION_PATRON_REQUIRED"):
+        submission.export(actor=collaborator, submission_package_id=uuid4(), now=NOW)
+
+    unconfigured = SubmissionPackageService(
+        session_factory=session_factory,
+        dispatcher=submission._dispatcher,  # noqa: SLF001
+        policy=AuthorizationPolicy(),
+    )
+    with pytest.raises(RuntimeError, match="SUBMISSION_EXPORT_STORAGE_NOT_CONFIGURED"):
+        unconfigured.export(actor=actor, submission_package_id=uuid4(), now=NOW)
+
+    prepared = submission.prepare(
+        actor=actor,
+        command=PrepareSubmissionPackageCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            preparation_package_id=preparation_package_id,
+            expected_preparation_revision=3,
+        ),
+        now=NOW,
+    )
+    package_id = prepared.aggregate_refs[0]["aggregate_id"]
+    with pytest.raises(sa.exc.ProgrammingError), session_factory.begin() as session:
+        session.execute(
+            sa.update(SubmissionPackageRecord)
+            .where(SubmissionPackageRecord.id == package_id)
+            .values(manifest_json={"schema_version": 999})
         )
 
 

@@ -20,6 +20,14 @@ from app.platform.events.dispatcher import (
     HandlerOutcome,
     PendingDomainEvent,
 )
+from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord
+from app.platform.security.audit import (
+    AuditEventType,
+    AuditOutcome,
+    AuditSeverity,
+    SecurityAuditEntry,
+    SecurityAuditWriter,
+)
 from app.platform.security.authorization import (
     AuthorizationPolicyPort,
     AuthorizationRequest,
@@ -51,11 +59,13 @@ class SubmissionPackageService:
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
         storage: GeneratedDocumentStorage | None = None,
+        audit_writer: SecurityAuditWriter | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._dispatcher = dispatcher
         self._policy = policy
         self._storage = storage
+        self._audit_writer = audit_writer or SecurityAuditWriter()
 
     def export(
         self, *, actor: ActorContext, submission_package_id: UUID, now: datetime
@@ -112,7 +122,76 @@ class SubmissionPackageService:
                 info.compress_type = zipfile.ZIP_DEFLATED
                 info.external_attr = 0o600 << 16
                 bundle.writestr(info, content)
-        return archive.getvalue()
+        archive_bytes = archive.getvalue()
+        archive_sha256 = hashlib.sha256(archive_bytes).hexdigest()
+        event_id = uuid4()
+        payload = {
+            "submission_package_id": str(submission_package_id),
+            "manifest_sha256": record.manifest_sha256,
+            "archive_sha256": archive_sha256,
+            "delivery": "DOWNLOAD",
+        }
+        with self._session_factory.begin() as session:
+            self._audit_writer.record(
+                session=session,
+                entry=SecurityAuditEntry(
+                    occurred_at=now,
+                    tenant_id=actor.tenant_id,
+                    actor_id=actor.actor_id,
+                    identity_id=actor.identity_id,
+                    session_id=actor.session_id,
+                    actor_kind=actor.actor_kind.value,
+                    auth_strength=None,
+                    event_type=AuditEventType.SUBMISSION_PACKAGE_EXPORTED,
+                    outcome=AuditOutcome.SUCCEEDED,
+                    severity=AuditSeverity.INFO,
+                    action="submission.export",
+                    resource_type="SUBMISSION_PACKAGE",
+                    resource_id=submission_package_id,
+                    case_id=record.case_id,
+                    correlation_id=actor.correlation_id,
+                    command_id=None,
+                    request_id=None,
+                    source_ip_hash=None,
+                    user_agent_family=None,
+                    reason_code=None,
+                    metadata={"channel": "download"},
+                ),
+            )
+            session.add(
+                DomainEventRecord(
+                    id=event_id,
+                    tenant_id=actor.tenant_id,
+                    aggregate_type="SubmissionPackage",
+                    aggregate_id=submission_package_id,
+                    aggregate_revision=record.version,
+                    event_type="SubmissionPackageExported",
+                    payload_version=1,
+                    payload_json=payload,
+                    actor_id=actor.actor_id,
+                    command_id=None,
+                    correlation_id=actor.correlation_id,
+                    causation_id=None,
+                    occurred_at=now,
+                )
+            )
+            session.add(
+                OutboxMessageRecord(
+                    id=uuid4(),
+                    tenant_id=actor.tenant_id,
+                    event_id=event_id,
+                    topic="submission.package.exported",
+                    payload_version=1,
+                    payload_json=payload,
+                    status="PENDING",
+                    attempt_count=0,
+                    next_attempt_at=now,
+                    published_at=None,
+                    last_error_code=None,
+                    dedupe_key=f"submission-export:{event_id}",
+                )
+            )
+        return archive_bytes
 
     def prepare(
         self,
