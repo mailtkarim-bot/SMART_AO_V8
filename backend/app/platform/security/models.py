@@ -1668,6 +1668,106 @@ class GeneratedTechnicalDocumentRecord(TenantScopedRecord, Base):
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
 
 
+class PreparationSnapshotRecord(TenantScopedRecord, Base):
+    """Immutable non-financial preparation facts frozen for patron review."""
+
+    __tablename__ = "preparation_snapshots"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_prep_snapshots__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "package_id"],
+            ["preparation_packages.tenant_id", "preparation_packages.id"],
+            name="fk_prep_snapshots__package",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "readiness_id"],
+            ["preparation_readiness.tenant_id", "preparation_readiness.id"],
+            name="fk_prep_snapshots__readiness",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "technical_document_id"],
+            ["generated_technical_documents.tenant_id", "generated_technical_documents.id"],
+            name="fk_prep_snapshots__document",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_prep_snapshots__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "package_id", "version", name="uq_prep_snapshot__version"
+        ),
+        sa.CheckConstraint("version > 0", name="version_positive"),
+        sa.CheckConstraint(
+            "state IN ('READY_FOR_PATRON_REVIEW')", name="state"
+        ),
+        sa.Index(
+            "ix_prep_snapshots__tenant_package_version", "tenant_id", "package_id", "version"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    package_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    dce_version_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    readiness_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    technical_document_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    technical_document_version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(sa.CHAR(64), nullable=False)
+    manifest_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class PreparationTransmissionRecord(TenantScopedRecord, Base):
+    """Append-only handoff of one immutable preparation snapshot to the patron."""
+
+    __tablename__ = "preparation_transmissions"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_prep_transmissions__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "package_id"],
+            ["preparation_packages.tenant_id", "preparation_packages.id"],
+            name="fk_prep_transmissions__package",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "snapshot_id"],
+            ["preparation_snapshots.tenant_id", "preparation_snapshots.id"],
+            name="fk_prep_transmissions__snapshot",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_prep_transmissions__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "snapshot_id", name="uq_prep_transmission__snapshot"
+        ),
+        sa.CheckConstraint(
+            "state IN ('TRANSMITTED_TO_PATRON')", name="state"
+        ),
+        sa.Index(
+            "ix_prep_transmissions__tenant_package", "tenant_id", "package_id", "created_at"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    package_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    snapshot_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    state: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
 class SubmissionPackageRecord(TenantScopedRecord, Base):
     """Immutable patron-controlled package prepared for human submission."""
 

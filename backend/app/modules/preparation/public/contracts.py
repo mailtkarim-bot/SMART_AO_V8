@@ -52,6 +52,19 @@ class AddPreparationCorrectionRequest(PreparationCommandRequest):
     source_locator: str | None = Field(default=None, max_length=500)
 
 
+class CreatePreparationSnapshotRequest(PreparationCommandRequest):
+    expected_package_revision: int = Field(ge=0)
+    package_id: UUID
+    snapshot_id: UUID
+
+
+class TransmitPreparationSnapshotRequest(PreparationCommandRequest):
+    expected_package_revision: int = Field(ge=0)
+    package_id: UUID
+    snapshot_id: UUID
+    transmission_id: UUID
+
+
 class CreateTechnicalResponseDraftRequest(PreparationCommandRequest):
     expected_package_revision: int = Field(ge=0)
     draft_id: UUID
@@ -68,6 +81,8 @@ class PreparationAggregateReference(BaseModel):
         "GeneratedTechnicalDocument",
         "PreparationReview",
         "TechnicalResponseDraft",
+        "PreparationSnapshot",
+        "PreparationTransmission",
     ]
     aggregate_id: UUID
     aggregate_revision: int = Field(ge=0)
@@ -86,6 +101,8 @@ class PreparationCommandResponse(BaseModel):
         "PREPARATION_REVIEW_DECIDED",
         "PREPARATION_CORRECTION_ADDED",
         "TECHNICAL_RESPONSE_DRAFT_CREATED",
+        "PREPARATION_SNAPSHOT_CREATED",
+        "PREPARATION_TRANSMITTED_TO_PATRON",
     ]
     aggregate_refs: list[PreparationAggregateReference]
     event_ids: list[UUID]

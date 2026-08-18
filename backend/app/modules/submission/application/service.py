@@ -110,7 +110,7 @@ class PrepareSubmissionPackageHandler:
             raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
         if preparation.aggregate_revision != command.expected_preparation_revision:
             raise CommandExecutionError("VERSION_CONFLICT")
-        if preparation.state != "GENERATED":
+        if preparation.state not in {"GENERATED", "READY", "A_REVIEW"}:
             raise CommandExecutionError("PREPARATION_NOT_GENERATED")
         readiness = session.scalar(
             sa.select(PreparationReadinessRecord)

@@ -68,6 +68,9 @@ from app.interfaces.http.routes.preparation import (
     build_preparation_review_router,
     build_preparation_router,
 )
+from app.interfaces.http.routes.preparation_transmission import (
+    build_preparation_transmission_router,
+)
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
@@ -160,6 +163,10 @@ from app.modules.preparation.application.review import (
     preparation_review_handlers,
 )
 from app.modules.preparation.application.service import PreparationService, preparation_handlers
+from app.modules.preparation.application.transmission import (
+    PreparationTransmissionService,
+    preparation_transmission_handlers,
+)
 from app.modules.preparation.infrastructure.dce_preparation_reader import (
     SqlAlchemyPreparationDceReader,
 )
@@ -237,6 +244,7 @@ class AppRuntime:
                     storage=preparation_storage,
                     dce_reader=SqlAlchemyPreparationDceReader(),
                 ),
+                **preparation_transmission_handlers(),
                 **preparation_review_handlers(storage=preparation_storage),
                 **submission_handlers(),
             },
@@ -526,6 +534,11 @@ def create_app(
             policy=security_policy,
             storage=runtime.preparation_storage,
         )
+        preparation_transmission_service = PreparationTransmissionService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -647,6 +660,12 @@ def create_app(
         app.include_router(
             build_preparation_review_router(
                 service=preparation_review_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_preparation_transmission_router(
+                service=preparation_transmission_service,
                 security_runtime=security_runtime,
             )
         )
