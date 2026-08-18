@@ -55,6 +55,7 @@ from app.interfaces.http.routes.patron_assignment_cockpit import (
 from app.interfaces.http.routes.patron_assignment_management import (
     build_patron_assignment_management_router,
 )
+from app.interfaces.http.routes.patron_decisions import build_patron_decision_router
 from app.interfaces.http.routes.patron_enterprise_capabilities import (
     build_patron_enterprise_capability_router,
 )
@@ -110,6 +111,7 @@ from app.modules.dce.infrastructure.quarantine import (
     LocalQuarantineStorageAdapter,
     PythonMagicContentInspectionAdapter,
 )
+from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
 from app.modules.enterprise.application.enterprise_capability import (
     EnterpriseCapabilityService,
     enterprise_capability_handlers,
@@ -551,6 +553,10 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        patron_decision_dossier_service = PatronDecisionDossierService(
+            session_factory=runtime.session_factory,
+            policy=security_policy,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -684,6 +690,12 @@ def create_app(
         app.include_router(
             build_patron_action_router(
                 service=patron_action_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_decision_router(
+                service=patron_decision_dossier_service,
                 security_runtime=security_runtime,
             )
         )
