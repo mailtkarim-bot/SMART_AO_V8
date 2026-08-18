@@ -11,6 +11,8 @@ import type {
   PricingScenario,
   SubmissionEvidenceReceipt,
   SubmissionPackageReceipt,
+  CollaboratorTaskList,
+  PreparationPackage,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -73,6 +75,118 @@ export function createApiClient(baseUrl: string, token: string) {
             command_id: makeId(),
             idempotency_key: makeId(),
             expected_preparation_revision: expectedRevision,
+          }),
+        },
+      ),
+    getCollaboratorPreparation: (packageId: string) =>
+      request<PreparationPackage>(
+        `/api/v1/collaborator/preparation/${encodeURIComponent(packageId)}`,
+      ),
+    listCollaboratorTasks: (caseId: string) =>
+      request<CollaboratorTaskList>(
+        `/api/v1/collaborator/cases/${encodeURIComponent(caseId)}/tasks`,
+      ),
+    evaluatePreparationReadiness: (
+      caseId: string,
+      input: {
+        package_id: string;
+        assignment_id: string;
+        dce_version_id: string;
+        expected_revision: number;
+      },
+    ) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/cases/${encodeURIComponent(caseId)}/preparation/readiness`,
+        {
+          method: "POST",
+          body: JSON.stringify({ command_id: makeId(), idempotency_key: makeId(), ...input }),
+        },
+      ),
+    generateTechnicalDocument: (
+      packageId: string,
+      input: { expected_revision: number; readiness_revision: number },
+    ) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/preparation/${encodeURIComponent(packageId)}/documents`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            document_kind: "TECHNICAL_RESPONSE",
+            ...input,
+          }),
+        },
+      ),
+    claimCollaboratorTask: (taskId: string, expectedRevision: number) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/tasks/${encodeURIComponent(taskId)}/claim`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            expected_revision: expectedRevision,
+          }),
+        },
+      ),
+    recordCollaboratorTaskResult: (
+      taskId: string,
+      input: {
+        expected_revision: number;
+        result_text: string;
+        source_locator?: string;
+        outcome: "RECORDED" | "NOT_APPLICABLE" | "UNABLE_TO_COMPLETE";
+      },
+    ) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/tasks/${encodeURIComponent(taskId)}/results`,
+        {
+          method: "POST",
+          body: JSON.stringify({ command_id: makeId(), idempotency_key: makeId(), ...input }),
+        },
+      ),
+    completeCollaboratorTask: (taskId: string, expectedRevision: number) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/tasks/${encodeURIComponent(taskId)}/complete`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            expected_revision: expectedRevision,
+          }),
+        },
+      ),
+    createPreparationSnapshot: (
+      packageId: string,
+      input: { snapshot_id: string; expected_package_revision: number },
+    ) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/preparation/${encodeURIComponent(packageId)}/snapshots`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            package_id: packageId,
+            ...input,
+          }),
+        },
+      ),
+    transmitPreparationSnapshot: (
+      packageId: string,
+      input: { snapshot_id: string; transmission_id: string; expected_package_revision: number },
+    ) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/preparation/${encodeURIComponent(packageId)}/transmissions`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            package_id: packageId,
+            ...input,
           }),
         },
       ),

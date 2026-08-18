@@ -165,3 +165,51 @@ export type SubmissionEvidenceReceipt = CommandReceipt & {
 };
 
 export type DecisionDossierItem = Record<string, unknown>;
+
+export type PreparationReadiness = {
+  readiness_id: string;
+  revision: number;
+  state: "READY" | "READY_WITH_WARNINGS" | "BLOCKED";
+  blocker_codes: string[];
+  warning_codes: string[];
+  checked_requirement_count: number;
+  checked_task_count: number;
+};
+
+export type GeneratedDocument = {
+  document_id: string;
+  version: number;
+  document_kind: "TECHNICAL_RESPONSE";
+  state: "GENERATED" | "FAILED_SAFE";
+  readiness_revision: number;
+};
+
+export type PreparationPackage = {
+  package_id: string;
+  case_id: string;
+  assignment_id: string;
+  dce_version_id: string;
+  state: "IN_PREPARATION" | "A_REVIEW" | "READY" | "BLOCKED" | "GENERATED";
+  aggregate_revision: number;
+  latest_readiness: PreparationReadiness | null;
+  generated_documents: GeneratedDocument[];
+};
+
+export type CollaboratorTask = {
+  task_id: string;
+  case_id: string;
+  assignment_id: string;
+  requirement_id: string | null;
+  task_kind: string;
+  title: string;
+  objective: string;
+  priority: "URGENT" | "HIGH" | "NORMAL" | "LOW";
+  state: "OPEN" | "CLAIMED" | "IN_PROGRESS" | "BLOCKED" | "COMPLETED" | "NOT_APPLICABLE";
+  due_at: string | null;
+  aggregate_revision: number;
+};
+
+export type CollaboratorTaskList = {
+  case_id: string;
+  tasks: CollaboratorTask[];
+};
