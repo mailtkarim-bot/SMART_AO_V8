@@ -42,6 +42,7 @@ class EnterpriseDocumentProjection:
     issued_at: datetime
     expires_at: datetime | None
     verification_status: str
+    verification_revision: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +114,17 @@ class EnterpriseLibraryService:
                     .limit(1)
                     .scalar_subquery()
                     .label("latest_verification"),
+                    sa.func.coalesce(
+                        sa.select(sa.func.max(EnterpriseDocumentVerificationRecord.revision))
+                        .where(
+                            EnterpriseDocumentVerificationRecord.tenant_id
+                            == EnterpriseDocumentRecord.tenant_id,
+                            EnterpriseDocumentVerificationRecord.document_id
+                            == EnterpriseDocumentRecord.id,
+                        )
+                        .scalar_subquery(),
+                        0,
+                    ).label("verification_revision"),
                 )
                 .where(
                     EnterpriseDocumentRecord.tenant_id == actor.tenant_id,
@@ -140,6 +152,7 @@ class EnterpriseLibraryService:
                     issued_at=row.issued_at,
                     expires_at=row.expires_at,
                     verification_status=row.latest_verification or row.verification_status,
+                    verification_revision=row.verification_revision,
                 )
                 for row in rows
             ),

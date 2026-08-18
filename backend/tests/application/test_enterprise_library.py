@@ -195,7 +195,9 @@ def test_patron_creates_company_and_registers_enterprise_documents(
         _seed_clean_upload(session_factory, actor, document_command)
         documents.append(service.register_document(actor=actor, command=document_command, now=NOW))
 
+    projection = service.read_company(actor=actor, now=NOW)
     assert created.result_code == "ENTERPRISE_COMPANY_CREATED"
+    assert [document.verification_revision for document in projection.documents] == [0, 0, 0]
     assert [item.result_code for item in documents] == [
         "ENTERPRISE_DOCUMENT_REGISTERED",
         "ENTERPRISE_DOCUMENT_REGISTERED",

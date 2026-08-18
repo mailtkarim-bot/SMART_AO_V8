@@ -137,6 +137,7 @@ class EnterpriseDocumentResponse(EnterprisePublicResponse):
     issued_at: datetime
     expires_at: datetime | None
     verification_status: Literal["PENDING", "VALIDATED", "EXPIRED", "REJECTED"]
+    verification_revision: int = Field(ge=0)
 
 
 class EnterpriseCompanyResponse(EnterprisePublicResponse):

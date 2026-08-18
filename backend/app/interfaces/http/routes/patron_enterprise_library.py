@@ -66,6 +66,7 @@ def _company_response(projection) -> EnterpriseCompanyResponse:
                 issued_at=document.issued_at,
                 expires_at=document.expires_at,
                 verification_status=document.verification_status,
+                verification_revision=document.verification_revision,
             )
             for document in projection.documents
         ],
