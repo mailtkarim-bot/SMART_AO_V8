@@ -66,6 +66,7 @@ from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
 )
 from app.interfaces.http.routes.patron_pricing import build_patron_pricing_router
+from app.interfaces.http.routes.patron_pricing_import import build_patron_pricing_import_router
 from app.interfaces.http.routes.patron_submission import build_patron_submission_router
 from app.interfaces.http.routes.patron_submission_evidence import (
     build_patron_submission_evidence_router,
@@ -189,6 +190,7 @@ from app.modules.preparation.infrastructure.dce_preparation_reader import (
 from app.modules.preparation.infrastructure.document_storage import (
     LocalGeneratedDocumentStorage,
 )
+from app.modules.pricing.application.import_preview import PricingImportPreviewService
 from app.modules.pricing.application.service import (
     PricingScenarioService,
     pricing_scenario_handlers,
@@ -596,6 +598,7 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        pricing_import_preview_service = PricingImportPreviewService(policy=security_policy)
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -747,6 +750,12 @@ def create_app(
             build_patron_pricing_router(
                 service=pricing_scenario_service,
                 transition_service=pricing_scenario_transition_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_pricing_import_router(
+                service=pricing_import_preview_service,
                 security_runtime=security_runtime,
             )
         )
