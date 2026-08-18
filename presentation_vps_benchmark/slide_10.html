@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Slide 10</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E0E0E0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            position: relative;
+            padding: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 64px;
+            color: #111111;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            line-height: 1.1;
+            margin-bottom: 50px;
+            text-align: center;
+        }
+        .content-block {
+            border: 4px solid #111111;
+            padding: 20px; /* reduced from 50 to save vertical space */
+            background-color: #E0E0E0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* reduced gap */
+        }
+        .main-conclusion {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 36px;
+            color: #0055FF;
+            line-height: 1.4;
+            text-align: center;
+        }
+        .artifacts-section {
+            border-top: 4px solid #111111;
+            padding-top: 20px; /* reduced from 40 */
+        }
+        .artifacts-title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 28px;
+            color: #111111;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+        .artifacts-list {
+            list-style-type: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px; /* smaller gap to reduce wrap height */
+        }
+        .artifact-item {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 24px;
+            color: #E0E0E0;
+            background-color: #111111;
+            padding: 10px 20px; /* reduced vertical padding */
+            border: 4px solid #111111;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <h2 class="title">Conclusion</h2>
+        
+        <div class="content-block">
+            <p class="main-conclusion">Le socle applicatif est prêt pour la validation préproduction, mais la preuve VPS reste une étape distincte.</p>
+            
+            <div class="artifacts-section">
+                <h3 class="artifacts-title">Artefacts de référence livrés :</h3>
+                <ul class="artifacts-list">
+                    <li class="artifact-item">Rapport benchmark</li>
+                    <li class="artifact-item">Audit code webhook</li>
+                    <li class="artifact-item">Plan de charge</li>
+                    <li class="artifact-item">Spécification opérationnelle VPS</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

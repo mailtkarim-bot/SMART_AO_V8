@@ -1,0 +1,133 @@
+{
+  "project_info": {
+    "title": "Cover",
+    "created": 1787089073.792,
+    "last_updated": 1787089254.946,
+    "total_slides": 11
+  },
+  "slides": [
+    {
+      "id": "cover",
+      "state": "edited",
+      "pageNum": 1
+    },
+    {
+      "id": "slide_1",
+      "state": "edited",
+      "pageNum": 2
+    },
+    {
+      "id": "slide_2",
+      "state": "edited",
+      "pageNum": 3
+    },
+    {
+      "id": "slide_3",
+      "state": "edited",
+      "pageNum": 4
+    },
+    {
+      "id": "slide_4",
+      "state": "edited",
+      "pageNum": 5
+    },
+    {
+      "id": "slide_5",
+      "state": "edited",
+      "pageNum": 6
+    },
+    {
+      "id": "slide_6",
+      "state": "edited",
+      "pageNum": 7
+    },
+    {
+      "id": "slide_7",
+      "state": "edited",
+      "pageNum": 8
+    },
+    {
+      "id": "slide_8",
+      "state": "edited",
+      "pageNum": 9
+    },
+    {
+      "id": "slide_9",
+      "state": "edited",
+      "pageNum": 10
+    },
+    {
+      "id": "slide_10",
+      "state": "edited",
+      "pageNum": 11
+    }
+  ],
+  "outline": [
+    {
+      "id": "cover",
+      "title": "Cover",
+      "summary": "Titre principal et sous-titre de la présentation.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_1",
+      "title": "Décision en une phrase",
+      "summary": "Validation du niveau ZIP_DEFLATED 6 et résumé du corpus.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_2",
+      "title": "Le corpus reflète des documents déjà compressés",
+      "summary": "Détail du corpus PDF BTP utilisé pour le benchmark.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_3",
+      "title": "Le niveau 6 domine le compromis taille / temps",
+      "summary": "Tableau comparatif des profils de compression ZIP.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_4",
+      "title": "L’implémentation protège la mémoire, mais le flux source reste perfectible",
+      "summary": "Analyse technique de l'implémentation ZIP et pistes d'optimisation.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_5",
+      "title": "Le worker webhook couvre les décisions critiques",
+      "summary": "Bilan de la couverture de tests et des garanties de sécurité du worker.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_6",
+      "title": "Quatre risques restent à fermer avant production",
+      "summary": "Identification des cas limites et risques résiduels du worker.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_7",
+      "title": "Le VPS sera validé par un gate en sept contrôles",
+      "summary": "Liste des sept étapes de validation opérationnelle sur le VPS cible.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_8",
+      "title": "La charge sera progressive et arrêtée par des garde-fous",
+      "summary": "Stratégie de test de charge, mesures et critères d'arrêt.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_9",
+      "title": "Prochaines étapes ordonnées",
+      "summary": "Plan d'action pour finaliser la validation et le déploiement.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "slide_10",
+      "title": "Conclusion",
+      "summary": "Bilan final sur l'état du socle applicatif et les artefacts livrés.",
+      "image_plan": "Use a suitable image if needed"
+    }
+  ]
+}

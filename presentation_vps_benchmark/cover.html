@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Cover</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E0E0E0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            position: relative;
+            overflow: hidden;
+        }
+        .content-block {
+            border: 4px solid #111111;
+            padding: 60px;
+            width: 1000px;
+            background-color: #E0E0E0;
+            position: relative;
+            z-index: 2;
+        }
+        .title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 80px;
+            color: #111111;
+            line-height: 1.1;
+            margin-top: -100px; /* Bleeding effect */
+            margin-bottom: 40px;
+            text-transform: uppercase;
+            letter-spacing: -2px;
+        }
+        .subtitle {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 32px;
+            color: #222222;
+            line-height: 1.4;
+            margin-bottom: 60px;
+            letter-spacing: 0.5px;
+        }
+        .metadata {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 24px;
+            color: #0055FF;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .accent-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            background-color: #0055FF;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="content-block">
+            <h1 class="title">SMART_AO V8<br>Benchmark ZIP<br>& Validation VPS</h1>
+            <p class="subtitle">Benchmark de compression, audit du worker webhook et feuille de route opérationnelle VPS</p>
+            <div class="metadata">
+                <span>Août 2026</span>
+                <span>Branche: ops/vps-deploy-health-digests-01</span>
+            </div>
+        </div>
+        <div class="accent-bar"></div>
+    </div>
+</body>
+</html>

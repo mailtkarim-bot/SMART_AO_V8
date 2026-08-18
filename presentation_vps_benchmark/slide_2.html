@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Slide 2</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E0E0E0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            display: flex;
+        }
+        .left-col {
+            width: 40%;
+            padding-top: 80px;
+            padding-left: 80px;
+            padding-right: 40px;
+        }
+        .right-col {
+            width: 60%;
+            padding-top: 80px;
+            padding-right: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 60px;
+            color: #111111;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+        .metric-block {
+            border: 4px solid #111111;
+            padding: 30px;
+            background-color: #E0E0E0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .metric-value {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 48px;
+            color: #0055FF;
+            margin-bottom: 10px;
+        }
+        .metric-label {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 24px;
+            color: #222222;
+        }
+        .conclusion-block {
+            border: 4px solid #111111;
+            padding: 30px;
+            background-color: #111111;
+            margin-top: 20px;
+        }
+        .conclusion-text {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 28px;
+            color: #E0E0E0;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="left-col">
+            <h2 class="title">Le corpus reflète des documents déjà compressés</h2>
+        </div>
+        <div class="right-col">
+            <div style="display: flex; gap: 20px;">
+                <div class="metric-block" style="flex: 1;">
+                    <div class="metric-value">75</div>
+                    <div class="metric-label">Pages DCE plomberie</div>
+                </div>
+                <div class="metric-block" style="flex: 1;">
+                    <div class="metric-value">23</div>
+                    <div class="metric-label">Pages CCTP lot travaux</div>
+                </div>
+            </div>
+            <div class="metric-block">
+                <div class="metric-value">5 807 069 octets</div>
+                <div class="metric-label">Taille totale avant archivage</div>
+            </div>
+            <div class="conclusion-block">
+                <p class="conclusion-text">Les PDF limitent mécaniquement le gain attendu de DEFLATE, car ils intègrent déjà leurs propres mécanismes de compression.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

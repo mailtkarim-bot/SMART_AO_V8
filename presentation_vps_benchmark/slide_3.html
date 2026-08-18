@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Slide 3</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E0E0E0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            padding: 60px 80px 0 80px;
+            display: flex;
+            flex-direction: column;
+        }
+        .title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 54px;
+            color: #111111;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            line-height: 1.1;
+            margin-bottom: 40px;
+        }
+        .table-container {
+            border: 4px solid #111111;
+            background-color: #E0E0E0;
+            margin-bottom: 20px; /* reduced from 30px */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 4px solid #111111;
+            padding: 10px; /* reduced from 20px to save vertical space */
+            text-align: right;
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 28px;
+            color: #222222;
+        }
+        th {
+            background-color: #111111;
+            color: #E0E0E0;
+            text-align: center;
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 24px;
+        }
+        td:first-child {
+            text-align: left;
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            color: #0055FF;
+        }
+        .takeaways {
+            border: 4px solid #111111;
+            padding: 20px; /* reduced from 30px */
+            background-color: #E0E0E0;
+        }
+        .takeaways ul {
+            list-style-type: none;
+        }
+        .takeaways li {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 26px;
+            color: #222222;
+            line-height: 1.4;
+            margin-bottom: 15px;
+            position: relative;
+            padding-left: 30px;
+        }
+        .takeaways li:last-child {
+            margin-bottom: 0;
+        }
+        .takeaways li::before {
+            content: "■";
+            color: #0055FF;
+            position: absolute;
+            left: 0;
+            font-size: 20px;
+            top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <h2 class="title">Le niveau 6 domine le compromis taille / temps</h2>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Profil</th>
+                        <th>Taille ZIP</th>
+                        <th>Réduction</th>
+                        <th>Temps</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>STORED</td>
+                        <td>5 807 704 o</td>
+                        <td>-0,01 %</td>
+                        <td>0,048 s</td>
+                    </tr>
+                    <tr>
+                        <td>DEFLATED 6</td>
+                        <td>5 592 481 o</td>
+                        <td>3,70 %</td>
+                        <td>0,220 s</td>
+                    </tr>
+                    <tr>
+                        <td>DEFLATED 9</td>
+                        <td>5 592 481 o</td>
+                        <td>3,70 %</td>
+                        <td>0,248 s</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="takeaways">
+            <ul>
+                <li><strong>Niveau 9 :</strong> aucune réduction additionnelle observée.</li>
+                <li><strong>Décision :</strong> conserver <code>compresslevel=6</code>.</li>
+                <li><strong>À compléter :</strong> p50/p95, RSS, CPU, I/O et corpus DOCX/XLSX/CSV/TXT.</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
