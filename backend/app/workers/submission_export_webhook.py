@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 from uuid import UUID
 
@@ -139,6 +140,9 @@ def _safe_payload(payload_json: object) -> dict[str, object] | None:
 
 
 def _post_json(url: str, payload: dict[str, object], timeout: float) -> int:
+    parsed = urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("invalid webhook URL")
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     request = Request(
         url,
@@ -146,7 +150,7 @@ def _post_json(url: str, payload: dict[str, object], timeout: float) -> int:
         method="POST",
         headers={"Content-Type": "application/json", "User-Agent": "SMART-AO-outbox/1"},
     )
-    with urlopen(request, timeout=timeout) as response:
+    with urlopen(request, timeout=timeout) as response:  # nosec B310 - URL scheme validated above
         return int(response.status)
 
 
