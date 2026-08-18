@@ -4,6 +4,9 @@ import type {
   AssignedCase,
   DraftReport,
   FinancialCategory,
+  PatronAssignment,
+  PatronAssignmentInteractions,
+  PatronAssignmentJournalItem,
 } from "../shared/types";
 import "./styles.css";
 
@@ -41,6 +44,10 @@ function App() {
     () => localStorage.getItem("smart-ao-token") ?? "",
   );
   const [cases, setCases] = useState<AssignedCase[]>([]);
+  const [assignments, setAssignments] = useState<PatronAssignment[]>([]);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState("");
+  const [journal, setJournal] = useState<PatronAssignmentJournalItem[]>([]);
+  const [interactions, setInteractions] = useState<PatronAssignmentInteractions | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState("");
   const [reportId, setReportId] = useState("");
   const [draft, setDraft] = useState<DraftReport | null>(null);
@@ -69,6 +76,7 @@ function App() {
   useEffect(() => {
     if (!token.trim()) return;
     void refreshCases();
+    void refreshAssignments();
   }, []);
 
   async function refreshCases() {
@@ -84,6 +92,47 @@ function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function refreshAssignments() {
+    try {
+      const result = await api.listPatronAssignments();
+      setAssignments(result.items);
+      const first = result.items[0];
+      if (first && !selectedAssignmentId) {
+        setSelectedAssignmentId(first.assignment_id);
+        await loadAssignmentDetails(first.assignment_id);
+      }
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de charger le cockpit patron.",
+      });
+    }
+  }
+
+  async function loadAssignmentDetails(assignmentId: string) {
+    try {
+      const [journalResult, interactionsResult] = await Promise.all([
+        api.getAssignmentJournal(assignmentId),
+        api.getAssignmentInteractions(assignmentId),
+      ]);
+      setJournal(journalResult.items);
+      setInteractions(interactionsResult);
+    } catch (error) {
+      setJournal([]);
+      setInteractions(null);
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de charger le journal patron.",
+      });
+    }
+  }
+
+  async function selectAssignment(assignment: PatronAssignment) {
+    setSelectedAssignmentId(assignment.assignment_id);
+    setSelectedCaseId(assignment.case_id);
+    await loadAssignmentDetails(assignment.assignment_id);
   }
 
   async function createDraft() {
@@ -187,6 +236,12 @@ function App() {
         </section>
 
         <section className="section-block"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Configurez votre Bearer token puis actualisez pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
+
+        <section className="section-block cockpit-section">
+          <div className="section-heading"><div><span className="section-kicker">PILOTAGE OPÉRATIONNEL</span><h2>Affectations et signaux</h2></div><span className="count-pill">{assignments.length} affectation{assignments.length > 1 ? "s" : ""}</span></div>
+          {assignments.length === 0 ? <div className="empty-card"><strong>Aucune affectation patronale visible</strong><p>La projection est tenant-scopée et ne montre que les affectations autorisées par le serveur.</p></div> : <div className="assignment-grid">{assignments.map((assignment) => <button key={assignment.assignment_id} className={`assignment-card ${assignment.assignment_id === selectedAssignmentId ? "selected" : ""}`} onClick={() => void selectAssignment(assignment)}><div className="case-top"><span className={`state-badge state-${assignment.state.toLowerCase()}`}>{assignment.state}</span><span className="case-arrow">↗</span></div><h3>{assignment.case_title}</h3><p>{assignment.case_id}</p><div className="assignment-footer"><span>Révision {assignment.aggregate_revision}</span><span>{assignment.scope_actions.length} action{assignment.scope_actions.length > 1 ? "s" : ""}</span></div></button>)}</div>}
+          {selectedAssignmentId && <div className="assignment-detail-grid"><div className="detail-panel"><div className="panel-heading"><div><h3>Journal de l’affectation</h3><p>Historique append-only projeté par le serveur.</p></div><span className="rule-tag">{journal.length} événement{journal.length > 1 ? "s" : ""}</span></div>{journal.length === 0 ? <p className="panel-empty">Aucun événement journalisé.</p> : <div className="timeline">{journal.slice(0, 6).map((entry) => <div className="timeline-row" key={entry.record_id}><span className="timeline-dot" /><div><strong>{entry.event_type}</strong><small>{entry.resulting_state} · Révision {entry.resulting_revision}</small></div></div>)}</div>}</div><div className="detail-panel"><div className="panel-heading"><div><h3>Interactions récentes</h3><p>Signaux collaborateur structurés, sans texte sensible.</p></div><span className="rule-tag">{interactions?.items.length ?? 0} signal{(interactions?.items.length ?? 0) > 1 ? "s" : ""}</span></div>{!interactions?.items.length ? <p className="panel-empty">Aucune interaction enregistrée.</p> : <div className="interaction-list">{interactions.items.slice(0, 6).map((item) => <div className="interaction-row" key={item.record_id}><span className={`interaction-kind kind-${item.operational_state.toLowerCase()}`}>{item.operational_state}</span><div><strong>{item.kind}</strong><small>{item.priority ?? item.reason_kind ?? item.clarification_kind ?? "Signal opérationnel"}</small></div></div>)}</div>}</div></div>}
+        </section>
 
         <section className="section-block draft-section" id="draft-section"><div className="section-heading"><div><span className="section-kicker">CHIFFRAGE PRIVÉ</span><h2>Brouillon financier</h2></div>{draft && <span className="draft-status"><span className="status-dot" />DRAFT · Révision {draft.aggregate_revision}</span>}</div><div className="draft-toolbar"><label><span>Affaire sélectionnée</span><select value={selectedCaseId} onChange={(event) => setSelectedCaseId(event.target.value)}><option value="">Choisir une affaire</option>{cases.map((item) => <option key={item.case_id} value={item.case_id}>{item.work_label}</option>)}</select></label><label className="report-input"><span>Identifiant du brouillon</span><input value={reportId} onChange={(event) => setReportId(event.target.value)} placeholder="UUID du snapshot DRAFT" /></label><div className="draft-actions"><button className="secondary-button" onClick={() => void createDraft()} disabled={loadingDraft}>+ Nouveau brouillon</button><button className="primary-button load-button" onClick={() => void loadDraft()} disabled={loadingDraft}>{loadingDraft ? "Chargement…" : "Lire le brouillon"}<span>→</span></button></div></div>
           {draft ? <><div className="summary-grid">{summaryCards.map((card) => <div className={`summary-card ${card.accent}`} key={card.label}><span>{card.label}</span><strong>{card.value}</strong><small>{card.label === "Marge brute" ? `${(draft.summary.gross_margin_rate_bps / 100).toFixed(1)} % du chiffre d’affaires` : `Révision ${draft.aggregate_revision}`}</small></div>)}</div><div className="draft-panel"><div className="panel-heading"><div><h3>Lignes du brouillon</h3><p>Les montants restent visibles uniquement dans cet espace patron.</p></div><span className="rule-tag">Règleset v{draft.ruleset_version}</span></div><div className="line-table-wrap"><table><thead><tr><th>Catégorie</th><th>Libellé</th><th>Quantité</th><th>Unité</th><th className="amount-column">Montant</th></tr></thead><tbody>{draft.lines.length === 0 ? <tr><td colSpan={5} className="table-empty">Aucune ligne. Ajoutez le premier poste du chiffrage.</td></tr> : draft.lines.map((line) => <tr key={line.line_id}><td><span className="category-badge">{categoryLabel(line.category)}</span></td><td><strong>{line.label}</strong></td><td>{line.quantity_decimal}</td><td>{line.unit}</td><td className="amount-column">{formatMoney(line.amount_minor, line.currency_code)}</td></tr>)}</tbody></table></div><form className="add-line-form" onSubmit={submitLine}><div className="form-title"><span className="plus-mark">+</span><div><strong>Ajouter une ligne</strong><small>La révision courante sera appliquée automatiquement.</small></div></div><label><span>Catégorie</span><select value={lineForm.category} onChange={(event) => setLineForm({ ...lineForm, category: event.target.value as FinancialCategory })}>{CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label><span>Libellé</span><input required value={lineForm.label} onChange={(event) => setLineForm({ ...lineForm, label: event.target.value })} placeholder="Ex. étude technique" /></label><label><span>Quantité</span><input required value={lineForm.quantity_decimal} onChange={(event) => setLineForm({ ...lineForm, quantity_decimal: event.target.value })} /></label><label><span>Unité</span><input required value={lineForm.unit} onChange={(event) => setLineForm({ ...lineForm, unit: event.target.value })} /></label><label><span>Montant (centimes)</span><input required type="number" step="1" value={lineForm.amount_minor} onChange={(event) => setLineForm({ ...lineForm, amount_minor: event.target.value })} placeholder="125000" /></label><button className="primary-button add-button" type="submit">Ajouter <span>→</span></button></form><div className="last-updated">Dernière lecture serveur : {formatDate(draft.calculated_at)} · Aucun cache local du montant</div></div></> : <div className="empty-draft"><div className="empty-icon">◫</div><div><strong>Sélectionnez un brouillon pour commencer.</strong><p>La lecture est tenant-scopée et ne montre que les snapshots DRAFT autorisés par le serveur.</p></div></div>}

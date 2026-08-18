@@ -62,4 +62,48 @@ export type CommandReceipt = {
   replayed: boolean;
 };
 
+export type PatronAssignment = {
+  assignment_id: string;
+  case_id: string;
+  case_title: string;
+  case_lifecycle: "ACTIVE" | "STOPPED" | "ARCHIVED";
+  state: "ACTIVE" | "SUSPENDED" | "ENDED" | "EXPIRED";
+  aggregate_revision: number;
+  starts_at: string;
+  ends_at: string | null;
+  ended_at: string | null;
+  scope_actions: string[];
+  scope_classifications: ["INTERNAL_OPERATIONAL"];
+};
+
+export type PatronAssignmentJournalItem = {
+  record_id: string;
+  recorded_at: string;
+  event_type:
+    | "ASSIGNMENT_CREATED"
+    | "ASSIGNMENT_SCOPE_AMENDED"
+    | "ASSIGNMENT_SUSPENDED"
+    | "ASSIGNMENT_REACTIVATED"
+    | "ASSIGNMENT_ENDED";
+  resulting_revision: number;
+  resulting_state: PatronAssignment["state"];
+  reason_code: string | null;
+};
+
+export type PatronAssignmentInteractions = {
+  assignment_id: string;
+  case_id: string;
+  case_lifecycle: PatronAssignment["case_lifecycle"];
+  items: Array<{
+    record_id: string;
+    kind: "ACKNOWLEDGEMENT" | "CLARIFICATION_REQUEST" | "UNAVAILABILITY_REPORT";
+    recorded_at: string;
+    operational_state: "RECORDED" | "OPEN";
+    priority?: string | null;
+    clarification_kind?: string | null;
+    reason_kind?: string | null;
+    known_deadline_impact?: boolean | null;
+  }>;
+};
+
 export type ApiError = Error & { status?: number; detail?: string };

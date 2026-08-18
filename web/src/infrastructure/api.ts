@@ -3,6 +3,9 @@ import type {
   CommandReceipt,
   DraftReport,
   FinancialCategory,
+  PatronAssignment,
+  PatronAssignmentInteractions,
+  PatronAssignmentJournalItem,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -36,6 +39,16 @@ export function createApiClient(baseUrl: string, token: string) {
 
   return {
     listAssignedCases: () => request<AssignedCase[]>("/api/v1/cases/assigned"),
+    listPatronAssignments: () =>
+      request<{ items: PatronAssignment[] }>("/api/v1/patron/assignments"),
+    getAssignmentJournal: (assignmentId: string) =>
+      request<{ assignment: PatronAssignment; items: PatronAssignmentJournalItem[] }>(
+        `/api/v1/patron/assignments/${encodeURIComponent(assignmentId)}/journal`,
+      ),
+    getAssignmentInteractions: (assignmentId: string) =>
+      request<PatronAssignmentInteractions>(
+        `/api/v1/patron/assignments/${encodeURIComponent(assignmentId)}/interactions`,
+      ),
     createDraft: (caseId: string) =>
       request<CommandReceipt>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/financial-reports/drafts`,
