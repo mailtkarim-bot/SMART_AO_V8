@@ -2,13 +2,13 @@
 
 **Date de mise à jour :** 18 août 2026
 **Branche de référence :** `ops/vps-deploy-health-digests-01`
-**Dernier commit publié :** `4c995d2`
-**Dernière CI verte :** [workflow `32104886313`](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32104886313)
-**Référence de validation fonctionnelle précédente :** 402 tests backend verts et 89,32 % de couverture branchée avec seuil CI à 85 %.
+**Dernier commit publié :** [`5843584`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/584358474e1ab05e87beec0991b8ad4ad5c36187)
+**Dernière CI verte :** [workflow `32107238022`](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32107238022)
+**Validation intégrée courante :** 407 tests backend verts, 85 % de couverture branchée avec seuil CI à 85 %, Ruff, Alembic, detect-secrets et build frontend TypeScript strict verts.
 
 ## 1. Position honnête du produit
 
-SMART_AO V8 est un **socle SaaS BTP sécurisé, multi-tenant et fortement audité**, auquel s’ajoutent déjà plusieurs parcours métier réels. Il ne faut toutefois pas le présenter comme une application commerciale achevée de bout en bout. Les quatre frontières encore à construire avant une déclaration produit complète sont la fabrication finale des documents de réponse, le cockpit patron couvrant tout le cycle métier, la préparation contrôlée d’un paquet de dépôt et le dépôt électronique lui-même.
+SMART_AO V8 est un **socle SaaS BTP sécurisé, multi-tenant et fortement audité**, auquel s’ajoutent désormais les parcours de préparation documentaire, cockpit patron initial et paquet de dépôt contrôlé. Il ne faut toutefois pas le présenter comme une application commerciale achevée de bout en bout. Les frontières restantes sont l’extension des modèles et pièces documentaires finales, l’unification complète du cockpit, l’extension des contrôles de dépôt et le dépôt électronique lui-même, qui ne sera jamais déclaré réussi sans preuve externe.
 
 La séparation fondamentale reste obligatoire : le collaborateur prépare et remonte des informations opérationnelles ; le patron conserve la décision, le chiffrage, la marge, la trésorerie et l’action de dépôt. Aucun contrat collaborateur ne doit transporter de données financières.
 
@@ -23,9 +23,9 @@ La séparation fondamentale reste obligatoire : le collaborateur prépare et rem
 | Entreprise | Livrée dans son premier incrément | Société, assurances/Kbis/RIB, uploads privés, vérification humaine, qualifications, références, capacités et preuves versionnées. | Les workflows métier plus riches de bibliothèque et d’usage des preuves restent à étendre. |
 | Collaboration | Fondations avancées | Affectations, interactions, tâches, demandes d’information, blocages, readiness, revues, corrections et brouillons techniques. | Le parcours complet de production de l’offre technique n’est pas encore assemblé. |
 | Finance patronale | Fondation sécurisée | Snapshots, lignes en unités mineures, publication contrôlée, lecture patronale et confidentialité financière. | Import Excel/DPGF/BPU, calcul opérationnel, scénarios de marge et trésorerie restent à construire. |
-| Génération documentaire | Partielle mais fonctionnelle | Génération versionnée d’un document technique contrôlé et brouillons de réponse avec readiness, stockage privé et hash serveur. | Il manque les modèles métier finaux, l’assemblage des pièces demandées et le paquet de remise. |
-| Cockpit patron | Partiel | API de lecture d’affectations, journaux, interactions et finance ; premier cockpit React connecté aux affaires et brouillons financiers. | Navigation métier complète, décisions, bibliothèque, préparation, revue et dépôt ne sont pas encore réunis dans une expérience cohérente. |
-| Dépôt | Non livré | Aucun paquet final de transmission ni connecteur de dépôt électronique revendiqué. | Préparer, verrouiller, contrôler, transmettre et conserver un accusé de réception. |
+| Génération documentaire | Livrée dans un périmètre contrôlé | Assembleur déterministe avec `TechnicalDocumentFacts`, exigences DCE structurées, versions append-only, readiness et stockage privé. | Les modèles métier finaux et l’assemblage exhaustif des pièces RC restent à étendre. |
+| Cockpit patron | Initial livré | React/Vite consomme les API réelles d’affectations, journaux, interactions et finance patronale confidentielle. | Navigation unifiée vers préparation, bibliothèque entreprise, revue, paquet et décisions reste à construire. |
+| Dépôt | Préparation contrôlée livrée | `submission` produit un paquet tenant-scoped idempotent, manifest JSONB hashé, contrôles de versions publiées et autorisation patronale ; `external_submission` reste `NOT_PERFORMED`. | Transmission électronique, accusé externe et coffre de dépôt ne sont pas implémentés et ne doivent pas être simulés. |
 | Déploiement | Préparé, non exécuté sur VPS | Factory production, Caddy, healthchecks, pinning digest, sauvegarde/restauration isolée, timers et rotation des secrets. | Gate VPS réel, HTTPS, EICAR, supervision externe et rapport opérateur. |
 
 ## 3. Corrections de socle publiées
@@ -55,17 +55,17 @@ Cette conformité doit être lue comme une conformité vérifiée sur les fronti
 
 Le parcours cible est : **DCE reçu → DCE sécurisé → lecture/confirmation → préparation collaborative → revue patronale → chiffrage → génération des pièces → paquet de dépôt → transmission**.
 
-Les quatre premières étapes sont largement codées. La prochaine séquence doit donc compléter la génération documentaire avec des sections et pièces explicitement contractualisées, construire le cockpit patron sur les API réelles, préparer un paquet de dépôt immutable et contrôlable, puis seulement ouvrir un éventuel connecteur de transmission. Le dépôt électronique ne doit jamais être simulé comme réussi sans preuve externe.
+Les étapes DCE, préparation collaborative, génération technique, cockpit patron initial et préparation contrôlée du paquet sont codées et validées. La suite immédiate est une réconciliation finale de la suite, de l’architecture et de la documentation, puis le gate VPS. Un éventuel connecteur de transmission restera ultérieur et le dépôt électronique ne devra jamais être simulé comme réussi sans preuve externe.
 
 ## 6. Ordre de travail avant VPS
 
 | Ordre | Slice | Résultat attendu |
 |---:|---|---|
-| 1 | Génération documentaire contrôlée | Contrat des pièces, assembleur déterministe, versions append-only, complétude et absence de finance dans les contrats collaborateurs. |
-| 2 | Cockpit patron | Dashboard, affectations, préparation, revues, finance confidentielle, bibliothèque entreprise et états d’action réunis dans React. |
-| 3 | Préparation du dépôt | Paquet immutable, manifest, contrôles de complétude, verrouillage, empreinte et receipt interne sans prétendre à un dépôt externe. |
-| 4 | Réconciliation finale | Suite complète, architecture, documentation, OpenAPI, secrets, couverture et parcours E2E. |
-| 5 | Gate VPS | Docker, Caddy, ClamAV réel, EICAR, HTTPS, backups hors hôte, restauration isolée, supervision et rapport opérateur. |
+| 1 | Génération documentaire contrôlée | Livrée dans le périmètre actuel ; étendre ultérieurement les modèles et pièces RC finales. |
+| 2 | Cockpit patron | Première tranche livrée ; réunir progressivement préparation, revue, bibliothèque et paquet. |
+| 3 | Préparation du dépôt | Livrée : paquet immutable, manifest hashé, contrôles de versions, autorisation patronale et `NOT_PERFORMED`. |
+| 4 | Réconciliation finale | En cours puis à publier : suite complète, architecture, documentation, OpenAPI, secrets, couverture et parcours intégré. |
+| 5 | Gate VPS | Après disponibilité d’un VPS : Docker, Caddy, ClamAV réel, EICAR, HTTPS, backups hors hôte, restauration isolée, supervision et rapport opérateur. |
 
 ## 7. Limites explicitement conservées
 

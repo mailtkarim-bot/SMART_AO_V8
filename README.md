@@ -2,7 +2,7 @@
 
 SMART_AO V8 est un SaaS web dédié aux entreprises françaises du BTP pour qualifier les appels d'offres, analyser les DCE, préparer les réponses et sécuriser les décisions patronales.
 
-> Le premier slice implémente le noyau durable : **Case**, **Consultation/DceVersion** et **Decision**. Il ne contient ni chiffrage, ni dépôt, ni IA métier, ni espace collaborateur complet tant que les invariants du socle ne sont pas prouvés.
+> Le socle durable (**Case**, **Consultation/DceVersion**, **Decision**, sécurité tenant-scoped et outbox) est complété par des parcours métier contrôlés : préparation collaborative, génération technique versionnée, cockpit patron initial, chiffrage confidentiel et paquet de dépôt immutable. Le système ne déclare jamais un dépôt externe réussi sans accusé de réception vérifiable.
 
 ## Principes non négociables
 
@@ -20,7 +20,7 @@ make up
 make test
 ```
 
-Le premier commit pose l'ossature, la documentation de référence, le health check et les tests de fumée. Les migrations DATA-01 seront écrites avec les modèles SQLAlchemy, dans le prochain incrément de code, afin d'éviter des migrations factices.
+Le dépôt se démarre localement avec Docker Compose ou les services de développement disponibles. Avant une mise en production, le runbook VPS doit encore être exécuté sur un hôte réel : images digest-pinnées, PostgreSQL, ClamAV/EICAR, Caddy/HTTPS, sauvegarde hors hôte, restauration isolée et supervision.
 
 ## Documentation
 
@@ -29,6 +29,8 @@ Le premier commit pose l'ossature, la documentation de référence, le health ch
 - [Contrat d'arborescence](docs/reference/SMART_AO_V8_ARC_01_CONTRAT_ARBORESCENCE_MODULES.md)
 - [Contrat de domaine](docs/reference/SMART_AO_V8_DOMAIN_01_AGGREGATE_OWNERSHIP_MATRIX.md)
 - [Premier slice : états et invariants](docs/reference/SMART_AO_V8_DOMAIN_03_STATE_MACHINES_INVARIANTS_FIRST_SLICE.md)
+- [Rapport global d’avancement](docs/PROJECT_PROGRESS_REPORT.md)
+- [Checklist durable](todo.md)
 
 ## Structure
 
