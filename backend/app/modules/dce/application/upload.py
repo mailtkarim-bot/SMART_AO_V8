@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Protocol
 from uuid import UUID, uuid5
 
 from app.modules.dce.application.commands import (
@@ -19,6 +18,21 @@ from app.platform.events.dispatcher import (
     CommandDispatcher,
     CommandExecutionError,
 )
+from app.platform.storage.quarantine import (
+    ContentInspectionPort as DceContentInspectionPort,
+)
+from app.platform.storage.quarantine import (
+    MalwareScanPort as DceMalwareScanPort,
+)
+from app.platform.storage.quarantine import (
+    MalwareScanResult,
+    QuarantineWriteResult,
+)
+from app.platform.storage.quarantine import (
+    QuarantineStoragePort as DceQuarantineStoragePort,
+)
+
+__all__ = ["MalwareScanResult", "QuarantineWriteResult"]
 
 SYSTEM_UPLOAD_ACTOR_ID = UUID("00000000-0000-0000-0000-000000000011")
 
@@ -40,57 +54,11 @@ class DceUploadRejectedError(DceUploadError):
 
 
 @dataclass(frozen=True, slots=True)
-class QuarantineWriteResult:
-    """Facts calculated from the bytes actually written to private quarantine."""
-
-    byte_size: int
-    sha256: str
-
-
-@dataclass(frozen=True, slots=True)
-class MalwareScanResult:
-    """Normalized scanner verdict; transport failures are represented as ERROR."""
-
-    verdict: str
-    scanner_name: str
-    scanner_signature_version: str
-    scanned_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
 class DceUploadResult:
     """Minimal service result suitable for the deliberately sparse HTTP response."""
 
     storage_object_id: UUID
     state: str
-
-
-class DceQuarantineStoragePort(Protocol):
-    """Private object storage; callers receive no path, URL or bucket reference."""
-
-    async def write(
-        self,
-        *,
-        storage_key: str,
-        stream: AsyncIterable[bytes],
-        max_bytes: int,
-    ) -> QuarantineWriteResult: ...
-
-    async def delete(self, *, storage_key: str) -> None: ...
-
-    async def local_path(self, *, storage_key: str): ...
-
-
-class DceContentInspectionPort(Protocol):
-    """Determines the actual media type from stored bytes, never from a request header."""
-
-    async def detect_media_type(self, *, storage_key: str) -> str: ...
-
-
-class DceMalwareScanPort(Protocol):
-    """Scans private content; an unavailable scanner returns a fail-closed ERROR verdict."""
-
-    async def scan(self, *, storage_key: str) -> MalwareScanResult: ...
 
 
 class DceUploadService:

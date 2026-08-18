@@ -7,10 +7,10 @@ from uuid import UUID, uuid4
 import pytest
 import sqlalchemy as sa
 from app.modules.dce.application.upload import MalwareScanResult, QuarantineWriteResult
-from app.modules.membership.application.enterprise_library import (
+from app.modules.enterprise.application.enterprise_library import (
     enterprise_library_handlers,
 )
-from app.modules.membership.application.enterprise_upload import (
+from app.modules.enterprise.application.enterprise_upload import (
     EnterprisePrivateUploadService,
     EnterpriseUploadAlreadyClaimedError,
     EnterpriseUploadRejectedError,

@@ -21,7 +21,7 @@ class CreateEnterpriseCapabilityRequest(EnterpriseCapabilityPublicModel):
     state: Literal["ACTIVE", "SUSPENDED", "RETIRED"] = "ACTIVE"
 
     def to_command(self, *, company_id: UUID) -> object:
-        from app.modules.membership.application.enterprise_capability_commands import (
+        from app.modules.enterprise.application.enterprise_capability_commands import (
             CreateEnterpriseCapabilityCommand,
         )
 
@@ -45,7 +45,7 @@ class AddEnterpriseCapabilityVersionRequest(EnterpriseCapabilityPublicModel):
     proof_document_ids: list[UUID] = Field(default_factory=list, max_length=20)
 
     def to_command(self, *, capability_id: UUID) -> object:
-        from app.modules.membership.application.enterprise_capability_commands import (
+        from app.modules.enterprise.application.enterprise_capability_commands import (
             AddEnterpriseCapabilityVersionCommand,
         )
 

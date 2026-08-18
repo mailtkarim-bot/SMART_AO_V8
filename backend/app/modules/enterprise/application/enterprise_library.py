@@ -7,7 +7,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.modules.membership.application.enterprise_commands import (
+from app.modules.enterprise.application.enterprise_commands import (
     CreateEnterpriseCompanyCommand,
     RegisterEnterpriseDocumentCommand,
 )

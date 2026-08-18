@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from app.modules.dce.application.commands import ApplicationCommand
+from app.platform.events.command_contracts import ApplicationCommand
 
 
 class CreateEnterpriseCompanyCommand(ApplicationCommand):

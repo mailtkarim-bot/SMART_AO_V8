@@ -9,13 +9,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.modules.dce.application.upload import (
-    DceContentInspectionPort,
-    DceMalwareScanPort,
-    DceQuarantineStoragePort,
-)
-from app.modules.membership.application.enterprise_library import EnterpriseLibraryService
-from app.modules.membership.application.enterprise_upload_commands import (
+from app.modules.enterprise.application.enterprise_library import EnterpriseLibraryService
+from app.modules.enterprise.application.enterprise_upload_commands import (
     PrepareEnterpriseDocumentUploadCommand,
     VerifyEnterpriseDocumentCommand,
 )
@@ -34,6 +29,11 @@ from app.platform.security.models import (
     EnterpriseDocumentRecord,
     EnterpriseDocumentUploadRecord,
     EnterpriseDocumentVerificationRecord,
+)
+from app.platform.storage.quarantine import (
+    ContentInspectionPort,
+    MalwareScanPort,
+    QuarantineStoragePort,
 )
 
 
@@ -72,9 +72,9 @@ class EnterprisePrivateUploadService:
         session_factory: sessionmaker[Session],
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
-        storage: DceQuarantineStoragePort,
-        inspector: DceContentInspectionPort,
-        scanner: DceMalwareScanPort,
+        storage: QuarantineStoragePort,
+        inspector: ContentInspectionPort,
+        scanner: MalwareScanPort,
         allowed_media_types: frozenset[str],
         max_bytes: int = 2_000_000_000,
     ) -> None:

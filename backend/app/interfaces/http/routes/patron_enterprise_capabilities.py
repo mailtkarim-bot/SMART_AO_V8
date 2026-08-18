@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.dce_versions import _resolve_context
-from app.modules.membership.application.enterprise_capability import EnterpriseCapabilityService
-from app.modules.membership.public.enterprise_capability_contracts import (
+from app.modules.enterprise.application.enterprise_capability import EnterpriseCapabilityService
+from app.modules.enterprise.public.enterprise_capability_contracts import (
     AddEnterpriseCapabilityVersionRequest,
     CreateEnterpriseCapabilityRequest,
     EnterpriseCapabilityListResponse,

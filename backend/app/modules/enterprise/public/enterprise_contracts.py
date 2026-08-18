@@ -28,7 +28,7 @@ class CreateEnterpriseCompanyRequest(EnterprisePublicRequest):
     country_code: str = Field(pattern=r"^[A-Z]{2}$")
 
     def to_command(self) -> object:
-        from app.modules.membership.application.enterprise_commands import (
+        from app.modules.enterprise.application.enterprise_commands import (
             CreateEnterpriseCompanyCommand,
         )
 
@@ -49,7 +49,7 @@ class PrepareEnterpriseDocumentUploadRequest(EnterprisePublicRequest):
     expires_at: datetime
 
     def to_command(self, *, company_id: UUID) -> object:
-        from app.modules.membership.application.enterprise_upload_commands import (
+        from app.modules.enterprise.application.enterprise_upload_commands import (
             PrepareEnterpriseDocumentUploadCommand,
         )
 
@@ -79,7 +79,7 @@ class RegisterEnterpriseDocumentRequest(EnterprisePublicRequest):
     verification_status: Literal["PENDING"] = "PENDING"
 
     def to_command(self, *, company_id: UUID) -> object:
-        from app.modules.membership.application.enterprise_commands import (
+        from app.modules.enterprise.application.enterprise_commands import (
             RegisterEnterpriseDocumentCommand,
         )
 
@@ -106,7 +106,7 @@ class VerifyEnterpriseDocumentRequest(EnterprisePublicRequest):
     ]
 
     def to_command(self, *, company_id: UUID, document_id: UUID) -> object:
-        from app.modules.membership.application.enterprise_upload_commands import (
+        from app.modules.enterprise.application.enterprise_upload_commands import (
             VerifyEnterpriseDocumentCommand,
         )
 

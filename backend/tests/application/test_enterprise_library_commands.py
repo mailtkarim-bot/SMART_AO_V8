@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from app.modules.membership.application.enterprise_commands import (
+from app.modules.enterprise.application.enterprise_commands import (
     CreateEnterpriseCompanyCommand,
     RegisterEnterpriseDocumentCommand,
 )

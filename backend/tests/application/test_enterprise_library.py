@@ -3,11 +3,11 @@ from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
-from app.modules.membership.application.enterprise_commands import (
+from app.modules.enterprise.application.enterprise_commands import (
     CreateEnterpriseCompanyCommand,
     RegisterEnterpriseDocumentCommand,
 )
-from app.modules.membership.application.enterprise_library import (
+from app.modules.enterprise.application.enterprise_library import (
     EnterpriseLibraryService,
     enterprise_library_handlers,
 )

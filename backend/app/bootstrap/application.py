@@ -105,6 +105,18 @@ from app.modules.dce.infrastructure.quarantine import (
     LocalQuarantineStorageAdapter,
     PythonMagicContentInspectionAdapter,
 )
+from app.modules.enterprise.application.enterprise_capability import (
+    EnterpriseCapabilityService,
+    enterprise_capability_handlers,
+)
+from app.modules.enterprise.application.enterprise_library import (
+    EnterpriseLibraryService,
+    enterprise_library_handlers,
+)
+from app.modules.enterprise.application.enterprise_upload import (
+    EnterprisePrivateUploadService,
+    enterprise_upload_handlers,
+)
 from app.modules.membership.application.assignment import (
     AssignmentInteractionService,
     assignment_handlers,
@@ -121,18 +133,6 @@ from app.modules.membership.application.collab_info_blockers import (
 from app.modules.membership.application.collab_work_task import (
     CollaboratorWorkTaskService,
     collaborator_work_task_handlers,
-)
-from app.modules.membership.application.enterprise_capability import (
-    EnterpriseCapabilityService,
-    enterprise_capability_handlers,
-)
-from app.modules.membership.application.enterprise_library import (
-    EnterpriseLibraryService,
-    enterprise_library_handlers,
-)
-from app.modules.membership.application.enterprise_upload import (
-    EnterprisePrivateUploadService,
-    enterprise_upload_handlers,
 )
 from app.modules.membership.application.financial_report import PatronFinancialReportService
 from app.modules.membership.application.financial_report_draft import (
