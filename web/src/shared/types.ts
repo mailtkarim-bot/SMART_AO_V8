@@ -164,6 +164,7 @@ export type EnterpriseDocument = {
   issued_at: string;
   expires_at: string | null;
   verification_status: "PENDING" | "VALIDATED" | "EXPIRED" | "REJECTED";
+  verification_revision: number;
 };
 
 export type EnterpriseCompany = {
