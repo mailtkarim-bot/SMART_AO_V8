@@ -483,18 +483,20 @@ class VerifyEnterpriseDocumentHandler:
         )
         if upload is None:
             raise CommandExecutionError("DOCUMENT_UPLOAD_NOT_CLEAN")
-        current = session.scalar(
-            sa.select(sa.func.max(EnterpriseDocumentVerificationRecord.revision))
+        current_record = session.scalar(
+            sa.select(EnterpriseDocumentVerificationRecord)
             .where(
                 EnterpriseDocumentVerificationRecord.tenant_id == context.tenant_id,
                 EnterpriseDocumentVerificationRecord.document_id == command.document_id,
             )
+            .order_by(EnterpriseDocumentVerificationRecord.revision.desc())
+            .limit(1)
             .with_for_update()
         )
-        current_revision = -1 if current is None else int(current)
+        current_revision = 0 if current_record is None else current_record.revision
         if current_revision != command.expected_verification_revision:
             raise CommandExecutionError("VERSION_CONFLICT")
-        revision = current_revision + 1
+        revision = 0 if current_record is None else current_revision + 1
         session.add(
             EnterpriseDocumentVerificationRecord(
                 id=UUID(int=command.command_id.int),

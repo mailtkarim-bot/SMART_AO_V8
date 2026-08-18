@@ -8,6 +8,7 @@ import pytest
 import sqlalchemy as sa
 from app.modules.dce.application.upload import MalwareScanResult, QuarantineWriteResult
 from app.modules.enterprise.application.enterprise_library import (
+    EnterpriseLibraryService,
     enterprise_library_handlers,
 )
 from app.modules.enterprise.application.enterprise_upload import (
@@ -15,6 +16,9 @@ from app.modules.enterprise.application.enterprise_upload import (
     EnterpriseUploadAlreadyClaimedError,
     EnterpriseUploadRejectedError,
     enterprise_upload_handlers,
+)
+from app.modules.enterprise.application.enterprise_upload_commands import (
+    VerifyEnterpriseDocumentCommand,
 )
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.persistence.models import TenantRecord
@@ -25,6 +29,7 @@ from app.platform.security.models import (
     EnterpriseCompanyRecord,
     EnterpriseDocumentRecord,
     EnterpriseDocumentUploadRecord,
+    EnterpriseDocumentVerificationRecord,
     IdentityRecord,
     TenantMembershipRecord,
 )
@@ -211,6 +216,52 @@ def test_private_enterprise_upload_hashes_scans_and_marks_clean(
     assert document.verification_status == "PENDING"
     assert document.storage_object_id == upload_id
     assert scanner.calls == 1 and storage.objects[storage_key] == b"%PDF-1.7"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+@pytest.mark.security
+@pytest.mark.e2e
+def test_clean_upload_materializes_then_human_verification_updates_projection(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, company_id, upload_id, document_id, _ = _seed(session_factory)
+    storage, scanner = MemoryStorage(), StaticScanner("CLEAN")
+    service = _service(session_factory, storage, scanner)
+    uploaded = asyncio.run(
+        service.upload(
+            actor=actor, upload_id=upload_id, stream=_stream(b"%PDF-1.7"), content_length=8
+        )
+    )
+    verified = service.verify(
+        actor=actor,
+        command=VerifyEnterpriseDocumentCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            company_id=company_id,
+            document_id=document_id,
+            expected_verification_revision=0,
+            outcome="VALIDATED",
+            reason_code="DOCUMENT_ACCEPTED",
+        ),
+        now=NOW,
+    )
+    projection = EnterpriseLibraryService(
+        session_factory=session_factory,
+        dispatcher=service._dispatcher,  # noqa: SLF001
+        policy=AuthorizationPolicy(),
+    ).read_company(actor=actor, now=NOW)
+    with session_factory() as session:
+        verification_count = session.scalar(
+            sa.select(sa.func.count()).select_from(EnterpriseDocumentVerificationRecord)
+        )
+    assert uploaded.state == "CLEAN"
+    assert verified.result_code == "ENTERPRISE_DOCUMENT_VERIFIED"
+    assert projection.documents[0].document_id == document_id
+    assert projection.documents[0].verification_status == "VALIDATED"
+    assert projection.documents[0].verification_revision == 0
+    assert verification_count == 1
 
 
 @pytest.mark.db

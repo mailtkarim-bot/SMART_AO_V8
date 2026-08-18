@@ -25,6 +25,11 @@ from app.platform.security.authorization import (
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
 from app.platform.security.models import (
+    CaseCapabilityProposalRecord,
+    EnterpriseCapabilityProofLinkRecord,
+    EnterpriseCapabilityRecord,
+    EnterpriseCapabilityVersionRecord,
+    EnterpriseDocumentRecord,
     FinancialReportSnapshotRecord,
     GeneratedTechnicalDocumentRecord,
     PreparationPackageRecord,
@@ -155,6 +160,11 @@ class PrepareSubmissionPackageHandler:
         )
         if snapshot is None:
             raise CommandExecutionError("OFFICIAL_PRICE_NOT_PUBLISHED")
+        enterprise_entries = self._validated_enterprise_entries(
+            session=session,
+            preparation=preparation,
+            context=context,
+        )
         version = (
             session.scalar(
                 sa.select(sa.func.coalesce(sa.func.max(SubmissionPackageRecord.version), 0)).where(
@@ -165,7 +175,7 @@ class PrepareSubmissionPackageHandler:
             + 1
         )
         manifest = {
-            "schema_version": 1,
+            "schema_version": 2,
             "case_id": str(preparation.case_id),
             "preparation_package_id": str(preparation.id),
             "dce_version_id": str(preparation.dce_version_id),
@@ -187,6 +197,7 @@ class PrepareSubmissionPackageHandler:
                     "snapshot_id": str(snapshot.id),
                     "revision": snapshot.aggregate_revision,
                 },
+                *enterprise_entries,
             ],
             "external_submission": "NOT_PERFORMED",
         }
@@ -241,6 +252,97 @@ class PrepareSubmissionPackageHandler:
                 ),
             ),
         )
+
+    def _validated_enterprise_entries(
+        self, *, session: Session, preparation: PreparationPackageRecord, context: CommandContext
+    ) -> tuple[dict[str, object], ...]:
+        proposals = list(
+            session.scalars(
+                sa.select(CaseCapabilityProposalRecord)
+                .where(
+                    CaseCapabilityProposalRecord.tenant_id == context.tenant_id,
+                    CaseCapabilityProposalRecord.case_id == preparation.case_id,
+                    CaseCapabilityProposalRecord.assignment_id == preparation.assignment_id,
+                )
+                .order_by(CaseCapabilityProposalRecord.id)
+            ).all()
+        )
+        entries: list[dict[str, object]] = []
+        for proposal in proposals:
+            if proposal.validity_state != "CURRENT":
+                raise CommandExecutionError("CAPABILITY_PROOF_EXPIRED")
+            capability = session.scalar(
+                sa.select(EnterpriseCapabilityRecord).where(
+                    EnterpriseCapabilityRecord.tenant_id == context.tenant_id,
+                    EnterpriseCapabilityRecord.id == proposal.capability_id,
+                )
+            )
+            version = session.scalar(
+                sa.select(EnterpriseCapabilityVersionRecord).where(
+                    EnterpriseCapabilityVersionRecord.tenant_id == context.tenant_id,
+                    EnterpriseCapabilityVersionRecord.id == proposal.capability_version_id,
+                    EnterpriseCapabilityVersionRecord.capability_id == proposal.capability_id,
+                )
+            )
+            if capability is None or version is None or capability.state != "ACTIVE":
+                raise CommandExecutionError("CAPABILITY_PROOF_UNAUTHORIZED")
+            if version.valid_from > context.received_at or (
+                version.valid_until is not None and version.valid_until <= context.received_at
+            ):
+                raise CommandExecutionError("CAPABILITY_PROOF_EXPIRED")
+            links = list(
+                session.scalars(
+                    sa.select(EnterpriseCapabilityProofLinkRecord)
+                    .where(
+                        EnterpriseCapabilityProofLinkRecord.tenant_id == context.tenant_id,
+                        EnterpriseCapabilityProofLinkRecord.capability_version_id == version.id,
+                    )
+                    .order_by(EnterpriseCapabilityProofLinkRecord.document_id)
+                ).all()
+            )
+            if not links:
+                raise CommandExecutionError("CAPABILITY_PROOF_MISSING")
+            proof_documents: list[dict[str, object]] = []
+            for link in links:
+                document = session.scalar(
+                    sa.select(EnterpriseDocumentRecord).where(
+                        EnterpriseDocumentRecord.tenant_id == context.tenant_id,
+                        EnterpriseDocumentRecord.id == link.document_id,
+                    )
+                )
+                if document is None or document.company_id != capability.company_id:
+                    raise CommandExecutionError("CAPABILITY_PROOF_UNAUTHORIZED")
+                if document.verification_status != "VALIDATED":
+                    raise CommandExecutionError("CAPABILITY_PROOF_UNAUTHORIZED")
+                if document.expires_at is not None and document.expires_at <= context.received_at:
+                    raise CommandExecutionError("CAPABILITY_PROOF_EXPIRED")
+                proof_documents.append(
+                    {
+                        "document_id": str(document.id),
+                        "document_kind": document.document_kind,
+                        "document_label": document.document_label,
+                        "sha256": document.sha256,
+                        "expires_at": document.expires_at.isoformat()
+                        if document.expires_at is not None
+                        else None,
+                    }
+                )
+            entries.append(
+                {
+                    "kind": "ENTERPRISE_CAPABILITY",
+                    "capability_id": str(capability.id),
+                    "capability_kind": capability.capability_kind,
+                    "name": capability.name,
+                    "summary": capability.summary,
+                    "version_id": str(version.id),
+                    "version_number": version.version_number,
+                    "title": version.title,
+                    "description": version.description,
+                    "usage_scope": version.usage_scope,
+                    "proof_documents": proof_documents,
+                }
+            )
+        return tuple(entries)
 
 
 def submission_handlers() -> dict[str, PrepareSubmissionPackageHandler]:

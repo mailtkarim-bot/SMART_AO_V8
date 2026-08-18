@@ -30,6 +30,7 @@ from tests.application.test_preparation_completeness import (
     _dce_version_id,
     _enable_preparation_scope,
     _readiness_command,
+    _seed_capability_assessment,
 )
 
 pytest_plugins = ("tests.application.test_collab_work_task",)
@@ -193,6 +194,77 @@ def test_submission_package_is_hashed_idempotent_and_append_only(services, sessi
             .where(SubmissionPackageRecord.tenant_id == actor.tenant_id)
             .values(state="AUTORISE_DEPOT")
         )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_submission_manifest_freezes_validated_enterprise_capability_proofs(
+    services, session_factory
+) -> None:
+    preparation, submission = services
+    actor, assignment_id, case_id, _, _ = _seed_capability_assessment(
+        session_factory,
+        proof_status="VALIDATED",
+        proof_expires_at=NOW.replace(year=2027),
+    )
+    dce_version_id = _dce_version_id(session_factory, actor.tenant_id)
+    preparation_package_id = uuid4()
+    preparation.execute(
+        actor=actor,
+        command=_readiness_command(
+            actor=actor,
+            assignment_id=assignment_id,
+            case_id=case_id,
+            dce_version_id=dce_version_id,
+            package_id=preparation_package_id,
+            expected_revision=0,
+        ),
+        now=NOW,
+    )
+    preparation.execute(
+        actor=actor,
+        command=GenerateTechnicalDocumentCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            package_id=preparation_package_id,
+            document_id=uuid4(),
+            expected_revision=1,
+            readiness_revision=1,
+            document_kind="TECHNICAL_RESPONSE",
+        ),
+        now=NOW,
+    )
+    patron = replace(
+        actor,
+        actor_kind=ActorKind.PATRON_ADMIN,
+        capabilities=capabilities_for(ActorKind.PATRON_ADMIN),
+    )
+    snapshot_id = _publish_snapshot(session_factory, tenant_id=actor.tenant_id, case_id=case_id)
+    result = submission.prepare(
+        actor=patron,
+        command=PrepareSubmissionPackageCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            preparation_package_id=preparation_package_id,
+            expected_preparation_revision=2,
+        ),
+        now=NOW,
+    )
+    with session_factory() as session:
+        record = session.get(SubmissionPackageRecord, result.aggregate_refs[0]["aggregate_id"])
+    assert record is not None
+    assert record.financial_snapshot_id == snapshot_id
+    enterprise_entries = [
+        entry
+        for entry in record.manifest_json["entries"]
+        if entry["kind"] == "ENTERPRISE_CAPABILITY"
+    ]
+    assert len(enterprise_entries) == 1
+    assert enterprise_entries[0]["proof_documents"][0]["document_kind"] == "INSURANCE"
+    assert "storage_key" not in str(record.manifest_json)
+    assert "sales_total_minor" not in str(record.manifest_json)
 
 
 @pytest.mark.db
