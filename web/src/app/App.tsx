@@ -8,6 +8,7 @@ import type {
   PatronAssignmentInteractions,
   PatronAssignmentJournalItem,
   PatronAction,
+  PatronDecisionDossier,
   PricingScenario,
 } from "../shared/types";
 import "./styles.css";
@@ -52,6 +53,16 @@ function App() {
   const [interactions, setInteractions] = useState<PatronAssignmentInteractions | null>(null);
   const [actions, setActions] = useState<PatronAction[]>([]);
   const [scenarios, setScenarios] = useState<PricingScenario[]>([]);
+  const [decisionDossier, setDecisionDossier] = useState<PatronDecisionDossier | null>(null);
+  const [preparationPackageId, setPreparationPackageId] = useState("");
+  const [preparationRevision, setPreparationRevision] = useState("1");
+  const [submissionPackageId, setSubmissionPackageId] = useState("");
+  const [evidenceForm, setEvidenceForm] = useState({
+    evidence_type: "MANUAL_RECEIPT" as "MANUAL_RECEIPT" | "MANUAL_PORTAL_REFERENCE",
+    external_reference_hash: "",
+    evidence_sha256: "",
+    notes_redacted: "",
+  });
   const [selectedCaseId, setSelectedCaseId] = useState("");
   const [reportId, setReportId] = useState("");
   const [draft, setDraft] = useState<DraftReport | null>(null);
@@ -84,6 +95,12 @@ function App() {
     void refreshActions();
   }, []);
 
+  useEffect(() => {
+    if (!selectedCaseId || !token.trim()) return;
+    void refreshScenarios(selectedCaseId);
+    void refreshDecisionDossier(selectedCaseId);
+  }, [selectedCaseId, token]);
+
   async function refreshCases() {
     setLoading(true);
     setMessage(null);
@@ -113,6 +130,14 @@ function App() {
       setScenarios(await api.listPricingScenarios(caseId));
     } catch {
       setScenarios([]);
+    }
+  }
+
+  async function refreshDecisionDossier(caseId: string) {
+    try {
+      setDecisionDossier(await api.getDecisionDossier(caseId));
+    } catch {
+      setDecisionDossier(null);
     }
   }
 
@@ -155,6 +180,50 @@ function App() {
     setSelectedAssignmentId(assignment.assignment_id);
     setSelectedCaseId(assignment.case_id);
     await Promise.all([loadAssignmentDetails(assignment.assignment_id), refreshScenarios(assignment.case_id)]);
+  }
+
+  async function prepareSubmissionPackage() {
+    if (!preparationPackageId.trim()) {
+      setMessage({ tone: "error", text: "Renseignez l’identifiant de la préparation à déposer." });
+      return;
+    }
+    try {
+      const receipt = await api.prepareSubmissionPackage(
+        preparationPackageId.trim(),
+        Number(preparationRevision),
+      );
+      const packageId = receipt.aggregate_refs[0]?.aggregate_id;
+      if (packageId) setSubmissionPackageId(packageId);
+      setMessage({
+        tone: "success",
+        text: receipt.replayed
+          ? "Paquet de dépôt déjà préparé, identifiant rechargé."
+          : "Paquet préparé pour contrôle patronal. Aucun dépôt externe n’a été effectué.",
+      });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de préparer le paquet." });
+    }
+  }
+
+  async function recordSubmissionEvidence() {
+    if (!submissionPackageId.trim()) {
+      setMessage({ tone: "error", text: "Préparez ou renseignez un paquet avant d’enregistrer sa preuve." });
+      return;
+    }
+    try {
+      const receipt = await api.recordSubmissionEvidence(submissionPackageId.trim(), {
+        ...evidenceForm,
+        notes_redacted: evidenceForm.notes_redacted || undefined,
+      });
+      setMessage({
+        tone: "success",
+        text: receipt.external_submission === "NOT_PERFORMED"
+          ? "Preuve append-only enregistrée. Le dépôt externe reste à effectuer manuellement."
+          : "Preuve enregistrée.",
+      });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible d’enregistrer la preuve." });
+    }
   }
 
   async function createDraft() {
@@ -273,6 +342,24 @@ function App() {
           <div className="section-heading"><div><span className="section-kicker">PILOTAGE OPÉRATIONNEL</span><h2>Affectations et signaux</h2></div><span className="count-pill">{assignments.length} affectation{assignments.length > 1 ? "s" : ""}</span></div>
           {assignments.length === 0 ? <div className="empty-card"><strong>Aucune affectation patronale visible</strong><p>La projection est tenant-scopée et ne montre que les affectations autorisées par le serveur.</p></div> : <div className="assignment-grid">{assignments.map((assignment) => <button key={assignment.assignment_id} className={`assignment-card ${assignment.assignment_id === selectedAssignmentId ? "selected" : ""}`} onClick={() => void selectAssignment(assignment)}><div className="case-top"><span className={`state-badge state-${assignment.state.toLowerCase()}`}>{assignment.state}</span><span className="case-arrow">↗</span></div><h3>{assignment.case_title}</h3><p>{assignment.case_id}</p><div className="assignment-footer"><span>Révision {assignment.aggregate_revision}</span><span>{assignment.scope_actions.length} action{assignment.scope_actions.length > 1 ? "s" : ""}</span></div></button>)}</div>}
           {selectedAssignmentId && <div className="assignment-detail-grid"><div className="detail-panel"><div className="panel-heading"><div><h3>Journal de l’affectation</h3><p>Historique append-only projeté par le serveur.</p></div><span className="rule-tag">{journal.length} événement{journal.length > 1 ? "s" : ""}</span></div>{journal.length === 0 ? <p className="panel-empty">Aucun événement journalisé.</p> : <div className="timeline">{journal.slice(0, 6).map((entry) => <div className="timeline-row" key={entry.record_id}><span className="timeline-dot" /><div><strong>{entry.event_type}</strong><small>{entry.resulting_state} · Révision {entry.resulting_revision}</small></div></div>)}</div>}</div><div className="detail-panel"><div className="panel-heading"><div><h3>Interactions récentes</h3><p>Signaux collaborateur structurés, sans texte sensible.</p></div><span className="rule-tag">{interactions?.items.length ?? 0} signal{(interactions?.items.length ?? 0) > 1 ? "s" : ""}</span></div>{!interactions?.items.length ? <p className="panel-empty">Aucune interaction enregistrée.</p> : <div className="interaction-list">{interactions.items.slice(0, 6).map((item) => <div className="interaction-row" key={item.record_id}><span className={`interaction-kind kind-${item.operational_state.toLowerCase()}`}>{item.operational_state}</span><div><strong>{item.kind}</strong><small>{item.priority ?? item.reason_kind ?? item.clarification_kind ?? "Signal opérationnel"}</small></div></div>)}</div>}</div></div>}
+        </section>
+
+        <section className="section-block decision-section">
+          <div className="section-heading"><div><span className="section-kicker">DOSSIER DE DÉCISION</span><h2>Décider sur des faits contrôlés</h2></div><span className="count-pill">{decisionDossier?.validity ?? "À charger"}</span></div>
+          {!decisionDossier ? <div className="empty-card"><strong>Aucun dossier de décision disponible</strong><p>Sélectionnez une affaire et actualisez pour projeter le contexte, les inconnus, les risques et les conditions autorisées.</p></div> : <div className="decision-grid">
+            <div className="detail-panel decision-summary"><div className="panel-heading"><div><h3>{decisionDossier.decision_type}</h3><p>Affaire {decisionDossier.case_id}</p></div><span className="state-badge state-active">{decisionDossier.outcome}</span></div><div className="decision-facts"><span><small>Cycle</small><strong>{decisionDossier.lifecycle}</strong></span><span><small>Contexte</small><strong>{decisionDossier.context_status}</strong></span><span><small>Validité</small><strong>{decisionDossier.validity}</strong></span></div>{decisionDossier.final_justification && <blockquote>{decisionDossier.final_justification}</blockquote>}</div>
+            <div className="detail-panel"><div className="panel-heading"><div><h3>Points de vigilance</h3><p>Les éléments restent issus du read model serveur.</p></div></div><div className="decision-list"><div><strong>Inconnus</strong><span>{decisionDossier.unknowns.length}</span></div><div><strong>Risques</strong><span>{decisionDossier.risks.length}</span></div><div><strong>Conditions</strong><span>{decisionDossier.conditions.length}</span></div></div><div className="decision-json">{[...decisionDossier.unknowns.slice(0, 3), ...decisionDossier.risks.slice(0, 3)].map((item, index) => <pre key={index}>{JSON.stringify(item, null, 2)}</pre>)}</div></div>
+            <div className="detail-panel"><div className="panel-heading"><div><h3>Conditions de décision</h3><p>Contrôles à satisfaire avant clôture.</p></div></div>{decisionDossier.conditions.length === 0 ? <p className="panel-empty">Aucune condition structurée.</p> : <div className="condition-list">{decisionDossier.conditions.map((condition) => <div className="condition-row" key={condition.condition_id}><span className={`state-badge state-${condition.status.toLowerCase()}`}>{condition.status}</span><div><strong>{condition.label}</strong><small>{condition.failure_consequence}{condition.due_at ? ` · Échéance ${formatDate(condition.due_at)}` : ""}</small></div></div>)}</div>}</div>
+            <div className="detail-panel"><div className="panel-heading"><div><h3>Sources de preuve</h3><p>Références projetées et révisées.</p></div></div>{decisionDossier.sources.length === 0 ? <p className="panel-empty">Aucune source référencée.</p> : <div className="source-list">{decisionDossier.sources.map((source) => <div className="source-row" key={`${source.aggregate_type}-${source.aggregate_id}`}><strong>{source.aggregate_type}</strong><span>{source.role} · Révision {source.aggregate_revision}</span></div>)}</div>}</div>
+          </div>}
+        </section>
+
+        <section className="section-block submission-section">
+          <div className="section-heading"><div><span className="section-kicker">PRÉPARATION & DÉPÔT</span><h2>Contrôler le paquet et conserver la preuve</h2></div><span className="secure-pill"><span className="status-dot" />Dépôt externe non effectué</span></div>
+          <div className="submission-grid">
+            <div className="detail-panel"><div className="panel-heading"><div><h3>Préparer le paquet</h3><p>La préparation est une commande patronale révisée et idempotente.</p></div></div><label><span>Identifiant de préparation</span><input value={preparationPackageId} onChange={(event) => setPreparationPackageId(event.target.value)} placeholder="UUID du package de préparation" /></label><label><span>Révision attendue</span><input type="number" min="1" step="1" value={preparationRevision} onChange={(event) => setPreparationRevision(event.target.value)} /></label><button className="primary-button" type="button" onClick={() => void prepareSubmissionPackage()}>Préparer le paquet <span>→</span></button></div>
+            <div className="detail-panel"><div className="panel-heading"><div><h3>Preuve manuelle</h3><p>Le registre conserve seulement des références et des hashes redigés.</p></div></div><label><span>Identifiant du paquet</span><input value={submissionPackageId} onChange={(event) => setSubmissionPackageId(event.target.value)} placeholder="UUID du paquet de dépôt" /></label><label><span>Type de preuve</span><select value={evidenceForm.evidence_type} onChange={(event) => setEvidenceForm({ ...evidenceForm, evidence_type: event.target.value as "MANUAL_RECEIPT" | "MANUAL_PORTAL_REFERENCE" })}><option value="MANUAL_RECEIPT">Accusé manuel</option><option value="MANUAL_PORTAL_REFERENCE">Référence portail manuelle</option></select></label><label><span>Hash de référence externe</span><input pattern="[0-9a-f]{64}" required value={evidenceForm.external_reference_hash} onChange={(event) => setEvidenceForm({ ...evidenceForm, external_reference_hash: event.target.value })} placeholder="64 caractères hexadécimaux" /></label><label><span>SHA-256 de la preuve</span><input pattern="[0-9a-f]{64}" required value={evidenceForm.evidence_sha256} onChange={(event) => setEvidenceForm({ ...evidenceForm, evidence_sha256: event.target.value })} placeholder="64 caractères hexadécimaux" /></label><label><span>Notes expurgées</span><textarea rows={2} maxLength={1000} value={evidenceForm.notes_redacted} onChange={(event) => setEvidenceForm({ ...evidenceForm, notes_redacted: event.target.value })} placeholder="Aucune donnée sensible" /></label><button className="primary-button" type="button" onClick={() => void recordSubmissionEvidence()}>Enregistrer la preuve <span>→</span></button><small className="invariant-note">Invariant serveur : <strong>external_submission: NOT_PERFORMED</strong>.</small></div>
+          </div>
         </section>
 
         <section className="section-block draft-section" id="draft-section"><div className="section-heading"><div><span className="section-kicker">CHIFFRAGE PRIVÉ</span><h2>Brouillon financier</h2></div>{draft && <span className="draft-status"><span className="status-dot" />DRAFT · Révision {draft.aggregate_revision}</span>}</div><div className="draft-toolbar"><label><span>Affaire sélectionnée</span><select value={selectedCaseId} onChange={(event) => setSelectedCaseId(event.target.value)}><option value="">Choisir une affaire</option>{cases.map((item) => <option key={item.case_id} value={item.case_id}>{item.work_label}</option>)}</select></label><label className="report-input"><span>Identifiant du brouillon</span><input value={reportId} onChange={(event) => setReportId(event.target.value)} placeholder="UUID du snapshot DRAFT" /></label><div className="draft-actions"><button className="secondary-button" onClick={() => void createDraft()} disabled={loadingDraft}>+ Nouveau brouillon</button><button className="primary-button load-button" onClick={() => void loadDraft()} disabled={loadingDraft}>{loadingDraft ? "Chargement…" : "Lire le brouillon"}<span>→</span></button></div></div>

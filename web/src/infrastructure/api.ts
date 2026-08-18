@@ -9,6 +9,8 @@ import type {
   PatronAction,
   PatronDecisionDossier,
   PricingScenario,
+  SubmissionEvidenceReceipt,
+  SubmissionPackageReceipt,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -61,6 +63,39 @@ export function createApiClient(baseUrl: string, token: string) {
     listPricingScenarios: (caseId: string) =>
       request<PricingScenario[]>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/pricing-scenarios`,
+      ),
+    prepareSubmissionPackage: (preparationPackageId: string, expectedRevision: number) =>
+      request<SubmissionPackageReceipt>(
+        `/api/v1/patron/preparation/${encodeURIComponent(preparationPackageId)}/submission-packages`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            expected_preparation_revision: expectedRevision,
+          }),
+        },
+      ),
+    recordSubmissionEvidence: (
+      submissionPackageId: string,
+      input: {
+        evidence_type: "MANUAL_RECEIPT" | "MANUAL_PORTAL_REFERENCE";
+        external_reference_hash: string;
+        evidence_sha256: string;
+        notes_redacted?: string;
+      },
+    ) =>
+      request<SubmissionEvidenceReceipt>(
+        `/api/v1/patron/submission-packages/${encodeURIComponent(submissionPackageId)}/evidence`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            evidence_id: makeId(),
+            ...input,
+          }),
+        },
       ),
     createDraft: (caseId: string) =>
       request<CommandReceipt>(

@@ -154,3 +154,14 @@ export type PricingScenario = {
   gross_margin_rate_bps: number;
   source_snapshot_revision: number;
 };
+
+export type SubmissionPackageReceipt = CommandReceipt & {
+  result_code: "SUBMISSION_PACKAGE_PREPARED";
+};
+
+export type SubmissionEvidenceReceipt = CommandReceipt & {
+  result_code: "SUBMISSION_EVIDENCE_RECORDED";
+  external_submission: "NOT_PERFORMED";
+};
+
+export type DecisionDossierItem = Record<string, unknown>;
