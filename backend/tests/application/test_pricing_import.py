@@ -3,10 +3,14 @@ from io import BytesIO
 from uuid import uuid4
 
 import pytest
+from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
+from app.interfaces.http.routes.patron_pricing_import import build_patron_pricing_import_router
 from app.modules.pricing.application.import_preview import PricingImportPreviewService
 from app.platform.security.authorization import AuthorizationDecision, AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
 from app.platform.security.context import ActorKind
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
 from tests.application.test_financial_report_draft_lines import _seed_draft
@@ -227,6 +231,70 @@ def test_pricing_import_preview_ignores_blank_rows_and_defaults_quantity(session
     assert preview.row_count == 1
     assert preview.rows[0].quantity_decimal == "1"
     assert preview.rows[0].total_minor == 500
+
+
+def test_pricing_import_preview_http_contract(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+
+    class _Resolver:
+        def resolve(self, *, access_token):
+            assert access_token == "test-token"
+            return actor
+
+    app = FastAPI()
+    app.include_router(
+        build_patron_pricing_import_router(
+            service=PricingImportPreviewService(policy=AuthorizationPolicy()),
+            security_runtime=ConsultationSecurityRuntime(
+                context_resolver=_Resolver(), policy=AuthorizationPolicy()
+            ),
+        )
+    )
+    client = TestClient(app)
+    payload = _xlsx(
+        [["Désignation", "Quantité", "Prix unitaire"], ["Lot test", 2, 7.5]]
+    )
+    response = client.post(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/preview?document_kind=BPU",
+        files={
+            "upload": (
+                "lot.xlsx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert response.status_code == 200
+    assert response.json()["valid_row_count"] == 1
+    assert response.json()["rows"][0]["total_minor"] == 1500
+    unauthenticated = client.post(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/preview",
+        files={"upload": ("lot.xlsx", payload)},
+    )
+    assert unauthenticated.status_code == 401
+    invalid = client.post(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/preview",
+        files={"upload": ("broken.xlsx", b"broken")},
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert invalid.status_code == 422
+
+    denied_app = FastAPI()
+    denied_app.include_router(
+        build_patron_pricing_import_router(
+            service=PricingImportPreviewService(policy=_DenyPolicy()),
+            security_runtime=ConsultationSecurityRuntime(
+                context_resolver=_Resolver(), policy=AuthorizationPolicy()
+            ),
+        )
+    )
+    denied = TestClient(denied_app).post(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/preview",
+        files={"upload": ("lot.xlsx", payload)},
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert denied.status_code == 403
 
 
 def test_pricing_import_preview_rejects_zip_bomb_metadata(session_factory, monkeypatch):
