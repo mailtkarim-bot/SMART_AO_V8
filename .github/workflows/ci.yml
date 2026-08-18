@@ -48,7 +48,7 @@ jobs:
         run: >-
           uv run pytest backend/tests -q --cov=app --cov-report=term-missing
           --cov-report=json:ci-coverage/coverage.json
-          --cov-report=xml:ci-coverage/coverage.xml --cov-fail-under=85
+          --cov-report=xml:ci-coverage/coverage.xml --cov-fail-under=85.50
       - name: Collect coverage environment
         if: always()
         run: uv run python scripts/collect_coverage_diagnostics.py

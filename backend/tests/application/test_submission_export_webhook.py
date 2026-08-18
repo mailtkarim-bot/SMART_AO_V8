@@ -2,6 +2,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from urllib.error import URLError
 from uuid import uuid4
 
 import app.workers.submission_export_webhook as webhook_module
@@ -190,3 +191,137 @@ def test_publish_and_retry_are_idempotent_for_already_published_message() -> Non
 
     assert worker._publish(message.id, NOW).skipped == 1
     assert worker._retry(message.id, NOW, "ignored").skipped == 1
+
+
+def test_safe_payload_rejects_non_dict_and_invalid_field_types() -> None:
+    assert _safe_payload(None) is None
+    assert _safe_payload(
+        {"submission_package_id": 123, "archive_sha256": "a" * 64, "delivery": "DOWNLOAD"}
+    ) is None
+    assert _safe_payload(
+        {"submission_package_id": "id", "archive_sha256": 123, "delivery": "DOWNLOAD"}
+    ) is None
+    assert _safe_payload(
+        {"submission_package_id": "id", "archive_sha256": "a" * 63, "delivery": "DOWNLOAD"}
+    ) is None
+
+
+def test_process_delivers_successful_webhook_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    message = _message()
+    monkeypatch.setattr(webhook_module, "_post_json", lambda *_args: 204)
+    worker = SubmissionExportWebhookWorker(
+        session_factory=_factory_for_message(message), webhook_url="https://example.test"
+    )
+
+    result = asyncio.run(worker._process_message(message.id, NOW))
+
+    assert result.delivered == 1
+    assert message.status == "PUBLISHED"
+    assert message.published_at == NOW
+
+
+@pytest.mark.parametrize("error", [URLError("offline"), TimeoutError(), OSError("socket")])
+def test_process_retries_delivery_exceptions(
+    monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    message = _message()
+
+    def raise_error(*_args: object) -> int:
+        raise error
+
+    monkeypatch.setattr(webhook_module, "_post_json", raise_error)
+    worker = SubmissionExportWebhookWorker(
+        session_factory=_factory_for_message(message), webhook_url="https://example.test"
+    )
+
+    result = asyncio.run(worker._process_message(message.id, NOW))
+
+    assert result.retried == 1
+    assert message.last_error_code == "EXPORT_WEBHOOK_DELIVERY_FAILED"
+
+
+def test_run_once_merges_results_from_claimed_messages(monkeypatch: pytest.MonkeyPatch) -> None:
+    first = _message()
+    second = _message()
+    factory = MagicMock()
+    transaction = MagicMock()
+    transaction.scalars.return_value = [first, second]
+    factory.begin.return_value.__enter__.return_value = transaction
+    worker = SubmissionExportWebhookWorker(session_factory=factory, webhook_url=None)
+    outcomes = iter(
+        [
+            webhook_module.WebhookRunResult(delivered=1),
+            webhook_module.WebhookRunResult(skipped=1),
+        ]
+    )
+    async def process_message(*_args: object) -> webhook_module.WebhookRunResult:
+        return next(outcomes)
+
+    monkeypatch.setattr(worker, "_process_message", process_message)
+
+    result = asyncio.run(worker.run_once(now=NOW))
+
+    assert result.delivered == 1
+    assert result.skipped == 1
+    assert result.retried == 0
+
+
+def test_publish_and_retry_skip_missing_message() -> None:
+    factory = MagicMock()
+    session = MagicMock()
+    session.get.return_value = None
+    factory.begin.return_value.__enter__.return_value = session
+    worker = SubmissionExportWebhookWorker(session_factory=factory, webhook_url=None)
+
+    assert worker._publish(uuid4(), NOW).skipped == 1
+    assert worker._retry(uuid4(), NOW, "missing").skipped == 1
+
+
+def test_post_json_validates_and_sends_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    response = MagicMock(status=202)
+    context = MagicMock()
+    context.__enter__.return_value = response
+    monkeypatch.setattr(webhook_module, "urlopen", lambda request, timeout: context)
+
+    status = _post_json("https://example.test/hook", {"event": "ok"}, 2.5)
+
+    assert status == 202
+
+
+def test_post_json_rejects_missing_host() -> None:
+    with pytest.raises(ValueError, match="invalid webhook URL"):
+        _post_json("https:///hook", {}, 1.0)
+
+
+def test_build_default_worker_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    engine = object()
+    factory = object()
+    monkeypatch.setenv("SMART_AO_DATABASE_URL", "postgresql://test")
+    monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_URL", "https://example.test/hook")
+    monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_BATCH_SIZE", "3")
+    monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_LEASE_SECONDS", "7")
+    monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_TIMEOUT_SECONDS", "2.5")
+    monkeypatch.setattr(webhook_module.sa, "create_engine", lambda url: (url, engine))
+    monkeypatch.setattr(webhook_module, "sessionmaker", lambda bind, expire_on_commit: factory)
+
+    worker = webhook_module.build_default_worker()
+
+    assert worker._session_factory is factory
+    assert worker._webhook_url == "https://example.test/hook"
+    assert worker._batch_size == 3
+    assert worker._lease_seconds == 7
+    assert worker._timeout_seconds == 2.5
+
+
+def test_main_runs_one_poll_cycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker = MagicMock()
+    monkeypatch.setattr(webhook_module, "build_default_worker", lambda: worker)
+    monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_POLL_SECONDS", "0")
+    monkeypatch.setattr(webhook_module.asyncio, "run", lambda coroutine: coroutine.close())
+
+    def stop(_seconds: float) -> None:
+        raise RuntimeError("stop test loop")
+
+    monkeypatch.setattr(webhook_module.time, "sleep", stop)
+    with pytest.raises(RuntimeError, match="stop test loop"):
+        webhook_module.main()

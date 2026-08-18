@@ -63,4 +63,5 @@ branch = true
 source = ["backend/app"]
 
 [tool.coverage.report]
-fail_under = 85
+precision = 2
+fail_under = 85.50

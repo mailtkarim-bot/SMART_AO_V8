@@ -5,6 +5,8 @@ import json
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from datetime import timedelta
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -16,8 +18,16 @@ from app.modules.preparation.infrastructure.dce_preparation_reader import (
 )
 from app.modules.preparation.infrastructure.document_storage import LocalGeneratedDocumentStorage
 from app.modules.submission.application.commands import PrepareSubmissionPackageCommand
-from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
-from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
+from app.modules.submission.application.service import (
+    PrepareSubmissionPackageHandler,
+    SubmissionPackageService,
+    submission_handlers,
+)
+from app.platform.events.dispatcher import (
+    CommandContext,
+    CommandDispatcher,
+    CommandExecutionError,
+)
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
@@ -410,4 +420,357 @@ def test_submission_package_requires_published_snapshot_and_current_revision(
             actor=actor,
             command=command.model_copy(update={"expected_preparation_revision": 2}),
             now=NOW,
+        )
+
+
+class _ScalarSequence:
+    def __init__(self, values: list[object]) -> None:
+        self._values = iter(values)
+
+    def next(self) -> object:
+        return next(self._values)
+
+
+class _EnterpriseBranchSession:
+    def __init__(self, *, scalar_values: list[object], scalars_values: list[list[object]]) -> None:
+        self._scalar_values = _ScalarSequence(scalar_values)
+        self._scalars_values = _ScalarSequence(
+            [SimpleNamespace(all=lambda values=values: values) for values in scalars_values]
+        )
+
+    def scalar(self, *_args, **_kwargs) -> object:
+        return self._scalar_values.next()
+
+    def scalars(self, *_args, **_kwargs) -> object:
+        return self._scalars_values.next()
+
+
+def _enterprise_branch_inputs() -> tuple[SimpleNamespace, CommandContext, SimpleNamespace]:
+    proposal = SimpleNamespace(
+        validity_state="CURRENT",
+        capability_id=uuid4(),
+        capability_version_id=uuid4(),
+    )
+    preparation = SimpleNamespace(case_id=uuid4(), assignment_id=uuid4())
+    context = CommandContext(
+        tenant_id=uuid4(),
+        actor_id=uuid4(),
+        actor_kind=ActorKind.PATRON_ADMIN.value,
+        received_at=NOW,
+        membership_id=uuid4(),
+    )
+    return proposal, context, preparation
+
+
+def _active_capability_version(
+    proposal: SimpleNamespace,
+) -> tuple[SimpleNamespace, SimpleNamespace]:
+    capability = SimpleNamespace(
+        id=proposal.capability_id,
+        company_id=uuid4(),
+        state="ACTIVE",
+        capability_kind="PLUMBER",
+        name="Qualification",
+        summary="Qualification BTP",
+    )
+    version = SimpleNamespace(
+        id=proposal.capability_version_id,
+        capability_id=proposal.capability_id,
+        valid_from=NOW - timedelta(days=1),
+        valid_until=NOW + timedelta(days=30),
+        version_number=1,
+        title="Version 1",
+        description="Description",
+        usage_scope="France",
+    )
+    return capability, version
+
+
+def test_submission_manifest_rejects_expired_capability_proposal() -> None:
+    proposal, context, preparation = _enterprise_branch_inputs()
+    proposal.validity_state = "EXPIRED"
+    session = _EnterpriseBranchSession(scalar_values=[], scalars_values=[[proposal]])
+
+    with pytest.raises(CommandExecutionError, match="CAPABILITY_PROOF_EXPIRED"):
+        PrepareSubmissionPackageHandler()._validated_enterprise_entries(  # noqa: SLF001
+            session=session, preparation=preparation, context=context
+        )
+
+
+@pytest.mark.parametrize("capability_state", ["INACTIVE", "MISSING"])
+def test_submission_manifest_rejects_unauthorized_capability(capability_state: str) -> None:
+    proposal, context, preparation = _enterprise_branch_inputs()
+    capability, version = _active_capability_version(proposal)
+    capability = (
+        None
+        if capability_state == "MISSING"
+        else SimpleNamespace(
+            **{**vars(capability), "state": "INACTIVE"}
+        )
+    )
+    session = _EnterpriseBranchSession(
+        scalar_values=[capability, version], scalars_values=[[proposal]]
+    )
+
+    with pytest.raises(CommandExecutionError, match="CAPABILITY_PROOF_UNAUTHORIZED"):
+        PrepareSubmissionPackageHandler()._validated_enterprise_entries(  # noqa: SLF001
+            session=session, preparation=preparation, context=context
+        )
+
+
+def test_submission_manifest_rejects_version_outside_validity_window() -> None:
+    proposal, context, preparation = _enterprise_branch_inputs()
+    capability, version = _active_capability_version(proposal)
+    version.valid_from = NOW + timedelta(days=1)
+    session = _EnterpriseBranchSession(
+        scalar_values=[capability, version], scalars_values=[[proposal]]
+    )
+
+    with pytest.raises(CommandExecutionError, match="CAPABILITY_PROOF_EXPIRED"):
+        PrepareSubmissionPackageHandler()._validated_enterprise_entries(  # noqa: SLF001
+            session=session, preparation=preparation, context=context
+        )
+
+
+def test_submission_manifest_rejects_missing_proof_link() -> None:
+    proposal, context, preparation = _enterprise_branch_inputs()
+    capability, version = _active_capability_version(proposal)
+    session = _EnterpriseBranchSession(
+        scalar_values=[capability, version], scalars_values=[[proposal], []]
+    )
+
+    with pytest.raises(CommandExecutionError, match="CAPABILITY_PROOF_MISSING"):
+        PrepareSubmissionPackageHandler()._validated_enterprise_entries(  # noqa: SLF001
+            session=session, preparation=preparation, context=context
+        )
+
+
+@pytest.mark.parametrize(
+    ("company_matches", "verification_status", "expired"),
+    [(False, "VALIDATED", False), (True, "PENDING", False), (True, "VALIDATED", True)],
+)
+def test_submission_manifest_rejects_invalid_proof_document(
+    company_matches: bool, verification_status: str, expired: bool
+) -> None:
+    proposal, context, preparation = _enterprise_branch_inputs()
+    capability, version = _active_capability_version(proposal)
+    link = SimpleNamespace(document_id=uuid4())
+    document = SimpleNamespace(
+        id=link.document_id,
+        company_id=capability.company_id if company_matches else uuid4(),
+        verification_status=verification_status,
+        expires_at=NOW - timedelta(days=1) if expired else NOW + timedelta(days=1),
+    )
+    session = _EnterpriseBranchSession(
+        scalar_values=[capability, version, document], scalars_values=[[proposal], [link]]
+    )
+    expected = "CAPABILITY_PROOF_EXPIRED" if expired else "CAPABILITY_PROOF_UNAUTHORIZED"
+
+    with pytest.raises(CommandExecutionError, match=expected):
+        PrepareSubmissionPackageHandler()._validated_enterprise_entries(  # noqa: SLF001
+            session=session, preparation=preparation, context=context
+        )
+
+
+class _AllowPolicy:
+    def __init__(self, allowed: bool, code: str = "DENIED") -> None:
+        self._allowed = allowed
+        self._code = code
+
+    def authorize(self, **_kwargs):
+        return SimpleNamespace(allowed=self._allowed, code=self._code)
+
+
+def _patron_actor() -> SimpleNamespace:
+    return SimpleNamespace(
+        actor_kind=ActorKind.PATRON_ADMIN,
+        membership_id=uuid4(),
+        tenant_id=uuid4(),
+        actor_id=uuid4(),
+        identity_id=uuid4(),
+        session_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+
+def _service_with_session(values: list[object], *, policy: object) -> SubmissionPackageService:
+    from unittest.mock import MagicMock
+
+    session = MagicMock()
+    session.scalar.side_effect = values
+    factory = MagicMock()
+    factory.return_value.__enter__.return_value = session
+    storage = SimpleNamespace(read=lambda **_kwargs: b"technical")
+    return SubmissionPackageService(
+        session_factory=factory,
+        dispatcher=MagicMock(),
+        policy=policy,
+        storage=storage,
+    )
+
+
+def test_submission_export_rejects_unauthorized_policy() -> None:
+    actor = _patron_actor()
+    service = _service_with_session([], policy=_AllowPolicy(False, "DENIED"))
+
+    with pytest.raises(PermissionError, match="DENIED"):
+        service.export(actor=actor, submission_package_id=uuid4(), now=NOW)
+
+
+def test_submission_export_rejects_corrupt_manifest() -> None:
+    import hashlib
+
+    actor = _patron_actor()
+    manifest = {"schema_version": 2}
+    manifest_bytes = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    record = SimpleNamespace(
+        tenant_id=actor.tenant_id,
+        id=uuid4(),
+        manifest_json=manifest,
+        manifest_sha256=hashlib.sha256(b"wrong").hexdigest(),
+    )
+    service = _service_with_session([record], policy=_AllowPolicy(True))
+
+    with pytest.raises(CommandExecutionError, match="SUBMISSION_MANIFEST_INTEGRITY_FAILED"):
+        service.export(actor=actor, submission_package_id=record.id, now=NOW)
+
+    assert manifest_bytes != b"wrong"
+
+
+def test_submission_export_requires_technical_document() -> None:
+    import hashlib
+
+    actor = _patron_actor()
+    manifest = {"schema_version": 2}
+    manifest_bytes = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    record = SimpleNamespace(
+        tenant_id=actor.tenant_id,
+        id=uuid4(),
+        manifest_json=manifest,
+        manifest_sha256=hashlib.sha256(manifest_bytes).hexdigest(),
+        technical_document_id=uuid4(),
+    )
+    service = _service_with_session([record, None], policy=_AllowPolicy(True))
+
+    with pytest.raises(CommandExecutionError, match="TECHNICAL_DOCUMENT_REQUIRED"):
+        service.export(actor=actor, submission_package_id=record.id, now=NOW)
+
+
+def test_submission_prepare_rejects_actor_and_policy() -> None:
+    service = SubmissionPackageService(
+        session_factory=SimpleNamespace(),
+        dispatcher=SimpleNamespace(dispatch=lambda **_kwargs: None),
+        policy=_AllowPolicy(True),
+    )
+    collaborator = _patron_actor()
+    collaborator.actor_kind = ActorKind.COLLABORATEUR
+    command = PrepareSubmissionPackageCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        preparation_package_id=uuid4(),
+        expected_preparation_revision=1,
+    )
+    with pytest.raises(PermissionError, match="SUBMISSION_PATRON_REQUIRED"):
+        service.prepare(actor=collaborator, command=command, now=NOW)
+
+    with pytest.raises(PermissionError, match="DENIED"):
+        SubmissionPackageService(
+            session_factory=SimpleNamespace(),
+            dispatcher=SimpleNamespace(dispatch=lambda **_kwargs: None),
+            policy=_AllowPolicy(False, "DENIED"),
+        ).prepare(actor=_patron_actor(), command=command, now=NOW)
+
+
+def _handler_context(actor_kind: str = ActorKind.PATRON_ADMIN.value) -> CommandContext:
+    return CommandContext(
+        tenant_id=uuid4(),
+        actor_id=uuid4(),
+        actor_kind=actor_kind,
+        received_at=NOW,
+        membership_id=uuid4(),
+    )
+
+
+def _handler_session(values: list[object]) -> SimpleNamespace:
+    iterator = iter(values)
+    return SimpleNamespace(scalar=lambda *_args, **_kwargs: next(iterator))
+
+
+@pytest.mark.parametrize(
+    ("preparation", "error"),
+    [
+        (None, "NOT_FOUND_OR_FORBIDDEN"),
+        (SimpleNamespace(aggregate_revision=1, state="DRAFT"), "VERSION_CONFLICT"),
+        (SimpleNamespace(aggregate_revision=2, state="DRAFT"), "PREPARATION_NOT_GENERATED"),
+    ],
+)
+def test_prepare_handler_rejects_invalid_preparation_states(
+    preparation: object, error: str
+) -> None:
+    command = SimpleNamespace(
+        preparation_package_id=uuid4(),
+        expected_preparation_revision=2,
+    )
+    if error == "VERSION_CONFLICT":
+        preparation.aggregate_revision = 1
+    with pytest.raises(CommandExecutionError, match=error):
+        PrepareSubmissionPackageHandler().execute(
+            session=_handler_session([preparation]),
+            command=command,
+            context=_handler_context(),
+        )
+
+
+@pytest.mark.parametrize("readiness", [None, SimpleNamespace(state="BLOCKED")])
+def test_prepare_handler_rejects_missing_or_blocked_readiness(readiness: object) -> None:
+    preparation = SimpleNamespace(
+        aggregate_revision=2,
+        state="GENERATED",
+        id=uuid4(),
+        case_id=uuid4(),
+    )
+    command = SimpleNamespace(
+        preparation_package_id=uuid4(),
+        expected_preparation_revision=2,
+    )
+    error = "READINESS_NOT_FOUND" if readiness is None else "PREPARATION_BLOCKED"
+    with pytest.raises(CommandExecutionError, match=error):
+        PrepareSubmissionPackageHandler().execute(
+            session=_handler_session([preparation, readiness]),
+            command=command,
+            context=_handler_context(),
+        )
+
+
+def test_prepare_handler_requires_generated_technical_document() -> None:
+    preparation = SimpleNamespace(
+        aggregate_revision=2,
+        state="GENERATED",
+        id=uuid4(),
+        case_id=uuid4(),
+    )
+    readiness = SimpleNamespace(state="READY")
+    command = SimpleNamespace(
+        preparation_package_id=uuid4(),
+        expected_preparation_revision=2,
+    )
+    with pytest.raises(CommandExecutionError, match="TECHNICAL_DOCUMENT_REQUIRED"):
+        PrepareSubmissionPackageHandler().execute(
+            session=_handler_session([preparation, readiness, None]),
+            command=command,
+            context=_handler_context(),
+        )
+
+
+def test_prepare_handler_rejects_non_patron_context() -> None:
+    command = SimpleNamespace(
+        preparation_package_id=uuid4(),
+        expected_preparation_revision=1,
+    )
+    with pytest.raises(CommandExecutionError, match="SUBMISSION_PATRON_REQUIRED"):
+        PrepareSubmissionPackageHandler().execute(
+            session=_handler_session([]),
+            command=command,
+            context=_handler_context(actor_kind=ActorKind.COLLABORATEUR.value),
         )
