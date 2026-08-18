@@ -1933,6 +1933,39 @@ class SubmissionPackageRecord(TenantScopedRecord, Base):
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
 
 
+class SubmissionEvidenceRecord(TenantScopedRecord, Base):
+    """Human-provided evidence; it never asserts automated external submission success."""
+
+    __tablename__ = "submission_evidence"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "submission_package_id"],
+            ["submission_packages.tenant_id", "submission_packages.id"],
+            name="fk_submission_evidence__package",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_submission_evidence__tenant_id"),
+        sa.UniqueConstraint("tenant_id", "command_id", name="uq_submission_evidence__command"),
+        sa.CheckConstraint("evidence_type IN ('MANUAL_RECEIPT', 'MANUAL_PORTAL_REFERENCE')", name="evidence_type"),
+        sa.CheckConstraint("status IN ('RECEIVED', 'REJECTED')", name="status"),
+        sa.Index("ix_submission_evidence__tenant_package", "tenant_id", "submission_package_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    submission_package_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    evidence_type: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    external_reference_hash: Mapped[str] = mapped_column(sa.CHAR(64), nullable=False)
+    evidence_sha256: Mapped[str] = mapped_column(sa.CHAR(64), nullable=False)
+    notes_redacted: Mapped[str | None] = mapped_column(sa.String(1000))
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
 class EnterpriseCapabilityRecord(TenantScopedRecord, Base):
     """Patron-owned reusable capability root, separate from any Case assessment."""
 
