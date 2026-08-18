@@ -1687,12 +1687,8 @@ class PricingScenarioRecord(TenantScopedRecord, Base):
             "tenant_id", "case_id", "scenario_key", "version", name="uq_pricing_scenario_version"
         ),
         sa.CheckConstraint("version > 0", name="version_positive"),
-        sa.CheckConstraint(
-            "state IN ('DRAFT', 'SELECTED', 'ARCHIVED')", name="state"
-        ),
-        sa.CheckConstraint(
-            "scenario_type IN ('BASE', 'PRUDENT', 'CUSTOM')", name="scenario_type"
-        ),
+        sa.CheckConstraint("state IN ('DRAFT', 'SELECTED', 'ARCHIVED')", name="state"),
+        sa.CheckConstraint("scenario_type IN ('BASE', 'PRUDENT', 'CUSTOM')", name="scenario_type"),
         sa.Index("ix_pricing_scenarios__tenant_case", "tenant_id", "case_id", "created_at"),
     )
 
@@ -1740,9 +1736,7 @@ class PatronActionRecord(TenantScopedRecord, Base):
             "action_type IN ('REVIEW_PREPARATION', 'CONTROL_SUBMISSION', 'VALIDATE_PRICE', 'DECIDE_GO_NO_GO')",
             name="action_type",
         ),
-        sa.Index(
-            "ix_patron_actions__tenant_state_due", "tenant_id", "state", "severity", "due_at"
-        ),
+        sa.Index("ix_patron_actions__tenant_state_due", "tenant_id", "state", "severity", "due_at"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
@@ -1758,6 +1752,57 @@ class PatronActionRecord(TenantScopedRecord, Base):
     due_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     source_refs_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     aggregate_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False, server_default="1")
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
+class PatronActionTransitionRecord(TenantScopedRecord, Base):
+    """Append-only state transition history for a patron action."""
+
+    __tablename__ = "patron_action_transitions"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "action_id"],
+            ["patron_actions.tenant_id", "patron_actions.id"],
+            name="fk_patron_action_transitions__action",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_patron_action_transitions__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "action_id",
+            "aggregate_revision",
+            name="uq_patron_action_transitions__revision",
+        ),
+        sa.UniqueConstraint(
+            "tenant_id", "command_id", name="uq_patron_action_transitions__command"
+        ),
+        sa.CheckConstraint("aggregate_revision > 1", name="aggregate_revision_positive"),
+        sa.CheckConstraint(
+            "from_state IN ('OPEN', 'IN_PROGRESS', 'WAITING')",
+            name="from_state",
+        ),
+        sa.CheckConstraint(
+            "to_state IN ('IN_PROGRESS', 'WAITING', 'COMPLETED', 'ABANDONED')",
+            name="to_state",
+        ),
+        sa.Index(
+            "ix_patron_action_transitions__tenant_action_revision",
+            "tenant_id",
+            "action_id",
+            "aggregate_revision",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    action_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    from_state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    to_state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    reason_code: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    aggregate_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
@@ -1792,16 +1837,10 @@ class PreparationSnapshotRecord(TenantScopedRecord, Base):
             ondelete="RESTRICT",
         ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_prep_snapshots__tenant_id"),
-        sa.UniqueConstraint(
-            "tenant_id", "package_id", "version", name="uq_prep_snapshot__version"
-        ),
+        sa.UniqueConstraint("tenant_id", "package_id", "version", name="uq_prep_snapshot__version"),
         sa.CheckConstraint("version > 0", name="version_positive"),
-        sa.CheckConstraint(
-            "state IN ('READY_FOR_PATRON_REVIEW')", name="state"
-        ),
-        sa.Index(
-            "ix_prep_snapshots__tenant_package_version", "tenant_id", "package_id", "version"
-        ),
+        sa.CheckConstraint("state IN ('READY_FOR_PATRON_REVIEW')", name="state"),
+        sa.Index("ix_prep_snapshots__tenant_package_version", "tenant_id", "package_id", "version"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
@@ -1843,15 +1882,9 @@ class PreparationTransmissionRecord(TenantScopedRecord, Base):
             ondelete="RESTRICT",
         ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_prep_transmissions__tenant_id"),
-        sa.UniqueConstraint(
-            "tenant_id", "snapshot_id", name="uq_prep_transmission__snapshot"
-        ),
-        sa.CheckConstraint(
-            "state IN ('TRANSMITTED_TO_PATRON')", name="state"
-        ),
-        sa.Index(
-            "ix_prep_transmissions__tenant_package", "tenant_id", "package_id", "created_at"
-        ),
+        sa.UniqueConstraint("tenant_id", "snapshot_id", name="uq_prep_transmission__snapshot"),
+        sa.CheckConstraint("state IN ('TRANSMITTED_TO_PATRON')", name="state"),
+        sa.Index("ix_prep_transmissions__tenant_package", "tenant_id", "package_id", "created_at"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
@@ -1946,7 +1979,9 @@ class SubmissionEvidenceRecord(TenantScopedRecord, Base):
         ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_submission_evidence__tenant_id"),
         sa.UniqueConstraint("tenant_id", "command_id", name="uq_submission_evidence__command"),
-        sa.CheckConstraint("evidence_type IN ('MANUAL_RECEIPT', 'MANUAL_PORTAL_REFERENCE')", name="evidence_type"),
+        sa.CheckConstraint(
+            "evidence_type IN ('MANUAL_RECEIPT', 'MANUAL_PORTAL_REFERENCE')", name="evidence_type"
+        ),
         sa.CheckConstraint("status IN ('RECEIVED', 'REJECTED')", name="status"),
         sa.Index("ix_submission_evidence__tenant_package", "tenant_id", "submission_package_id"),
     )

@@ -170,6 +170,10 @@ from app.modules.patron_action.application.service import (
     PatronActionWriter,
     patron_action_handlers,
 )
+from app.modules.patron_action.application.transition_service import (
+    PatronActionTransitionService,
+    patron_action_transition_handlers,
+)
 from app.modules.preparation.application.review import (
     PreparationReviewService,
     preparation_review_handlers,
@@ -266,6 +270,7 @@ class AppRuntime:
                 ),
                 **preparation_transmission_handlers(action_writer=PatronActionWriter()),
                 **patron_action_handlers(),
+                **patron_action_transition_handlers(),
                 **pricing_scenario_handlers(),
                 **preparation_review_handlers(storage=preparation_storage),
                 **submission_handlers(),
@@ -567,6 +572,11 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        patron_action_transition_service = PatronActionTransitionService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         patron_decision_dossier_service = PatronDecisionDossierService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -713,6 +723,7 @@ def create_app(
         app.include_router(
             build_patron_action_router(
                 service=patron_action_service,
+                transition_service=patron_action_transition_service,
                 security_runtime=security_runtime,
             )
         )

@@ -29,6 +29,18 @@ class CreatePatronActionRequest(BaseModel):
     source_refs: list[str] = Field(max_length=32)
 
 
+class TransitionPatronActionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    transition_id: UUID
+    expected_revision: int = Field(ge=1)
+    target_state: Literal["IN_PROGRESS", "WAITING", "COMPLETED", "ABANDONED"]
+    reason_code: str = Field(min_length=2, max_length=64, pattern=r"^[A-Z0-9_]+$")
+
+
 class PatronActionCommandResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -38,6 +50,19 @@ class PatronActionCommandResponse(BaseModel):
     result_code: Literal["PATRON_ACTION_CREATED"]
     aggregate_id: UUID
     aggregate_revision: int = Field(ge=1)
+    event_ids: list[UUID]
+    replayed: bool = False
+
+
+class PatronActionTransitionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal["PATRON_ACTION_TRANSITIONED"]
+    aggregate_id: UUID
+    aggregate_revision: int = Field(ge=2)
     event_ids: list[UUID]
     replayed: bool = False
 

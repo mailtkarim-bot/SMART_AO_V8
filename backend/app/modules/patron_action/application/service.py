@@ -23,7 +23,7 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import PatronActionRecord
+from app.platform.security.models import PatronActionRecord, PatronActionTransitionRecord
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,7 +113,25 @@ class PatronActionService:
                     PatronActionRecord.created_at.asc(),
                 )
             ).all()
-            return tuple(_projection(record) for record in records)
+            projections = []
+            for record in records:
+                latest = session.scalar(
+                    sa.select(PatronActionTransitionRecord)
+                    .where(
+                        PatronActionTransitionRecord.tenant_id == actor.tenant_id,
+                        PatronActionTransitionRecord.action_id == record.id,
+                    )
+                    .order_by(PatronActionTransitionRecord.aggregate_revision.desc())
+                    .limit(1)
+                )
+                state = latest.to_state if latest is not None else record.state
+                if state in {"COMPLETED", "ABANDONED"}:
+                    continue
+                revision = (
+                    latest.aggregate_revision if latest is not None else record.aggregate_revision
+                )
+                projections.append(_projection(record, state=state, revision=revision))
+            return tuple(projections)
 
     def _authorize_read(
         self, *, actor: ActorContext, action_id: UUID | None, now: datetime
@@ -256,19 +274,21 @@ def patron_action_handlers() -> dict[str, PatronActionHandler]:
     return {CreatePatronActionCommand.command_type: handler}
 
 
-def _projection(record: PatronActionRecord) -> PatronActionProjection:
+def _projection(
+    record: PatronActionRecord, *, state: str | None = None, revision: int | None = None
+) -> PatronActionProjection:
     return PatronActionProjection(
         action_id=record.id,
         case_id=record.case_id,
         functional_key=record.functional_key,
         action_type=record.action_type,
         severity=record.severity,
-        state=record.state,
+        state=state or record.state,
         title=record.title,
         why_now=record.why_now,
         impact=record.impact,
         recommended_action=record.recommended_action,
         due_at=record.due_at,
         source_refs=tuple(record.source_refs_json),
-        aggregate_revision=record.aggregate_revision,
+        aggregate_revision=revision or record.aggregate_revision,
     )
