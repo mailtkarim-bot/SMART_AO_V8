@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from uuid import UUID, uuid4
 
@@ -194,6 +195,49 @@ def test_submission_package_is_hashed_idempotent_and_append_only(services, sessi
             .where(SubmissionPackageRecord.tenant_id == actor.tenant_id)
             .values(state="AUTORISE_DEPOT")
         )
+
+
+@pytest.mark.concurrency
+@pytest.mark.db
+@pytest.mark.security
+def test_concurrent_submission_manifest_assembly_serializes_versions_without_duplicates(
+    services, session_factory
+) -> None:
+    _, submission = services
+    actor, preparation_package_id, case_id = _prepare_generated_document(services, session_factory)
+    _publish_snapshot(session_factory, tenant_id=actor.tenant_id, case_id=case_id)
+    commands = [
+        PrepareSubmissionPackageCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            preparation_package_id=preparation_package_id,
+            expected_preparation_revision=3,
+        )
+        for _ in range(6)
+    ]
+
+    def assemble(command: PrepareSubmissionPackageCommand):
+        return submission.prepare(actor=actor, command=command, now=NOW)
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        results = list(executor.map(assemble, commands))
+
+    assert all(result.result_code == "SUBMISSION_PACKAGE_PREPARED" for result in results)
+    with session_factory() as session:
+        records = list(
+            session.scalars(
+                sa.select(SubmissionPackageRecord)
+                .where(
+                    SubmissionPackageRecord.tenant_id == actor.tenant_id,
+                    SubmissionPackageRecord.preparation_package_id == preparation_package_id,
+                )
+                .order_by(SubmissionPackageRecord.version)
+            )
+        )
+    assert [record.version for record in records] == list(range(1, 7))
+    assert len({record.manifest_sha256 for record in records}) == 1
+    assert all(record.manifest_json["schema_version"] == 2 for record in records)
 
 
 @pytest.mark.db
