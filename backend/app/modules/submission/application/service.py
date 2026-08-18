@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import zipfile
 from datetime import datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
 from app.modules.submission.application.commands import PrepareSubmissionPackageCommand
 from app.platform.events.dispatcher import (
     CommandContext,
@@ -47,10 +50,69 @@ class SubmissionPackageService:
         session_factory: sessionmaker[Session],
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
+        storage: GeneratedDocumentStorage | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._dispatcher = dispatcher
         self._policy = policy
+        self._storage = storage
+
+    def export(
+        self, *, actor: ActorContext, submission_package_id: UUID, now: datetime
+    ) -> bytes:
+        if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
+            raise PermissionError("SUBMISSION_PATRON_REQUIRED")
+        if self._storage is None:
+            raise RuntimeError("SUBMISSION_EXPORT_STORAGE_NOT_CONFIGURED")
+        decision = self._policy.authorize(
+            context=actor,
+            request=AuthorizationRequest(
+                action=Capability.SUBMISSION_AUTHORIZE,
+                resource=AuthorizationResource(
+                    resource_type="SUBMISSION_PACKAGE",
+                    resource_id=submission_package_id,
+                    tenant_id=actor.tenant_id,
+                    classification=DataClassification.FINANCIAL_PRIVATE,
+                ),
+                evaluated_at=now,
+            ),
+        )
+        if not decision.allowed:
+            raise PermissionError(decision.code)
+        with self._session_factory() as session:
+            record = session.scalar(
+                sa.select(SubmissionPackageRecord).where(
+                    SubmissionPackageRecord.tenant_id == actor.tenant_id,
+                    SubmissionPackageRecord.id == submission_package_id,
+                )
+            )
+            if record is None:
+                raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+            manifest_bytes = json.dumps(
+                record.manifest_json, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ).encode("utf-8")
+            if hashlib.sha256(manifest_bytes).hexdigest() != record.manifest_sha256:
+                raise CommandExecutionError("SUBMISSION_MANIFEST_INTEGRITY_FAILED")
+            document = session.scalar(
+                sa.select(GeneratedTechnicalDocumentRecord).where(
+                    GeneratedTechnicalDocumentRecord.tenant_id == actor.tenant_id,
+                    GeneratedTechnicalDocumentRecord.id == record.technical_document_id,
+                )
+            )
+            if document is None:
+                raise CommandExecutionError("TECHNICAL_DOCUMENT_REQUIRED")
+            technical_bytes = self._storage.read(storage_key=document.storage_key)
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            for name, content in (
+                ("manifest.json", manifest_bytes),
+                ("technical-response.md", technical_bytes),
+            ):
+                info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o600 << 16
+                bundle.writestr(info, content)
+        return archive.getvalue()
 
     def prepare(
         self,

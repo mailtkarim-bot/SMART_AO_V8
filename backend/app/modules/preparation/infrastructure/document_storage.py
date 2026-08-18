@@ -12,6 +12,9 @@ class GeneratedDocumentStorage:
     def write(self, *, storage_key: str, content: bytes) -> str:
         raise NotImplementedError
 
+    def read(self, *, storage_key: str) -> bytes:
+        raise NotImplementedError
+
 
 class LocalGeneratedDocumentStorage(GeneratedDocumentStorage):
     """Atomic private storage under the already protected DCE root."""
@@ -37,6 +40,9 @@ class LocalGeneratedDocumentStorage(GeneratedDocumentStorage):
             temporary.unlink(missing_ok=True)
             raise
         return hashlib.sha256(content).hexdigest()
+
+    def read(self, *, storage_key: str) -> bytes:
+        return self._path(storage_key).read_bytes()
 
     def _path(self, storage_key: str) -> Path:
         relative = PurePosixPath(storage_key)

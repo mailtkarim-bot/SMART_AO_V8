@@ -664,6 +664,7 @@ def create_app(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
             policy=security_policy,
+            storage=runtime.preparation_storage,
         )
         app.include_router(
             build_case_dce_reading_router(

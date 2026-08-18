@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import io
+import json
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from uuid import UUID, uuid4
@@ -61,6 +64,7 @@ def services(session_factory: sessionmaker[Session], tmp_path):
         session_factory=session_factory,
         dispatcher=dispatcher,
         policy=policy,
+        storage=storage,
     )
     return preparation, submission
 
@@ -166,6 +170,16 @@ def test_submission_package_is_hashed_idempotent_and_append_only(services, sessi
     assert prepared.result_code == "SUBMISSION_PACKAGE_PREPARED"
     assert replay.replayed is True
     package_id = prepared.aggregate_refs[0]["aggregate_id"]
+    archive = submission.export(actor=actor, submission_package_id=UUID(package_id), now=NOW)
+    with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
+        names = sorted(bundle.namelist())
+        exported_manifest = json.loads(bundle.read("manifest.json"))
+        technical_content = bundle.read("technical-response.md")
+    assert names == ["manifest.json", "technical-response.md"]
+    assert exported_manifest["schema_version"] == 2
+    assert "storage_key" not in str(exported_manifest)
+    assert "sales_total_minor" not in str(exported_manifest)
+    assert technical_content.startswith("# Réponse technique".encode())
     with session_factory() as session:
         record = session.get(SubmissionPackageRecord, package_id)
         assert record is not None

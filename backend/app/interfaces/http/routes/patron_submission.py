@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.dce_versions import _resolve_context
@@ -78,6 +78,52 @@ def build_patron_submission_router(
         return JSONResponse(
             status_code=status.HTTP_200_OK if result.replayed else status.HTTP_201_CREATED,
             content=response.model_dump(mode="json"),
+        )
+
+    @router.get(
+        "/submission-packages/{submission_package_id}/export",
+        responses={
+            200: {"description": "Export ZIP déterministe du dossier préparé."},
+            401: {"description": "Bearer absent, invalide ou expiré."},
+            403: {"description": "Export réservé au patron habilité."},
+            404: {"description": "Dossier absent ou hors tenant."},
+            422: {"description": "Manifeste ou document technique incohérent."},
+            503: {"description": "Stockage privé d’export indisponible."},
+        },
+    )
+    def export_submission_package(
+        submission_package_id: UUID,
+        authorization: str | None = Header(default=None),
+    ) -> StreamingResponse:
+        context = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        try:
+            archive = service.export(
+                actor=context,
+                submission_package_id=submission_package_id,
+                now=datetime.now(tz=UTC),
+            )
+        except PermissionError as error:
+            if str(error) == "NOT_FOUND_OR_FORBIDDEN":
+                raise HTTPException(status_code=404, detail="NOT_FOUND_OR_FORBIDDEN") from error
+            raise HTTPException(status_code=403, detail="FORBIDDEN") from error
+        except CommandExecutionError as error:
+            raise HTTPException(status_code=422, detail="EXPORT_REJECTED") from error
+        except RuntimeError as error:
+            if str(error) == "SUBMISSION_EXPORT_STORAGE_NOT_CONFIGURED":
+                raise HTTPException(status_code=503, detail="EXPORT_UNAVAILABLE") from error
+            raise
+        return StreamingResponse(
+            iter((archive,)),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="submission-{submission_package_id}.zip"'
+                ),
+                "Cache-Control": "no-store",
+            },
         )
 
     return router
