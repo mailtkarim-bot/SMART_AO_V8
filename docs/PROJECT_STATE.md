@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`AUDIT-REMEDIATION-01` — corrections confirmées des deux audits publiées sur la branche `ops/vps-deploy-health-digests-01`. Le dépôt contient maintenant la protection anti-brute-force, la centralisation hermétique des fixtures PostgreSQL, l’observabilité structurée, le runtime backend non-root, les dépendances frontend reproductibles, le seuil de couverture et les scénarios de concurrence déterministes. L’exécution sur un VPS réel reste volontairement hors environnement disponible.
+`AUDIT-REMEDIATION-01` — corrections confirmées des deux audits et premier réalignement architectural publiés sur la branche `ops/vps-deploy-health-digests-01`. Le dépôt contient maintenant la protection anti-brute-force, la centralisation hermétique des fixtures PostgreSQL, l’observabilité structurée, le runtime backend non-root, les dépendances frontend reproductibles, le seuil de couverture, les scénarios de concurrence déterministes, l’adaptateur DCE de préparation et le bounded context `enterprise` séparé de `membership`. L’exécution sur un VPS réel reste volontairement hors environnement disponible.
 
 > **Vue propriétaire :** lire d’abord [`PROJECT_PROGRESS_REPORT.md`](PROJECT_PROGRESS_REPORT.md) pour la photographie métier globale, les capacités réellement livrées, les limites actuelles et l’ordre de travail recommandé. Lire ensuite ce fichier pour reprendre l’exécution technique d’un slice.
 
@@ -9,11 +9,11 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | `e3eafc7` — couverture et scénarios de concurrence déterministes. |
+| Commit courant | `4c995d2` — alignement du bounded context enterprise et extraction des ports de quarantaine platform. |
 | Branche | `ops/vps-deploy-health-digests-01`, PR [#10](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/10). |
-| Corrections précédentes | `025c36d` anti-brute-force ; `aac4de0` fixtures PostgreSQL ; `0ecb24c`/`0ab3cbc` observabilité et runtime non-root ; `d4b33fe` dépendances frontend figées. |
-| Validation locale courante | **402 tests backend verts**, couverture branchée **89,32 %** avec seuil `85 %`, Ruff, detect-secrets, Bandit ciblé, `git diff --check`, cycle Alembic et build frontend TypeScript strict verts. |
-| CI | `32083322693` est verte sur `e3eafc7`; les CI précédentes `32081102590`, `32080763983` et `32078237301` sont également vertes. |
+| Corrections précédentes | `025c36d` anti-brute-force ; `aac4de0` fixtures PostgreSQL ; `0ecb24c`/`0ab3cbc` observabilité et runtime non-root ; `d4b33fe` dépendances frontend figées ; `e3eafc7` couverture/concurrence ; `bdce65a` frontières préparation. |
+| Validation locale courante | Référence complète précédente : **402 tests backend verts**, couverture branchée **89,32 %** avec seuil `85 %`. Depuis, les tests ciblés architecture/préparation/enterprise sont verts ; une suite complète sera rejouée après les prochains slices métier. |
+| CI | `32104886313` est verte sur `4c995d2`; `32104138038` est verte sur `bdce65a`; les CI précédentes `32083322693`, `32081102590`, `32080763983` et `32078237301` sont également vertes. |
 | Frontière restante | Le gate VPS réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts, car aucun VPS utilisateur n’est disponible. |
 
 ## Ce qui est terminé

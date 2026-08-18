@@ -1,121 +1,83 @@
 # SMART_AO V8 — Rapport global d’avancement
 
-**Date de mise à jour :** 15 août 2026  
-**Référence de code publiée :** `e480987` sur `main`  
-**Fonctionnalité métier la plus récente :** publication patron d’un rapport financier `DRAFT → PUBLISHED`  
-**Preuve technique la plus récente :** CI GitHub `31892907918` verte ; 308 tests backend locaux verts.
+**Date de mise à jour :** 18 août 2026
+**Branche de référence :** `ops/vps-deploy-health-digests-01`
+**Dernier commit publié :** `4c995d2`
+**Dernière CI verte :** [workflow `32104886313`](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32104886313)
+**Référence de validation fonctionnelle précédente :** 402 tests backend verts et 89,32 % de couverture branchée avec seuil CI à 85 %.
 
-## 1. La vision simple du produit
+## 1. Position honnête du produit
 
-SMART_AO V8 est en construction comme un **assistant de réponse aux appels d’offres BTP**, et non comme un ERP généraliste. Son travail futur est de guider une entreprise depuis un DCE reçu jusqu’à un dossier de réponse contrôlé : lecture du règlement de consultation, préparation collaborative, contrôle patron, chiffrage confidentiel puis production des pièces à remettre.
+SMART_AO V8 est un **socle SaaS BTP sécurisé, multi-tenant et fortement audité**, auquel s’ajoutent déjà plusieurs parcours métier réels. Il ne faut toutefois pas le présenter comme une application commerciale achevée de bout en bout. Les quatre frontières encore à construire avant une déclaration produit complète sont la fabrication finale des documents de réponse, le cockpit patron couvrant tout le cycle métier, la préparation contrôlée d’un paquet de dépôt et le dépôt électronique lui-même.
 
-La règle fondamentale est déjà inscrite dans l’architecture : le collaborateur prépare et remonte des informations opérationnelles ; le patron conserve la décision, le chiffrage, la marge, la trésorerie et le dépôt. Les données financières ne doivent jamais apparaître dans l’espace collaborateur.
+La séparation fondamentale reste obligatoire : le collaborateur prépare et remonte des informations opérationnelles ; le patron conserve la décision, le chiffrage, la marge, la trésorerie et l’action de dépôt. Aucun contrat collaborateur ne doit transporter de données financières.
 
-> À ce stade, SMART_AO V8 est un **socle backend sécurisé et testé**, avec un premier wizard collaborateur. Ce n’est pas encore un logiciel commercialisable pour gérer un appel d’offres de bout en bout.
+## 2. État par domaine
 
-## 2. Où nous en sommes réellement
-
-| Domaine | État | Ce qui existe réellement | Ce qui ne doit pas encore être vendu comme disponible |
+| Domaine | État | Fonctionnalités réellement présentes | Limite actuelle |
 |---|---|---|---|
-| Noyau métier | **Solide** | Affaire (`Case`), consultation, version DCE, décision, révision, événements, idempotence, historique. | Parcours complet utilisateur final. |
-| Sécurité entreprise | **Solide** | Tenant par entreprise, comptes patron/collaborateur, sessions, refresh, MFA, RBAC/ABAC/ReBAC, audit append-only. | Provisionnement automatisé client/VPS prêt à l’emploi. |
-| Admission DCE | **Avancé** | Staging privé, upload binaire, limites, SHA-256, signature MIME, ClamAV, rétention, registre durable. | Exploitation Docker réelle sur VPS et corpus de DCE BTP de validation terrain. |
-| Lecture et analyse DCE | **Avancé mais déterministe** | Extraction PDF/DOCX/XLSX/TXT, classification, signaux du RC, exigences atomiques, confirmation humaine, lecture Case-scopée. | OCR robuste de plans, analyse IA complète, garantie de conformité ou calcul automatique de délais. |
-| Travail collaborateur | **Partiel mais sécurisé** | Affectation, accusé de réception, clarification, indisponibilité, historique fermé et wizard de lecture DCE. | Pilotage complet des tâches, pièces produites, relances, assemblage final de réponse. |
-| Cockpit patron | **Partiel** | Lecture des affectations, journaux et interactions ; fondation de lecture financière ; publication explicite d’un snapshot financier. | Interface patron complète, décisions Go/No-Go ergonomiques, chiffrage et préparation de dépôt. |
-| Finance | **Fondation seulement** | Snapshots, lignes en unités mineures, lecture patron d’un snapshot publié, publication `DRAFT → PUBLISHED` immutable. | Saisie/création de brouillon, import de prix Excel, calcul de DPGF/BPU, marge, trésorerie opérationnelle. |
-| Documents de réponse | **Non démarré** | Aucun générateur métier final n’est revendiqué. | Mémoire technique, DC1/DC2/DUME, DPGF/BPU, ZIP de remise, signature ou dépôt. |
-| Recherche d’affaires | **Non démarré** | Aucune collecte de plateformes d’appels d’offres. | Veille automatique, qualification géographique, alertes ou prospection. |
-| Frontend et déploiement | **Partiel** | React/Tailwind : connexion, sélection des affaires affectées, wizard collaborateur ; contrat d’API configurable. | Raccordement HTTPS réel, cockpit patron, déploiement VPS client, supervision, sauvegardes, exploitation. |
+| Noyau métier | Livré et stable | `Case`, Consultation, DCE, Decision, révisions, événements, outbox, receipts et idempotence. | Le parcours utilisateur complet reste à assembler. |
+| Sécurité et tenants | Livré et durci | Authentification, sessions, refresh rotatif, MFA, RBAC/ABAC/ReBAC, audit append-only, limitation anti-brute-force progressive. | La preuve d’exploitation réelle sur VPS reste ouverte. |
+| Admission DCE | Livrée côté code | Staging privé, upload binaire, limites, hash serveur, MIME détecté, ClamAV fail-closed, rétention et extraction déterministe. | Scan ClamAV, HTTPS, stockage privé et sauvegardes doivent être éprouvés sur un hôte réel. |
+| Analyse DCE | Livrée dans un périmètre déterministe | Analyse lexicale RC, classification, exigences atomiques, preuves sourcées, confirmations humaines et impact de rectificatif. | OCR, plans, formats supplémentaires et analyse IA complète restent hors périmètre. |
+| Entreprise | Livrée dans son premier incrément | Société, assurances/Kbis/RIB, uploads privés, vérification humaine, qualifications, références, capacités et preuves versionnées. | Les workflows métier plus riches de bibliothèque et d’usage des preuves restent à étendre. |
+| Collaboration | Fondations avancées | Affectations, interactions, tâches, demandes d’information, blocages, readiness, revues, corrections et brouillons techniques. | Le parcours complet de production de l’offre technique n’est pas encore assemblé. |
+| Finance patronale | Fondation sécurisée | Snapshots, lignes en unités mineures, publication contrôlée, lecture patronale et confidentialité financière. | Import Excel/DPGF/BPU, calcul opérationnel, scénarios de marge et trésorerie restent à construire. |
+| Génération documentaire | Partielle mais fonctionnelle | Génération versionnée d’un document technique contrôlé et brouillons de réponse avec readiness, stockage privé et hash serveur. | Il manque les modèles métier finaux, l’assemblage des pièces demandées et le paquet de remise. |
+| Cockpit patron | Partiel | API de lecture d’affectations, journaux, interactions et finance ; premier cockpit React connecté aux affaires et brouillons financiers. | Navigation métier complète, décisions, bibliothèque, préparation, revue et dépôt ne sont pas encore réunis dans une expérience cohérente. |
+| Dépôt | Non livré | Aucun paquet final de transmission ni connecteur de dépôt électronique revendiqué. | Préparer, verrouiller, contrôler, transmettre et conserver un accusé de réception. |
+| Déploiement | Préparé, non exécuté sur VPS | Factory production, Caddy, healthchecks, pinning digest, sauvegarde/restauration isolée, timers et rotation des secrets. | Gate VPS réel, HTTPS, EICAR, supervision externe et rapport opérateur. |
 
-## 3. Les fondations déjà terminées
+## 3. Corrections de socle publiées
 
-Le travail réalisé n’est pas seulement de la maquette. Les éléments suivants sont codés, testés et intégrés à la CI :
+Les corrections confirmées par les audits sont maintenant intégrées : limitation anti-brute-force sur login/refresh, fixtures PostgreSQL centralisées, logs JSON et `request_id`, endpoint `/metrics` sans données métier, runtime backend non-root, dépendances frontend figées, seuil de couverture et scénarios de concurrence déterministes.
 
-| Bloc | Résultat durable |
-|---|---|
-| Domaine et traçabilité | Les objets centraux conservent leurs versions, décisions et événements. Les commandes sont idempotentes : un rejeu ne crée pas deux opérations. |
-| Isolation des entreprises | Toute ressource est recherchée dans son tenant ; une ressource d’une autre entreprise est neutre côté HTTP. |
-| Séparation patron/collaborateur | Les droits viennent des faits serveur et non du navigateur. Le collaborateur ne reçoit que les affaires et actions explicitement affectées. |
-| DCE | Le flux protège l’admission de documents et matérialise des résultats sourcés. Une exigence détectée est un signal à confirmer par un humain, jamais une conformité automatique. |
-| Affectations | Le patron crée, modifie, suspend, réactive et termine les affectations ; le collaborateur peut signaler l’avancement et ses blocages. Tous ces actes possèdent un historique. |
-| Finance confidentielle | Les montants sont manipulés en unités mineures et réservés au patron. La publication est atomique, révisionnée et irréversible dans le périmètre actuel. |
+Le durcissement architectural a ensuite isolé la lecture DCE de l’application préparation derrière un port et un adaptateur, déplacé la détection de contenu sensible vers un contrat public, extrait les ports de quarantaine vers `platform.storage` et déplacé le bounded context `enterprise` hors de `membership`. Les tests d’architecture vérifient désormais ces nouvelles frontières.
 
-## 4. Le point exact atteint dans le parcours d’une affaire
+| Slice | Commit | Preuve distante |
+|---|---:|---:|
+| Anti-brute-force | `025c36d` | CI `32076462140` verte |
+| Fixtures PostgreSQL centralisées | `aac4de0` | CI `32078237301` verte |
+| Observabilité et runtime non-root | `0ecb24c` puis `0ab3cbc` | CI corrective `32080763983` verte |
+| Dépendances frontend reproductibles | `d4b33fe` | CI `32081102590` verte |
+| Couverture et concurrence | `e3eafc7` | CI `32083322693` verte |
+| Documentation consolidée | `cff4302` | CI `32083816529` verte |
+| Frontières préparation | `bdce65a` | CI `32104138038` verte |
+| Arborescence enterprise et ports platform | `4c995d2` | CI `32104886313` verte |
 
-Le parcours cible est : **DCE reçu → DCE sécurisé → lecture/confirmation → préparation collaborateur → contrôle patron → chiffrage → dossier de réponse → dépôt**.
+## 4. Architecture et arborescence
 
-Aujourd’hui, le logiciel couvre réellement les quatre premières briques de données et de sécurité : réception sécurisée, traitement documentaire déterministe, lecture guidée par affaire, et collaboration encadrée. Il commence aussi le contrôle patron et la confidentialité financière. Il ne couvre pas encore la fabrication effective des pièces de réponse, le chiffrage utilisable au quotidien, ni le dépôt.
+Le dépôt respecte la stratégie de **monolithe modulaire incrémental** : les modules réels ont des couches séparées, les routes HTTP ne portent pas les transitions métier, les tests d’architecture sont bloquants et les bounded contexts nouvellement réels sont maintenant rangés dans `backend/app/modules/enterprise`.
 
-| Étape du parcours BTP | Statut actuel | Décision humaine conservée |
-|---|---|---|
-| Recevoir et sécuriser le DCE | Construite côté backend. | Le patron reste responsable du choix d’ouvrir et de traiter l’affaire. |
-| Lire le RC et extraire des exigences | Construite sous forme de signaux sourcés et confirmables. | Un humain confirme ce qui est réellement demandé. |
-| Répartir le travail | Construite pour les affectations et interactions structurées. | Le patron décide qui intervient et sur quel périmètre. |
-| Préparer l’offre technique | Non terminée. | Le collaborateur devra compléter et transmettre, sans décision autonome du logiciel. |
-| Chiffrer et arbitrer | Fondation seulement. | Prix, marge, Go/No-Go restent exclusivement patron. |
-| Générer et rassembler les pièces | Non démarré. | Le patron valide chaque document final. |
-| Déposer l’offre | Non démarré. | Le dépôt est une action humaine explicite. |
+Cette conformité doit être lue comme une conformité vérifiée sur les frontières couvertes, non comme une preuve mathématique que chaque règle future ARC-01 est déjà exhaustive. Toute nouvelle dépendance inter-module doit passer par un contrat public, un port, un événement ou une commande aval corrélée, puis recevoir un test d’architecture.
 
-## 5. Ce que nous venons exactement de finir
+## 5. Parcours métier restant à construire
 
-La dernière frontière, `FINANCIAL-REPORT-PUBLICATION-01`, ne crée pas encore un chiffrage. Elle sécurise le moment où un chiffrage déjà présent sous forme de brouillon devient publiable pour le patron.
+Le parcours cible est : **DCE reçu → DCE sécurisé → lecture/confirmation → préparation collaborative → revue patronale → chiffrage → génération des pièces → paquet de dépôt → transmission**.
 
-1. Le seul acteur admis est un `PATRON_ADMIN` disposant de `financial.report.publish`.
-2. Le système verrouille le snapshot, vérifie qu’il est encore `DRAFT` et que sa révision est celle attendue.
-3. Il crée un acte durable de publication, passe le snapshot à `PUBLISHED`, date l’acte côté serveur et augmente la révision.
-4. Il écrit l’événement, l’outbox et le receipt dans la même transaction.
-5. La réponse HTTP ne contient aucun montant, marge, ligne, libellé, source ni formule.
+Les quatre premières étapes sont largement codées. La prochaine séquence doit donc compléter la génération documentaire avec des sections et pièces explicitement contractualisées, construire le cockpit patron sur les API réelles, préparer un paquet de dépôt immutable et contrôlable, puis seulement ouvrir un éventuel connecteur de transmission. Le dépôt électronique ne doit jamais être simulé comme réussi sans preuve externe.
 
-Le test de sécurité prouve qu’un collaborateur reçoit `403 FORBIDDEN` **avant toute lecture du snapshot**. La CI du commit fonctionnel `13bc1b2` est verte ; la branche `main` a ensuite été vérifiée verte par la CI `31892907918`.
+## 6. Ordre de travail avant VPS
 
-## 6. La prochaine étape recommandée
+| Ordre | Slice | Résultat attendu |
+|---:|---|---|
+| 1 | Génération documentaire contrôlée | Contrat des pièces, assembleur déterministe, versions append-only, complétude et absence de finance dans les contrats collaborateurs. |
+| 2 | Cockpit patron | Dashboard, affectations, préparation, revues, finance confidentielle, bibliothèque entreprise et états d’action réunis dans React. |
+| 3 | Préparation du dépôt | Paquet immutable, manifest, contrôles de complétude, verrouillage, empreinte et receipt interne sans prétendre à un dépôt externe. |
+| 4 | Réconciliation finale | Suite complète, architecture, documentation, OpenAPI, secrets, couverture et parcours E2E. |
+| 5 | Gate VPS | Docker, Caddy, ClamAV réel, EICAR, HTTPS, backups hors hôte, restauration isolée, supervision et rapport opérateur. |
 
-La prochaine priorité n’est **pas** le frontend patron tout de suite. Le backend vient d’apprendre à publier un brouillon financier, mais il ne sait pas encore créer ce brouillon de manière contrôlée. Sans cette étape, le bouton « publier » serait techniquement correct mais inutilisable dans le travail quotidien d’un entrepreneur.
+## 7. Limites explicitement conservées
 
-La recommandation est donc d’ouvrir le slice suivant : **FINANCIAL-REPORT-DRAFT-CREATION-01**.
+MinIO sans contrat de stockage stabilisé, Redis/sharding/tracing distribué spéculatifs, DAST/Semgrep déjà couverts par les contrôles existants et tests de charge nécessitant un environnement dédié ne sont pas ajoutés artificiellement. Les formats documentaires non pris en charge restent explicitement `UNSUPPORTED` plutôt que de produire une fausse analyse.
 
-| Ordre | Prochaine frontière | But métier | Pourquoi maintenant |
-|---:|---|---|---|
-| 1 | Création contrôlée de snapshot financier `DRAFT` | Permettre au patron d’ouvrir un brouillon de chiffrage pour une affaire, sans exposer de données au collaborateur. | C’est le maillon manquant directement avant la publication déjà codée. |
-| 2 | Écriture contrôlée des lignes financières du brouillon | Ajouter/modifier les lignes de chiffrage avec révision, unités mineures et historisation. | Un brouillon vide ne produit aucune valeur opérationnelle. |
-| 3 | Cockpit patron web de lecture/édition | Donner au patron un environnement simple pour visualiser ses affaires, chiffrages et validations. | L’API doit exister avant l’écran afin de ne pas fabriquer une interface fictive. |
-| 4 | Bibliothèque entreprise patron | Administrer société, assurances, Kbis, RIB, qualifications, documents expirables et références. | Ces données alimenteront ensuite les pièces administratives et techniques. |
-| 5 | Wizard collaborateur de préparation de réponse | Associer exigences, preuves, tâches et pièces techniques à l’affaire. | C’est le cœur opérationnel avant assemblage des livrables. |
-| 6 | Génération documentaire et contrôle de complétude | Produire les documents demandés par le RC, sans affirmer une conformité automatique. | C’est le résultat visible et vendable à l’entrepreneur. |
-| 7 | Préproduction VPS et DCE réels | Tester flux complet, Docker, ClamAV, sauvegardes, HTTPS et DCE représentatifs. | Aucun client ne doit arriver avant cette preuve de terrain. |
-
-## 7. Ce qui dépend du VPS et ce qui n’en dépend pas
-
-Nous pouvons continuer sans VPS sur les contrats, le backend, les migrations PostgreSQL, les tests d’intégration, la CI GitHub et les écrans React locaux.
-
-Le VPS devient nécessaire pour la vraie préproduction : URL HTTPS, cookies sécurisés dans un navigateur réel, Docker/ClamAV, stockage privé, reverse proxy, sauvegardes, logs, supervision et tests avec des DCE réels. L’absence actuelle de VPS ne bloque donc pas le prochain slice de création de brouillons financiers.
-
-## 8. Décision simple à prendre maintenant
-
-La décision recommandée est : **continuer immédiatement avec la création patron de brouillon financier**, puis ses lignes de chiffrage. Cela donnera une chaîne cohérente : le patron crée un brouillon, le chiffre, puis le publie dans son périmètre confidentiel.
-
-Après cette chaîne financière minimale, nous construirons le cockpit patron web correspondant. Le frontend collaborateur reste en attente d’une URL HTTPS réelle pour son branchement complet, mais cette dépendance ne doit pas arrêter le backend métier.
-
-## 9. Mesure d’avancement honnête
-
-Il serait trompeur d’annoncer un pourcentage unique du logiciel : le socle de sécurité et de traçabilité est très avancé, mais les fonctions qui font gagner du temps au patron sur la production d’une réponse ne sont pas encore réalisées. La bonne lecture est donc la suivante :
-
-| Axe | Niveau actuel | Lecture honnête |
-|---|---|---|
-| Fiabilité de la base technique | Élevé | Les frontières déjà ouvertes ont des contrats, migrations, tests, audits et CI. |
-| Cœur DCE documentaire | Intermédiaire à avancé | Les données sont admises, lues et structurées ; les résultats métier finaux restent à construire. |
-| Collaboration opérationnelle | Intermédiaire | Les droits et interactions existent ; le travail de production d’offre est à développer. |
-| Chiffrage patron | Initial | La confidentialité et la publication sont prêtes ; la saisie et le calcul ne le sont pas. |
-| Produit visible client | Initial à intermédiaire | Un premier wizard collaborateur existe ; le cockpit patron et l’expérience complète manquent. |
-| Prêt à vendre | Non | Il manque encore les pièces de réponse, les validations de terrain et la préproduction VPS. |
-
-## 10. Références internes
+## 8. Références internes
 
 | Document | Rôle |
 |---|---|
-| `docs/PROJECT_STATE.md` | Point de reprise technique et état des slices publiés. |
-| `todo.md` | Checklist durable des travaux restants. |
-| `docs/reference/SMART_AO_V8_PATRON_FINANCIAL_REPORT_PUBLICATION_01_SPEC.md` | Contrat de la dernière frontière financière. |
-| `docs/reference/SMART_AO_V8_ASSIGNMENT_OPENAPI.md` | Registre des quinze opérations HTTP documentées. |
-| `docs/presentations/financial_foundation_slides/slide_notes.md` | Script de présentation de la fondation financière. |
+| [`docs/PROJECT_STATE.md`](PROJECT_STATE.md) | Reprise technique, slices, migrations, validations et risques courants. |
+| [`todo.md`](../todo.md) | Checklist durable des frontières restantes. |
+| [`docs/reference/SMART_AO_V8_ARC_01_CONTRAT_ARBORESCENCE_MODULES.md`](reference/SMART_AO_V8_ARC_01_CONTRAT_ARBORESCENCE_MODULES.md) | Contrat d’arborescence, couches et dépendances. |
+| [`docs/reference/SMART_AO_V8_PREPARATION_COMPLETENESS_01_CONTRAT.md`](reference/SMART_AO_V8_PREPARATION_COMPLETENESS_01_CONTRAT.md) | Contrat de readiness et génération technique contrôlée. |
+| [`docs/AUDIT_REMEDIATION_MATRIX.md`](AUDIT_REMEDIATION_MATRIX.md) | Réconciliation du premier audit. |
+| [`docs/AUDIT2_RELEVANCE_MATRIX.md`](AUDIT2_RELEVANCE_MATRIX.md) | Pertinence du second audit et corrections retenues. |
