@@ -8,16 +8,12 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.modules.dce.infrastructure.models.dce_requirement_confirmations import (
-    DceRequirementConfirmationCurrentRecord,
-)
-from app.modules.dce.infrastructure.models.dce_requirements import DceRequirementRecord
-from app.modules.dce.infrastructure.models.dce_version import DceVersionRecord
-from app.modules.membership.application.collab_info_blockers_commands import _contains_forbidden
+from app.modules.membership.public.text_safety import contains_forbidden_text
 from app.modules.preparation.application.commands import (
     EvaluatePreparationReadinessCommand,
     GenerateTechnicalDocumentCommand,
 )
+from app.modules.preparation.application.ports import PreparationDceReader
 from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
 from app.platform.events.dispatcher import (
     CommandContext,
@@ -220,8 +216,11 @@ class PreparationService:
 class PreparationHandler:
     """Own preparation package revisions, readiness history and document versions."""
 
-    def __init__(self, *, storage: GeneratedDocumentStorage) -> None:
+    def __init__(
+        self, *, storage: GeneratedDocumentStorage, dce_reader: PreparationDceReader
+    ) -> None:
         self._storage = storage
+        self._dce_reader = dce_reader
 
     def execute(self, *, session: Session, command, context: CommandContext) -> HandlerOutcome:
         if context.actor_kind != ActorKind.COLLABORATEUR.value or context.membership_id is None:
@@ -289,11 +288,11 @@ class PreparationHandler:
             self._ensure_assignment(session=session, package=package, context=context)
             if package.aggregate_revision != command.expected_revision:
                 raise CommandExecutionError("VERSION_CONFLICT")
-        dce = session.scalar(
-            sa.select(DceVersionRecord).where(
-                DceVersionRecord.tenant_id == context.tenant_id,
-                DceVersionRecord.id == package.dce_version_id,
-            )
+        dce = self._dce_reader.read(
+            session=session,
+            tenant_id=context.tenant_id,
+            dce_version_id=package.dce_version_id,
+            as_of=context.received_at,
         )
         if dce is None:
             raise CommandExecutionError("DCE_NOT_FOUND_OR_FORBIDDEN")
@@ -301,22 +300,9 @@ class PreparationHandler:
         warning_codes: set[str] = set()
         if dce.analysis_readiness != "READY_FOR_ANALYSIS":
             blocker_codes.add("DCE_NOT_READY")
-        requirements = list(
-            session.scalars(
-                sa.select(DceRequirementRecord).where(
-                    DceRequirementRecord.tenant_id == context.tenant_id,
-                    DceRequirementRecord.dce_version_id == package.dce_version_id,
-                )
-            ).all()
-        )
+        requirements = dce.requirements
         for requirement in requirements:
-            confirmation = session.scalar(
-                sa.select(DceRequirementConfirmationCurrentRecord).where(
-                    DceRequirementConfirmationCurrentRecord.tenant_id == context.tenant_id,
-                    DceRequirementConfirmationCurrentRecord.requirement_id == requirement.id,
-                )
-            )
-            if confirmation is None or confirmation.outcome == "REVIEW_REQUIRED":
+            if requirement.confirmation_outcome in {None, "REVIEW_REQUIRED"}:
                 blocker_codes.add("REQUIREMENT_UNCONFIRMED")
         tasks = list(
             session.scalars(
@@ -440,7 +426,7 @@ class PreparationHandler:
             "case_id": str(package.case_id),
             "assignment_id": str(package.assignment_id),
             "dce_version_id": str(package.dce_version_id),
-            "requirements": sorted(str(item.id) for item in requirements),
+            "requirements": sorted(str(item.requirement_id) for item in requirements),
             "tasks": sorted(str(item.id) for item in tasks),
             "capability_assessments": proposal_proof_manifest,
             "gaps": sorted(
@@ -560,7 +546,7 @@ class PreparationHandler:
             "Ce document est un brouillon technique versionné, réservé au contrôle opérationnel.",
         ]
         content = "\n".join(lines).encode("utf-8")
-        if _contains_forbidden(content.decode("utf-8")):
+        if contains_forbidden_text(content.decode("utf-8")):
             raise CommandExecutionError("FINANCIAL_DATA_FORBIDDEN")
         storage_key = (
             f"generated-documents/{context.tenant_id}/{package.id}/{command.document_id}.md"
@@ -611,6 +597,8 @@ class PreparationHandler:
         )
 
 
-def preparation_handlers(*, storage: GeneratedDocumentStorage) -> dict[str, PreparationHandler]:
-    handler = PreparationHandler(storage=storage)
+def preparation_handlers(
+    *, storage: GeneratedDocumentStorage, dce_reader: PreparationDceReader
+) -> dict[str, PreparationHandler]:
+    handler = PreparationHandler(storage=storage, dce_reader=dce_reader)
     return {command_type: handler for command_type in _PREPARATION_COMMANDS}

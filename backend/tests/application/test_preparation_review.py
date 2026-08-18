@@ -18,6 +18,9 @@ from app.modules.preparation.application.review_commands import (
     RequestPreparationReviewCommand,
 )
 from app.modules.preparation.application.service import PreparationService, preparation_handlers
+from app.modules.preparation.infrastructure.dce_preparation_reader import (
+    SqlAlchemyPreparationDceReader,
+)
 from app.modules.preparation.infrastructure.document_storage import LocalGeneratedDocumentStorage
 from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord
@@ -51,7 +54,10 @@ def services(session_factory: sessionmaker[Session], tmp_path: Path):
     dispatcher = CommandDispatcher(
         session_factory=session_factory,
         handlers={
-            **preparation_handlers(storage=storage),
+            **preparation_handlers(
+                storage=storage,
+                dce_reader=SqlAlchemyPreparationDceReader(),
+            ),
             **preparation_review_handlers(storage=storage),
         },
     )

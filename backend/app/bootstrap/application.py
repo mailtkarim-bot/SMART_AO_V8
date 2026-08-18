@@ -159,6 +159,9 @@ from app.modules.preparation.application.review import (
     preparation_review_handlers,
 )
 from app.modules.preparation.application.service import PreparationService, preparation_handlers
+from app.modules.preparation.infrastructure.dce_preparation_reader import (
+    SqlAlchemyPreparationDceReader,
+)
 from app.modules.preparation.infrastructure.document_storage import (
     LocalGeneratedDocumentStorage,
 )
@@ -228,7 +231,10 @@ class AppRuntime:
                 **collaborator_capability_handlers(),
                 **collaborator_info_blocker_handlers(),
                 **patron_assignment_handlers(),
-                **preparation_handlers(storage=preparation_storage),
+                **preparation_handlers(
+                    storage=preparation_storage,
+                    dce_reader=SqlAlchemyPreparationDceReader(),
+                ),
                 **preparation_review_handlers(storage=preparation_storage),
             },
         )

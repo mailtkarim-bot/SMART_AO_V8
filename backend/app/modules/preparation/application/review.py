@@ -6,7 +6,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.modules.membership.application.collab_info_blockers_commands import _contains_forbidden
+from app.modules.membership.public.text_safety import contains_forbidden_text
 from app.modules.preparation.application.review_commands import (
     AddPreparationCorrectionCommand,
     CreateTechnicalResponseDraftCommand,
@@ -437,7 +437,7 @@ class PreparationReviewHandler:
             f"Sections: {', '.join(sections)}\n"
             f"Sources internes: {', '.join(refs)}\n"
         ).encode()
-        if _contains_forbidden(content.decode("utf-8")):
+        if contains_forbidden_text(content.decode("utf-8")):
             raise CommandExecutionError("FINANCIAL_DATA_FORBIDDEN")
         storage_key = (
             f"technical-response-drafts/{context.tenant_id}/{package.id}/"

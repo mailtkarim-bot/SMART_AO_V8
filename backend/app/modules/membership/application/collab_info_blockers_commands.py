@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from app.modules.dce.application.commands import ApplicationCommand
-from app.modules.membership.application.collab_work_task_commands import _contains_forbidden
+from app.modules.membership.public.text_safety import contains_forbidden_text
 
 
 class CreateInformationRequestCommand(ApplicationCommand):
@@ -33,7 +33,7 @@ class CreateInformationRequestCommand(ApplicationCommand):
 
     @model_validator(mode="after")
     def reject_financial_content(self) -> CreateInformationRequestCommand:
-        if _contains_forbidden(self.subject, self.question, self.requested_object, self.reason):
+        if contains_forbidden_text(self.subject, self.question, self.requested_object, self.reason):
             raise ValueError("FINANCIAL_DATA_FORBIDDEN")
         return self
 
@@ -51,7 +51,7 @@ class RecordInformationRequestResponseCommand(ApplicationCommand):
 
     @model_validator(mode="after")
     def reject_financial_content(self) -> RecordInformationRequestResponseCommand:
-        if _contains_forbidden(self.response_text, self.source_locator or ""):
+        if contains_forbidden_text(self.response_text, self.source_locator or ""):
             raise ValueError("FINANCIAL_DATA_FORBIDDEN")
         return self
 
@@ -76,7 +76,7 @@ class DeclareTaskBlockerCommand(ApplicationCommand):
 
     @model_validator(mode="after")
     def reject_financial_content(self) -> DeclareTaskBlockerCommand:
-        if _contains_forbidden(self.description, self.source_locator or ""):
+        if contains_forbidden_text(self.description, self.source_locator or ""):
             raise ValueError("FINANCIAL_DATA_FORBIDDEN")
         return self
 
@@ -93,6 +93,6 @@ class ResolveTaskBlockerCommand(ApplicationCommand):
 
     @model_validator(mode="after")
     def reject_financial_content(self) -> ResolveTaskBlockerCommand:
-        if _contains_forbidden(self.resolution_note):
+        if contains_forbidden_text(self.resolution_note):
             raise ValueError("FINANCIAL_DATA_FORBIDDEN")
         return self

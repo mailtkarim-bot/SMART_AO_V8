@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from app.modules.dce.application.commands import ApplicationCommand
-from app.modules.membership.application.collab_work_task_commands import _contains_forbidden
+from app.modules.membership.public.text_safety import contains_forbidden_text
 
 
 class ProposeCapabilityForCaseCommand(ApplicationCommand):
@@ -28,7 +28,7 @@ class ProposeCapabilityForCaseCommand(ApplicationCommand):
     def validate_source_and_text(self) -> ProposeCapabilityForCaseCommand:
         if self.requirement_id is None and self.task_id is None:
             raise ValueError("CAPABILITY_SOURCE_REQUIRED")
-        if _contains_forbidden(self.justification, self.source_locator or ""):
+        if contains_forbidden_text(self.justification, self.source_locator or ""):
             raise ValueError("FINANCIAL_DATA_FORBIDDEN")
         return self
 
@@ -54,6 +54,6 @@ class ReportCapabilityGapCommand(ApplicationCommand):
     def validate_source_and_text(self) -> ReportCapabilityGapCommand:
         if self.requirement_id is None and self.task_id is None:
             raise ValueError("CAPABILITY_SOURCE_REQUIRED")
-        if _contains_forbidden(self.reason, self.source_locator or "", self.recommended_action):
+        if contains_forbidden_text(self.reason, self.source_locator or "", self.recommended_action):
             raise ValueError("FINANCIAL_DATA_FORBIDDEN")
         return self

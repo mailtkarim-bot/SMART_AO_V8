@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from app.modules.dce.application.commands import ApplicationCommand
+from app.platform.events.command_contracts import ApplicationCommand
 
 _FINANCIAL_TERMS = (
     "prix",

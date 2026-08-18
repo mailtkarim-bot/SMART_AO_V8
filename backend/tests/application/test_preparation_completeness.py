@@ -16,6 +16,9 @@ from app.modules.preparation.application.commands import (
     GenerateTechnicalDocumentCommand,
 )
 from app.modules.preparation.application.service import PreparationService, preparation_handlers
+from app.modules.preparation.infrastructure.dce_preparation_reader import (
+    SqlAlchemyPreparationDceReader,
+)
 from app.modules.preparation.infrastructure.document_storage import LocalGeneratedDocumentStorage
 from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord
@@ -50,7 +53,10 @@ def preparation_service(
     storage = LocalGeneratedDocumentStorage(root=tmp_path / "dce-private")
     dispatcher = CommandDispatcher(
         session_factory=session_factory,
-        handlers=preparation_handlers(storage=storage),
+        handlers=preparation_handlers(
+            storage=storage,
+            dce_reader=SqlAlchemyPreparationDceReader(),
+        ),
     )
     return PreparationService(
         session_factory=session_factory,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -8,13 +7,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from app.modules.dce.application.commands import ApplicationCommand
-
-_FORBIDDEN_FINANCIAL_TERMS = re.compile(
-    r"\b(price|prix|cost|coût|cout|margin|marge|treasury|trésorerie|tresorerie|"
-    r"financial|financier|finance|go/no-go|go_no_go|deposit|dépôt|depot|"
-    r"submission|soumission|chiffrage)\b",
-    re.IGNORECASE,
-)
+from app.modules.membership.public.text_safety import contains_forbidden_text
 
 
 class CreateTaskFromRequirementCommand(ApplicationCommand):
@@ -39,7 +32,7 @@ class CreateTaskFromRequirementCommand(ApplicationCommand):
 
     @model_validator(mode="after")
     def reject_financial_content(self) -> CreateTaskFromRequirementCommand:
-        if _contains_forbidden(self.title, self.objective):
+        if contains_forbidden_text(self.title, self.objective):
             raise ValueError("FINANCIAL_DATA_FORBIDDEN")
         return self
 
@@ -66,7 +59,7 @@ class RecordTaskResultCommand(ApplicationCommand):
 
     @model_validator(mode="after")
     def validate_result(self) -> RecordTaskResultCommand:
-        if _contains_forbidden(self.result_text, self.source_locator or ""):
+        if contains_forbidden_text(self.result_text, self.source_locator or ""):
             raise ValueError("FINANCIAL_DATA_FORBIDDEN")
         return self
 
@@ -78,7 +71,3 @@ class CompleteTaskCommand(ApplicationCommand):
 
     task_id: UUID
     expected_revision: int = Field(ge=0)
-
-
-def _contains_forbidden(*values: str) -> bool:
-    return any(_FORBIDDEN_FINANCIAL_TERMS.search(value) for value in values)
