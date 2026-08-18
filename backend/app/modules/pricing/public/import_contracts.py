@@ -17,6 +17,37 @@ class PricingImportRowResponse(BaseModel):
     errors: list[str]
 
 
+class PricingImportAggregateReferenceResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    aggregate_type: str
+    aggregate_id: UUID
+    aggregate_revision: int = Field(ge=1)
+
+
+class CommitPricingImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    report_id: UUID
+    expected_batch_revision: int = Field(gt=0)
+    expected_report_revision: int = Field(ge=0)
+
+
+class PricingImportCommitResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal["PRICING_IMPORT_COMMITTED"]
+    aggregate_refs: list[PricingImportAggregateReferenceResponse]
+    event_ids: list[UUID]
+    replayed: bool = False
+
+
 class PricingImportPreviewResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

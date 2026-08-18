@@ -1769,10 +1769,16 @@ class PricingImportRowRecord(TenantScopedRecord, Base):
         sa.UniqueConstraint("tenant_id", "id", name="uq_pricing_import_rows__tenant_id"),
         sa.UniqueConstraint("tenant_id", "batch_id", "row_number", name="uq_pricing_import_row_number"),
         sa.CheckConstraint("row_number >= 1", name="row_number_positive"),
-        sa.CheckConstraint("length(trim(designation)) > 0", name="designation"),
-        sa.CheckConstraint("quantity_decimal <> ''", name="quantity_decimal_non_empty"),
-        sa.CheckConstraint("unit_price_minor >= 0", name="unit_price_non_negative"),
-        sa.CheckConstraint("total_minor >= 0", name="total_non_negative"),
+        sa.CheckConstraint(
+            "designation IS NULL OR length(trim(designation)) > 0", name="designation"
+        ),
+        sa.CheckConstraint(
+            "quantity_decimal IS NULL OR quantity_decimal <> ''", name="quantity_decimal_non_empty"
+        ),
+        sa.CheckConstraint(
+            "unit_price_minor IS NULL OR unit_price_minor >= 0", name="unit_price_non_negative"
+        ),
+        sa.CheckConstraint("total_minor IS NULL OR total_minor >= 0", name="total_non_negative"),
         sa.Index("ix_pricing_import_rows__tenant_batch", "tenant_id", "batch_id", "row_number"),
     )
 
@@ -1780,12 +1786,54 @@ class PricingImportRowRecord(TenantScopedRecord, Base):
     batch_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     row_number: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     code: Mapped[str | None] = mapped_column(sa.String(120))
-    designation: Mapped[str] = mapped_column(sa.String(500), nullable=False)
+    designation: Mapped[str | None] = mapped_column(sa.String(500))
     unit: Mapped[str | None] = mapped_column(sa.String(32))
-    quantity_decimal: Mapped[str] = mapped_column(sa.String(32), nullable=False)
-    unit_price_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
-    total_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    quantity_decimal: Mapped[str | None] = mapped_column(sa.String(32))
+    unit_price_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
+    total_minor: Mapped[int | None] = mapped_column(sa.BigInteger)
     error_codes_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+
+
+class PricingImportTransitionRecord(TenantScopedRecord, Base):
+    """Append-only lifecycle transition for one normalized pricing import batch."""
+
+    __tablename__ = "pricing_import_transitions"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name="fk_pricing_import_transitions__tenant", ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "batch_id"],
+            ["pricing_import_batches.tenant_id", "pricing_import_batches.id"],
+            name="fk_pricing_import_transitions__batch",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_pricing_import_transitions__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "batch_id", "version", name="uq_pricing_import_transition_version"
+        ),
+        sa.UniqueConstraint("tenant_id", "command_id", name="uq_pricing_import_transition_command"),
+        sa.CheckConstraint("version > 1", name="version_positive"),
+        sa.CheckConstraint("from_state = 'PREVIEWED'", name="from_state"),
+        sa.CheckConstraint("to_state = 'COMMITTED'", name="to_state"),
+        sa.Index(
+            "ix_pricing_import_transitions__tenant_batch_version",
+            "tenant_id",
+            "batch_id",
+            "version",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    batch_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    from_state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    to_state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
 
 
 class PatronActionRecord(TenantScopedRecord, Base):

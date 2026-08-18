@@ -191,6 +191,10 @@ from app.modules.preparation.infrastructure.document_storage import (
     LocalGeneratedDocumentStorage,
 )
 from app.modules.pricing.application.import_preview import PricingImportPreviewService
+from app.modules.pricing.application.import_service import (
+    PricingImportService,
+    pricing_import_handlers,
+)
 from app.modules.pricing.application.service import (
     PricingScenarioService,
     pricing_scenario_handlers,
@@ -279,6 +283,7 @@ class AppRuntime:
                 **patron_action_transition_handlers(),
                 **pricing_scenario_handlers(),
                 **pricing_scenario_transition_handlers(),
+                **pricing_import_handlers(),
                 **preparation_review_handlers(storage=preparation_storage),
                 **submission_handlers(),
                 **submission_evidence_handlers(),
@@ -599,6 +604,11 @@ def create_app(
             policy=security_policy,
         )
         pricing_import_preview_service = PricingImportPreviewService(policy=security_policy)
+        pricing_import_service = PricingImportService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -756,6 +766,7 @@ def create_app(
         app.include_router(
             build_patron_pricing_import_router(
                 service=pricing_import_preview_service,
+                commit_service=pricing_import_service,
                 security_runtime=security_runtime,
             )
         )
