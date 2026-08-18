@@ -63,6 +63,7 @@ from app.interfaces.http.routes.patron_enterprise_library import (
 from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
 )
+from app.interfaces.http.routes.patron_submission import build_patron_submission_router
 from app.interfaces.http.routes.preparation import (
     build_preparation_review_router,
     build_preparation_router,
@@ -165,6 +166,7 @@ from app.modules.preparation.infrastructure.dce_preparation_reader import (
 from app.modules.preparation.infrastructure.document_storage import (
     LocalGeneratedDocumentStorage,
 )
+from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.observability.http import RequestObservabilityMiddleware
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
@@ -236,6 +238,7 @@ class AppRuntime:
                     dce_reader=SqlAlchemyPreparationDceReader(),
                 ),
                 **preparation_review_handlers(storage=preparation_storage),
+                **submission_handlers(),
             },
         )
         upload_service = (
@@ -570,6 +573,11 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        submission_package_service = SubmissionPackageService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         app.include_router(
             build_case_dce_reading_router(
                 runtime=runtime,
@@ -666,6 +674,12 @@ def create_app(
                 line_service=patron_financial_report_line_service,
                 draft_creation_service=patron_financial_report_draft_creation_service,
                 publication_service=patron_financial_report_publication_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_submission_router(
+                service=submission_package_service,
                 security_runtime=security_runtime,
             )
         )
