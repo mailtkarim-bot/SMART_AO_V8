@@ -208,6 +208,7 @@ from app.modules.submission.application.evidence_service import (
     submission_evidence_handlers,
 )
 from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
+from app.modules.submission.application.signature_service import submission_signature_handlers
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.observability.http import RequestObservabilityMiddleware
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
@@ -287,6 +288,7 @@ class AppRuntime:
                 **preparation_review_handlers(storage=preparation_storage),
                 **submission_handlers(),
                 **submission_evidence_handlers(),
+                **submission_signature_handlers(),
             },
         )
         upload_service = (

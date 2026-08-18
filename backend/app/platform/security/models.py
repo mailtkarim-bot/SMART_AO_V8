@@ -2131,6 +2131,56 @@ class SubmissionPackageRecord(TenantScopedRecord, Base):
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
 
 
+class SubmissionSignatureRecord(TenantScopedRecord, Base):
+    """Append-only electronic-signature intent and provider proof."""
+
+    __tablename__ = "submission_signatures"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_submission_signatures__tenants__tenant_id",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "submission_package_id"],
+            ["submission_packages.tenant_id", "submission_packages.id"],
+            name="fk_submission_signatures__submission_packages__tenant_id",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_submission_signatures__tenant_id"),
+        sa.UniqueConstraint("tenant_id", "command_id", name="uq_submission_signatures__tenant_command"),
+        sa.CheckConstraint(
+            "status IN ('REQUESTED', 'SIGNED', 'REJECTED')", name="status"
+        ),
+        sa.CheckConstraint("expected_package_version > 0", name="expected_package_version"),
+        sa.CheckConstraint(
+            "provider_reference_hash IS NULL OR provider_reference_hash ~ '^[a-f0-9]{64}$'",
+            name="provider_reference_hash",
+        ),
+        sa.CheckConstraint(
+            "signature_sha256 IS NULL OR signature_sha256 ~ '^[a-f0-9]{64}$'",
+            name="signature_sha256",
+        ),
+        sa.Index("ix_submission_signatures__tenant_package", "tenant_id", "submission_package_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    submission_package_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    case_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    provider: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    signer_membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    expected_package_version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    provider_reference_hash: Mapped[str | None] = mapped_column(sa.CHAR(64))
+    signature_sha256: Mapped[str | None] = mapped_column(sa.CHAR(64))
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
 class SubmissionEvidenceRecord(TenantScopedRecord, Base):
     """Human-provided evidence; it never asserts automated external submission success."""
 
