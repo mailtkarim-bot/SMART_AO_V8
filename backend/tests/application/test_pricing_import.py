@@ -4,12 +4,17 @@ from uuid import uuid4
 
 import pytest
 from app.modules.pricing.application.import_preview import PricingImportPreviewService
-from app.platform.security.authorization import AuthorizationPolicy
+from app.platform.security.authorization import AuthorizationDecision, AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
 from app.platform.security.context import ActorKind
 from openpyxl import Workbook
 
 from tests.application.test_financial_report_draft_lines import _seed_draft
+
+
+class _DenyPolicy:
+    def authorize(self, *, context, request):
+        return AuthorizationDecision.denied(reason="test")
 
 
 def _xlsx(rows: list[list[object]]) -> bytes:
@@ -26,7 +31,7 @@ def test_pricing_import_preview_parses_dpgf_rows_without_persisting_raw_file(ses
     actor, case_id, _, _ = _seed_draft(session_factory)
     payload = _xlsx(
         [
-            ["Code", "Désignation", "Unité", "Quantité", "Prix unitaire"],
+            ["Code", "Désignation", "Unité", "Quantité", "Prix unitaire", "Colonne ignorée"],
             ["A-01", "Terrassement", "m2", 10, 12.5],
             ["A-02", "Fondations", "m3", 2, 100],
         ]
@@ -66,6 +71,19 @@ def test_pricing_import_preview_reports_missing_designation_and_refuses_non_xlsx
             filename="bordereau.xlsm",
             content_type=None,
             payload=payload,
+        )
+
+
+def test_pricing_import_preview_refuses_policy_denied_patron(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    with pytest.raises(PermissionError, match="AUTHORIZATION_DENIED"):
+        PricingImportPreviewService(policy=_DenyPolicy()).preview(
+            actor=actor,
+            case_id=case_id,
+            document_kind="EXCEL",
+            filename="bordereau.xlsx",
+            content_type=None,
+            payload=b"not-read",
         )
 
 
@@ -170,3 +188,75 @@ def test_pricing_import_preview_reports_invalid_row_values(session_factory):
     assert preview.valid_row_count == 0
     assert preview.error_count >= 3
     assert {"QUANTITY_INVALID", "PRICE_REQUIRED"}.issubset(preview.rows[0].errors)
+
+
+def test_pricing_import_preview_bounds_error_collection_and_bad_numbers(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    preview = PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+        actor=actor,
+        case_id=case_id,
+        document_kind="DPGF",
+        filename="large-invalid.xlsx",
+        content_type=None,
+        payload=_xlsx(
+            [["Désignation", "Quantité", "Prix unitaire"]]
+            + [[" ", "not-a-number", "not-a-price"] for _ in range(50)]
+        ),
+    )
+    assert preview.error_count == 102
+    assert preview.valid_row_count == 0
+    assert preview.row_count == 34
+
+
+def test_pricing_import_preview_ignores_blank_rows_and_defaults_quantity(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    preview = PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+        actor=actor,
+        case_id=case_id,
+        document_kind="BPU",
+        filename="defaults.xlsx",
+        content_type=None,
+        payload=_xlsx(
+            [
+                ["Désignation", "Quantité", "Prix unitaire"],
+                [None, None, None],
+                ["Sans quantité", None, 5],
+            ]
+        ),
+    )
+    assert preview.row_count == 1
+    assert preview.rows[0].quantity_decimal == "1"
+    assert preview.rows[0].total_minor == 500
+
+
+def test_pricing_import_preview_rejects_zip_bomb_metadata(session_factory, monkeypatch):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+
+    class _HugeArchive:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def namelist(self):
+            return []
+
+        def infolist(self):
+            return [type("Info", (), {"file_size": 50 * 1024 * 1024 + 1})()]
+
+    monkeypatch.setattr(
+        "app.modules.pricing.application.import_preview.ZipFile", _HugeArchive
+    )
+    with pytest.raises(ValueError, match="IMPORT_ARCHIVE_TOO_LARGE"):
+        PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+            actor=actor,
+            case_id=case_id,
+            document_kind="EXCEL",
+            filename="bomb.xlsx",
+            content_type=None,
+            payload=b"metadata-only",
+        )
