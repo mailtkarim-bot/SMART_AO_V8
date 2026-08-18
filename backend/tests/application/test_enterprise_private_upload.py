@@ -23,6 +23,7 @@ from app.platform.security.capabilities import capabilities_for
 from app.platform.security.context import ActorContext, ActorKind, MembershipState
 from app.platform.security.models import (
     EnterpriseCompanyRecord,
+    EnterpriseDocumentRecord,
     EnterpriseDocumentUploadRecord,
     IdentityRecord,
     TenantMembershipRecord,
@@ -200,10 +201,43 @@ def test_private_enterprise_upload_hashes_scans_and_marks_clean(
     assert result.state == "CLEAN"
     with session_factory() as session:
         row = session.get(EnterpriseDocumentUploadRecord, upload_id)
+        document = (
+            session.get(EnterpriseDocumentRecord, UUID(str(row.document_id))) if row else None
+        )
     assert (
         row is not None and row.state == "CLEAN" and row.sha256 == sha256(b"%PDF-1.7").hexdigest()
     )
+    assert document is not None
+    assert document.verification_status == "PENDING"
+    assert document.storage_object_id == upload_id
     assert scanner.calls == 1 and storage.objects[storage_key] == b"%PDF-1.7"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+@pytest.mark.security
+def test_private_enterprise_upload_replays_clean_materialization_without_duplicate(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, _, upload_id, _, _ = _seed(session_factory)
+    storage, scanner = MemoryStorage(), StaticScanner("CLEAN")
+    service = _service(session_factory, storage, scanner)
+    first = asyncio.run(
+        service.upload(
+            actor=actor, upload_id=upload_id, stream=_stream(b"%PDF-1.7"), content_length=8
+        )
+    )
+    replay = asyncio.run(
+        service.upload(
+            actor=actor, upload_id=upload_id, stream=_stream(b"ignored"), content_length=7
+        )
+    )
+    with session_factory() as session:
+        document_count = session.scalar(
+            sa.select(sa.func.count()).select_from(EnterpriseDocumentRecord)
+        )
+    assert first.state == "CLEAN" and replay.state == "CLEAN"
+    assert scanner.calls == 1 and document_count == 1
 
 
 @pytest.mark.db

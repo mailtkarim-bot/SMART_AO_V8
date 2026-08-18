@@ -3,14 +3,15 @@ from __future__ import annotations
 from collections.abc import AsyncIterable
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from uuid import UUID
+from datetime import UTC, datetime, timedelta
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.enterprise.application.enterprise_library import EnterpriseLibraryService
 from app.modules.enterprise.application.enterprise_upload_commands import (
+    FinalizeEnterpriseDocumentUploadCommand,
     PrepareEnterpriseDocumentUploadCommand,
     VerifyEnterpriseDocumentCommand,
 )
@@ -39,12 +40,18 @@ from app.platform.storage.quarantine import (
 
 @dataclass(frozen=True, slots=True)
 class EnterpriseUploadTarget:
+    upload_id: UUID
     tenant_id: UUID
     company_id: UUID
     document_id: UUID
+    document_kind: str
+    document_label: str
+    original_filename: str
     storage_key: str
     expected_byte_size: int
+    expires_at: datetime
     state: str
+    sha256: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,12 +113,18 @@ class EnterprisePrivateUploadService:
             if record is None:
                 return None
             return EnterpriseUploadTarget(
-                record.tenant_id,
-                record.company_id,
-                record.document_id,
-                record.storage_key,
-                record.expected_byte_size,
-                record.state,
+                upload_id=record.id,
+                tenant_id=record.tenant_id,
+                company_id=record.company_id,
+                document_id=record.document_id,
+                document_kind=record.document_kind,
+                document_label=record.document_label,
+                original_filename=record.original_filename,
+                storage_key=record.storage_key,
+                expected_byte_size=record.expected_byte_size,
+                expires_at=record.expires_at,
+                state=record.state,
+                sha256=record.sha256,
             )
 
     async def upload(
@@ -140,10 +153,20 @@ class EnterprisePrivateUploadService:
             )
             if row is None:
                 raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
-            if row.state != "AWAITING_UPLOAD":
+            if row.state == "CLEAN":
+                existing_document = session.scalar(
+                    sa.select(EnterpriseDocumentRecord).where(
+                        EnterpriseDocumentRecord.tenant_id == actor.tenant_id,
+                        EnterpriseDocumentRecord.id == row.document_id,
+                    )
+                )
+                if existing_document is not None:
+                    return EnterpriseUploadResult(upload_id=upload_id, state="CLEAN")
+            elif row.state != "AWAITING_UPLOAD":
                 raise EnterpriseUploadAlreadyClaimedError()
-            row.state = "UPLOADING"
-            session.commit()
+            else:
+                row.state = "UPLOADING"
+                session.commit()
         if content_length is not None and content_length > self._max_bytes:
             self._reject(upload_id=upload_id, code="UPLOAD_LIMIT_EXCEEDED")
             raise EnterpriseUploadRejectedError(status_code=413)
@@ -196,6 +219,10 @@ class EnterprisePrivateUploadService:
             if scan.verdict != "CLEAN":
                 await self._storage.delete(storage_key=target.storage_key)
                 raise EnterpriseUploadRejectedError()
+            clean_target = self.target(tenant_id=actor.tenant_id, upload_id=upload_id)
+            if clean_target is None or clean_target.sha256 is None:
+                raise EnterpriseUploadRejectedError()
+            self._finalize_clean_upload(actor=actor, target=clean_target)
             return EnterpriseUploadResult(upload_id=upload_id, state="CLEAN")
         except EnterpriseUploadRejectedError:
             raise
@@ -222,6 +249,21 @@ class EnterprisePrivateUploadService:
         if document is None:
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
         return self._dispatcher.dispatch(command=command, context=self._context(actor, now))
+
+    def _finalize_clean_upload(
+        self, *, actor: ActorContext, target: EnterpriseUploadTarget
+    ) -> None:
+        self._dispatcher.dispatch(
+            command=FinalizeEnterpriseDocumentUploadCommand(
+                command_id=uuid5(NAMESPACE_URL, f"enterprise-finalize:{target.upload_id}"),
+                idempotency_key=uuid5(NAMESPACE_URL, f"enterprise-finalize-key:{target.upload_id}"),
+                correlation_id=actor.correlation_id,
+                upload_id=target.upload_id,
+                company_id=target.company_id,
+                document_id=target.document_id,
+            ),
+            context=self._context(actor, datetime.now(tz=UTC)),
+        )
 
     def _reject(self, *, upload_id: UUID, code: str) -> None:
         with self._session_factory() as session:
@@ -323,6 +365,100 @@ class PrepareEnterpriseDocumentUploadHandler:
         )
 
 
+class FinalizeEnterpriseDocumentUploadHandler:
+    def execute(
+        self,
+        *,
+        session: Session,
+        command: FinalizeEnterpriseDocumentUploadCommand,
+        context: CommandContext,
+    ) -> HandlerOutcome:
+        if context.actor_kind != ActorKind.PATRON_ADMIN.value or context.membership_id is None:
+            raise CommandExecutionError("ENTERPRISE_LIBRARY_PATRON_REQUIRED")
+        upload = session.scalar(
+            sa.select(EnterpriseDocumentUploadRecord)
+            .where(
+                EnterpriseDocumentUploadRecord.tenant_id == context.tenant_id,
+                EnterpriseDocumentUploadRecord.id == command.upload_id,
+                EnterpriseDocumentUploadRecord.company_id == command.company_id,
+                EnterpriseDocumentUploadRecord.document_id == command.document_id,
+            )
+            .with_for_update()
+        )
+        if upload is None:
+            raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
+        if upload.state != "CLEAN" or upload.sha256 is None:
+            raise CommandExecutionError("DOCUMENT_UPLOAD_NOT_CLEAN")
+        company = session.scalar(
+            sa.select(EnterpriseCompanyRecord)
+            .where(
+                EnterpriseCompanyRecord.tenant_id == context.tenant_id,
+                EnterpriseCompanyRecord.id == command.company_id,
+            )
+            .with_for_update()
+        )
+        if company is None:
+            raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
+        existing = session.scalar(
+            sa.select(EnterpriseDocumentRecord).where(
+                EnterpriseDocumentRecord.tenant_id == context.tenant_id,
+                EnterpriseDocumentRecord.id == command.document_id,
+            )
+        )
+        if existing is not None:
+            raise CommandExecutionError("ENTERPRISE_DOCUMENT_ALREADY_EXISTS")
+        session.add(
+            EnterpriseDocumentRecord(
+                id=command.document_id,
+                tenant_id=context.tenant_id,
+                company_id=command.company_id,
+                document_kind=upload.document_kind,
+                document_label=upload.document_label,
+                storage_object_id=command.upload_id,
+                original_filename=upload.original_filename,
+                issued_at=min(
+                    context.received_at, upload.expires_at - timedelta(microseconds=1)
+                ),
+                expires_at=upload.expires_at,
+                sha256=upload.sha256,
+                verification_status="PENDING",
+                registered_by_membership_id=context.membership_id,
+                command_id=command.command_id,
+                idempotency_key=command.idempotency_key,
+                correlation_id=command.correlation_id,
+            )
+        )
+        company.aggregate_revision += 1
+        return HandlerOutcome(
+            result_code="ENTERPRISE_DOCUMENT_REGISTERED",
+            aggregate_refs=(
+                {
+                    "aggregate_type": "EnterpriseCompany",
+                    "aggregate_id": str(company.id),
+                    "aggregate_revision": company.aggregate_revision,
+                },
+                {
+                    "aggregate_type": "EnterpriseDocument",
+                    "aggregate_id": str(command.document_id),
+                    "aggregate_revision": 0,
+                },
+            ),
+            events=(
+                PendingDomainEvent(
+                    aggregate_type="EnterpriseCompany",
+                    aggregate_id=company.id,
+                    aggregate_revision=company.aggregate_revision,
+                    event_type="EnterpriseDocumentRegistered",
+                    payload={
+                        "company_id": str(company.id),
+                        "document_id": str(command.document_id),
+                        "source": "PRIVATE_UPLOAD_CLEAN",
+                    },
+                ),
+            ),
+        )
+
+
 class VerifyEnterpriseDocumentHandler:
     def execute(
         self, *, session: Session, command: VerifyEnterpriseDocumentCommand, context: CommandContext
@@ -401,5 +537,6 @@ class VerifyEnterpriseDocumentHandler:
 def enterprise_upload_handlers() -> dict[str, object]:
     return {
         "PrepareEnterpriseDocumentUpload": PrepareEnterpriseDocumentUploadHandler(),
+        "FinalizeEnterpriseDocumentUpload": FinalizeEnterpriseDocumentUploadHandler(),
         "VerifyEnterpriseDocument": VerifyEnterpriseDocumentHandler(),
     }

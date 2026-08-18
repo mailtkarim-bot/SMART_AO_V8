@@ -31,6 +31,16 @@ class PrepareEnterpriseDocumentUploadCommand(ApplicationCommand):
         return self
 
 
+class FinalizeEnterpriseDocumentUploadCommand(ApplicationCommand):
+    """Materialize a scanned-clean private upload as an immutable enterprise document."""
+
+    command_type = "FinalizeEnterpriseDocumentUpload"
+
+    upload_id: UUID
+    company_id: UUID
+    document_id: UUID
+
+
 class VerifyEnterpriseDocumentCommand(ApplicationCommand):
     """Append one human verification decision for a clean enterprise document."""
 
