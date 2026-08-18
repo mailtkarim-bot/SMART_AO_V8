@@ -209,6 +209,47 @@ export type EnterpriseDocumentUploadInput = {
   expires_at: string;
 };
 
+export type EnterpriseCapabilityKind = "QUALIFICATION" | "REFERENCE" | "EQUIPMENT" | "TEAM" | "METHOD";
+
+export type EnterpriseCapabilityVersion = {
+  version_id: string;
+  version_number: number;
+  title: string;
+  description: string;
+  valid_from: string;
+  valid_until: string | null;
+  usage_scope: string;
+  proof_document_ids: string[];
+};
+
+export type EnterpriseCapability = {
+  capability_id: string;
+  company_id: string;
+  aggregate_revision: number;
+  capability_kind: EnterpriseCapabilityKind;
+  name: string;
+  summary: string;
+  state: "ACTIVE" | "SUSPENDED" | "RETIRED";
+  versions: EnterpriseCapabilityVersion[];
+};
+
+export type EnterpriseCapabilityInput = {
+  capability_kind: EnterpriseCapabilityKind;
+  name: string;
+  summary: string;
+  state?: "ACTIVE" | "SUSPENDED" | "RETIRED";
+};
+
+export type EnterpriseCapabilityVersionInput = {
+  expected_revision: number;
+  title: string;
+  description: string;
+  valid_from: string;
+  valid_until?: string;
+  usage_scope: string;
+  proof_document_ids?: string[];
+};
+
 export type EnterpriseDocumentVerificationInput = {
   expected_verification_revision: number;
   outcome: "VALIDATED" | "REJECTED";

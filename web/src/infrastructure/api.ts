@@ -21,6 +21,9 @@ import type {
   EnterpriseDocumentVerificationInput,
   EnterpriseReceipt,
   EnterpriseUploadReceipt,
+  EnterpriseCapability,
+  EnterpriseCapabilityInput,
+  EnterpriseCapabilityVersionInput,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -73,6 +76,29 @@ export function createApiClient(baseUrl: string, token: string) {
     listPricingScenarios: (caseId: string) =>
       request<PricingScenario[]>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/pricing-scenarios`,
+      ),
+    listEnterpriseCapabilities: (companyId: string) =>
+      request<{ capabilities: EnterpriseCapability[] }>(
+        `/api/v1/patron/enterprise/companies/${encodeURIComponent(companyId)}/capabilities`,
+      ),
+    createEnterpriseCapability: (companyId: string, input: EnterpriseCapabilityInput) =>
+      request<EnterpriseReceipt>(
+        `/api/v1/patron/enterprise/companies/${encodeURIComponent(companyId)}/capabilities`,
+        {
+          method: "POST",
+          body: JSON.stringify({ command_id: makeId(), idempotency_key: makeId(), ...input }),
+        },
+      ),
+    addEnterpriseCapabilityVersion: (
+      capabilityId: string,
+      input: EnterpriseCapabilityVersionInput,
+    ) =>
+      request<EnterpriseReceipt>(
+        `/api/v1/patron/enterprise/capabilities/${encodeURIComponent(capabilityId)}/versions`,
+        {
+          method: "POST",
+          body: JSON.stringify({ command_id: makeId(), idempotency_key: makeId(), ...input }),
+        },
       ),
     getEnterpriseCompany: () =>
       request<EnterpriseCompany>("/api/v1/patron/enterprise/company"),
