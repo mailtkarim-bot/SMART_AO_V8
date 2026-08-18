@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`OPS/VPS-7B` — livré sur la branche `ops/vps-deploy-health-digests-01` après `PREPARATION-READINESS-EVIDENCE-05C` et `COLLAB-REVIEW/RESPONSE-DRAFT-05D`. Le dépôt contient désormais le backup vérifiable, la restauration isolée, le healthcheck opérateur, la rotation bornée des logs, les timers systemd et la rotation JWT manuelle ; l’exécution sur un VPS réel reste la seule frontière opérationnelle non démontrée.
+`AUDIT-REMEDIATION-01` — corrections confirmées des deux audits publiées sur la branche `ops/vps-deploy-health-digests-01`. Le dépôt contient maintenant la protection anti-brute-force, la centralisation hermétique des fixtures PostgreSQL, l’observabilité structurée, le runtime backend non-root, les dépendances frontend reproductibles, le seuil de couverture et les scénarios de concurrence déterministes. L’exécution sur un VPS réel reste volontairement hors environnement disponible.
 
 > **Vue propriétaire :** lire d’abord [`PROJECT_PROGRESS_REPORT.md`](PROJECT_PROGRESS_REPORT.md) pour la photographie métier globale, les capacités réellement livrées, les limites actuelles et l’ordre de travail recommandé. Lire ensuite ce fichier pour reprendre l’exécution technique d’un slice.
 
@@ -9,13 +9,12 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | `OPS/VPS-7B` publié par [`8965a43`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/8965a43). |
-| Branche | `ops/vps-deploy-health-digests-01`, PR [#10](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/10), base `feat/enterprise-capability-foundation-01`. |
-| Commit précédent | DCE-CLASSIFICATION-01 publié sur `main` : [`e099f2a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/e099f2a), contrat normatif, migration `0015`, classifieur déterministe, registre append-only, projection courante historisée et tests dédiés. |
-| Migration Alembic | `20260817_0035` ajoutée pour les revues versionnées, corrections ciblées et brouillons techniques ; upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` validés sur PostgreSQL local. |
-| Migration précédente | `20260814_0015` validée : upgrade frais depuis `base`, `alembic check` sans écart puis downgrade vers `base` sur PostgreSQL local. La base locale est volontairement revenue à `base`. |
-| Validation locale courante | **387 tests backend verts**, dont revue/correction/brouillon, contrat OPS, 5c, E2E capability et healthchecks ; Ruff, detect-secrets, Bandit ciblé, `git diff --check`, cycle Alembic et build frontend TypeScript strict verts. |
-| CI | Le workflow [#32070896704](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32070896704) du commit 7b et le workflow [#32068934417](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32068934417) du commit 5d sont **verts** pour backend, frontend et image-security. |
+| Commit courant | `e3eafc7` — couverture et scénarios de concurrence déterministes. |
+| Branche | `ops/vps-deploy-health-digests-01`, PR [#10](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/10). |
+| Corrections précédentes | `025c36d` anti-brute-force ; `aac4de0` fixtures PostgreSQL ; `0ecb24c`/`0ab3cbc` observabilité et runtime non-root ; `d4b33fe` dépendances frontend figées. |
+| Validation locale courante | **402 tests backend verts**, couverture branchée **89,32 %** avec seuil `85 %`, Ruff, detect-secrets, Bandit ciblé, `git diff --check`, cycle Alembic et build frontend TypeScript strict verts. |
+| CI | `32083322693` est verte sur `e3eafc7`; les CI précédentes `32081102590`, `32080763983` et `32078237301` sont également vertes. |
+| Frontière restante | Le gate VPS réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts, car aucun VPS utilisateur n’est disponible. |
 
 ## Ce qui est terminé
 
