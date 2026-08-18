@@ -111,3 +111,37 @@ La campagne est acceptée uniquement si :
 - le rapport contient toutes les preuves exigées.
 
 Une seule violation de confidentialité ou de conservation outbox entraîne un statut **REFUSÉ**, indépendamment des performances.
+
+## 10. Scripts d’automatisation livrés
+
+Le dépôt fournit maintenant trois outils opérateur et un comparateur de couverture :
+
+| Script | Usage |
+|---|---|
+| `scripts/run_vps_compression_campaign.py` | Répète les profils ZIP à froid et à chaud, calcule médiane/p95, hashes et CPU process |
+| `scripts/run_vps_load_campaign.py` | Envoie une charge GET bornée vers des chemins de test, avec concurrence contrôlée et rapport JSON sans body |
+| `scripts/collect_coverage_diagnostics.py` | Capture l’empreinte runtime et produit les rapports de couverture local/CI |
+| `scripts/compare_coverage_reports.py` | Compare les totaux, fichiers, lignes manquantes et branches entre deux rapports JSON |
+
+Exemple de benchmark sur le VPS, après transfert d’un corpus autorisé :
+
+```bash
+uv run python scripts/run_vps_compression_campaign.py \
+  --corpus-dir /srv/smart-ao/corpus-btp-approved \
+  --output /srv/smart-ao/reports/compression-$(date -u +%Y%m%dT%H%M%SZ).json \
+  --repetitions 5
+```
+
+Exemple de charge santé depuis le runner séparé :
+
+```bash
+uv run python scripts/run_vps_load_campaign.py \
+  --base-url https://preprod.example.invalid \
+  --paths-file ./ops/load/health-paths.json \
+  --output ./reports/load-health-p1.json \
+  --requests 10 --concurrency 1 --timeout-seconds 10
+```
+
+Pour les chemins d’export authentifiés, le token est fourni uniquement par la variable d’environnement `SMART_AO_LOAD_BEARER_TOKEN`. Le script ne l’écrit jamais dans le rapport et ne conserve qu’un compteur, les codes HTTP, les chemins de test et les latences. Le fichier de chemins doit contenir uniquement des chemins relatifs préparés à l’avance ; il ne doit pas contenir de données financières ni d’URL arbitraires.
+
+Le mode `--dry-run` est obligatoire pour valider les paramètres et les paliers avant tout appel distant. Aucun de ces scripts ne crée de dossier, ne modifie la base, ne déclenche d’export non autorisé ou ne pousse de document dans le webhook par lui-même.

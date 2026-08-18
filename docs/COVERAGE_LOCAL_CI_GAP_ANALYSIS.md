@@ -122,3 +122,25 @@ Exécuter séparément les marqueurs `db`, `integration`, `concurrency` et `proc
 Aucune modification du seuil ne doit être faite pour masquer l’écart. Si la divergence est due à une différence de runtime, épingler la version Python et l’outil de couverture. Si elle vient d’un test non déterministe, corriger le test. Si elle vient d’un chemin non couvert, ajouter le test avant de conserver le seuil de 85 %.
 
 L’objectif de sortie est une couverture locale et CI supérieure à **85,50 %**, afin de conserver une marge opérationnelle de 0,50 point, avec artefacts comparables et zéro différence non expliquée.
+
+## Conclusion exacte obtenue par les artefacts
+
+La collecte instrumentée a permis de télécharger l’artefact CI du run `32192887751` et de produire le rapport local correspondant. La comparaison des deux fichiers `coverage.json` est sans ambiguïté :
+
+| Total | Local | CI |
+|---|---:|---:|
+| Statements | 11 938 | 11 938 |
+| Covered lines | 10 606 | 10 606 |
+| Missing lines | 1 332 | 1 332 |
+| Branches | 2 102 | 2 102 |
+| Covered branches | 1 303 | 1 303 |
+| Partial branches | 609 | 609 |
+| Couverture calculée | 84,821937 % | 84,821937 % |
+
+Le comparateur ne trouve **aucun fichier, aucune ligne et aucune branche différente**. L’écart apparent de 0,18 point n’est donc pas une divergence entre local et CI : les deux environnements calculent exactement la même couverture. La CI affiche `85` dans le champ d’affichage arrondi et son gate passe, tandis que la reproduction locale précédente affichait `84,82` et avait été interprétée comme un échec.
+
+Le comportement observé avec `coverage report --fail-under=85` sur l’artefact local confirme que le seuil est évalué avec la précision d’affichage par défaut, alors que le fichier JSON conserve la valeur décimale complète. Le problème est donc une **ambiguïté de précision du seuil**, pas une différence de code ou de tests.
+
+La décision recommandée est de rendre la politique explicite. Pour un seuil réellement strict de 85,00 %, configurer `precision = 2` dans `[tool.coverage.report]`, puis ajouter les tests nécessaires pour atteindre au moins 85,50 %. Si le seuil historique doit rester fondé sur l’arrondi entier, documenter explicitement ce choix et suivre également `percent_covered` dans le JSON afin d’éviter de confondre 84,82 % avec 85,00 %.
+
+Les empreintes restantes confirment Python 3.12.3, pytest 8.4.2, coverage.py 7.15.4 et le même SHA de lockfile. La seule différence d’outil visible est uv 0.12.1 local contre uv 0.12.5 CI ; elle n’a aucune incidence démontrée ici puisque les rapports de couverture sont identiques.
