@@ -194,6 +194,25 @@ export function createApiClient(baseUrl: string, token: string) {
           }),
         },
       ),
+    downloadSubmissionPackage: async (submissionPackageId: string): Promise<Blob> => {
+      const headers = new Headers({ Accept: "application/zip" });
+      if (token.trim()) headers.set("Authorization", `Bearer ${token.trim()}`);
+      const response = await fetch(
+        `${root}/api/v1/patron/submission-packages/${encodeURIComponent(submissionPackageId)}/export`,
+        { headers },
+      );
+      if (!response.ok) {
+        const body = await response.text();
+        let detail: string | undefined;
+        try {
+          detail = body ? (JSON.parse(body) as { detail?: string }).detail : undefined;
+        } catch {
+          detail = undefined;
+        }
+        throw new Error(detail ?? `L’export a échoué (${response.status}).`);
+      }
+      return response.blob();
+    },
     getCollaboratorPreparation: (packageId: string) =>
       request<PreparationPackage>(
         `/api/v1/collaborator/preparation/${encodeURIComponent(packageId)}`,
