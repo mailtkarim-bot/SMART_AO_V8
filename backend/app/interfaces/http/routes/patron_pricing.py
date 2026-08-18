@@ -9,10 +9,17 @@ from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.dce_versions import _resolve_context
 from app.modules.pricing.application.commands import CreatePricingScenarioCommand
 from app.modules.pricing.application.service import PricingScenarioService
+from app.modules.pricing.application.transition_commands import (
+    ArchivePricingScenarioCommand,
+    SelectPricingScenarioCommand,
+)
+from app.modules.pricing.application.transition_service import PricingScenarioTransitionService
 from app.modules.pricing.public.contracts import (
     CreatePricingScenarioRequest,
     PricingScenarioCommandResponse,
     PricingScenarioResponse,
+    PricingScenarioStateChangeRequest,
+    PricingScenarioTransitionResponse,
 )
 from app.platform.events.dispatcher import (
     CommandExecutionError,
@@ -22,7 +29,10 @@ from app.platform.events.dispatcher import (
 
 
 def build_patron_pricing_router(
-    *, service: PricingScenarioService, security_runtime: ConsultationSecurityRuntime
+    *,
+    service: PricingScenarioService,
+    transition_service: PricingScenarioTransitionService,
+    security_runtime: ConsultationSecurityRuntime,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1/patron", tags=["patron-pricing"])
 
@@ -46,6 +56,105 @@ def build_patron_pricing_router(
                 status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN"
             ) from error
         return [PricingScenarioResponse(**asdict(item)) for item in scenarios]
+
+    def _transition_scenario(
+        *, case_id: UUID, scenario_id: UUID, request: PricingScenarioStateChangeRequest,
+        command_type: str, authorization: str | None,
+    ):
+        actor = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        command_cls = (
+            SelectPricingScenarioCommand
+            if command_type == "SELECTED"
+            else ArchivePricingScenarioCommand
+        )
+        try:
+            result = transition_service.execute(
+                actor=actor,
+                command=command_cls(
+                    command_id=request.command_id,
+                    idempotency_key=request.idempotency_key,
+                    correlation_id=request.correlation_id,
+                    transition_id=request.transition_id,
+                    scenario_id=scenario_id,
+                    expected_version=request.expected_version,
+                    reason_code=request.reason_code,
+                ),
+                now=datetime.now(tz=UTC),
+            )
+        except PermissionError as error:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN"
+            ) from error
+        except (IdempotencyKeyReusedError, CommandInProgressError) as error:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="IDEMPOTENCY_CONFLICT"
+            ) from error
+        except CommandExecutionError as error:
+            detail = str(error)
+            conflict_codes = {
+                "VERSION_CONFLICT",
+                "SCENARIO_ALREADY_SELECTED",
+                "SCENARIO_ALREADY_ARCHIVED",
+            }
+            code = (
+                status.HTTP_409_CONFLICT
+                if detail in conflict_codes
+                else status.HTTP_422_UNPROCESSABLE_CONTENT
+            )
+            raise HTTPException(status_code=code, detail=detail) from error
+        reference = result.aggregate_refs[0]
+        response = PricingScenarioTransitionResponse(
+            command_id=result.command_id,
+            idempotency_key=result.idempotency_key,
+            result_code=result.result_code,
+            scenario_id=UUID(str(reference["aggregate_id"])),
+            version=int(reference["aggregate_revision"]),
+            event_ids=[UUID(event_id) for event_id in result.event_ids],
+            replayed=result.replayed,
+        )
+        return JSONResponse(
+            status_code=200 if result.replayed else 201,
+            content=response.model_dump(mode="json"),
+        )
+
+    @router.post(
+        "/cases/{case_id}/pricing-scenarios/{scenario_id}/selection",
+        response_model=PricingScenarioTransitionResponse,
+    )
+    def select_scenario(
+        case_id: UUID,
+        scenario_id: UUID,
+        request: PricingScenarioStateChangeRequest,
+        authorization: str | None = Header(default=None),
+    ):
+        return _transition_scenario(
+            case_id=case_id,
+            scenario_id=scenario_id,
+            request=request,
+            command_type="SELECTED",
+            authorization=authorization,
+        )
+
+    @router.post(
+        "/cases/{case_id}/pricing-scenarios/{scenario_id}/archive",
+        response_model=PricingScenarioTransitionResponse,
+    )
+    def archive_scenario(
+        case_id: UUID,
+        scenario_id: UUID,
+        request: PricingScenarioStateChangeRequest,
+        authorization: str | None = Header(default=None),
+    ):
+        return _transition_scenario(
+            case_id=case_id,
+            scenario_id=scenario_id,
+            request=request,
+            command_type="ARCHIVED",
+            authorization=authorization,
+        )
 
     @router.post(
         "/cases/{case_id}/pricing-scenarios",

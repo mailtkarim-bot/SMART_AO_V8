@@ -1759,6 +1759,46 @@ class PatronActionRecord(TenantScopedRecord, Base):
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
 
 
+class PricingScenarioTransitionRecord(TenantScopedRecord, Base):
+    """Append-only selection/archive history for a private pricing scenario."""
+
+    __tablename__ = "pricing_scenario_transitions"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "scenario_id"],
+            ["pricing_scenarios.tenant_id", "pricing_scenarios.id"],
+            name="fk_pricing_scenario_transitions__scenario",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_pricing_scenario_transitions__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "scenario_id", "version", name="uq_pricing_scenario_transitions__version"
+        ),
+        sa.UniqueConstraint("tenant_id", "command_id", name="uq_pricing_scenario_transitions__command"),
+        sa.CheckConstraint("version > 1", name="version_positive"),
+        sa.CheckConstraint("from_state IN ('DRAFT', 'SELECTED')", name="from_state"),
+        sa.CheckConstraint("to_state IN ('SELECTED', 'ARCHIVED')", name="to_state"),
+        sa.Index(
+            "ix_pricing_scenario_transitions__tenant_scenario_version",
+            "tenant_id",
+            "scenario_id",
+            "version",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    scenario_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    from_state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    to_state: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    reason_code: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    version: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
 class PatronActionTransitionRecord(TenantScopedRecord, Base):
     """Append-only state transition history for a patron action."""
 

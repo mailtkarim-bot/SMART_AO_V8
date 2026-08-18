@@ -36,6 +36,42 @@ class PricingScenarioResponse(BaseModel):
     source_snapshot_revision: int
 
 
+class TransitionPricingScenarioRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    transition_id: UUID
+    expected_version: int = Field(ge=1)
+    target_state: Literal["SELECTED", "ARCHIVED"]
+    reason_code: str = Field(min_length=2, max_length=64, pattern=r"^[A-Z0-9_]+$")
+
+
+class PricingScenarioStateChangeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    transition_id: UUID
+    expected_version: int = Field(ge=1)
+    reason_code: str = Field(min_length=2, max_length=64, pattern=r"^[A-Z0-9_]+$")
+
+
+class PricingScenarioTransitionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal["PRICING_SCENARIO_TRANSITIONED"]
+    scenario_id: UUID
+    version: int = Field(ge=2)
+    event_ids: list[UUID]
+    replayed: bool = False
+
+
 class PricingScenarioCommandResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

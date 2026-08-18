@@ -193,6 +193,10 @@ from app.modules.pricing.application.service import (
     PricingScenarioService,
     pricing_scenario_handlers,
 )
+from app.modules.pricing.application.transition_service import (
+    PricingScenarioTransitionService,
+    pricing_scenario_transition_handlers,
+)
 from app.modules.submission.application.evidence_service import (
     SubmissionEvidenceService,
     submission_evidence_handlers,
@@ -272,6 +276,7 @@ class AppRuntime:
                 **patron_action_handlers(),
                 **patron_action_transition_handlers(),
                 **pricing_scenario_handlers(),
+                **pricing_scenario_transition_handlers(),
                 **preparation_review_handlers(storage=preparation_storage),
                 **submission_handlers(),
                 **submission_evidence_handlers(),
@@ -586,6 +591,11 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        pricing_scenario_transition_service = PricingScenarioTransitionService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -736,6 +746,7 @@ def create_app(
         app.include_router(
             build_patron_pricing_router(
                 service=pricing_scenario_service,
+                transition_service=pricing_scenario_transition_service,
                 security_runtime=security_runtime,
             )
         )
