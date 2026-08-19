@@ -326,3 +326,152 @@ def test_collaborator_is_refused_before_private_lookup(
                 actor=actor, upload_id=upload_id, stream=_stream(b"%PDF-1.7"), content_length=8
             )
         )
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_private_enterprise_upload_rejects_content_length_limit(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, _, upload_id, _, _ = _seed(session_factory)
+    service = _service(session_factory, MemoryStorage(), StaticScanner("CLEAN"))
+
+    with pytest.raises(EnterpriseUploadRejectedError) as error:
+        asyncio.run(
+            service.upload(
+                actor=actor,
+                upload_id=upload_id,
+                stream=_stream(b"too-large"),
+                content_length=1001,
+            )
+        )
+
+    assert error.value.status_code == 413
+    with session_factory() as session:
+        row = session.get(EnterpriseDocumentUploadRecord, upload_id)
+    assert row is not None and row.state == "REJECTED"
+    assert row.rejection_code == "UPLOAD_LIMIT_EXCEEDED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_private_enterprise_upload_rejects_empty_content(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, _, upload_id, _, _ = _seed(session_factory)
+    service = _service(session_factory, MemoryStorage(), StaticScanner("CLEAN"))
+
+    with pytest.raises(EnterpriseUploadRejectedError):
+        asyncio.run(
+            service.upload(
+                actor=actor, upload_id=upload_id, stream=_stream(b""), content_length=0
+            )
+        )
+
+    with session_factory() as session:
+        row = session.get(EnterpriseDocumentUploadRecord, upload_id)
+    assert row is not None and row.state == "UPLOADING"
+
+
+class WrongMediaInspector(StaticInspector):
+    async def detect_media_type(self, *, storage_key: str) -> str:
+        return "application/octet-stream"
+
+
+class FailingWriteStorage(MemoryStorage):
+    async def write(
+        self, *, storage_key: str, stream: AsyncIterable[bytes], max_bytes: int
+    ) -> QuarantineWriteResult:
+        raise OSError("write failed")
+
+
+class FailingScan(StaticScanner):
+    async def scan(self, *, storage_key: str) -> MalwareScanResult:
+        raise OSError("scanner unavailable")
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_private_enterprise_upload_rejects_disallowed_media_type(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, _, upload_id, _, storage_key = _seed(session_factory)
+    storage = MemoryStorage()
+    service = EnterprisePrivateUploadService(
+        session_factory=session_factory,
+        dispatcher=_service(session_factory, storage, StaticScanner("CLEAN"))._dispatcher,
+        policy=AuthorizationPolicy(),
+        storage=storage,
+        inspector=WrongMediaInspector(),
+        scanner=StaticScanner("CLEAN"),
+        allowed_media_types=frozenset({"application/pdf"}),
+        max_bytes=1000,
+    )
+
+    with pytest.raises(EnterpriseUploadRejectedError):
+        asyncio.run(
+            service.upload(
+                actor=actor, upload_id=upload_id, stream=_stream(b"%PDF-1.7"), content_length=8
+            )
+        )
+
+    assert storage.deleted == [storage_key]
+    with session_factory() as session:
+        row = session.get(EnterpriseDocumentUploadRecord, upload_id)
+    assert row is not None and row.rejection_code == "MEDIA_TYPE_NOT_ALLOWED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_private_enterprise_upload_rejects_storage_failure(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, _, upload_id, _, _ = _seed(session_factory)
+    service = _service(session_factory, FailingWriteStorage(), StaticScanner("CLEAN"))
+
+    with pytest.raises(EnterpriseUploadRejectedError):
+        asyncio.run(
+            service.upload(
+                actor=actor, upload_id=upload_id, stream=_stream(b"%PDF-1.7"), content_length=8
+            )
+        )
+
+    with session_factory() as session:
+        row = session.get(EnterpriseDocumentUploadRecord, upload_id)
+    assert row is not None and row.rejection_code == "STORAGE_OR_SCAN_FAILED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_private_enterprise_upload_rejects_scanner_failure(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, _, upload_id, _, _ = _seed(session_factory)
+    service = _service(session_factory, MemoryStorage(), FailingScan("CLEAN"))
+
+    with pytest.raises(EnterpriseUploadRejectedError):
+        asyncio.run(
+            service.upload(
+                actor=actor, upload_id=upload_id, stream=_stream(b"%PDF-1.7"), content_length=8
+            )
+        )
+
+    with session_factory() as session:
+        row = session.get(EnterpriseDocumentUploadRecord, upload_id)
+    assert row is not None and row.rejection_code == "STORAGE_OR_SCAN_FAILED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_private_enterprise_upload_rejects_missing_target(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, _, _, _, _ = _seed(session_factory)
+    service = _service(session_factory, MemoryStorage(), StaticScanner("CLEAN"))
+
+    with pytest.raises(PermissionError, match="NOT_FOUND_OR_FORBIDDEN"):
+        asyncio.run(
+            service.upload(
+                actor=actor, upload_id=uuid4(), stream=_stream(b"%PDF-1.7"), content_length=8
+            )
+        )
