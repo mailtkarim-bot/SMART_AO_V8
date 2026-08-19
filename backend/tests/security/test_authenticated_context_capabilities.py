@@ -7,7 +7,10 @@ import pytest
 import sqlalchemy as sa
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.platform.persistence.models import TenantRecord
-from app.platform.security.authenticated_context import AuthenticationContextResolver
+from app.platform.security.authenticated_context import (
+    AuthenticationContextResolver,
+    UnauthenticatedError,
+)
 from app.platform.security.capabilities import Capability
 from app.platform.security.models import (
     AuthSessionRecord,
@@ -221,3 +224,120 @@ def test_context_resolver_excludes_assignment_when_its_end_date_has_elapsed(
 
     assert context.assignment_scopes == ()
     assert context.assigned_case_ids == frozenset()
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_context_resolver_rejects_missing_and_expired_sessions(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, identity_id, _, _, session_id = _seed_collaborator_assignment(database_engine)
+    resolver, access_tokens = _resolver(session_factory)
+    token = access_tokens.issue(
+        identity_id=identity_id,
+        session_id=session_id,
+        token_version=1,
+    )
+
+    with Session(database_engine) as session:
+        auth_session = session.get(AuthSessionRecord, session_id)
+        assert auth_session is not None
+        auth_session.issued_at = NOW - timedelta(hours=1)
+        auth_session.last_seen_at = NOW - timedelta(hours=1)
+        auth_session.expires_at = NOW - timedelta(seconds=1)
+        session.commit()
+    with pytest.raises(UnauthenticatedError, match="UNAUTHENTICATED"):
+        resolver.resolve(access_token=token)
+
+    with pytest.raises(UnauthenticatedError, match="UNAUTHENTICATED"):
+        resolver.resolve(
+            access_token=access_tokens.issue(
+                identity_id=identity_id,
+                session_id=uuid4(),
+                token_version=1,
+            )
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_context_resolver_rejects_inactive_membership(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, identity_id, membership_id, _, session_id = _seed_collaborator_assignment(
+        database_engine
+    )
+    with Session(database_engine) as session:
+        membership = session.get(TenantMembershipRecord, membership_id)
+        assert membership is not None
+        membership.state = "SUSPENDED"
+        session.commit()
+    resolver, access_tokens = _resolver(session_factory)
+
+    with pytest.raises(UnauthenticatedError, match="UNAUTHENTICATED"):
+        resolver.resolve(
+            access_token=access_tokens.issue(
+                identity_id=identity_id,
+                session_id=session_id,
+                token_version=1,
+            )
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_non_collaborator_context_has_no_assignment_scopes(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, identity_id, membership_id, _, session_id = _seed_collaborator_assignment(
+        database_engine
+    )
+    with Session(database_engine) as session:
+        membership = session.get(TenantMembershipRecord, membership_id)
+        assert membership is not None
+        membership.role = "PATRON_ADMIN"
+        session.commit()
+    resolver, access_tokens = _resolver(session_factory)
+
+    context = resolver.resolve(
+        access_token=access_tokens.issue(
+            identity_id=identity_id,
+            session_id=session_id,
+            token_version=1,
+        )
+    )
+
+    assert context.assignment_scopes == ()
+    assert context.assigned_case_ids == frozenset()
+
+
+class NaiveClock:
+    def now(self) -> datetime:
+        return NOW.replace(tzinfo=None)
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_context_resolver_rejects_naive_clock(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    _, identity_id, _, _, session_id = _seed_collaborator_assignment(database_engine)
+    _, access_tokens = _resolver(session_factory)
+    resolver = AuthenticationContextResolver(
+        session_factory=session_factory,
+        access_tokens=access_tokens,
+        clock=NaiveClock(),
+    )
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        resolver.resolve(
+            access_token=access_tokens.issue(
+                identity_id=identity_id,
+                session_id=session_id,
+                token_version=1,
+            )
+        )
