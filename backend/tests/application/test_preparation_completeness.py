@@ -24,7 +24,7 @@ from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionEr
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.capabilities import Capability
-from app.platform.security.context import AssignmentScope, DataClassification
+from app.platform.security.context import ActorKind, AssignmentScope, DataClassification
 from app.platform.security.models import (
     CaseAssignmentRecord,
     CaseCapabilityGapRecord,
@@ -426,6 +426,86 @@ def test_readiness_blocks_missing_expired_or_unauthorized_capability_proof(
         "CAPABILITY_PROOF_UNAUTHORIZED",
         "CAPABILITY_GAP_BLOCKING",
     }
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_read_package_returns_latest_readiness_and_documents(
+    preparation_service: PreparationService, session_factory: sessionmaker[Session]
+) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    actor = _enable_preparation_scope(session_factory, actor, assignment_id)
+    dce_version_id = _dce_version_id(session_factory, actor.tenant_id)
+    package_id = uuid4()
+    preparation_service.execute(
+        actor=actor,
+        command=_readiness_command(
+            actor=actor,
+            assignment_id=assignment_id,
+            case_id=case_id,
+            dce_version_id=dce_version_id,
+            package_id=package_id,
+            expected_revision=0,
+        ),
+        now=NOW,
+    )
+    _confirm_requirement(session_factory, actor=actor, requirement_id=requirement_id)
+    preparation_service.execute(
+        actor=actor,
+        command=_readiness_command(
+            actor=actor,
+            assignment_id=assignment_id,
+            case_id=case_id,
+            dce_version_id=dce_version_id,
+            package_id=package_id,
+            expected_revision=1,
+        ),
+        now=NOW,
+    )
+    document_id = uuid4()
+    preparation_service.execute(
+        actor=actor,
+        command=GenerateTechnicalDocumentCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            package_id=package_id,
+            document_id=document_id,
+            expected_revision=2,
+            readiness_revision=2,
+            document_kind="TECHNICAL_RESPONSE",
+        ),
+        now=NOW,
+    )
+
+    package, readiness, documents = preparation_service.read_package(
+        actor=actor, package_id=package_id, now=NOW
+    )
+
+    assert package.id == package_id
+    assert readiness is not None and readiness.revision == 2
+    assert [document.id for document in documents] == [document_id]
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_read_package_rejects_missing_package_and_wrong_actor(
+    preparation_service: PreparationService, session_factory: sessionmaker[Session]
+) -> None:
+    actor, assignment_id, case_id, _ = _seed(session_factory)
+    actor = _enable_preparation_scope(session_factory, actor, assignment_id)
+
+    with pytest.raises(PermissionError, match="NOT_FOUND_OR_FORBIDDEN"):
+        preparation_service.read_package(actor=actor, package_id=uuid4(), now=NOW)
+
+    with pytest.raises(PermissionError, match="COLLABORATOR_REQUIRED"):
+        preparation_service.read_package(
+            actor=replace(actor, actor_kind=ActorKind.PATRON_ADMIN),
+            package_id=uuid4(),
+            now=NOW,
+        )
+
+    assert case_id is not None
 
 
 @pytest.mark.db
