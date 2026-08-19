@@ -1,8 +1,11 @@
 import json
 import logging
 import re
+import sys
+from types import SimpleNamespace
 
 from app.bootstrap.application import create_app
+from app.platform.observability import logging as structured_logging
 from app.platform.observability.logging import JsonLogFormatter
 from fastapi.testclient import TestClient
 
@@ -78,3 +81,112 @@ def test_json_log_formatter_emits_only_operational_fields() -> None:
     )
     assert "tenant_id" not in payload
     assert "financial_amount" not in payload
+
+
+def test_json_log_formatter_omits_absent_optional_fields() -> None:
+    record = logging.LogRecord(
+        name="smart_ao.worker",
+        level=logging.WARNING,
+        pathname=__file__,
+        lineno=1,
+        msg="worker retry scheduled",
+        args=(),
+        exc_info=None,
+    )
+
+    payload = json.loads(JsonLogFormatter().format(record))
+
+    assert payload["level"] == "WARNING"
+    assert payload["logger"] == "smart_ao.worker"
+    assert payload["message"] == "worker retry scheduled"
+    assert "request_id" not in payload
+    assert "method" not in payload
+    assert "path" not in payload
+    assert "status_code" not in payload
+    assert "duration_ms" not in payload
+
+
+def test_json_log_formatter_serializes_exception_without_business_fields() -> None:
+    try:
+        raise RuntimeError("storage unavailable")
+    except RuntimeError:
+        record = logging.LogRecord(
+            name="smart_ao.worker",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="worker failed",
+            args=(),
+            exc_info=True,
+        )
+        record.exc_info = sys.exc_info()
+
+    payload = json.loads(JsonLogFormatter().format(record))
+
+    assert payload["message"] == "worker failed"
+    assert "RuntimeError: storage unavailable" in payload["exception"]
+    assert "tenant_id" not in payload
+    assert "financial_amount" not in payload
+
+
+def test_configure_structured_logging_installs_root_handler_once(monkeypatch) -> None:
+    class FakeRoot:
+        def __init__(self) -> None:
+            self.handlers = []
+            self.level = None
+
+        def addHandler(self, handler) -> None:
+            self.handlers.append(handler)
+
+        def setLevel(self, level) -> None:
+            self.level = level
+
+    root = FakeRoot()
+    monkeypatch.setattr(
+        structured_logging,
+        "logging",
+        SimpleNamespace(
+            INFO=logging.INFO,
+            StreamHandler=logging.StreamHandler,
+            getLogger=lambda: root,
+        ),
+    )
+
+    structured_logging.configure_structured_logging()
+    first_handlers = list(root.handlers)
+    structured_logging.configure_structured_logging()
+
+    assert len(first_handlers) == 1
+    assert root.handlers == first_handlers
+    assert isinstance(root.handlers[0].formatter, JsonLogFormatter)
+    assert root.level == logging.INFO
+
+
+def test_configure_structured_logging_replaces_non_json_handlers(monkeypatch) -> None:
+    class FakeRoot:
+        def __init__(self) -> None:
+            self.handlers = [logging.StreamHandler()]
+            self.level = None
+
+        def addHandler(self, handler) -> None:
+            self.handlers.append(handler)
+
+        def setLevel(self, level) -> None:
+            self.level = level
+
+    root = FakeRoot()
+    monkeypatch.setattr(
+        structured_logging,
+        "logging",
+        SimpleNamespace(
+            INFO=logging.INFO,
+            StreamHandler=logging.StreamHandler,
+            getLogger=lambda: root,
+        ),
+    )
+
+    structured_logging.configure_structured_logging()
+
+    assert len(root.handlers) == 1
+    assert isinstance(root.handlers[0].formatter, JsonLogFormatter)
+    assert root.level == logging.INFO
