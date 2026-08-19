@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
 from app.modules.preparation.application.commands import GenerateTechnicalDocumentCommand
 from app.modules.preparation.application.review import (
+    PreparationReviewHandler,
     PreparationReviewService,
     preparation_review_handlers,
 )
@@ -22,7 +24,11 @@ from app.modules.preparation.infrastructure.dce_preparation_reader import (
     SqlAlchemyPreparationDceReader,
 )
 from app.modules.preparation.infrastructure.document_storage import LocalGeneratedDocumentStorage
-from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
+from app.platform.events.dispatcher import (
+    CommandContext,
+    CommandDispatcher,
+    CommandExecutionError,
+)
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.capabilities import Capability, capabilities_for
@@ -178,6 +184,15 @@ def test_review_is_versioned_idempotent_and_corrections_are_append_only(
     replay = review.execute(actor=actor, command=request, now=NOW)
     assert requested.result_code == "PREPARATION_REVIEW_REQUESTED"
     assert replay.replayed is True
+    duplicate = request.model_copy(
+        update={
+            "command_id": uuid4(),
+            "idempotency_key": uuid4(),
+            "expected_package_revision": 4,
+        }
+    )
+    with pytest.raises(CommandExecutionError, match="REVIEW_ALREADY_EXISTS"):
+        review.execute(actor=actor, command=duplicate, now=NOW)
 
     with pytest.raises(PermissionError, match="PATRON_REQUIRED"):
         review.execute(
@@ -324,4 +339,197 @@ def test_response_draft_is_versioned_replayed_and_financial_payload_is_rejected(
             target_document_id=document_id,
             correction_code="WORDING_UNCLEAR",
             instruction="Ajouter le prix et la marge dans le texte.",
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_review_rejects_missing_target_version_and_invalid_decision_state(
+    services, session_factory: sessionmaker[Session]
+) -> None:
+    _, review = services
+    actor, _, _, _, package_id, document_id = _prepare_document(services, session_factory)
+    patron = _patron(actor)
+    review_id = uuid4()
+    request = RequestPreparationReviewCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        review_id=review_id,
+        package_id=package_id,
+        target_document_id=document_id,
+        target_version=1,
+        expected_package_revision=3,
+    )
+    with pytest.raises(CommandExecutionError, match="TARGET_VERSION_NOT_FOUND"):
+        review.execute(
+            actor=actor,
+            command=request.model_copy(update={"target_version": 99}),
+            now=NOW,
+        )
+    review.execute(actor=actor, command=request, now=NOW)
+    with pytest.raises(CommandExecutionError, match="REVIEW_NOT_FOUND"):
+        review.execute(
+            actor=patron,
+            command=DecidePreparationReviewCommand(
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=uuid4(),
+                review_id=review_id,
+                package_id=package_id,
+                target_document_id=uuid4(),
+                expected_review_revision=1,
+                decision_code="ACCEPTED",
+            ),
+            now=NOW,
+        )
+    review.execute(
+        actor=patron,
+        command=DecidePreparationReviewCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            review_id=review_id,
+            package_id=package_id,
+            target_document_id=document_id,
+            expected_review_revision=1,
+            decision_code="ACCEPTED",
+        ),
+        now=NOW,
+    )
+    with pytest.raises(CommandExecutionError, match="REVIEW_STATE_INVALID"):
+        review.execute(
+            actor=patron,
+            command=DecidePreparationReviewCommand(
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=uuid4(),
+                review_id=review_id,
+                package_id=package_id,
+                target_document_id=document_id,
+                expected_review_revision=2,
+                decision_code="REJECTED",
+            ),
+            now=NOW,
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_correction_requires_returned_review_and_draft_rejects_invalid_inputs(
+    services, session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, review = services
+    actor, _, _, requirement_id, package_id, document_id = _prepare_document(
+        services, session_factory
+    )
+    patron = _patron(actor)
+    review_id = uuid4()
+    request = RequestPreparationReviewCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        review_id=review_id,
+        package_id=package_id,
+        target_document_id=document_id,
+        target_version=1,
+        expected_package_revision=3,
+    )
+    review.execute(actor=actor, command=request, now=NOW)
+    review.execute(
+        actor=patron,
+        command=DecidePreparationReviewCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            review_id=review_id,
+            package_id=package_id,
+            target_document_id=document_id,
+            expected_review_revision=1,
+            decision_code="ACCEPTED",
+        ),
+        now=NOW,
+    )
+    with pytest.raises(CommandExecutionError, match="CORRECTIONS_NOT_REQUESTED"):
+        review.execute(
+            actor=patron,
+            command=AddPreparationCorrectionCommand(
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=uuid4(),
+                review_id=review_id,
+                package_id=package_id,
+                target_document_id=document_id,
+                correction_code="SOURCE_MISSING",
+                instruction="Ajouter une source publique.",
+            ),
+            now=NOW,
+        )
+    with pytest.raises(CommandExecutionError, match="SECTION_CODE_INVALID"):
+        review.execute(
+            actor=actor,
+            command=CreateTechnicalResponseDraftCommand(
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=uuid4(),
+                draft_id=uuid4(),
+                package_id=package_id,
+                source_document_id=document_id,
+                expected_package_revision=5,
+                section_codes=["UNKNOWN"],
+                source_refs=[requirement_id],
+            ),
+            now=NOW,
+        )
+    with pytest.raises(CommandExecutionError, match="SOURCE_DOCUMENT_NOT_FOUND"):
+        review.execute(
+            actor=actor,
+            command=CreateTechnicalResponseDraftCommand(
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=uuid4(),
+                draft_id=uuid4(),
+                package_id=package_id,
+                source_document_id=uuid4(),
+                expected_package_revision=5,
+                section_codes=["METHOD"],
+                source_refs=[requirement_id],
+            ),
+            now=NOW,
+        )
+    monkeypatch.setattr(
+        "app.modules.preparation.application.review.contains_forbidden_text",
+        lambda content: True,
+    )
+    with pytest.raises(CommandExecutionError, match="FINANCIAL_DATA_FORBIDDEN"):
+        review.execute(
+            actor=actor,
+            command=CreateTechnicalResponseDraftCommand(
+                command_id=uuid4(),
+                idempotency_key=uuid4(),
+                correlation_id=uuid4(),
+                draft_id=uuid4(),
+                package_id=package_id,
+                source_document_id=document_id,
+                expected_package_revision=5,
+                section_codes=["METHOD"],
+                source_refs=[requirement_id],
+            ),
+            now=NOW,
+        )
+
+
+def test_review_handler_rejects_unknown_command_type() -> None:
+    handler = PreparationReviewHandler(storage=SimpleNamespace())
+
+    with pytest.raises(CommandExecutionError, match="unsupported preparation review command"):
+        handler.execute(
+            session=SimpleNamespace(),
+            command=SimpleNamespace(command_type="UnknownReviewCommand"),
+            context=CommandContext(
+                tenant_id=uuid4(),
+                actor_id=uuid4(),
+                actor_kind=ActorKind.COLLABORATEUR.value,
+                received_at=NOW,
+            ),
         )
