@@ -12,12 +12,19 @@ from app.modules.preparation.infrastructure.document_storage import LocalGenerat
 from app.modules.submission.application.commands import PrepareSubmissionPackageCommand
 from app.modules.submission.application.evidence_commands import RecordSubmissionEvidenceCommand
 from app.modules.submission.application.evidence_service import (
+    RecordSubmissionEvidenceHandler,
     SubmissionEvidenceService,
     submission_evidence_handlers,
 )
 from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
-from app.platform.events.dispatcher import CommandDispatcher
+from app.platform.events.dispatcher import (
+    CommandContext,
+    CommandDispatcher,
+    CommandExecutionError,
+)
 from app.platform.security.authorization import AuthorizationPolicy
+from app.platform.security.capabilities import capabilities_for
+from app.platform.security.context import ActorKind
 from app.platform.security.models import SubmissionEvidenceRecord
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -115,3 +122,125 @@ def test_manual_submission_evidence_is_hashed_idempotent_and_append_only(
                 .where(SubmissionEvidenceRecord.id == command.evidence_id)
                 .values(status="REJECTED")
             )
+
+    with (
+        pytest.raises(CommandExecutionError, match="SUBMISSION_EVIDENCE_ALREADY_EXISTS"),
+        session_factory.begin() as session,
+    ):
+        RecordSubmissionEvidenceHandler().execute(
+            session=session,
+            command=command,
+            context=CommandContext(
+                tenant_id=actor.tenant_id,
+                actor_id=actor.actor_id,
+                actor_kind=actor.actor_kind.value,
+                received_at=NOW,
+                membership_id=actor.membership_id,
+                correlation_id=actor.correlation_id,
+            ),
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_submission_evidence_rejects_collaborator_and_missing_package(
+    services, session_factory
+) -> None:
+    _, submission = services
+    actor, preparation_package_id, case_id = _prepare_generated_document(
+        services, session_factory
+    )
+    _publish_snapshot(session_factory, tenant_id=actor.tenant_id, case_id=case_id)
+    package_result = submission.prepare(
+        actor=actor,
+        command=PrepareSubmissionPackageCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            preparation_package_id=preparation_package_id,
+            expected_preparation_revision=3,
+        ),
+        now=NOW,
+    )
+    command = RecordSubmissionEvidenceCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        evidence_id=uuid4(),
+        submission_package_id=UUID(package_result.aggregate_refs[0]["aggregate_id"]),
+        evidence_type="MANUAL_RECEIPT",
+        external_reference_hash="a" * 64,
+        evidence_sha256="b" * 64,
+        notes_redacted="Preuve opérationnelle.",
+    )
+    evidence = SubmissionEvidenceService(
+        dispatcher=CommandDispatcher(
+            session_factory=session_factory,
+            handlers=submission_evidence_handlers(),
+        ),
+        policy=AuthorizationPolicy(),
+    )
+    collaborator = replace(
+        actor,
+        actor_kind=ActorKind.COLLABORATEUR,
+        capabilities=capabilities_for(ActorKind.COLLABORATEUR),
+    )
+    with pytest.raises(PermissionError, match="PATRON_REQUIRED"):
+        evidence.execute(actor=collaborator, command=command, now=NOW)
+
+    patron = replace(actor, actor_kind=ActorKind.PATRON_ADMIN)
+    with pytest.raises(CommandExecutionError, match="NOT_FOUND_OR_FORBIDDEN"):
+        evidence.execute(
+            actor=patron,
+            command=command.model_copy(update={"submission_package_id": uuid4()}),
+            now=NOW,
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_submission_evidence_rejects_denied_capability(
+    services, session_factory
+) -> None:
+    _, submission = services
+    actor, preparation_package_id, case_id = _prepare_generated_document(
+        services, session_factory
+    )
+    _publish_snapshot(session_factory, tenant_id=actor.tenant_id, case_id=case_id)
+    package_result = submission.prepare(
+        actor=actor,
+        command=PrepareSubmissionPackageCommand(
+            command_id=uuid4(),
+            idempotency_key=uuid4(),
+            correlation_id=uuid4(),
+            preparation_package_id=preparation_package_id,
+            expected_preparation_revision=3,
+        ),
+        now=NOW,
+    )
+    patron = replace(actor, actor_kind=ActorKind.PATRON_ADMIN)
+    command = RecordSubmissionEvidenceCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        evidence_id=uuid4(),
+        submission_package_id=UUID(package_result.aggregate_refs[0]["aggregate_id"]),
+        evidence_type="MANUAL_RECEIPT",
+        external_reference_hash="a" * 64,
+        evidence_sha256="b" * 64,
+        notes_redacted="Preuve opérationnelle.",
+    )
+
+    class DeniedPolicy:
+        def authorize(self, **kwargs):
+            return type("Decision", (), {"allowed": False, "code": "AUTHORIZATION_DENIED"})()
+
+    evidence = SubmissionEvidenceService(
+        dispatcher=CommandDispatcher(
+            session_factory=session_factory,
+            handlers=submission_evidence_handlers(),
+        ),
+        policy=DeniedPolicy(),
+    )
+    with pytest.raises(PermissionError, match="AUTHORIZATION_DENIED"):
+        evidence.execute(actor=patron, command=command, now=NOW)
