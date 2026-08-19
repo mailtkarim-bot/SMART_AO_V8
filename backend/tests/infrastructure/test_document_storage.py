@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -16,7 +17,7 @@ def test_write_is_atomic_private_and_returns_content_hash(tmp_path: Path) -> Non
     digest = storage.write(storage_key="case-1/answer.pdf", content=content)
     target = root / "case-1" / "answer.pdf"
 
-    assert digest == "5a855430e6b6a41750a0928768920a774a02f00d02d79d2880a4204a2f1f22f5"
+    assert digest == hashlib.sha256(content).hexdigest()
     assert target.read_bytes() == content
     assert target.stat().st_mode & 0o777 == 0o600
     assert (root / "case-1").stat().st_mode & 0o777 == 0o700
