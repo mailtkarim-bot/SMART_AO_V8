@@ -101,7 +101,7 @@ deploy() {
     backup_database
   fi
   compose run --rm backend alembic -c /app/backend/alembic.ini upgrade head
-  compose up -d backend dce-retention-worker frontend caddy
+  compose up -d backend dce-retention-worker submission-export-webhook-worker frontend caddy
   smoke
   printf 'Deployment completed successfully. No automatic downgrade was attempted.\n'
 }

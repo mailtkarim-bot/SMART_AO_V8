@@ -41,3 +41,12 @@ def test_7b_units_and_rotation_contract_are_present() -> None:
     runbook = (OPS / "README.md").read_text(encoding="utf-8")
     for marker in ("restore-preprod.sh", "rotate-jwt-key-preprod.sh", "SHA-256", "json-file"):
         assert marker in runbook
+
+
+def test_deploy_starts_submission_webhook_worker_explicitly() -> None:
+    deploy_script = (OPS / "deploy-preprod.sh").read_text(encoding="utf-8")
+    assert "submission-export-webhook-worker" in deploy_script
+    assert (
+        "compose up -d backend dce-retention-worker submission-export-webhook-worker"
+        in deploy_script
+    )
