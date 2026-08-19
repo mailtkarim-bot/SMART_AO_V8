@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Prochaine séquence : CI verte, durcissement, puis VPS réel</title>
+  <style>
+    * { box-sizing:border-box; }
+    body { margin: 0; }
+    .slide-container { width:1280px; min-height:720px; background:#e0e0e0; color:#111; font-family:"Helvetica Neue",Arial,sans-serif; padding:54px 72px 0 72px; margin-top:-1px; }
+    .eyebrow { color:#0055ff; font-size:18px; font-weight:800; letter-spacing:2px; text-transform:uppercase; }
+    h1 { font-family:"Arial Black",Impact,sans-serif; font-size:46px; line-height:1.04; margin:13px 0 40px; text-transform:uppercase; max-width:1100px; }
+    .columns { display:grid; grid-template-columns:repeat(3, 1fr); gap:32px; }
+    .col { border-top:4px solid #111; padding-top:16px; }
+    .col-title { font-size:22px; font-weight:800; margin-bottom:12px; color:#0055ff; text-transform:uppercase; }
+    .col-desc { font-family:Georgia,serif; font-size:18px; line-height:1.4; }
+    .final-note { margin-top:48px; padding:20px 28px; border:4px solid #111; font-family:Georgia,serif; font-size:22px; line-height:1.4; background:#e0e0e0; position:relative; }
+    .final-note::before { content:""; position:absolute; left:0; top:0; bottom:0; width:12px; background:#0055ff; }
+  </style>
+</head>
+<body>
+  <div class="slide-container">
+    <div class="eyebrow">07 — Conclusion</div>
+    <h1>Prochaine séquence : CI verte,<br>durcissement, puis VPS réel</h1>
+    <div class="columns">
+      <div class="col">
+        <div class="col-title">1. Validation Continue</div>
+        <div class="col-desc">Le commit de couverture des routes patronales et le correctif du worker webhook sont publiés. La CI garantit le maintien du seuil strict de 85,50 %.</div>
+      </div>
+      <div class="col">
+        <div class="col-title">2. Durcissement</div>
+        <div class="col-desc">Compléter le script de restauration isolée pour inclure les preuves métier manuelles : échantillon documentaire, isolation tenant et état de l'outbox.</div>
+      </div>
+      <div class="col">
+        <div class="col-title">3. Exécution VPS</div>
+        <div class="col-desc">Provisionner l'infrastructure cible, configurer le DNS et le stockage externe, puis dérouler les sept preuves du gate opérationnel.</div>
+      </div>
+    </div>
+    <div class="final-note">
+      <strong>Règle d'or :</strong> Tant qu'aucun VPS réel n'est disponible, la branche reste dans l'état <em>préparée mais non validée opérationnellement</em>. Aucun résultat de charge ne doit être anticipé.
+    </div>
+  </div>
+</body>
+</html>

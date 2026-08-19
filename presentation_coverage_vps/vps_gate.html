@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Le gate VPS exige sept preuves indépendantes</title>
+  <style>
+    * { box-sizing:border-box; }
+    body { margin:0; }
+    .slide-container { width:1280px; min-height:720px; background:#e0e0e0; color:#111; font-family:"Helvetica Neue",Arial,sans-serif; padding:54px 72px 0 72px; }
+    .eyebrow { color:#0055ff; font-size:18px; font-weight:800; letter-spacing:2px; text-transform:uppercase; }
+    h1 { font-family:"Arial Black",Impact,sans-serif; font-size:46px; line-height:1.04; margin:13px 0 24px; text-transform:uppercase; max-width:1100px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 64px; }
+    .item { display:flex; gap:12px; align-items:flex-start; border-top:2px solid #111; padding-top:10px; }
+    .number { color:#0055ff; font-family:"Arial Black",Impact,sans-serif; font-size:24px; line-height:1; }
+    .content { flex:1; }
+    .name { font-size:20px; font-weight:800; margin-bottom:4px; }
+    .desc { font-family:Georgia,serif; font-size:16px; line-height:1.3; }
+    .footer { margin-top:16px; font-family:Georgia,serif; font-size:18px; color:#0055ff; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <div class="slide-container">
+    <div class="eyebrow">06 — Validation Opérationnelle</div>
+    <h1>Le gate VPS exige sept preuves indépendantes</h1>
+    <div class="grid">
+      <div class="item">
+        <div class="number">01</div>
+        <div class="content">
+          <div class="name">Réseau & TLS</div>
+          <div class="desc">Certificat valide, ports internes (PostgreSQL, ClamAV) strictement masqués.</div>
+        </div>
+      </div>
+      <div class="item">
+        <div class="number">02</div>
+        <div class="content">
+          <div class="name">Test EICAR</div>
+          <div class="desc">Rejet par ClamAV en quarantaine, aucune matérialisation en état CLEAN.</div>
+        </div>
+      </div>
+      <div class="item">
+        <div class="number">03</div>
+        <div class="content">
+          <div class="name">Export & Outbox</div>
+          <div class="desc">Archive déterministe, webhook fonctionnel sans aucune donnée financière.</div>
+        </div>
+      </div>
+      <div class="item">
+        <div class="number">04</div>
+        <div class="content">
+          <div class="name">Backup hors VPS</div>
+          <div class="desc">Manifeste SHA-256 vérifié et transfert chiffré vers un stockage externe.</div>
+        </div>
+      </div>
+      <div class="item">
+        <div class="number">05</div>
+        <div class="content">
+          <div class="name">Restauration isolée</div>
+          <div class="desc">Vérification de l'isolation tenant et de l'état sémantique de l'outbox.</div>
+        </div>
+      </div>
+      <div class="item">
+        <div class="number">06</div>
+        <div class="content">
+          <div class="name">Timers systemd</div>
+          <div class="desc">Services de backup et de healthcheck actifs et planifiés.</div>
+        </div>
+      </div>
+      <div class="item">
+        <div class="number">07</div>
+        <div class="content">
+          <div class="name">Supervision externe</div>
+          <div class="desc">Alerte déclenchée sur échec du healthcheck ou âge excessif du backup.</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">Une seule preuve manquante ou un secret exposé entraîne un statut REFUSÉ.</div>
+  </div>
+</body>
+</html>

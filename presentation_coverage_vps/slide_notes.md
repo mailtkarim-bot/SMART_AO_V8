@@ -1,0 +1,19 @@
+# 1 - SMART_AO V8 — Couverture & Gate VPS
+
+Nous lançons ici le plan de durcissement et la préparation de la préproduction pour SMART_AO V8. L'enjeu est de remonter les angles morts patronaux tout en protégeant nos invariants métier. Nous posons les bases d'une validation VPS rigoureuse. Gardez à l'esprit qu'aucun VPS réel n'est encore provisionné à ce stade. C'est une phase de préparation technique. Passons maintenant à l'analyse de notre jalon global de couverture.
+
+# 2 - Le jalon global est atteint, la marge doit être protégée
+
+Le jalon global est atteint avec succès, mais notre marge doit être protégée en permanence. Nous affichons 558 tests backend réussis et une couverture locale avec branches à 86,72 pour cent. C'est un point de plus vingt-deux au-dessus du seuil CI fixé à 85,50 pour cent. Rappelons qu'aucune validation VPS réelle n'a encore eu lieu. La couverture est désormais une contrainte de livraison incontournable. Voyons précisément où se situent nos principaux angles morts.
+
+# 3 - Les routes HTTP patronales sont le principal angle mort
+
+Les routes HTTP patronales constituent notre principal angle mort technique. Les façades patronales affichent des taux de couverture plus faibles, notamment patron submission et patron actions. En revanche, le socle et le métier affichent des niveaux plus solides. Nous devons suivre un ordre de recommandations strict, des fondations vers les routes HTTP et les prix. Chaque zone doit être couverte pour éviter toute faille. Examinons la stratégie de test déployée pour sécuriser ces points.
+
+# 4 - Les façades patronales sont maintenant testées par branches
+
+Les façades patronales sont maintenant testées par branches avec trente-cinq nouveaux tests de routes ajoutés. Nous validons les codes HTTP de création et de succès ainsi que le rejeu idempotent. Les mécanismes de rejet d'authentification et d'autorisation bloquent strictement les requêtes non valides. Les conflits sont gérés proprement et l'export ZIP vérifie les binaires. L'isolation des tenants reste garantie sans aucune fuite de données financières. C'est une étape clé pour préparer sereinement notre chaîne de déploiement.
+
+# 5 - Chaque lot de tests protège un invariant métier
+
+Chaque lot de tests protège un invariant métier critique pour la plateforme. Nous avons structuré la remédiation en six lots distincts allant des fondations jusqu'aux rapports de pricing. Ces lots garantissent l'isolation des tenants et la confidentialité financière. Nous assurons aussi l'immutabilité des preuves et la gestion des révisions optimistes. L'idempotence permet un rejeu sécurisé sans double effet. Voyons concrètement comment les façades patronales intègrent désormais ces exigences par branches.
