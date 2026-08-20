@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { ApiClient } from "../../infrastructure/api";
 import type { SubmissionEvidenceForm } from "./SubmissionPanel";
 
-type Message = { tone: "success" | "error"; text: string };
+type Message = { tone: "success" | "error" | "warning"; text: string };
 type SetMessage = Dispatch<SetStateAction<Message | null>>;
 
 type SubmissionActions = {

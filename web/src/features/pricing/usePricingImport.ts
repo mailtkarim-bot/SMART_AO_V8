@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ApiClient } from "../../infrastructure/api";
 
-type Message = { tone: "success" | "error"; text: string };
+type Message = { tone: "success" | "error" | "warning"; text: string };
 type SetMessage = Dispatch<SetStateAction<Message | null>>;
 export type PricingImportState = "IDLE" | "COMMITTED" | "REPLAYED";
 
@@ -70,7 +70,14 @@ export function usePricingImport(
           ? "Import déjà commité : rejeu idempotent sans nouvelle ligne."
           : "Import commité dans le brouillon financier patronal.",
       });
-      await onDraftReload();
+      try {
+        await onDraftReload();
+      } catch {
+        setMessage({
+          tone: "warning",
+          text: "Import confirmé, mais le brouillon n’a pas pu être rechargé. Relancez sa lecture.",
+        });
+      }
     } catch (error) {
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Le commit de l’import a échoué." });
     } finally {
