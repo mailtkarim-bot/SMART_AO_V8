@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Slide 4</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E0E0E0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            position: relative;
+            padding-top: 60px;
+            padding-left: 80px;
+            padding-right: 80px;
+        }
+        .title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 52px;
+            color: #111111;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            line-height: 1.1;
+            margin-bottom: 50px;
+        }
+        .columns {
+            display: flex;
+            gap: 40px;
+        }
+        .col-block {
+            flex: 1;
+            border: 4px solid #111111;
+            background-color: #E0E0E0;
+            display: flex;
+            flex-direction: column;
+        }
+        .col-header {
+            background-color: #111111;
+            color: #E0E0E0;
+            padding: 20px;
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 28px;
+            text-transform: uppercase;
+        }
+        .col-content {
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        .point {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 26px;
+            color: #222222;
+            line-height: 1.4;
+            border-left: 4px solid #0055FF;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <h2 class="title">L’implémentation protège la mémoire,<br>mais le flux source reste perfectible</h2>
+        
+        <div class="columns">
+            <div class="col-block">
+                <div class="col-header">Forces actuelles</div>
+                <div class="col-content">
+                    <div class="point">
+                        <strong>Protection RAM :</strong> L'utilisation de <code>SpooledTemporaryFile</code> bascule automatiquement sur disque au-delà de 8 MiB.
+                    </div>
+                    <div class="point">
+                        <strong>Déterminisme :</strong> Les timestamps et permissions sont figés pour garantir un hash d'archive stable et la confidentialité.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-block">
+                <div class="col-header">Pistes d'optimisation</div>
+                <div class="col-content">
+                    <div class="point">
+                        <strong>Double lecture :</strong> Le benchmark lit actuellement chaque PDF deux fois (une pour le hash, une pour l'écriture ZIP).
+                    </div>
+                    <div class="point">
+                        <strong>Flux source :</strong> La prochaine optimisation nécessitera une lecture par chunks ou une interface de stockage en flux continu.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

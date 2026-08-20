@@ -8,6 +8,7 @@ transition or directly queries an ORM record from a route.
 from __future__ import annotations
 
 import os
+import socket
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.interfaces.http.routes.assignment_history import build_assignment_history_router
@@ -27,6 +29,15 @@ from app.interfaces.http.routes.authentication import (
 )
 from app.interfaces.http.routes.case_assigned import build_assigned_case_router
 from app.interfaces.http.routes.case_dce_reading import build_case_dce_reading_router
+from app.interfaces.http.routes.collaborator_capabilities import (
+    build_collaborator_capability_router,
+)
+from app.interfaces.http.routes.collaborator_info_blockers import (
+    build_collaborator_info_blocker_router,
+)
+from app.interfaces.http.routes.collaborator_work_tasks import (
+    build_collaborator_work_task_router,
+)
 from app.interfaces.http.routes.consultations import (
     ConsultationSecurityRuntime,
     build_consultation_router,
@@ -36,14 +47,36 @@ from app.interfaces.http.routes.dce_requirement_confirmations import (
 )
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
+from app.interfaces.http.routes.observability import build_observability_router
+from app.interfaces.http.routes.patron_actions import build_patron_action_router
 from app.interfaces.http.routes.patron_assignment_cockpit import (
     build_patron_assignment_cockpit_router,
 )
 from app.interfaces.http.routes.patron_assignment_management import (
     build_patron_assignment_management_router,
 )
+from app.interfaces.http.routes.patron_decisions import build_patron_decision_router
+from app.interfaces.http.routes.patron_enterprise_capabilities import (
+    build_patron_enterprise_capability_router,
+)
+from app.interfaces.http.routes.patron_enterprise_library import (
+    build_patron_enterprise_library_router,
+)
 from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
+)
+from app.interfaces.http.routes.patron_pricing import build_patron_pricing_router
+from app.interfaces.http.routes.patron_pricing_import import build_patron_pricing_import_router
+from app.interfaces.http.routes.patron_submission import build_patron_submission_router
+from app.interfaces.http.routes.patron_submission_evidence import (
+    build_patron_submission_evidence_router,
+)
+from app.interfaces.http.routes.preparation import (
+    build_preparation_review_router,
+    build_preparation_router,
+)
+from app.interfaces.http.routes.preparation_transmission import (
+    build_preparation_transmission_router,
 )
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.handlers import (
@@ -83,15 +116,44 @@ from app.modules.dce.infrastructure.quarantine import (
     LocalQuarantineStorageAdapter,
     PythonMagicContentInspectionAdapter,
 )
+from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
+from app.modules.enterprise.application.enterprise_capability import (
+    EnterpriseCapabilityService,
+    enterprise_capability_handlers,
+)
+from app.modules.enterprise.application.enterprise_library import (
+    EnterpriseLibraryService,
+    enterprise_library_handlers,
+)
+from app.modules.enterprise.application.enterprise_upload import (
+    EnterprisePrivateUploadService,
+    enterprise_upload_handlers,
+)
 from app.modules.membership.application.assignment import (
     AssignmentInteractionService,
     assignment_handlers,
 )
 from app.modules.membership.application.assignment_history import AssignmentHistoryService
+from app.modules.membership.application.collab_capability import (
+    CollaboratorCapabilityAssessmentService,
+    collaborator_capability_handlers,
+)
+from app.modules.membership.application.collab_info_blockers import (
+    CollaboratorInfoBlockerService,
+    collaborator_info_blocker_handlers,
+)
+from app.modules.membership.application.collab_work_task import (
+    CollaboratorWorkTaskService,
+    collaborator_work_task_handlers,
+)
 from app.modules.membership.application.financial_report import PatronFinancialReportService
 from app.modules.membership.application.financial_report_draft import (
     CreateFinancialReportDraftHandler,
     PatronFinancialReportDraftCreationService,
+)
+from app.modules.membership.application.financial_report_lines import (
+    PatronFinancialReportLineService,
+    financial_report_line_handlers,
 )
 from app.modules.membership.application.financial_report_publication import (
     PatronFinancialReportPublicationService,
@@ -104,7 +166,51 @@ from app.modules.membership.application.patron_assignment import (
 from app.modules.membership.application.patron_assignment_cockpit import (
     PatronAssignmentCockpitService,
 )
+from app.modules.patron_action.application.service import (
+    PatronActionService,
+    PatronActionWriter,
+    patron_action_handlers,
+)
+from app.modules.patron_action.application.transition_service import (
+    PatronActionTransitionService,
+    patron_action_transition_handlers,
+)
+from app.modules.preparation.application.review import (
+    PreparationReviewService,
+    preparation_review_handlers,
+)
+from app.modules.preparation.application.service import PreparationService, preparation_handlers
+from app.modules.preparation.application.transmission import (
+    PreparationTransmissionService,
+    preparation_transmission_handlers,
+)
+from app.modules.preparation.infrastructure.dce_preparation_reader import (
+    SqlAlchemyPreparationDceReader,
+)
+from app.modules.preparation.infrastructure.document_storage import (
+    LocalGeneratedDocumentStorage,
+)
+from app.modules.pricing.application.import_preview import PricingImportPreviewService
+from app.modules.pricing.application.import_service import (
+    PricingImportService,
+    pricing_import_handlers,
+)
+from app.modules.pricing.application.service import (
+    PricingScenarioService,
+    pricing_scenario_handlers,
+)
+from app.modules.pricing.application.transition_service import (
+    PricingScenarioTransitionService,
+    pricing_scenario_transition_handlers,
+)
+from app.modules.submission.application.evidence_service import (
+    SubmissionEvidenceService,
+    submission_evidence_handlers,
+)
+from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
+from app.modules.submission.application.signature_service import submission_signature_handlers
 from app.platform.events.dispatcher import CommandDispatcher
+from app.platform.observability.http import RequestObservabilityMiddleware
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
 
@@ -127,6 +233,7 @@ class AppRuntime:
     session_factory: sessionmaker[Session]
     dispatcher: CommandDispatcher
     dce_upload_service: DceUploadService
+    preparation_storage: LocalGeneratedDocumentStorage
 
     @classmethod
     def create(
@@ -135,9 +242,13 @@ class AppRuntime:
         session_factory: sessionmaker[Session],
         dce_upload_service_factory: Callable[[CommandDispatcher], DceUploadService] | None = None,
     ) -> AppRuntime:
+        preparation_storage = LocalGeneratedDocumentStorage(
+            root=Path(os.getenv("SMART_AO_DCE_QUARANTINE_ROOT", "/var/lib/smart_ao/dce-quarantine"))
+        )
         dispatcher = CommandDispatcher(
             session_factory=session_factory,
             handlers={
+                **enterprise_upload_handlers(),
                 "ClaimDceStagedObjectUpload": ClaimDceStagedObjectUploadHandler(),
                 "CreateConsultation": CreateConsultationHandler(),
                 "ExpireDceStagedObject": ExpireDceStagedObjectHandler(),
@@ -154,10 +265,30 @@ class AppRuntime:
                 "RecordDceRequirementConfirmation": RecordDceRequirementConfirmationHandler(),
                 "CreateFinancialReportDraft": CreateFinancialReportDraftHandler(),
                 "PublishFinancialReport": PublishFinancialReportHandler(),
+                **financial_report_line_handlers(),
+                **enterprise_capability_handlers(),
+                **enterprise_library_handlers(),
                 "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
                 "RegisterDceVersion": RegisterDceVersionHandler(),
                 **assignment_handlers(),
+                **collaborator_work_task_handlers(),
+                **collaborator_capability_handlers(),
+                **collaborator_info_blocker_handlers(),
                 **patron_assignment_handlers(),
+                **preparation_handlers(
+                    storage=preparation_storage,
+                    dce_reader=SqlAlchemyPreparationDceReader(),
+                ),
+                **preparation_transmission_handlers(action_writer=PatronActionWriter()),
+                **patron_action_handlers(),
+                **patron_action_transition_handlers(),
+                **pricing_scenario_handlers(),
+                **pricing_scenario_transition_handlers(),
+                **pricing_import_handlers(),
+                **preparation_review_handlers(storage=preparation_storage),
+                **submission_handlers(),
+                **submission_evidence_handlers(),
+                **submission_signature_handlers(),
             },
         )
         upload_service = (
@@ -169,6 +300,7 @@ class AppRuntime:
             session_factory=session_factory,
             dispatcher=dispatcher,
             dce_upload_service=upload_service,
+            preparation_storage=preparation_storage,
         )
 
     def get_dce_staged_object_upload_target(
@@ -316,6 +448,28 @@ def _default_dce_upload_service(*, dispatcher: CommandDispatcher) -> DceUploadSe
     )
 
 
+def _default_enterprise_private_upload_service(
+    *, session_factory: sessionmaker[Session], dispatcher: CommandDispatcher, policy
+) -> EnterprisePrivateUploadService:
+    storage = LocalQuarantineStorageAdapter(
+        root=Path(os.getenv("SMART_AO_DCE_QUARANTINE_ROOT", "/var/lib/smart_ao/dce-quarantine"))
+    )
+    return EnterprisePrivateUploadService(
+        session_factory=session_factory,
+        dispatcher=dispatcher,
+        policy=policy,
+        storage=storage,
+        inspector=PythonMagicContentInspectionAdapter(storage=storage),
+        scanner=ClamdTcpMalwareScanAdapter(
+            storage=storage,
+            host=os.getenv("SMART_AO_CLAMD_HOST", "clamav"),
+            port=int(os.getenv("SMART_AO_CLAMD_PORT", "3310")),
+            timeout_seconds=float(os.getenv("SMART_AO_CLAMD_TIMEOUT_SECONDS", "30")),
+        ),
+        allowed_media_types=_ALLOWED_DCE_MEDIA_TYPES,
+    )
+
+
 def create_app(
     *,
     runtime: AppRuntime | None = None,
@@ -326,10 +480,52 @@ def create_app(
         version="0.1.0",
         description="SaaS BTP d'analyse DCE et de décision d'appel d'offres.",
     )
+    app.add_middleware(RequestObservabilityMiddleware)
+    app.include_router(build_observability_router())
 
     @app.get("/healthz", tags=["system"])
     def healthcheck() -> dict[str, str]:
         return {"status": "ok", "service": "smart-ao-v8"}
+
+    @app.get("/healthz/live", tags=["system"])
+    def liveness() -> dict[str, object]:
+        return {"status": "ok", "service": "smart-ao-v8", "checks": {"process": "ok"}}
+
+    @app.get("/healthz/ready", tags=["system"])
+    def readiness() -> JSONResponse:
+        checks: dict[str, str] = {"database": "unknown", "clamav": "unknown"}
+        if runtime is None:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "service": "smart-ao-v8", "checks": checks},
+            )
+        try:
+            with runtime.session_factory() as session:
+                session.execute(sa.text("SELECT 1"))
+            checks["database"] = "ok"
+        except sa.exc.SQLAlchemyError:
+            checks["database"] = "failed"
+        try:
+            with socket.create_connection(
+                (
+                    os.getenv("SMART_AO_CLAMD_HOST", "clamav"),
+                    int(os.getenv("SMART_AO_CLAMD_PORT", "3310")),
+                ),
+                timeout=float(os.getenv("SMART_AO_CLAMD_TIMEOUT_SECONDS", "3")),
+            ):
+                pass
+            checks["clamav"] = "ok"
+        except (OSError, ValueError):
+            checks["clamav"] = "failed"
+        ready = all(value == "ok" for value in checks.values())
+        return JSONResponse(
+            status_code=200 if ready else 503,
+            content={
+                "status": "ok" if ready else "not_ready",
+                "service": "smart-ao-v8",
+                "checks": checks,
+            },
+        )
 
     if authentication_runtime is not None:
         app.include_router(build_authentication_router(runtime=authentication_runtime))
@@ -353,6 +549,68 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        collaborator_work_task_service = CollaboratorWorkTaskService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        collaborator_info_blocker_service = CollaboratorInfoBlockerService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        collaborator_capability_service = CollaboratorCapabilityAssessmentService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        preparation_service = PreparationService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+            storage=runtime.preparation_storage,
+        )
+        preparation_review_service = PreparationReviewService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+            storage=runtime.preparation_storage,
+        )
+        preparation_transmission_service = PreparationTransmissionService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        patron_action_service = PatronActionService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        patron_action_transition_service = PatronActionTransitionService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        patron_decision_dossier_service = PatronDecisionDossierService(
+            session_factory=runtime.session_factory,
+            policy=security_policy,
+        )
+        pricing_scenario_service = PricingScenarioService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        pricing_scenario_transition_service = PricingScenarioTransitionService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        pricing_import_preview_service = PricingImportPreviewService(policy=security_policy)
+        pricing_import_service = PricingImportService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -370,6 +628,11 @@ def create_app(
             session_factory=runtime.session_factory,
             policy=security_policy,
         )
+        patron_financial_report_line_service = PatronFinancialReportLineService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         patron_financial_report_draft_creation_service = PatronFinancialReportDraftCreationService(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
@@ -379,6 +642,31 @@ def create_app(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
             policy=security_policy,
+        )
+        enterprise_library_service = EnterpriseLibraryService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        enterprise_capability_service = EnterpriseCapabilityService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        enterprise_upload_service = _default_enterprise_private_upload_service(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        submission_evidence_service = SubmissionEvidenceService(
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        submission_package_service = SubmissionPackageService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+            storage=runtime.preparation_storage,
         )
         app.include_router(
             build_case_dce_reading_router(
@@ -423,6 +711,69 @@ def create_app(
             )
         )
         app.include_router(
+            build_collaborator_work_task_router(
+                service=collaborator_work_task_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_collaborator_info_blocker_router(
+                service=collaborator_info_blocker_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_collaborator_capability_router(
+                service=collaborator_capability_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_preparation_router(
+                service=preparation_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_preparation_review_router(
+                service=preparation_review_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_preparation_transmission_router(
+                service=preparation_transmission_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_action_router(
+                service=patron_action_service,
+                transition_service=patron_action_transition_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_decision_router(
+                service=patron_decision_dossier_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_pricing_router(
+                service=pricing_scenario_service,
+                transition_service=pricing_scenario_transition_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_pricing_import_router(
+                service=pricing_import_preview_service,
+                commit_service=pricing_import_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
             build_assignment_history_router(
                 service=assignment_history_service,
                 security_runtime=security_runtime,
@@ -443,8 +794,34 @@ def create_app(
         app.include_router(
             build_patron_financial_report_router(
                 service=patron_financial_report_service,
+                line_service=patron_financial_report_line_service,
                 draft_creation_service=patron_financial_report_draft_creation_service,
                 publication_service=patron_financial_report_publication_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_submission_router(
+                service=submission_package_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_submission_evidence_router(
+                service=submission_evidence_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_enterprise_library_router(
+                service=enterprise_library_service,
+                upload_service=enterprise_upload_service,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_enterprise_capability_router(
+                service=enterprise_capability_service,
                 security_runtime=security_runtime,
             )
         )

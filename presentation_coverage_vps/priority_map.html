@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Cartographie des priorités</title>
+  <style>
+    * { box-sizing:border-box; }
+    body { margin:0; }
+    .slide-container { width:1280px; min-height:720px; background:#e0e0e0; color:#111; font-family:"Helvetica Neue",Arial,sans-serif; padding:54px 72px 0 72px; }
+    .eyebrow { color:#0055ff; font-size:18px; font-weight:800; letter-spacing:2px; text-transform:uppercase; }
+    h1 { font-family:"Arial Black",Impact,sans-serif; font-size:46px; line-height:1.04; margin:13px 0 20px; text-transform:uppercase; max-width:980px; }
+    .columns { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+    .column-title { border-bottom:4px solid #111; padding-bottom:6px; font-size:20px; font-weight:800; text-transform:uppercase; }
+    .item { display:grid; grid-template-columns:100px 1fr; gap:10px; border-bottom:1px solid #999; padding:8px 0 6px; }
+    .score { color:#0055ff; font-family:"Arial Black",Impact,sans-serif; font-size:30px; line-height:1; }
+    .name { font-size:20px; font-weight:800; line-height:1.1; }
+    .desc { font-family:Georgia,serif; font-size:16px; line-height:1.2; margin-top:2px; }
+    .bottom { margin-top:12px; border-top:4px solid #0055ff; padding-top:8px; display:flex; gap:24px; align-items:baseline; }
+    .bottom strong { font-family:"Arial Black",Impact,sans-serif; font-size:25px; }
+    .bottom span { font-family:Georgia,serif; font-size:20px; }
+  </style>
+</head>
+<body>
+  <div class="slide-container">
+    <div class="eyebrow">02 — Carte des risques</div>
+    <h1>Les routes HTTP patronales<br>sont le principal angle mort</h1>
+    <div class="columns">
+      <div>
+        <div class="column-title">Façades patronales</div>
+        <div class="item"><div class="score">29,31%</div><div><div class="name">patron_submission</div><div class="desc">Dépôt et export du dossier de réponse.</div></div></div>
+        <div class="item"><div class="score">35,48%</div><div><div class="name">patron_actions</div><div class="desc">File d’actions, création et transitions.</div></div></div>
+        <div class="item"><div class="score">37,50%</div><div><div class="name">preparation_transmission</div><div class="desc">Transmission du snapshot collaborateur.</div></div></div>
+      </div>
+      <div>
+        <div class="column-title">Socle et métier</div>
+        <div class="item"><div class="score">59,38%</div><div><div class="name">observability/logging</div><div class="desc">Exceptions JSON et configuration idempotente.</div></div></div>
+        <div class="item"><div class="score">76,60%</div><div><div class="name">document_storage</div><div class="desc">Collision, nettoyage temporaire et traversal.</div></div></div>
+        <div class="item"><div class="score">79,86%</div><div><div class="name">preparation/service</div><div class="desc">Readiness, preuves, autorisation et génération.</div></div></div>
+      </div>
+    </div>
+    <div class="bottom"><strong>Ordre recommandé</strong><span>fondations → routes HTTP → DCE/quarantaine → wizard → pricing et preuves</span></div>
+  </div>
+</body>
+</html>

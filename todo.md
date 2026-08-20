@@ -1,166 +1,27 @@
-# CASE-WEB-02 — Raccordement backend
+# SMART_AO V8 — Checklist durable
 
-- [x] Auditer le modèle d’affectation Case et les champs réellement projetables.
-- [x] Définir le DTO fermé de `GET /api/v1/cases/assigned`.
-- [x] Ajouter la query tenant-scopée et la policy ReBAC `case.dce.read`.
-- [x] Exposer la route authentifiée avec réponses neutres et audit des refus.
-- [x] Vérifier le chemin et la visibilité navigateur du cookie CSRF.
-- [x] Tester login, refresh, logout, CSRF invalide et cookie HttpOnly.
-- [x] Rejouer Ruff, pytest, Alembic et les contrôles SEC-01 avant publication.
-- [ ] Raccorder le frontend à l’endpoint publié et mettre à jour la mémoire durable.
-- [ ] Maintenir le raccordement HTTPS frontend en attente jusqu’à la disponibilité d’un VPS et d’une URL backend réelle.
-- [ ] Ne configurer `VITE_API_BASE_URL` qu’après réception et vérification de l’URL HTTPS backend.
-- [ ] Choisir et figer le prochain slice backend à partir de la roadmap V8 avant toute nouvelle implémentation.
-- [x] Identifier le prochain slice backend explicitement documenté après `CASES-ASSIGNED-01`.
-- [ ] Slice retenu : `CASE-DCE-IMPACT-01`, analyse d’impact d’un rectificatif DCE dans une Case, sans recalcul silencieux des confirmations.
-- [x] Slice retenu : `CASE-DCE-IMPACT-01`, analyse d’impact d’un rectificatif DCE dans une Case, sans recalcul silencieux des confirmations.
-- [x] Vérifier que son contrat, sa matrice de sécurité et ses critères de fermeture existent avant le code.
-- [x] Figer ou compléter le contrat normatif du slice retenu.
-- [x] Implémenter uniquement son périmètre fermé dans le backend V8.
-- [x] Ajouter les tests de persistance, tenant, idempotence, append-only et acteur SYSTEM requis.
-- [x] Valider Ruff, pytest, Alembic et les invariants avant commit et push.
-- [x] Committer et pousser CASE-DCE-IMPACT-01 sur `main`.
-- [x] Vérifier le résultat final de la CI GitHub du commit `92259e7` et l’inscrire dans PROJECT_STATE.
-- [x] Identifier le prochain slice backend explicitement présent dans la feuille de route V8 : `COLLAB-ASSIGNMENT-01`.
-- [x] Régénérer `.secrets.baseline` pour corriger l’échec du job Secrets scan.
-- [x] Figer son contrat normatif avant toute nouvelle modification de code.
-- [x] Publier la baseline et le contrat `COLLAB-ASSIGNMENT-01` sur `main`.
-- [x] Vérifier la CI post-correction : workflow `31822069069` vert.
-- [x] Vérifier le statut de la dernière CI GitHub sur le commit `a380bad` : workflow `31822332866` vert.
-- [x] Auditer `CaseAssignmentRecord`, les memberships, la policy et le dispatcher avant code.
-- [x] Ajouter la révision optimiste et les historiques append-only du slice Assignment.
-- [x] Ajouter les commandes `AcknowledgeAssignment`, `RequestAssignmentClarification` et `ReportAssignmentUnavailability`.
-- [x] Implémenter les handlers transactionnels avec idempotence et événements minimisés.
-- [x] Ajouter les tests unitaires de validation/invariants et les tests PostgreSQL tenant-scoped.
-- [x] Valider Ruff, pytest, Alembic, detect-secrets et CI avant publication.
-- [x] Committer et pousser COLLAB-ASSIGNMENT-01 après revue finale du diff.
-- [x] Corriger le faux positif detect-secrets sur l’URL PostgreSQL de test et republier le correctif.
-- [x] Vérifier la CI finale : workflow `31824210865` vert.
-- [x] Implémenter, tester, valider et publier le prochain slice retenu.
-- [x] Auditer les conventions de routes, DTO, contexte bearer et audit SEC-01 pour les commandes Assignment.
-- [x] Figer le contrat HTTP des trois commandes Assignment et leurs erreurs publiques fermées.
-- [x] Implémenter la façade HTTP auditée et son branchement au bootstrap V8.
-- [x] Ajouter les tests API de succès, refus ReBAC, neutralité tenant, idempotence et audit.
-- [x] Générer le résumé de couverture de tests et des exigences ReBAC associées.
-- [x] Inscrire dans le dépôt la matrice vérifiable de couverture HTTP Assignment et de contrôles ReBAC.
-- [x] Valider Ruff, pytest, Alembic et detect-secrets avant publication de la façade HTTP.
-- [x] Committer et pousser COLLAB-ASSIGNMENT-HTTP-01, puis vérifier la CI GitHub : workflow `31829240985` vert.
-- [x] Auditer les trois historiques Assignment et définir leur projection publique fermée.
-- [x] Figer le contrat CASE-ASSIGNMENT-HISTORY-01 et les règles ReBAC de lecture.
-- [x] Implémenter la query tenant/Case-scopée et la route HTTP d’historique collaborateur.
-- [x] Ajouter les tests API de lecture, ReBAC, neutralité inter-tenant, tri et non-fuite.
-- [x] Générer et vérifier l’OpenAPI des quatre routes Assignment (trois POST et un GET).
-- [x] Préparer le plan contractuel de gestion patron des affectations et la matrice de tests unitaires associée.
-- [x] Relancer la validation complète, publier CASE-ASSIGNMENT-HISTORY-01 et vérifier la CI GitHub (commit `257ddca`, workflow `31831648517` vert).
-- [x] Auditer les invariants, capabilities, modèles et conventions déjà publiés avant de figer `PATRON-ASSIGNMENT-MANAGEMENT-01`.
-- [x] Rédiger le contrat normatif patron : commandes, machine d’état, scopes fermés, ReBAC, audit, idempotence, persistance et non-fuites.
-- [x] Vérifier le registre OpenAPI Assignment, régénérer son snapshot via le script reproductible et contrôler les quatre opérations.
-- [x] Rejouer les tests backend complets et le harnais API Assignment couvrant `GET /api/v1/assignments/{assignment_id}/history`.
-- [x] Mettre à jour `PROJECT_STATE.md`, valider le diff et publier la frontière documentaire patron après revue finale (contrat `c3b8c01`, CI `31832528921` verte).
-- [x] Auditer les patterns de migration Alembic, modèles ORM, commandes Pydantic, dispatcher et tests PostgreSQL applicables à la création d’affectation patron.
-- [x] Rédiger la spécification technique et le plan SQL de la migration append-only `PATRON-ASSIGNMENT-MANAGEMENT-01`.
-- [x] Ajouter et tester les schémas Pydantic fermés `CreateCaseAssignment` et `AmendCaseAssignmentScope`.
-- [x] Implémenter le premier handler transactionnel `CreateCaseAssignment`, son journal patron, son événement, son outbox et son receipt idempotent.
-- [x] Écrire les tests d’intégration PostgreSQL du premier incrément : tenant, FKs, unicité, append-only, rollback, idempotence et conflit de révision Case.
-- [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du premier incrément patron (commit `04f0469`, workflow `31838720621` vert).
-- [x] Auditer les conventions du handler patron, du journal `case_assignment_change_events`, des routes authentifiées et des tests API existants.
-- [x] Implémenter `AmendCaseAssignmentScope` avec verrou, révision optimiste, journal append-only, événement, outbox et receipt idempotent.
-- [x] Écrire les tests PostgreSQL d’amendement : scope fermé, révision, rejeu, refus tenant/role/état et append-only.
-- [x] Vérifier l’upgrade/check/downgrade de la migration `20260814_0021` et mesurer les insertions/lectures du journal append-only avec un seuil explicitement documenté.
-- [x] Créer les routes HTTP patron uniquement pour `CreateCaseAssignment` et `AmendCaseAssignmentScope`, avec bearer réel, policy auditée, DTO fermés et OpenAPI vérifiée.
-- [x] Publier un amendement normatif et une migration additive `0022` pour lever le check historique incompatible avec les fenêtres d’affectation futures.
-- [x] Auditer le contrat patron publié, la machine d’état, le journal append-only, les routes patron et les conventions de migration applicables à `SuspendCaseAssignment`.
-- [x] Figer le contrat incrémental `PATRON-ASSIGNMENT-SUSPEND-01`, incluant les raisons fermées, l’état suspendu, la reprise, l’audit, l’idempotence et les non-fuites.
-- [x] Mettre à jour le registre et le snapshot OpenAPI avec la route de suspension, ses DTO fermés, ses statuts et ses erreurs publiques.
-- [x] Implémenter `SuspendCaseAssignment`, son journal append-only, son événement, son outbox, son receipt et vérifier qu’aucune migration additive n’est requise.
-- [x] Écrire les tests PostgreSQL et API de suspension : révision, rejeu, état, raisons, tenant, role, journal et absence de fuite.
-- [x] Mesurer le chemin append-only de suspension avec un seuil local de non-régression et confirmer le cycle Alembic jusqu’à la tête `0022`.
-- [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de suspension (commit `2b421cf`, workflow `31847314071` vert).
-- [x] Auditer les invariants de suspension, la machine d’état, le journal append-only, les routes patron et le contrat de fenêtre applicables à `ReactivateCaseAssignment`.
-- [x] Figer le contrat incrémental `PATRON-ASSIGNMENT-REACTIVATE-01`, incluant les motifs fermés, la fenêtre valide, l’audit, l’idempotence et les non-fuites.
-- [x] Mettre à jour le registre et le snapshot OpenAPI avec la route de réactivation, son DTO fermé, ses statuts et ses erreurs publiques.
-- [x] Implémenter `ReactivateCaseAssignment`, son journal append-only, son événement, son outbox et son receipt, avec la migration additive `0023` nécessaire au catalogue fermé de motifs.
-- [x] Écrire les tests PostgreSQL et API de réactivation : révision, rejeu, état, motif, fenêtre, tenant, rôle, journal et absence de fuite.
-- [x] Mesurer le chemin append-only de réactivation avec un seuil local de non-régression et confirmer le cycle Alembic jusqu’à la tête `0023`.
-- [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub du slice de réactivation (commit `ca740c6`, workflow `31850271931` vert).
-- [ ] Auditer les états `ACTIVE` et `SUSPENDED`, le journal append-only, le catalogue de motifs, les routes patron et les conventions de fin applicables à `EndCaseAssignment`.
-- [ ] Figer le contrat normatif `PATRON-ASSIGNMENT-END-01` : états admis, motifs fermés, transition irréversible, ReBAC, audit, idempotence, non-fuites et migration éventuelle.
-- [ ] Régénérer et vérifier le snapshot OpenAPI Assignment ; constater explicitement si la route `POST /api/v1/patron/assignments/{assignment_id}/end` n’est pas encore exposée.
-- [ ] Lancer la suite backend de référence et consigner que la route de fin ne peut être testée fonctionnellement qu’après l’implémentation issue du contrat figé.
-- [x] Relancer les validations globales, mettre à jour l’état durable, publier et vérifier la CI GitHub de l’incrément patron 2 (commit `5054416`, workflow `31844799829` vert).
-- [x] Auditer les états `ACTIVE` et `SUSPENDED`, le journal append-only, le catalogue de motifs, les routes patron et les conventions de fin applicables à `EndCaseAssignment`.
-- [x] Figer le contrat normatif `PATRON-ASSIGNMENT-END-01` : états admis, motifs fermés, transition irréversible, ReBAC, audit, idempotence, non-fuites et migration éventuelle.
-- [x] Régénérer et vérifier le snapshot OpenAPI Assignment ; constater explicitement que la route `POST /api/v1/patron/assignments/{assignment_id}/end` n’était pas exposée avant implémentation.
-- [x] Lancer la suite backend de référence et consigner que la route de fin ne pouvait être testée fonctionnellement qu’après l’implémentation issue du contrat figé.
-- [x] Ajouter `EndCaseAssignmentCommand`, son motif fermé et son branchement dans le dispatcher patron.
-- [x] Implémenter le handler transactionnel `EndCaseAssignment` avec verrouillage, contrôle de révision, mutation irréversible, journal `ASSIGNMENT_ENDED`, événement/outbox et receipt idempotent.
-- [x] Ajouter le DTO HTTP fermé et `POST /api/v1/patron/assignments/{assignment_id}/end` sur le runtime bearer réel.
-- [x] Écrire les scénarios PostgreSQL de fin depuis `ACTIVE` et `SUSPENDED`, rejeu, états non terminables, conflit de révision et immutabilité du journal.
-- [x] Écrire les scénarios API couvrant `201`, `200`, `403`, `404`, `409`, `422` et l’absence de fuite de motif ou de données protégées.
-- [x] Étendre le benchmark append-only à `ASSIGNMENT_ENDED`, régénérer l’OpenAPI à neuf opérations et mettre à jour le registre Markdown.
-- [x] Valider Ruff, pytest, Alembic, scan de secrets, diff, CI GitHub puis publier le slice et l’état durable (commit `a3fa73a`, workflow `31853564951` vert).
-- [x] Auditer les projections Assignment existantes, les capacités patron, les journaux append-only et les conventions HTTP/ReBAC applicables au cockpit patron.
-- [x] Figer le contrat normatif du cockpit patron de lecture : vues de liste/détail, données autorisées, non-fuites, pagination/borne, filtres et erreurs publiques.
-- [x] Définir les DTO Pydantic fermés et implémenter le lecteur applicatif tenant-scopé des affectations et de leurs journaux patron.
-- [x] Exposer les routes de lecture patron avec bearer réel, capability auditée, projection fermée et OpenAPI détaillée.
-- [x] Écrire les tests d’intégration PostgreSQL/API : liste, détail, journal, tri, borne, `401`, `403`, `404`, `422`, tenant et absence de fuite financière ou sensible.
-- [x] Régénérer le snapshot OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub (commit `6df4c55`, workflow `31855776751` vert).
-- [x] Auditer les trois registres d’interactions collaborateur, leurs projections actuelles, les règles ReBAC et les exclusions de texte libre sensible.
-- [x] Figer le contrat normatif de lecture patron des interactions : routes, projections fermées, ordre, borne, rôles, neutralité et OpenAPI attendue.
-- [x] Ajouter les DTO Pydantic fermés et le lecteur tenant-scopé des accusés, demandes de clarification et indisponibilités utiles au patron.
-- [x] Exposer les routes de lecture patron et vérifier le refus explicite d’un collaborateur standard, sans contourner le bearer réel.
-- [x] Écrire les tests d’intégration patron/collaborateur : liste, filtres, ordre, borne, `200`, `401`, `403`, `404`, `422`, tenant et non-fuites.
-- [x] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub (commit `3bc7772`, workflow `31879239096` vert).
-- [x] Auditer le cycle de vie actuel des demandes de clarification et déterminer les validations patron qui restent non ambiguës, sans inventer de réponse ou décision métier.
-- [x] Figer le contrat `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01` : commande, idempotence, projection fermée, audit, non-fuites, migrations et OpenAPI.
-- [x] Implémenter la validation patron directe autorisée par le contrat, son registre append-only, son événement/outbox et sa route HTTP Bearer réelle.
-- [x] Écrire les tests d’intégration de validation patron : succès, rejeu, rôles, tenant, état, révision, payload fermé et absence de fuite.
-- [x] Produire un rapport de couverture des 12 opérations OpenAPI Assignment/patron, avec chemins de test et statuts vérifiés.
-- [x] Préparer la spécification technique de la prochaine lecture financière patron, sans exposer ni implémenter de prix ou marge avant contrat figé.
-- [ ] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub.
-- [x] Régénérer OpenAPI, valider Ruff/pytest/Alembic/secrets/diff, publier le slice et vérifier la CI GitHub (commit `bc41d33`, workflow `31880338075` vert).
-- [ ] Auditer la spécification financière préparatoire, les classifications SEC-01 et les prérequis de snapshot avant toute exposition de montant.
-- [ ] Figer le contrat `FINANCIAL-REPORT-FOUNDATION-01` : snapshots, lignes, publication, autorisation `financial.report.read`, non-fuites et migration.
-- [ ] Intégrer au modèle financier patron les catégories confirmées : coûts directs, frais généraux, sous-traitance, provision d’aléas, marge brute et trésorerie prévisionnelle, toutes en unités mineures.
-- [ ] Créer `financial_report_snapshots` et `financial_report_lines`, leurs FKs tenant/Case, checks de catégories, index et triggers append-only dans une migration additive.
-- [ ] Rendre un snapshot lisible uniquement avec `state=PUBLISHED` et un acte de publication durable ; conserver les snapshots incomplets hors route HTTP.
-- [ ] Construire le lecteur SQLAlchemy tenant-scopé qui retourne uniquement le snapshot publié demandé et ses lignes autorisées.
-- [ ] Implémenter les schémas Pydantic fermés, la persistance append-only et la projection patron d’un rapport financier publié.
-- [ ] Exposer la route financière patron sur bearer réel, avec capability distincte, `no-store` et erreurs neutres.
-- [ ] Vérifier les DTO `extra=forbid`, la présence exclusive d’unités mineures entières et l’absence de float, source, audit ou stockage dans le JSON financier.
-- [ ] Vérifier que la réponse `200` financière porte `Cache-Control: no-store` et que les réponses refusées ne révèlent aucun rapport.
-- [ ] Écrire les tests PostgreSQL/API du rapport financier : patron, collaborateur, tenant, rapport non publié, montants mineurs, redaction et cache.
-- [ ] Régénérer OpenAPI, étendre le rapport de couverture à 13 opérations publiées, valider Ruff/pytest/Alembic/secrets/diff et CI.
-- [ ] Exécuter le contrôle de secrets, mettre à jour l’état durable puis committer, pousser et vérifier la CI de `FINANCIAL-REPORT-FOUNDATION-01`.
-- [ ] Rédiger la spécification de la prochaine écriture patron : publication ou validation explicite d’un snapshot financier sans mutation du calcul.
-- [ ] Préparer puis générer une présentation synthétique de la fondation financière patron et des 14 opérations OpenAPI.
-- [ ] Ajouter `financial.report.publish`, la commande Pydantic, le registre de publication append-only, l’événement/outbox et la route patron `DRAFT → PUBLISHED`.
-- [ ] Ajouter la révision d’agrégat du snapshot, verrouiller `DRAFT` avant publication et écrire `financial_report_publications` sans montant ni formule.
-- [x] Valider explicitement que le collaborateur standard obtient `403 FORBIDDEN` avant toute résolution ou fuite de snapshot financier.
-- [x] Écrire les tests d’intégration de publication : succès, rejeu, révision, double publication, tenant, refus collaborateur et non-fuite de montant.
-- [x] Générer les notes détaillées de la présentation financière patron et présenter à nouveau le deck avec script.
-- [x] Régénérer le snapshot à quinze opérations après publication financière, contrôler les secrets, exécuter la suite complète et vérifier la CI GitHub.
-- [x] Créer l’acte immutable de publication, basculer exclusivement un snapshot `DRAFT` vers `PUBLISHED` et conserver le receipt sans montant.
-- [x] Publier le commit de la route de publication financière seulement après CI verte couvrant les quinze opérations OpenAPI.
-- [x] Vérifier dans un même harnais que la publication réussit pour le patron et que le collaborateur est refusé sans lire le snapshot.
-- [x] Implémenter `PublishFinancialReportCommand`, son dispatcher, la mutation atomique du snapshot et l’acte `financial_report_publications` append-only.
-- [ ] Vérifier le handler et la route POST contre les cas `201`, `200`, `403`, `404`, `409` et `422` avant la CI.
-- [x] Ne committer qu’après exécution locale des six codes de réponse et scan de secrets sans nouveau secret détecté.
-- [ ] Vérifier que le handler publie atomiquement, incrémente la révision et ne retourne aucun montant financier dans le receipt.
-- [ ] Afficher uniquement après vérification le code source final de la route POST et du handler SQLAlchemy de publication.
-- [x] Mettre à jour les notes de présentation avec le chemin de contrôle `PATRON_ADMIN → publication → registre immutable`.
-- [x] Produire un rapport global V8 distinguant précisément les capacités publiées, les frontières prêtes mais non démarrées et les dépendances VPS.
-- [x] Figer la prochaine frontière prioritaire après revue globale : création contrôlée de snapshots financiers `DRAFT` ou cockpit patron web.
-- [x] 1. Figer puis livrer `FINANCIAL-REPORT-DRAFT-CREATION-01` : seul le patron ouvre un brouillon de chiffrage pour une Case.
-- [x] Contrat `SMART_AO_V8_FINANCIAL_REPORT_DRAFT_CREATION_01_CONTRAT.md` validé par le propriétaire avant code.
-- [x] Ajouter la capability fermée `financial.report.create`, la commande Pydantic et les DTO HTTP fermés de création DRAFT.
-- [x] Ajouter l’unicité partielle du seul brouillon `DRAFT` ouvert par affaire et valider le cycle Alembic.
-- [x] Implémenter le handler transactionnel : contrôle patron avant lecture, verrou Case, snapshot vide, événement, outbox et receipt idempotent.
-- [x] Exposer la route patron et écrire les tests `201/200/403/404/409/422`, concurrence et non-fuite financière.
-- [x] Publier `FINANCIAL-REPORT-DRAFT-CREATION-01` et vérifier la CI GitHub `31899212603` verte.
-- [ ] 2. Figer puis livrer l’écriture révisionnée et historisée des lignes financières d’un brouillon `DRAFT`.
-- [ ] 3. Construire le cockpit patron web uniquement après les API financières de création et d’écriture réellement publiées.
-- [ ] 4. Construire la bibliothèque entreprise patron : société, assurances, Kbis, RIB, qualifications, pièces expirables et références.
-- [ ] 5. Construire le wizard collaborateur de préparation : exigences confirmées, preuves, tâches et pièces techniques par affaire.
-- [ ] 6. Construire la génération documentaire et le contrôle de complétude sans déclarer une conformité automatique.
-- [ ] 7. Exécuter la préproduction VPS et DCE réels : Docker, ClamAV, sauvegardes, HTTPS, supervision et parcours complet avant tout client.
+Cette checklist est la source de vérité opérationnelle après réconciliation des deux audits. Les anciennes entrées historiques détaillées ont été remplacées par le journal des slices publiés et les seules frontières encore ouvertes.
+
+## Corrections d’audit publiées
+
+- [x] **Protection anti-brute-force progressive** — `LoginRateLimiter` injectable, buckets SHA-256, throttling `/login` et `/refresh`, audit des refus `429` et `Retry-After`. Commit `025c36d`, CI `32076462140` verte.
+- [x] **Fixtures PostgreSQL de tests centralisées** — `backend/tests/conftest.py`, `tests.support.database`, URL unique `SMART_AO_TEST_DATABASE_URL` avec fallback par concaténation, 43 modules nettoyés. Commit `aac4de0`, CI `32078237301` verte.
+- [x] **Observabilité et durcissement runtime** — `request_id`, logs JSON opérationnels, compteurs `/metrics` sans données métier, image backend digest-pinnée et utilisateur non-root avec quarantaine privée contrôlée. Commits `0ecb24c` et `0ab3cbc`, CI finale `32080763983` verte.
+- [x] **Dépendances frontend reproductibles** — suppression de `latest` dans `web/package.json`, alignement des spécificateurs avec `web/pnpm-lock.yaml`, installation `--frozen-lockfile` et build TypeScript strict. Commit `d4b33fe`, CI `32081102590` verte.
+- [x] **Couverture et concurrence déterministes** — seuil initial `85 %` dans `pyproject.toml` et la CI, deux scénarios PostgreSQL couvrant révision optimiste et receipt `PROCESSING` avant outbox. Mesure locale : `402 passed`, couverture branchée `89,32 %`. Commit `e3eafc7`, CI `32083322693` verte.
+
+## État technique publié
+
+- [x] Healthchecks live/ready, factory de production, scripts de déploiement, sauvegarde/restauration isolée, rotation bornée des logs/secrets et pinning des images sont publiés.
+- [x] Les slices métier DCE, sécurité, affectations patron/collaborateur, préparation, capacités/preuves, revues/brouillons techniques et fondation financière déjà publiés restent couverts par la suite backend et ne doivent pas être réouverts comme tâches historiques.
+- [x] Les invariants de sécurité restent obligatoires : tenant résolu serveur, confidentialité financière absolue, append-only des registres immuables, révision optimiste et idempotence par `command_id`/`idempotency_key`.
+
+## Tâches réellement restantes
+
+- [ ] **Gate VPS réel**, lorsque l’utilisateur disposera d’un VPS : builder les images digest-pinnées, lancer PostgreSQL/ClamAV/Caddy, exécuter le test EICAR, vérifier HTTPS et `/healthz/ready`, installer les timers systemd, tester la sauvegarde hors VPS, la restauration isolée et la supervision externe.
+- [ ] **Raccordement frontend à l’API publiée**, uniquement après réception et vérification d’une URL HTTPS backend réelle ; ne pas fixer `VITE_API_BASE_URL` avant cette preuve.
+- [ ] **Rapport opérateur de restauration**, à produire pendant le gate VPS réel avec hashes, échantillon documentaire, contrôle tenant, état outbox, logs, backup hors hôte et preuve de rotation des secrets.
+
+## Frontières explicitement non retenues par les audits
+
+MinIO sans contrat de stockage établi, sharding/Redis/tracing distribué spéculatifs, DAST/Semgrep déjà couvert par Bandit/Trivy, et tests de charge nécessitant un environnement dédié ne sont pas des tâches ouvertes de cette remédiation.

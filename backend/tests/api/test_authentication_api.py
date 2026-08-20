@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import os
 from collections import deque
 from datetime import UTC, datetime
-from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from app.bootstrap.application import create_app
 from app.interfaces.http.routes.authentication import AuthenticationHttpRuntime
 from app.platform.security.authentication import AuthenticationService
@@ -24,12 +20,6 @@ from app.platform.security.tokens import JwtAccessTokenCodec
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv(
-    "SMART_AO_TEST_DATABASE_URL",
-    "postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5432/smart_ao",
-)
 FIXED_NOW = datetime(2026, 8, 13, 12, 0, tzinfo=UTC)
 
 
@@ -51,22 +41,8 @@ class SequenceTokenGenerator:
         return self._tokens.popleft()
 
 
-@pytest.fixture(scope="module")
-def database_engine() -> sa.Engine:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        command.downgrade(config, "base")
 
 
-@pytest.fixture
-def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
-    return sessionmaker(bind=database_engine, expire_on_commit=False)
 
 
 @pytest.fixture(autouse=True)
@@ -225,6 +201,29 @@ def test_login_failure_is_neutral_and_never_sets_authentication_cookies(
     assert response.json() == {"detail": "INVALID_CREDENTIALS"}
     assert not response.headers.get_list("set-cookie")
     assert client.cookies.get("smart_ao_refresh") is None
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_login_is_rate_limited_after_repeated_failures(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id = _insert_tenant(database_engine)
+    client, _ = _client(session_factory)
+    payload = {
+        "email": "unknown@example.test",
+        "password": "Wrong#Pass123",
+        "tenant_id": str(tenant_id),
+    }
+
+    responses = [client.post("/api/v1/auth/login", json=payload) for _ in range(6)]
+
+    assert [response.status_code for response in responses[:5]] == [401] * 5
+    assert responses[5].status_code == 429
+    assert responses[5].json() == {"detail": "RATE_LIMITED"}
+    assert int(responses[5].headers["Retry-After"]) >= 1
 
 
 @pytest.mark.api

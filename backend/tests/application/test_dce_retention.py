@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from collections.abc import AsyncIterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
+import app.workers.dce_retention as retention_module
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from app.modules.dce.application.handlers import ExpireDceStagedObjectHandler
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.quarantine import LocalQuarantineStorageAdapter
-from app.platform.events.dispatcher import CommandDispatcher
+from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import (
     DomainEventRecord,
     OutboxMessageRecord,
@@ -24,31 +24,11 @@ from app.platform.persistence.models import (
 from app.workers.dce_retention import RETENTION_TOPIC, DceRetentionWorker
 from sqlalchemy.orm import Session, sessionmaker
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv(
-    "SMART_AO_TEST_DATABASE_URL",
-    "postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5432/smart_ao",
-)
 NOW = datetime(2026, 8, 13, 17, 0, tzinfo=UTC)
 
 
-@pytest.fixture(scope="module")
-def database_engine() -> sa.Engine:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        command.downgrade(config, "base")
 
 
-@pytest.fixture
-def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
-    return sessionmaker(bind=database_engine, expire_on_commit=False)
 
 
 @pytest.fixture(autouse=True)
@@ -362,3 +342,142 @@ def test_retention_expires_uploading_orphan_then_deletes_its_private_file(
     assert staged_object is not None
     assert staged_object.state == "EXPIRED"
     assert [message.status for message in outbox] == ["PUBLISHED"]
+
+
+def test_retention_run_result_merges_all_counters() -> None:
+    first = retention_module.RetentionRunResult(expired=1, published=2)
+    second = retention_module.RetentionRunResult(retried=3, skipped=4)
+
+    assert first.merged(second) == retention_module.RetentionRunResult(
+        expired=1, published=2, retried=3, skipped=4
+    )
+
+
+@pytest.mark.parametrize(
+    ("payload", "key"),
+    [(None, "tenant_id"), ({"tenant_id": "not-a-uuid"}, "tenant_id"), ({}, "missing")],
+)
+def test_retention_uuid_payload_rejects_invalid_values(payload: object, key: str) -> None:
+    assert retention_module._uuid_payload(payload, key) is None  # noqa: SLF001
+
+
+def test_retention_expiry_continues_after_dispatch_rejection() -> None:
+    storage_object_id = uuid4()
+    tenant_id = uuid4()
+    transaction = MagicMock()
+    transaction.scalars.side_effect = [
+        [SimpleNamespace(id=storage_object_id)],
+        [SimpleNamespace(id=storage_object_id, tenant_id=tenant_id)],
+    ]
+    factory = MagicMock()
+    factory.begin.return_value.__enter__.return_value = transaction
+    dispatcher = MagicMock()
+    dispatcher.dispatch.side_effect = CommandExecutionError("already-expired")
+    worker = DceRetentionWorker(
+        session_factory=factory,
+        dispatcher=dispatcher,
+        storage=MagicMock(),
+    )
+
+    assert worker._expire_due_objects(now=NOW) == 0  # noqa: SLF001
+    dispatcher.dispatch.assert_called_once()
+
+
+def _message_factory(message: object) -> MagicMock:
+    factory = MagicMock()
+    read_session = MagicMock()
+    read_session.get.return_value = message
+    factory.return_value.__enter__.return_value = read_session
+    write_session = MagicMock()
+    write_session.get.return_value = message
+    factory.begin.return_value.__enter__.return_value = write_session
+    return factory
+
+
+def test_retention_process_skips_missing_and_wrong_topic_messages() -> None:
+    worker = DceRetentionWorker(
+        session_factory=_message_factory(None),
+        dispatcher=MagicMock(),
+        storage=MagicMock(),
+    )
+    assert asyncio.run(worker._process_message(message_id=uuid4(), now=NOW)).skipped == 1  # noqa: SLF001
+    wrong = SimpleNamespace(topic="other.topic")
+    worker = DceRetentionWorker(
+        session_factory=_message_factory(wrong),
+        dispatcher=MagicMock(),
+        storage=MagicMock(),
+    )
+    assert asyncio.run(worker._process_message(message_id=uuid4(), now=NOW)).skipped == 1  # noqa: SLF001
+
+
+def test_retention_process_retries_invalid_payload() -> None:
+    message = SimpleNamespace(
+        topic=RETENTION_TOPIC,
+        payload_json={"data": {}},
+        status="RETRY",
+        attempt_count=0,
+    )
+    factory = _message_factory(message)
+    worker = DceRetentionWorker(
+        session_factory=factory,
+        dispatcher=MagicMock(),
+        storage=MagicMock(),
+    )
+
+    result = asyncio.run(worker._process_message(message_id=uuid4(), now=NOW))  # noqa: SLF001
+
+    assert result.retried == 1
+    assert message.last_error_code == "INVALID_RETENTION_PAYLOAD"
+
+
+def test_retention_publish_and_retry_are_idempotent_for_published_message() -> None:
+    message = SimpleNamespace(status="PUBLISHED")
+    worker = DceRetentionWorker(
+        session_factory=_message_factory(message),
+        dispatcher=MagicMock(),
+        storage=MagicMock(),
+    )
+
+    assert worker._publish_message(message_id=uuid4(), now=NOW).skipped == 1  # noqa: SLF001
+    assert worker._retry_message(  # noqa: SLF001
+        message_id=uuid4(), now=NOW, error_code="ignored"
+    ).skipped == 1
+
+
+def test_retention_build_default_worker_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    engine = object()
+    session_factory = object()
+    monkeypatch.setenv("SMART_AO_DATABASE_URL", "postgresql://test")
+    monkeypatch.setenv("SMART_AO_DCE_QUARANTINE_ROOT", "/tmp/quarantine")
+    monkeypatch.setenv("SMART_AO_RETENTION_BATCH_SIZE", "3")
+    monkeypatch.setenv("SMART_AO_RETENTION_LEASE_SECONDS", "7")
+    monkeypatch.setattr(retention_module.sa, "create_engine", lambda url: (url, engine))
+    monkeypatch.setattr(
+        retention_module, "sessionmaker", lambda bind, expire_on_commit: session_factory
+    )
+    monkeypatch.setattr(retention_module, "CommandDispatcher", lambda **_kwargs: "dispatcher")
+    monkeypatch.setattr(
+        retention_module,
+        "LocalQuarantineStorageAdapter",
+        lambda root: ("storage", root),
+    )
+
+    worker = retention_module.build_default_worker()
+
+    assert worker._session_factory is session_factory
+    assert worker._batch_size == 3
+    assert worker._lease_seconds == 7
+
+
+def test_retention_main_runs_one_poll_cycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    worker = MagicMock()
+    monkeypatch.setattr(retention_module, "build_default_worker", lambda: worker)
+    monkeypatch.setattr(asyncio, "run", lambda coroutine: coroutine.close())
+    monkeypatch.setenv("SMART_AO_RETENTION_POLL_SECONDS", "0")
+
+    def stop(_seconds: float) -> None:
+        raise RuntimeError("stop retention loop")
+
+    monkeypatch.setattr(retention_module.time, "sleep", stop)
+    with pytest.raises(RuntimeError, match="stop retention loop"):
+        retention_module.main()

@@ -1,0 +1,196 @@
+name: smart-ao-preprod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "${SMART_AO_LOG_MAX_SIZE:-50m}"
+    max-file: "${SMART_AO_LOG_MAX_FILES:-5}"
+
+services:
+  caddy:
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_PUBLIC_HOST: ${SMART_AO_PUBLIC_HOST:?SMART_AO_PUBLIC_HOST is required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    depends_on:
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    networks:
+      - edge
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: ops/docker/frontend.Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    expose:
+      - "80"
+    networks:
+      - edge
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    env_file:
+      - .env.preprod
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
+      SMART_AO_CLAMD_HOST: clamav
+      SMART_AO_CLAMD_PORT: "3310"
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+    volumes:
+      - dce_quarantine:/var/lib/smart_ao/dce-quarantine
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz/ready', timeout=3).read()"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  dce-retention-worker:
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: python -m app.workers.dce_retention
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    env_file:
+      - .env.preprod
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
+      SMART_AO_RETENTION_BATCH_SIZE: ${SMART_AO_RETENTION_BATCH_SIZE:-50}
+      SMART_AO_RETENTION_LEASE_SECONDS: ${SMART_AO_RETENTION_LEASE_SECONDS:-120}
+      SMART_AO_RETENTION_POLL_SECONDS: ${SMART_AO_RETENTION_POLL_SECONDS:-30}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - dce_quarantine:/var/lib/smart_ao/dce-quarantine
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  submission-export-webhook-worker:
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: python -m app.workers.submission_export_webhook
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    env_file:
+      - .env.preprod
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_EXPORT_WEBHOOK_URL: ${SMART_AO_EXPORT_WEBHOOK_URL:-}
+      SMART_AO_EXPORT_WEBHOOK_BATCH_SIZE: ${SMART_AO_EXPORT_WEBHOOK_BATCH_SIZE:-50}
+      SMART_AO_EXPORT_WEBHOOK_LEASE_SECONDS: ${SMART_AO_EXPORT_WEBHOOK_LEASE_SECONDS:-120}
+      SMART_AO_EXPORT_WEBHOOK_POLL_SECONDS: ${SMART_AO_EXPORT_WEBHOOK_POLL_SECONDS:-30}
+      SMART_AO_EXPORT_WEBHOOK_TIMEOUT_SECONDS: ${SMART_AO_EXPORT_WEBHOOK_TIMEOUT_SECONDS:-10}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  postgres:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+
+  clamav:
+    image: clamav/clamav:1.4_base@sha256:1b6920e8c32cca47ea33b1e2611d9a4740ccc622cf13b30b29f8283d60175e39
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    environment:
+      CLAMAV_NO_MILTERD: "true"
+    volumes:
+      - clamav_database:/var/lib/clamav
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 90s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres_data:
+  dce_quarantine:
+  clamav_database:
+  caddy_data:
+  caddy_config:
+  caddy_logs:
+
+networks:
+  edge:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true

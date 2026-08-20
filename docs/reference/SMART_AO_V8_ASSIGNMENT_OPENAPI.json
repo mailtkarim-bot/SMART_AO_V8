@@ -76,6 +76,86 @@
         "title": "AcknowledgeAssignmentRequest",
         "type": "object"
       },
+      "AddFinancialReportLineRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_minor": {
+            "title": "Amount Minor",
+            "type": "integer"
+          },
+          "category": {
+            "enum": [
+              "SALES",
+              "DIRECT_COST",
+              "OVERHEAD",
+              "SUBCONTRACTING",
+              "CONTINGENCY",
+              "GROSS_MARGIN",
+              "FORECAST_CASHFLOW"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "quantity_decimal": {
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "title": "Quantity Decimal",
+            "type": "string"
+          },
+          "unit": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "expected_revision",
+          "category",
+          "label",
+          "quantity_decimal",
+          "unit",
+          "amount_minor"
+        ],
+        "title": "AddFinancialReportLineRequest",
+        "type": "object"
+      },
       "AggregateReferenceResponse": {
         "additionalProperties": false,
         "properties": {
@@ -1264,6 +1344,62 @@
         "title": "FinancialReportDraftCreationResponse",
         "type": "object"
       },
+      "FinancialReportLineAdditionResponse": {
+        "additionalProperties": false,
+        "description": "Closed receipt intentionally excluding every financial value.",
+        "properties": {
+          "aggregate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/AggregateReferenceResponse"
+            },
+            "title": "Aggregate Refs",
+            "type": "array"
+          },
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "event_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Event Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "format": "uuid",
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result_code": {
+            "const": "FINANCIAL_REPORT_LINE_ADDED",
+            "title": "Result Code",
+            "type": "string"
+          },
+          "status": {
+            "const": "SUCCEEDED",
+            "default": "SUCCEEDED",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "idempotency_key",
+          "result_code",
+          "aggregate_refs",
+          "event_ids"
+        ],
+        "title": "FinancialReportLineAdditionResponse",
+        "type": "object"
+      },
       "FinancialReportPublicationResponse": {
         "additionalProperties": false,
         "description": "Closed receipt intentionally excluding every financial value and source.",
@@ -1859,6 +1995,69 @@
           "items"
         ],
         "title": "PatronAssignmentJournalResponse",
+        "type": "object"
+      },
+      "PatronFinancialReportDraftResponse": {
+        "additionalProperties": false,
+        "description": "Closed patron-only projection of one mutable financial DRAFT.",
+        "properties": {
+          "aggregate_revision": {
+            "minimum": 0.0,
+            "title": "Aggregate Revision",
+            "type": "integer"
+          },
+          "calculated_at": {
+            "format": "date-time",
+            "title": "Calculated At",
+            "type": "string"
+          },
+          "case_id": {
+            "format": "uuid",
+            "title": "Case Id",
+            "type": "string"
+          },
+          "currency_code": {
+            "title": "Currency Code",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PatronFinancialReportLineResponse"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "report_id": {
+            "format": "uuid",
+            "title": "Report Id",
+            "type": "string"
+          },
+          "ruleset_version": {
+            "minimum": 1.0,
+            "title": "Ruleset Version",
+            "type": "integer"
+          },
+          "status": {
+            "const": "DRAFT",
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PatronFinancialReportSummaryResponse"
+          }
+        },
+        "required": [
+          "report_id",
+          "case_id",
+          "status",
+          "aggregate_revision",
+          "currency_code",
+          "calculated_at",
+          "ruleset_version",
+          "summary",
+          "lines"
+        ],
+        "title": "PatronFinancialReportDraftResponse",
         "type": "object"
       },
       "PatronFinancialReportLineResponse": {
@@ -4177,6 +4376,164 @@
           }
         },
         "summary": "Get Financial Report",
+        "tags": [
+          "patron-financial-reports"
+        ]
+      }
+    },
+    "/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/draft": {
+      "get": {
+        "operationId": "get_financial_report_draft_api_v1_patron_cases__case_id__financial_reports__report_id__draft_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatronFinancialReportDraftResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Accès financier patron insuffisant."
+          },
+          "404": {
+            "description": "Brouillon absent, publié ou hors tenant."
+          },
+          "422": {
+            "description": "UUID invalide."
+          }
+        },
+        "summary": "Get Financial Report Draft",
+        "tags": [
+          "patron-financial-reports"
+        ]
+      }
+    },
+    "/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/lines": {
+      "post": {
+        "operationId": "add_financial_report_line_api_v1_patron_cases__case_id__financial_reports__report_id__lines_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddFinancialReportLineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rejeu idempotent de l’ajout."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinancialReportLineAdditionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Bearer absent, invalide ou expiré."
+          },
+          "403": {
+            "description": "Écriture financière réservée au patron."
+          },
+          "404": {
+            "description": "Rapport absent ou hors tenant."
+          },
+          "409": {
+            "description": "Conflit de révision ou d’idempotence."
+          },
+          "422": {
+            "description": "Snapshot publié ou invariant de ligne refusé."
+          }
+        },
+        "summary": "Add Financial Report Line",
         "tags": [
           "patron-financial-reports"
         ]

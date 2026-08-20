@@ -2,7 +2,7 @@
 
 **Statut :** référence générée et vérifiée.
 
-**Périmètre :** seize opérations : les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01`, les deux lectures `PATRON-ASSIGNMENT-READ-01`, la lecture `PATRON-ASSIGNMENT-INTERACTIONS-READ-01`, la validation `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01`, la lecture financière patron, la publication financière `FINANCIAL-REPORT-PUBLICATION-01` et la création de brouillon `FINANCIAL-REPORT-DRAFT-CREATION-01`.
+**Périmètre :** dix-huit opérations : les trois commandes collaborateur `COLLAB-ASSIGNMENT-HTTP-01`, la lecture fermée `CASE-ASSIGNMENT-HISTORY-01`, les cinq commandes patron de `PATRON-ASSIGNMENT-MANAGEMENT-01`, les deux lectures `PATRON-ASSIGNMENT-READ-01`, la lecture `PATRON-ASSIGNMENT-INTERACTIONS-READ-01`, la validation `PATRON-ASSIGNMENT-INTERACTION-VALIDATION-01`, la lecture financière publiée, la création de brouillon, l’ajout de ligne financière et la lecture de brouillon `FINANCIAL-REPORT-DRAFT-READ-01`, la publication financière `FINANCIAL-REPORT-PUBLICATION-01` et les lectures patronales complémentaires.
 **Source de vérité exécutable :** `scripts/export_assignment_openapi.py`, qui produit le snapshot [`SMART_AO_V8_ASSIGNMENT_OPENAPI.json`](SMART_AO_V8_ASSIGNMENT_OPENAPI.json) depuis `create_app()` et ses dépendances SEC-01 réelles.
 
 Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et `/api/v1/patron`. Elles résolvent toujours l’acteur depuis le bearer serveur : aucun tenant, membership d’auteur, scope d’autorité, acteur ou contexte de test n’est accepté depuis le corps client.
@@ -21,6 +21,8 @@ Ce registre décrit les routes HTTP sous les préfixes `/api/v1/assignments` et 
 | `POST` | `/api/v1/patron/assignments/{assignment_id}/interaction-validations` | `assignment.manage`, `PATRON_ADMIN` | Prise en compte patron append-only d’une interaction collaborateur. |
 | `GET` | `/api/v1/patron/cases/{case_id}/financial-reports/{report_id}` | `financial.report.read`, `PATRON_ADMIN` | Lecture `no-store` d’un snapshot financier publié et tenant-scopé. |
 | `POST` | `/api/v1/patron/cases/{case_id}/financial-reports/drafts` | `financial.report.create`, `PATRON_ADMIN` | Création atomique d’un unique brouillon financier vide, tenant-scopé et confidentiel. |
+| `POST` | `/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/lines` | `financial.report.line.write`, `PATRON_ADMIN` | Ajout révisionné d’une ligne au brouillon, receipt fermé sans montant. |
+| `GET` | `/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/draft` | `financial.report.read`, `PATRON_ADMIN` | Lecture `no-store` du brouillon DRAFT courant, de sa révision et de ses lignes. |
 | `POST` | `/api/v1/patron/cases/{case_id}/financial-reports/{report_id}/publications` | `financial.report.publish`, `PATRON_ADMIN` | Publication atomique `DRAFT → PUBLISHED`, acte immutable, receipt sans montant. |
 | `GET` | `/api/v1/patron/assignments?case_id?&state?&limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Liste tenant-scopée, fermée et bornée des affectations d’autorité. |
 | `GET` | `/api/v1/patron/assignments/{assignment_id}/journal?limit=1..200` | `assignment.manage`, `PATRON_ADMIN` | Journal patron append-only fermé, tenant-scopé et borné. |

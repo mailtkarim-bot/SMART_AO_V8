@@ -1,0 +1,26 @@
+# Matrice de pertinence du second audit SMART_AO_V8
+
+Le second audit est utile comme photographie historique, mais plusieurs lignes décrivent la version antérieure `PREPARATION-COMPLETENESS-01` et non l’état actuel de la branche. Les décisions ci-dessous sont prises après vérification du dépôt courant.
+
+| Observation du second audit | Verdict | Vérification et décision |
+|---|---|---|
+| 359 tests verts, dernier slice `PREPARATION-COMPLETENESS-01`, 32 migrations | **Historique** | Les slices 5a, 5b, 5c, 5d et 7b ont depuis été publiés ; la tête Alembic est `20260817_0035`, et le dernier état CI connu avant le correctif audit courant était à 387 tests. Ne pas corriger une information historique ; mettre à jour la mémoire durable. |
+| Architecture hexagonale, domaine pur, outbox, idempotence, FKs tenant | **Pertinent et confirmé** | Les tests d’architecture, les receipts, l’outbox et les contraintes composites existent toujours. Aucune modification nécessaire. |
+| MinIO prévu et intégration de stockage incomplète | **Non pertinent pour l’état actuel** | Le dépôt utilise un port de stockage et des adaptateurs privés locaux/quarantaine ; MinIO n’est pas une dépendance contractuelle active. Ne pas ajouter MinIO sans contrat produit. |
+| ClamAV encore en finalisation | **Faux/historique** | L’admission DCE utilise ClamAV `INSTREAM` fail-closed, la quarantaine est privée et le worker de rétention traite les suppressions avec retry borné. Le test réel VPS reste une preuve d’exploitation, pas une implémentation manquante. |
+| Dossiers `tests/concurrency/` et `tests/process/` vides | **Vrai, limité** | Ils ne contiennent que leurs marqueurs/initiaux et aucun scénario dédié. Les tests de concurrence existent toutefois aussi dans des suites applicatives ciblées. Ajouter des scénarios dédiés seulement pour les invariants de verrouillage et d’outbox réellement critiques, pas une suite de charge spéculative. |
+| Absence de consommateurs outbox | **Partiellement vrai** | Le worker DCE de rétention consomme son topic ; aucun consumer générique de tous les événements métier n’est contractuellement défini. Ne pas créer un consumer générique sans sémantique de livraison, topics et effets attendus. Ajouter au plus une métrique de backlog et une alerte opérateur. |
+| Absence de SAST/DAST et scan sécurité CI | **Faux** | Le workflow actuel exécute detect-secrets, pip-audit, Bandit et Trivy image-security. Un DAST ou Semgrep supplémentaire n’est pas justifié par cette observation seule. |
+| Absence de job frontend CI | **Faux** | Le workflow contient un job frontend avec `pnpm install --frozen-lockfile` et build TypeScript/Vite strict. |
+| Absence de seuil de couverture bloquant | **Vrai** | `pytest-cov` est déclaré mais aucun seuil n’est configuré dans `pyproject.toml` ou la CI. Ajouter un seuil explicite après mesure de la couverture réelle, sans masquer des modules. |
+| Observabilité JSON, métriques et tracing absents | **Partiellement vrai** | Le module applicatif observability est encore vide ; les healthchecks, logs Docker/Caddy et supervision systemd sont déjà présents. Ajouter request-id, logging structuré minimal et métriques techniques bornées ; ne pas promettre Prometheus/Grafana/Jaeger sans déploiement et contrat opérationnel. |
+| Frontend squelette vide | **Faux/historique** | `web/src/app/App.tsx`, `api.ts` et les styles existent, avec cockpit financier et modal de connexion. Le raccordement à une URL backend réelle reste une étape distincte. |
+| Dépendances frontend `latest` | **Vrai** | `web/package.json` conserve `latest` pour React, Vite, TypeScript et le plugin React malgré un lockfile et une CI fonctionnelle. Remplacer par les versions résolues du lockfile, puis reconstruire strictement. |
+| Pas d’ADR formels | **Vrai comme dette documentaire, non bloquant runtime** | Les contrats normatifs et `PROJECT_STATE.md` documentent fortement les décisions, mais aucun répertoire ADR dédié n’est établi. Ajouter quelques ADR ciblés sur tenant/ReBAC, outbox et production assembly, sans réécrire les contrats. |
+| Absence de tests de charge/stress | **Vrai, mais non corrigé automatiquement** | Aucun outil Locust/k6 n’est présent. Ajouter d’abord des tests de concurrence déterministes et des budgets locaux ; un test de charge nécessite un environnement et des objectifs de capacité validés. |
+| Sharding, partitionnement, cache Redis, tracing distribué | **Non actionnable à ce stade** | Ce sont des options d’échelle dépendant de volumes et SLA non fournis. Les ajouter maintenant créerait une architecture spéculative. |
+| Complexité cyclomatique élevée et N+1 | **Non prouvé par l’audit** | Aucune mesure reproductible ni trace de requête n’est fournie. Ne pas refactorer ou optimiser à l’aveugle ; ouvrir une tâche seulement après profilage ciblé. |
+
+## Corrections retenues
+
+Les corrections retenues sont donc : limitation anti-brute-force, centralisation de la configuration PostgreSQL des tests, métriques/logging applicatifs minimisés, seuil de couverture mesuré, dépendances frontend reproductibles, scénarios de concurrence déterministes et ADR ciblés. Les affirmations fausses ou historiques ne donnent lieu à aucune modification de code.

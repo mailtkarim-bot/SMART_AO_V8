@@ -423,11 +423,11 @@ Commit, CI verte, PROJECT_STATE mis à jour
 
 ## 22. Prochaine action exacte
 
-La roadmap ne décale pas le démarrage du code. Le prochain travail reste celui inscrit dans `PROJECT_STATE.md` :
+Les slices métier prioritaires de préparation documentaire, cockpit patron initial et paquet de dépôt contrôlé sont publiés sur `ops/vps-deploy-health-digests-01`, avec CI verte. La prochaine action de développement est la réconciliation finale : conserver la suite backend complète verte, vérifier les tests d’architecture et d’import, le build frontend strict, les contrats OpenAPI, les secrets et la documentation. Les documents de reprise à maintenir sont `docs/PROJECT_STATE.md`, `docs/PROJECT_PROGRESS_REPORT.md` et `todo.md`.
 
-> **Commencer `S01-A` : écrire les premiers tests rouges de `Case` pour `CASE-INV-01` à `CASE-INV-04`, puis implémenter le domaine pur sans persistance ni FastAPI.**
+> **Prochaine frontière opérationnelle :** lorsque l’utilisateur disposera d’un VPS, exécuter le runbook de préproduction avec images digest-pinnées, PostgreSQL, ClamAV/EICAR, Caddy/HTTPS, sauvegarde hors hôte, restauration isolée, timers systemd, supervision externe et rapport opérateur.
 
-Une fois `S01-A` terminé et les tests verts, nous mettrons à jour `PROJECT_STATE.md`, créerons le commit correspondant, puis passerons à `S01-B` pour Consultation/DceVersion.
+Le dépôt électronique reste hors simulation : le paquet préparé porte `external_submission: NOT_PERFORMED` tant qu’aucun accusé externe vérifiable n’est archivé.
 
 ---
 

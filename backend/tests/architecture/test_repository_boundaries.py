@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
 import pytest
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+from tests.support.database import REPOSITORY_ROOT
 
 
 @pytest.mark.architecture

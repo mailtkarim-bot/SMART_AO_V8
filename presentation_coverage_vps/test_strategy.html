@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Stratégie de test</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    .slide-container { width: 1280px; min-height: 720px; background: #e0e0e0; color: #111; font-family: "Helvetica Neue", Arial, sans-serif; padding: 54px 72px 0 72px; }
+    .eyebrow { color: #0055ff; font-size: 18px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+    h1 { font-family: "Arial Black", Impact, sans-serif; font-size: 46px; line-height: 1.04; margin: 13px 0 24px; text-transform: uppercase; max-width: 1000px; }
+    .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    .section-title { border-bottom: 4px solid #111; padding-bottom: 8px; font-size: 22px; font-weight: 800; text-transform: uppercase; margin-bottom: 8px; }
+    .lot-list { display: flex; flex-direction: column; gap: 6px; }
+    .lot-item { display: flex; gap: 10px; align-items: baseline; }
+    .lot-letter { color: #0055ff; font-family: "Arial Black", Impact, sans-serif; font-size: 24px; }
+    .lot-desc { font-family: Georgia, serif; font-size: 20px; line-height: 1.3; }
+    .invariant-list { display: flex; flex-direction: column; gap: 8px; }
+    .invariant-item { border-left: 4px solid #0055ff; padding-left: 10px; }
+    .invariant-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; }
+    .invariant-desc { font-family: Georgia, serif; font-size: 18px; line-height: 1.25; }
+  </style>
+</head>
+<body>
+  <div class="slide-container">
+    <div class="eyebrow">03 — Stratégie de test</div>
+    <h1>Chaque lot de tests protège<br>un invariant métier</h1>
+    <div class="layout">
+      <div>
+        <div class="section-title">Lots de remédiation</div>
+        <div class="lot-list">
+          <div class="lot-item"><div class="lot-letter">A</div><div class="lot-desc">Fondations techniques & observabilité</div></div>
+          <div class="lot-item"><div class="lot-letter">B</div><div class="lot-desc">Contrats HTTP du wizard & cockpit</div></div>
+          <div class="lot-item"><div class="lot-letter">C</div><div class="lot-desc">DCE, quarantaine & stockage</div></div>
+          <div class="lot-item"><div class="lot-letter">D</div><div class="lot-desc">Orchestrateur de préparation & revue</div></div>
+          <div class="lot-item"><div class="lot-letter">E</div><div class="lot-desc">Wizard collaborateur & actions patronales</div></div>
+          <div class="lot-item"><div class="lot-letter">F</div><div class="lot-desc">Pricing, preuves & rapports</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-title">Invariants garantis</div>
+        <div class="invariant-list">
+          <div class="invariant-item">
+            <div class="invariant-title">Isolation Tenant</div>
+            <div class="invariant-desc">Résolution serveur stricte, sans fuite inter-tenant.</div>
+          </div>
+          <div class="invariant-item">
+            <div class="invariant-title">Confidentialité Financière</div>
+            <div class="invariant-desc">Aucun montant ni prix exposé dans les contrats/webhooks.</div>
+          </div>
+          <div class="invariant-item">
+            <div class="invariant-title">Append-only</div>
+            <div class="invariant-desc">Immutabilité des readiness, audits et preuves.</div>
+          </div>
+          <div class="invariant-item">
+            <div class="invariant-title">Révision Optimiste</div>
+            <div class="invariant-desc">Protection contre les conflits de concurrence.</div>
+          </div>
+          <div class="invariant-item">
+            <div class="invariant-title">Idempotence</div>
+            <div class="invariant-desc">Rejeu sécurisé des commandes sans double effet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

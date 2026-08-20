@@ -1,4 +1,4 @@
-"""Closed patron-only reads of published immutable financial snapshots."""
+"""Patron-only projections of published and draft financial reports."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from app.platform.security.authorization import (
     AuthorizationResource,
 )
 from app.platform.security.capabilities import Capability
-from app.platform.security.context import ActorContext, DataClassification
+from app.platform.security.context import ActorContext, ActorKind, DataClassification
 from app.platform.security.models import FinancialReportLineRecord, FinancialReportSnapshotRecord
 
 
@@ -38,6 +38,8 @@ class FinancialReportProjection:
     ruleset_version: int
     summary: dict[str, int]
     lines: tuple[FinancialReportLineProjection, ...]
+    status: str
+    aggregate_revision: int
 
 
 class PatronFinancialReportService:
@@ -48,13 +50,43 @@ class PatronFinancialReportService:
     def get(
         self, *, actor: ActorContext, case_id: UUID, report_id: UUID, now: datetime
     ) -> FinancialReportProjection:
+        return self._get_by_state(
+            actor=actor,
+            case_id=case_id,
+            report_id=report_id,
+            state="PUBLISHED",
+            now=now,
+        )
+
+    def get_draft(
+        self, *, actor: ActorContext, case_id: UUID, report_id: UUID, now: datetime
+    ) -> FinancialReportProjection:
+        return self._get_by_state(
+            actor=actor,
+            case_id=case_id,
+            report_id=report_id,
+            state="DRAFT",
+            now=now,
+        )
+
+    def _get_by_state(
+        self,
+        *,
+        actor: ActorContext,
+        case_id: UUID,
+        report_id: UUID,
+        state: str,
+        now: datetime,
+    ) -> FinancialReportProjection:
+        if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
+            raise PermissionError("FORBIDDEN")
         with self._session_factory() as session:
             snapshot = session.scalar(
                 sa.select(FinancialReportSnapshotRecord).where(
                     FinancialReportSnapshotRecord.tenant_id == actor.tenant_id,
                     FinancialReportSnapshotRecord.case_id == case_id,
                     FinancialReportSnapshotRecord.id == report_id,
-                    FinancialReportSnapshotRecord.state == "PUBLISHED",
+                    FinancialReportSnapshotRecord.state == state,
                 )
             )
             if snapshot is None:
@@ -111,4 +143,6 @@ class PatronFinancialReportService:
                     )
                     for line in lines
                 ),
+                status=snapshot.state,
+                aggregate_revision=snapshot.aggregate_revision,
             )

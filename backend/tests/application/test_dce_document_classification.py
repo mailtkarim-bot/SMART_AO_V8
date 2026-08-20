@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
-from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from app.modules.dce.application.classification import (
     ClassificationDocument,
     DceDocumentClassificationService,
@@ -37,31 +33,11 @@ from app.platform.events.dispatcher import CommandContext, CommandDispatcher, Co
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from sqlalchemy.orm import Session, sessionmaker
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv(
-    "SMART_AO_TEST_DATABASE_URL",
-    "postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5432/smart_ao",
-)
 NOW = datetime(2026, 8, 14, 10, 0, tzinfo=UTC)
 
 
-@pytest.fixture(scope="module")
-def database_engine() -> sa.Engine:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        command.downgrade(config, "base")
 
 
-@pytest.fixture
-def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
-    return sessionmaker(bind=database_engine, expire_on_commit=False)
 
 
 @pytest.fixture(autouse=True)
@@ -386,6 +362,110 @@ def test_classification_rejects_non_system_actor_without_durable_effect(
             sa.select(sa.func.count()).select_from(DceDocumentClassificationRunRecord)
         )
     assert run_count == 0
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_classification_handler_rejects_document_manifest_count_stale_and_integrity_mismatch(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, dce_version_id, _ = _seed_dce(
+        session_factory,
+        document_texts=["Règlement de consultation"],
+    )
+    service = _service(session_factory=session_factory)
+    expected_revision, documents = service._load_documents(  # noqa: SLF001
+        tenant_id=tenant_id,
+        dce_version_id=dce_version_id,
+    )
+    valid_command = _recording_command(
+        dce_version_id=dce_version_id,
+        expected_dce_version_revision=expected_revision,
+        projection=project_dce_classification(documents=documents),
+    )
+    dispatcher = CommandDispatcher(
+        session_factory=session_factory,
+        handlers={
+            "RecordDceDocumentClassificationRun": RecordDceDocumentClassificationRunHandler()
+        },
+    )
+
+    with pytest.raises(CommandExecutionError) as document_count_failure:
+        dispatcher.dispatch(
+            command=valid_command.model_copy(
+                update={
+                    "command_id": uuid4(),
+                    "idempotency_key": uuid4(),
+                    "document_count": valid_command.document_count + 1,
+                }
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(document_count_failure.value.__cause__) == (
+        "DCE_CLASSIFICATION_DOCUMENT_COUNT_REQUIRED"
+    )
+
+    with pytest.raises(CommandExecutionError) as manifest_failure:
+        dispatcher.dispatch(
+            command=valid_command.model_copy(
+                update={
+                    "command_id": uuid4(),
+                    "idempotency_key": uuid4(),
+                    "input_manifest_sha256": "f" * 64,
+                }
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(manifest_failure.value.__cause__) == "DCE_CLASSIFICATION_INPUT_MANIFEST_REQUIRED"
+
+    with pytest.raises(CommandExecutionError) as source_count_failure:
+        dispatcher.dispatch(
+            command=valid_command.model_copy(
+                update={
+                    "command_id": uuid4(),
+                    "idempotency_key": uuid4(),
+                    "source_fragment_count": valid_command.source_fragment_count + 1,
+                }
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(source_count_failure.value.__cause__) == "DCE_CLASSIFICATION_SOURCE_COUNT_REQUIRED"
+
+    with session_factory.begin() as session:
+        version = session.get(DceVersionRecord, dce_version_id)
+        assert version is not None
+        version.aggregate_revision += 1
+    with pytest.raises(CommandExecutionError) as stale_failure:
+        dispatcher.dispatch(
+            command=valid_command.model_copy(
+                update={"command_id": uuid4(), "idempotency_key": uuid4()}
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(stale_failure.value.__cause__) == "DCE_VERSION_STALE"
+
+    with session_factory.begin() as session:
+        version = session.get(DceVersionRecord, dce_version_id)
+        assert version is not None
+        version.integrity = "PARTIAL"
+    with pytest.raises(CommandExecutionError) as integrity_failure:
+        dispatcher.dispatch(
+            command=valid_command.model_copy(
+                update={"command_id": uuid4(), "idempotency_key": uuid4()}
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(integrity_failure.value.__cause__) == "DCE_VERSION_NOT_CLASSIFIABLE"
 
 
 @pytest.mark.db

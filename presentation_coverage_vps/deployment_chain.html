@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Le déploiement préproduction démarre toute la chaîne</title>
+  <style>
+    * { box-sizing:border-box; }
+    body { margin: 0; }
+    /* slide must keep min-height:720px (do not remove) */
+    .slide-container { width:1280px; min-height:720px; background:#e0e0e0; color:#111; font-family:"Helvetica Neue",Arial,sans-serif; padding:54px 72px 0 72px; margin-top:-1px; }
+    .eyebrow { color:#0055ff; font-size:18px; font-weight:800; letter-spacing:2px; text-transform:uppercase; }
+    h1 { font-family:"Arial Black",Impact,sans-serif; font-size:46px; line-height:1.04; margin:13px 0 20px; text-transform:uppercase; max-width:1100px; }
+    
+    .timeline { display: flex; gap: 18px; margin-top: 8px; }
+    .step { flex: 1; border-top: 4px solid #111; padding-top: 8px; }
+    .step-number { font-family:"Arial Black",Impact,sans-serif; font-size:40px; color:#0055ff; line-height:1; margin-bottom: 8px; }
+    .step-title { font-size:22px; font-weight:800; margin-bottom: 8px; line-height:1.2; }
+    .step-desc { font-family:Georgia,serif; font-size:17px; line-height:1.4; }
+    
+    .highlight-box { margin-top: 12px; border: 3px solid #0055ff; padding: 12px 20px; background: rgba(0,85,255,0.05); }
+    .highlight-title { color: #0055ff; font-weight: 800; font-size: 20px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+    .highlight-text { font-family: Georgia, serif; font-size: 20px; line-height: 1.4; }
+    code { font-family: monospace; background: #d0d0d0; padding: 2px 6px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <div class="slide-container">
+    <div class="eyebrow">05 — Séquence de déploiement</div>
+    <h1>Le déploiement préproduction<br>démarre toute la chaîne</h1>
+    
+    <div class="timeline">
+      <div class="step">
+        <div class="step-number">01</div>
+        <div class="step-title">Configuration</div>
+        <div class="step-desc">Validation du fichier <code>.env.preprod</code>, vérification des digests d'images et refus strict des placeholders.</div>
+      </div>
+      <div class="step">
+        <div class="step-number">02</div>
+        <div class="step-title">Backup & Migrations</div>
+        <div class="step-desc">Attente de PostgreSQL, sauvegarde de la base existante, puis exécution de <code>alembic upgrade head</code>.</div>
+      </div>
+      <div class="step">
+        <div class="step-number">03</div>
+        <div class="step-title">Services & Workers</div>
+        <div class="step-desc">Démarrage du backend, frontend, Caddy, et des workers de rétention DCE et d'export webhook.</div>
+      </div>
+      <div class="step">
+        <div class="step-number">04</div>
+        <div class="step-title">Healthchecks</div>
+        <div class="step-desc">Vérification des endpoints <code>/live</code> et <code>/ready</code>, santé de ClamAV et absence de ports internes exposés.</div>
+      </div>
+    </div>
+    
+    <div class="highlight-box">
+      <div class="highlight-title">Correction appliquée : Démarrage explicite du worker webhook</div>
+      <div class="highlight-text">Le script <code>ops/deploy-preprod.sh</code> a été corrigé pour inclure explicitement <code>submission-export-webhook-worker</code> dans la séquence de démarrage. Cette exigence est désormais protégée par un test de contrat CI pour éviter toute régression silencieuse.</div>
+    </div>
+  </div>
+</body>
+</html>

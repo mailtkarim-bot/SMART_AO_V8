@@ -1,0 +1,6 @@
+[Unit]
+Description=SMART AO healthcheck failure alert
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/logger -p daemon.err -t smart-ao "SMART AO preproduction healthcheck failed; inspect journalctl -u smart-ao-healthcheck.service"

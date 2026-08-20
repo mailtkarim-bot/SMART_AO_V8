@@ -1,0 +1,100 @@
+{
+  "project_info": {
+    "title": "SMART_AO V8 — Couverture & Gate VPS",
+    "created": 1787139520.988,
+    "last_updated": 1787139896.39,
+    "total_slides": 8
+  },
+  "slides": [
+    {
+      "id": "cover",
+      "state": "edited",
+      "pageNum": 1
+    },
+    {
+      "id": "coverage_baseline",
+      "state": "edited",
+      "pageNum": 2
+    },
+    {
+      "id": "priority_map",
+      "state": "edited",
+      "pageNum": 3
+    },
+    {
+      "id": "test_strategy",
+      "state": "edited",
+      "pageNum": 4
+    },
+    {
+      "id": "route_tests",
+      "state": "edited",
+      "pageNum": 5
+    },
+    {
+      "id": "deployment_chain",
+      "state": "edited",
+      "pageNum": 6
+    },
+    {
+      "id": "vps_gate",
+      "state": "edited",
+      "pageNum": 7
+    },
+    {
+      "id": "next_steps",
+      "state": "edited",
+      "pageNum": 8
+    }
+  ],
+  "outline": [
+    {
+      "id": "cover",
+      "title": "SMART_AO V8 — Couverture & Gate VPS",
+      "summary": "Titre, branche de référence et décision de pilotage : maintenir au moins 86 % tout en préparant la validation VPS réelle.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "coverage_baseline",
+      "title": "Le jalon global est atteint, la marge doit être protégée",
+      "summary": "Présenter les 558 tests locaux, la couverture globale de 86,72 %, le gate CI de 85,50 % et l’absence de VPS réel validé.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "priority_map",
+      "title": "Les routes HTTP patronales sont le principal angle mort",
+      "summary": "Montrer les faibles couvertures des routes patron_submission et patron_actions, puis les modules techniques et métier prioritaires.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "test_strategy",
+      "title": "Chaque lot de tests protège un invariant métier",
+      "summary": "Présenter les lots A à F et les invariants tenant, append-only, révision optimiste, idempotence et confidentialité financière.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "route_tests",
+      "title": "Les façades patronales sont maintenant testées par branches",
+      "summary": "Résumer les 35 tests de routes ajoutés : succès, replay, auth, permissions, conflits, export ZIP et transitions d’actions.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "deployment_chain",
+      "title": "Le déploiement préproduction démarre toute la chaîne",
+      "summary": "Présenter la séquence config, backup, migrations, services, healthchecks et le démarrage explicite du worker webhook.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "vps_gate",
+      "title": "Le gate VPS exige sept preuves indépendantes",
+      "summary": "Présenter les contrôles réels : réseau/TLS, EICAR, export/outbox, backup hors VPS, restauration isolée, timers et supervision.",
+      "image_plan": "Use a suitable image if needed"
+    },
+    {
+      "id": "next_steps",
+      "title": "Prochaine séquence : CI verte, durcissement, puis VPS réel",
+      "summary": "Conclure sur le commit publié, la CI verte, les écarts restants du script et les prérequis avant validation opérationnelle.",
+      "image_plan": "Use a suitable image if needed"
+    }
+  ]
+}

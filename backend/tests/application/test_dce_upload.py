@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from collections.abc import AsyncIterable
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -10,8 +9,6 @@ from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
     RecordDceStagedObjectQuarantineHandler,
@@ -34,12 +31,6 @@ from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.persistence.models import TenantRecord
 from sqlalchemy.orm import Session, sessionmaker
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv(
-    "SMART_AO_TEST_DATABASE_URL",
-    "postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5432/smart_ao",
-)
 NOW = datetime.now(tz=UTC)
 
 
@@ -66,22 +57,8 @@ class StaticScanner:
         )
 
 
-@pytest.fixture(scope="module")
-def database_engine() -> sa.Engine:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        command.downgrade(config, "base")
 
 
-@pytest.fixture
-def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
-    return sessionmaker(bind=database_engine, expire_on_commit=False)
 
 
 @pytest.fixture(autouse=True)

@@ -3,13 +3,21 @@ from __future__ import annotations
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from uuid import uuid4
+from uuid import uuid4, uuid5
 
 import pytest
 import sqlalchemy as sa
 from app.modules.case.infrastructure.models.case import CaseRecord
+from app.modules.dce.application.commands import RecordCaseDceImpactRunCommand
 from app.modules.dce.application.handlers import RecordCaseDceImpactRunHandler
-from app.modules.dce.application.impact import CaseDceImpactService
+from app.modules.dce.application.impact import (
+    IMPACT_ALGORITHM_ID,
+    IMPACT_ALGORITHM_VERSION,
+    CaseDceImpactService,
+    expected_impact_items,
+    impact_manifest_sha256,
+    load_impact_requirements,
+)
 from app.modules.dce.infrastructure.models.case_dce_impact import (
     CaseDceImpactItemRecord,
     CaseDceImpactRunRecord,
@@ -36,7 +44,6 @@ sys.path.append(str(Path(__file__).parent))
 
 from test_dce_rc_analysis import (  # noqa: E402, F401
     NOW,
-    database_engine,
     isolate_rc_analysis_records,
 )
 
@@ -294,6 +301,143 @@ def _service(factory) -> CaseDceImpactService:
             handlers={"RecordCaseDceImpactRun": RecordCaseDceImpactRunHandler()},
         ),
     )
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_case_dce_impact_handler_rejects_chain_manifest_counts_projection_and_replays(
+    impact_session_factory,
+) -> None:
+    tenant_id, case_id, predecessor_id, successor_id = _seed_rectification_case(
+        impact_session_factory
+    )
+    with impact_session_factory() as session:
+        previous = load_impact_requirements(
+            session=session, tenant_id=tenant_id, dce_version_id=predecessor_id
+        )
+        successor = load_impact_requirements(
+            session=session, tenant_id=tenant_id, dce_version_id=successor_id
+        )
+    manifest = impact_manifest_sha256(
+        case_id=case_id,
+        predecessor_dce_version_id=predecessor_id,
+        successor_dce_version_id=successor_id,
+        previous_requirements=previous,
+        successor_requirements=successor,
+    )
+    impact_run_id = uuid5(
+        case_id,
+        f"{predecessor_id}:{successor_id}:{manifest}:{IMPACT_ALGORITHM_ID}:"
+        f"{IMPACT_ALGORITHM_VERSION}",
+    )
+    items = list(
+        expected_impact_items(
+            impact_run_id=impact_run_id,
+            previous_requirements=previous,
+            successor_requirements=successor,
+        )
+    )
+    command = RecordCaseDceImpactRunCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=successor_id,
+        impact_run_id=impact_run_id,
+        case_id=case_id,
+        predecessor_dce_version_id=predecessor_id,
+        successor_dce_version_id=successor_id,
+        input_manifest_sha256=manifest,
+        algorithm_id=IMPACT_ALGORITHM_ID,
+        algorithm_version=IMPACT_ALGORITHM_VERSION,
+        status="COMPLETED",
+        previous_requirement_count=len(previous),
+        successor_requirement_count=len(successor),
+        items=items,
+    )
+    dispatcher = CommandDispatcher(
+        session_factory=impact_session_factory,
+        handlers={"RecordCaseDceImpactRun": RecordCaseDceImpactRunHandler()},
+    )
+
+    with pytest.raises(CommandExecutionError) as missing_case:
+        dispatcher.dispatch(
+            command=command.model_copy(
+                update={"command_id": uuid4(), "idempotency_key": uuid4(), "case_id": uuid4()}
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(missing_case.value.__cause__) == "CASE_NOT_FOUND_OR_FORBIDDEN"
+
+    with pytest.raises(CommandExecutionError) as chain_failure:
+        dispatcher.dispatch(
+            command=command.model_copy(
+                update={
+                    "command_id": uuid4(),
+                    "idempotency_key": uuid4(),
+                    "predecessor_dce_version_id": uuid4(),
+                }
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(chain_failure.value.__cause__) == "CASE_DCE_PREDECESSOR_MISMATCH"
+
+    with pytest.raises(CommandExecutionError) as manifest_failure:
+        dispatcher.dispatch(
+            command=command.model_copy(
+                update={
+                    "command_id": uuid4(),
+                    "idempotency_key": uuid4(),
+                    "input_manifest_sha256": "f" * 64,
+                }
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(manifest_failure.value.__cause__) == "CASE_DCE_IMPACT_INPUT_MANIFEST_REQUIRED"
+
+    with pytest.raises(CommandExecutionError) as source_failure:
+        dispatcher.dispatch(
+            command=command.model_copy(
+                update={
+                    "command_id": uuid4(),
+                    "idempotency_key": uuid4(),
+                    "previous_requirement_count": command.previous_requirement_count + 1,
+                }
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(source_failure.value.__cause__) == "CASE_DCE_IMPACT_SOURCE_COUNT_REQUIRED"
+
+    with pytest.raises(CommandExecutionError) as projection_failure:
+        dispatcher.dispatch(
+            command=command.model_copy(
+                update={"command_id": uuid4(), "idempotency_key": uuid4(), "items": []}
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(projection_failure.value.__cause__) == "CASE_DCE_IMPACT_PROJECTION_REQUIRED"
+
+    first = dispatcher.dispatch(command=command, context=CommandContext(
+        tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+    ))
+    replay = dispatcher.dispatch(
+        command=command.model_copy(
+            update={"command_id": uuid4(), "idempotency_key": uuid4()}
+        ),
+        context=CommandContext(
+            tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+        ),
+    )
+    assert first.result_code == "CASE_DCE_IMPACT_RECORDED"
+    assert replay.result_code == "CASE_DCE_IMPACT_ALREADY_RECORDED"
 
 
 @pytest.mark.db

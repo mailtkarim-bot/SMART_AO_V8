@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Les façades patronales sont maintenant testées par branches</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    .slide-container {
+      width: 1280px;
+      min-height: 720px;
+      background: #e0e0e0;
+      color: #111111;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      padding: 54px 72px 0 72px;
+    }
+    .eyebrow {
+      color: #0055ff;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-family: "Arial Black", Impact, sans-serif;
+      font-size: 46px;
+      line-height: 1.04;
+      margin: 13px 0 48px;
+      text-transform: uppercase;
+      max-width: 1000px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 64px;
+      align-items: start;
+    }
+    .big-number-container {
+      border-top: 4px solid #111111;
+      padding-top: 20px;
+    }
+    .big-number {
+      font-family: "Arial Black", Impact, sans-serif;
+      font-size: 120px;
+      line-height: 0.9;
+      color: #0055ff;
+      letter-spacing: -4px;
+      margin-bottom: 16px;
+    }
+    .caption {
+      font-family: Georgia, serif;
+      font-size: 22px;
+      line-height: 1.3;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px 32px;
+    }
+    .item {
+      border-left: 4px solid #0055ff;
+      padding-left: 20px;
+    }
+    .item-title {
+      font-size: 22px;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .item-desc {
+      font-family: Georgia, serif;
+      font-size: 18px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide-container">
+    <div class="eyebrow">04 — Tests HTTP</div>
+    <h1>Les façades patronales sont maintenant testées par branches</h1>
+    <div class="layout">
+      <div class="big-number-container">
+        <div class="big-number">35</div>
+        <div class="caption">Tests de routes ajoutés pour <strong>patron_submission</strong> et <strong>patron_actions</strong>.</div>
+      </div>
+      <div class="grid">
+        <div class="item">
+          <div class="item-title">Succès &amp; Replay</div>
+          <div class="item-desc">Validation des codes 201 Created et 200 OK lors du rejeu idempotent des commandes.</div>
+        </div>
+        <div class="item">
+          <div class="item-title">Auth &amp; Permissions</div>
+          <div class="item-desc">Rejet strict (401, 403) des requêtes sans Bearer, avec token expiré ou acteur non autorisé.</div>
+        </div>
+        <div class="item">
+          <div class="item-title">Conflits &amp; Idempotence</div>
+          <div class="item-desc">Gestion des erreurs 409 pour les clés réutilisées, commandes en cours et conflits de révision.</div>
+        </div>
+        <div class="item">
+          <div class="item-title">Export ZIP</div>
+          <div class="item-desc">Vérification des en-têtes HTTP, du contenu binaire et des erreurs de stockage (503).</div>
+        </div>
+        <div class="item">
+          <div class="item-title">Transitions d'actions</div>
+          <div class="item-desc">Couverture des changements d'état, de la validation des règles métier et des erreurs 422.</div>
+        </div>
+        <div class="item">
+          <div class="item-title">Isolation Tenant</div>
+          <div class="item-desc">Garantie qu'aucune donnée financière ou d'un autre tenant ne fuite via les contrats HTTP.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

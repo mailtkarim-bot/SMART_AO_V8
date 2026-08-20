@@ -690,6 +690,33 @@ class CreateFinancialReportDraftCommand(ApplicationCommand):
     ruleset_version: int = Field(default=1, ge=1)
 
 
+class AddFinancialReportLineCommand(ApplicationCommand):
+    """Append one patron-authored line to a mutable financial DRAFT."""
+
+    command_type = "AddFinancialReportLine"
+
+    case_id: UUID
+    report_id: UUID
+    expected_revision: int = Field(ge=0)
+    category: Literal[
+        "SALES",
+        "DIRECT_COST",
+        "OVERHEAD",
+        "SUBCONTRACTING",
+        "CONTINGENCY",
+        "GROSS_MARGIN",
+        "FORECAST_CASHFLOW",
+    ]
+    label: str = Field(min_length=1, max_length=160)
+    quantity_decimal: str = Field(
+        min_length=1,
+        max_length=32,
+        pattern=r"^(?:0|[1-9]\d*)(?:\.\d+)?$",
+    )
+    unit: str = Field(min_length=1, max_length=32)
+    amount_minor: int
+
+
 class RegisterDceVersionCommand(ApplicationCommand):
     """Atomically admit an immutable DCE corpus already staged outside HTTP."""
 

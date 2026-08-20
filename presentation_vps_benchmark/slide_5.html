@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Slide 5</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E0E0E0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            position: relative;
+            padding: 60px 80px 0 80px;
+        }
+        .title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 56px;
+            color: #111111;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            line-height: 1.1;
+            margin-top: -20px;
+            margin-bottom: 50px;
+        }
+        .content-grid {
+            display: flex;
+            gap: 40px;
+        }
+        .block {
+            flex: 1;
+            border: 4px solid #111111;
+            padding: 40px;
+            background-color: #E0E0E0;
+        }
+        .block-title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 32px;
+            color: #0055FF;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+        .bullet-list {
+            list-style-type: none;
+        }
+        .bullet-list li {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 24px;
+            color: #222222;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            position: relative;
+            padding-left: 30px;
+        }
+        .bullet-list li::before {
+            content: "■";
+            color: #111111;
+            position: absolute;
+            left: 0;
+            font-size: 18px;
+            top: 6px;
+        }
+        .highlight {
+            background-color: #111111;
+            color: #E0E0E0;
+            padding: 2px 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <h2 class="title">Le worker webhook couvre<br>les décisions critiques</h2>
+        
+        <div class="content-grid">
+            <div class="block">
+                <h3 class="block-title">Couverture & Tests</h3>
+                <ul class="bullet-list">
+                    <li><strong>14 tests unitaires dédiés</strong> au worker webhook.</li>
+                    <li>Couverture ciblée de <strong>80 %</strong> avec analyse des branches.</li>
+                    <li>Cas limites validés : lease, message absent, topic incorrect, retry HTTP, idempotence.</li>
+                </ul>
+            </div>
+            
+            <div class="block">
+                <h3 class="block-title">Garanties de Sécurité</h3>
+                <ul class="bullet-list">
+                    <li><strong>Allowlist stricte :</strong> identifiant de dossier, hash de l'archive, canal <span class="highlight">DOWNLOAD</span>.</li>
+                    <li><strong>Aucune fuite :</strong> montant, snapshot financier, storage key ou contenu documentaire exclus du payload.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

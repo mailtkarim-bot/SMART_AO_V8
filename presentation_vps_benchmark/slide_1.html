@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Slide 1</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            background-color: #E0E0E0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            position: relative;
+        }
+        .header {
+            padding-top: 60px;
+            padding-left: 80px;
+            padding-right: 80px;
+            margin-bottom: 40px;
+        }
+        .title {
+            font-family: 'Arial Black', Impact, sans-serif;
+            font-weight: 900;
+            font-size: 60px;
+            color: #111111;
+            text-transform: uppercase;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+        .content-area {
+            padding-left: 80px;
+            padding-right: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+        .highlight-box {
+            border: 4px solid #111111;
+            padding: 40px;
+            background-color: #E0E0E0;
+        }
+        .conclusion {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 36px;
+            color: #0055FF;
+            line-height: 1.4;
+            margin-bottom: 30px;
+        }
+        .bullet-list {
+            list-style-type: none;
+        }
+        .bullet-list li {
+            font-family: 'Georgia', serif;
+            font-weight: 500;
+            font-size: 28px;
+            color: #222222;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            position: relative;
+            padding-left: 30px;
+        }
+        .bullet-list li::before {
+            content: "■";
+            color: #111111;
+            position: absolute;
+            left: 0;
+            font-size: 20px;
+            top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="header">
+            <h2 class="title">Décision en une phrase</h2>
+        </div>
+        <div class="content-area">
+            <div class="highlight-box">
+                <p class="conclusion">Le niveau <strong>ZIP_DEFLATED 6</strong> est retenu : il réduit l’archive BTP de 3,70 % sur le corpus mesuré sans gain supplémentaire au niveau 9.</p>
+                <ul class="bullet-list">
+                    <li>Corpus : 2 PDF publics BTP, 5,81 Mo, 98 pages cumulées</li>
+                    <li>Mesure locale reproductible avec hashes et timestamps ZIP figés</li>
+                    <li>Validation VPS encore distincte et non exécutée</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

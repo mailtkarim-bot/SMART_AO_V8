@@ -20,20 +20,35 @@ class Capability(StrEnum):
     ASSIGNMENT_CLARIFY = "assignment.clarify"
     ASSIGNMENT_HISTORY_READ = "assignment.history.read"
     ASSIGNMENT_UNAVAILABILITY = "assignment.unavailability"
+    WORK_TASK_READ = "work.task.read"
+    WORK_TASK_WRITE = "work.task.write"
     ASSIGNMENT_MANAGE = "assignment.manage"
     DOCUMENT_ADMIN_READ = "document.administrative.read"
     PREPARATION_TRANSMIT = "preparation.transmit"
+    PREPARATION_READINESS_WRITE = "preparation.readiness.write"
+    PREPARATION_DOCUMENT_WRITE = "preparation.document.write"
+    PREPARATION_CAPABILITY_PROPOSE = "preparation.capability.propose"
+    PREPARATION_CAPABILITY_GAP_REPORT = "preparation.capability.gap.report"
+    PREPARATION_REVIEW_REQUEST = "preparation.review.request"
+    PREPARATION_REVIEW_DECIDE = "preparation.review.decide"
     MEMBERSHIP_MANAGE = "membership.manage"
     TENANT_MANAGE = "tenant.manage"
     DECISION_FINALIZE = "decision.finalize"
     PRICING_READ = "pricing.read"
     PRICING_WRITE = "pricing.write"
     SUBMISSION_AUTHORIZE = "submission.authorize"
+    PATRON_ACTION_READ = "patron.action.read"
+    PATRON_ACTION_WRITE = "patron.action.write"
     SENSITIVE_EXPORT = "export.sensitive"
     AUDIT_READ = "audit.read"
     FINANCIAL_REPORT_READ = "financial.report.read"
     FINANCIAL_REPORT_CREATE = "financial.report.create"
     FINANCIAL_REPORT_PUBLISH = "financial.report.publish"
+    FINANCIAL_REPORT_LINE_WRITE = "financial.report.line.write"
+    ENTERPRISE_LIBRARY_READ = "enterprise.library.read"
+    ENTERPRISE_LIBRARY_WRITE = "enterprise.library.write"
+    ENTERPRISE_CAPABILITY_READ = "enterprise.capability.read"
+    ENTERPRISE_CAPABILITY_WRITE = "enterprise.capability.write"
     SYSTEM_JOB_EXECUTE = "system.job.execute"
 
 
@@ -44,20 +59,30 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
+        Capability.ASSIGNMENT_MANAGE,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
-        Capability.ASSIGNMENT_MANAGE,
+        Capability.PREPARATION_READINESS_WRITE,
+        Capability.PREPARATION_DOCUMENT_WRITE,
         Capability.MEMBERSHIP_MANAGE,
         Capability.TENANT_MANAGE,
         Capability.DECISION_FINALIZE,
         Capability.PRICING_READ,
         Capability.PRICING_WRITE,
         Capability.SUBMISSION_AUTHORIZE,
+        Capability.PATRON_ACTION_READ,
+        Capability.PATRON_ACTION_WRITE,
         Capability.SENSITIVE_EXPORT,
         Capability.AUDIT_READ,
         Capability.FINANCIAL_REPORT_READ,
         Capability.FINANCIAL_REPORT_CREATE,
         Capability.FINANCIAL_REPORT_PUBLISH,
+        Capability.FINANCIAL_REPORT_LINE_WRITE,
+        Capability.ENTERPRISE_LIBRARY_READ,
+        Capability.ENTERPRISE_LIBRARY_WRITE,
+        Capability.ENTERPRISE_CAPABILITY_READ,
+        Capability.ENTERPRISE_CAPABILITY_WRITE,
+        Capability.PREPARATION_REVIEW_DECIDE,
     }
 )
 _COLLABORATOR_CAPABILITIES = frozenset(
@@ -68,10 +93,17 @@ _COLLABORATOR_CAPABILITIES = frozenset(
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.ASSIGNMENT_ACKNOWLEDGE,
         Capability.ASSIGNMENT_CLARIFY,
-        Capability.ASSIGNMENT_HISTORY_READ,
         Capability.ASSIGNMENT_UNAVAILABILITY,
+        Capability.ASSIGNMENT_HISTORY_READ,
+        Capability.WORK_TASK_READ,
+        Capability.WORK_TASK_WRITE,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.PREPARATION_TRANSMIT,
+        Capability.PREPARATION_READINESS_WRITE,
+        Capability.PREPARATION_DOCUMENT_WRITE,
+        Capability.PREPARATION_CAPABILITY_PROPOSE,
+        Capability.PREPARATION_CAPABILITY_GAP_REPORT,
+        Capability.PREPARATION_REVIEW_REQUEST,
     }
 )
 _DELEGABLE_CAPABILITIES = frozenset(
@@ -81,7 +113,11 @@ _DELEGABLE_CAPABILITIES = frozenset(
         Capability.CASE_DCE_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.DOCUMENT_ADMIN_READ,
+        Capability.WORK_TASK_READ,
+        Capability.WORK_TASK_WRITE,
         Capability.PREPARATION_TRANSMIT,
+        Capability.PREPARATION_READINESS_WRITE,
+        Capability.PREPARATION_DOCUMENT_WRITE,
         Capability.DECISION_FINALIZE,
         Capability.SUBMISSION_AUTHORIZE,
         Capability.SENSITIVE_EXPORT,

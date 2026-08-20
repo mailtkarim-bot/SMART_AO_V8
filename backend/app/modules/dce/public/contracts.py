@@ -10,6 +10,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 
 from app.modules.dce.application.commands import (
     AcknowledgeAssignmentCommand,
+    AddFinancialReportLineCommand,
     AmendCaseAssignmentScopeCommand,
     AssignmentInteractionKind,
     AssignmentInteractionValidationCode,
@@ -331,6 +332,49 @@ class CreateFinancialReportDraftRequest(PublicRequestModel):
 
     def to_command(self, *, case_id: UUID) -> CreateFinancialReportDraftCommand:
         return CreateFinancialReportDraftCommand(**self.model_dump(), case_id=case_id)
+
+
+class AddFinancialReportLineRequest(PublicRequestModel):
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+    expected_revision: int = Field(ge=0)
+    category: Literal[
+        "SALES",
+        "DIRECT_COST",
+        "OVERHEAD",
+        "SUBCONTRACTING",
+        "CONTINGENCY",
+        "GROSS_MARGIN",
+        "FORECAST_CASHFLOW",
+    ]
+    label: str = Field(min_length=1, max_length=160)
+    quantity_decimal: str = Field(
+        min_length=1,
+        max_length=32,
+        pattern=r"^(?:0|[1-9]\d*)(?:\.\d+)?$",
+    )
+    unit: str = Field(min_length=1, max_length=32)
+    amount_minor: int
+
+    def to_command(self, *, case_id: UUID, report_id: UUID) -> AddFinancialReportLineCommand:
+        return AddFinancialReportLineCommand(
+            **self.model_dump(),
+            case_id=case_id,
+            report_id=report_id,
+        )
+
+
+class FinancialReportLineAdditionResponse(PublicResponseModel):
+    """Closed receipt intentionally excluding every financial value."""
+
+    status: Literal["SUCCEEDED"] = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: Literal["FINANCIAL_REPORT_LINE_ADDED"]
+    aggregate_refs: list[AggregateReferenceResponse]
+    event_ids: list[UUID]
+    replayed: bool = False
 
 
 class FinancialReportDraftCreationResponse(PublicResponseModel):

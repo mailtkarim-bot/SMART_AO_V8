@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from io import BytesIO
@@ -10,8 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
+from app.modules.dce.application.commands import RecordDceDocumentExtractionCommand
 from app.modules.dce.application.extraction import (
     DceDocumentExtractionService,
     _project_document,
@@ -25,7 +23,11 @@ from app.modules.dce.infrastructure.models.dce_extraction import (
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.models.dce_version import DceDocumentRecord, DceVersionRecord
 from app.modules.dce.infrastructure.quarantine import LocalQuarantineStorageAdapter
-from app.platform.events.dispatcher import CommandDispatcher
+from app.platform.events.dispatcher import (
+    CommandContext,
+    CommandDispatcher,
+    CommandExecutionError,
+)
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from docx import Document
 from openpyxl import Workbook
@@ -33,31 +35,11 @@ from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from sqlalchemy.orm import Session, sessionmaker
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv(
-    "SMART_AO_TEST_DATABASE_URL",
-    "postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5432/smart_ao",
-)
 NOW = datetime(2026, 8, 13, 18, 0, tzinfo=UTC)
 
 
-@pytest.fixture(scope="module")
-def database_engine() -> sa.Engine:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        command.downgrade(config, "base")
 
 
-@pytest.fixture
-def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
-    return sessionmaker(bind=database_engine, expire_on_commit=False)
 
 
 @pytest.fixture(autouse=True)
@@ -190,20 +172,198 @@ def _seed_admitted_document(
     return tenant_id, document_id, dce_version_id
 
 
+def _handler_dispatcher(session_factory: sessionmaker[Session]) -> CommandDispatcher:
+    return CommandDispatcher(
+        session_factory=session_factory,
+        handlers={"RecordDceDocumentExtraction": RecordDceDocumentExtractionHandler()},
+    )
+
+
 def _service(
     *,
     session_factory: sessionmaker[Session],
     storage: LocalQuarantineStorageAdapter,
 ) -> DceDocumentExtractionService:
-    dispatcher = CommandDispatcher(
-        session_factory=session_factory,
-        handlers={"RecordDceDocumentExtraction": RecordDceDocumentExtractionHandler()},
-    )
     return DceDocumentExtractionService(
         session_factory=session_factory,
-        dispatcher=dispatcher,
+        dispatcher=_handler_dispatcher(session_factory),
         storage=storage,
     )
+
+
+def _failed_extraction_command(
+    *,
+    document_id: UUID,
+    input_sha256: str,
+) -> RecordDceDocumentExtractionCommand:
+    return RecordDceDocumentExtractionCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        extraction_id=uuid4(),
+        dce_document_id=document_id,
+        input_sha256=input_sha256,
+        extractor_id="fixture",
+        extractor_version="1",
+        status="FAILED_SAFE",
+        extracted_char_count=0,
+        failure_code="TEST_FAILURE",
+        fragments=[],
+    )
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_extraction_handler_rejects_missing_storage_and_input_hash_mismatch(
+    session_factory: sessionmaker[Session],
+    tmp_path: Path,
+) -> None:
+    storage = LocalQuarantineStorageAdapter(root=tmp_path)
+    tenant_id, document_id, dce_version_id = _seed_admitted_document(
+        session_factory,
+        storage=storage,
+        source_bytes=b"source document",
+        media_type="text/plain",
+    )
+    dispatcher = _handler_dispatcher(session_factory)
+
+    with pytest.raises(CommandExecutionError) as missing_failure:
+        dispatcher.dispatch(
+            command=_failed_extraction_command(document_id=uuid4(), input_sha256="a" * 64),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(missing_failure.value.__cause__) == "DCE_DOCUMENT_REQUIRED"
+
+    alternate_storage_object_id = uuid4()
+    alternate_document_id = uuid4()
+    alternate_storage_key = f"private/{tenant_id}/{alternate_storage_object_id}"
+    alternate_hash = "c" * 64
+    with session_factory.begin() as session:
+        session.add(
+            DceStagedObjectRecord(
+                id=alternate_storage_object_id,
+                tenant_id=tenant_id,
+                consultation_id=session.get(DceVersionRecord, dce_version_id).consultation_id,
+                storage_key=alternate_storage_key,
+                original_filename="alternate.txt",
+                expected_byte_size=15,
+                actual_byte_size=None,
+                sha256=None,
+                media_type=None,
+                source_channel="MANUAL_UPLOAD",
+                state="AWAITING_UPLOAD",
+                scan_verdict=None,
+                scanner_name=None,
+                scanner_signature_version=None,
+                scanned_at=None,
+                rejection_code=None,
+                expires_at=NOW + timedelta(days=1),
+                consumed_by_dce_version_id=None,
+                consumed_at=None,
+                created_by_actor_id=None,
+                updated_by_actor_id=None,
+            )
+        )
+        session.add(
+            DceDocumentRecord(
+                id=alternate_document_id,
+                tenant_id=tenant_id,
+                dce_version_id=dce_version_id,
+                storage_object_id=alternate_storage_object_id,
+                storage_key=alternate_storage_key,
+                original_filename="alternate.txt",
+                media_type="text/plain",
+                byte_size=15,
+                sha256=alternate_hash,
+                received_from="MANUAL_UPLOAD",
+            )
+        )
+    with pytest.raises(CommandExecutionError) as storage_failure:
+        dispatcher.dispatch(
+            command=_failed_extraction_command(
+                document_id=alternate_document_id, input_sha256=alternate_hash
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(storage_failure.value.__cause__) == "DOCUMENT_STORAGE_NOT_CONSUMED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_extraction_handler_rejects_input_hash_mismatch(
+    session_factory: sessionmaker[Session],
+    tmp_path: Path,
+) -> None:
+    storage = LocalQuarantineStorageAdapter(root=tmp_path)
+    tenant_id, document_id, _ = _seed_admitted_document(
+        session_factory,
+        storage=storage,
+        source_bytes=b"source document",
+        media_type="text/plain",
+    )
+    with pytest.raises(CommandExecutionError) as hash_failure:
+        _handler_dispatcher(session_factory).dispatch(
+            command=_failed_extraction_command(document_id=document_id, input_sha256="f" * 64),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(hash_failure.value.__cause__) == "DOCUMENT_INPUT_HASH_REQUIRED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_extraction_handler_rejects_non_admitted_and_unverified_versions(
+    session_factory: sessionmaker[Session],
+    tmp_path: Path,
+) -> None:
+    storage = LocalQuarantineStorageAdapter(root=tmp_path)
+    tenant_id, document_id, dce_version_id = _seed_admitted_document(
+        session_factory,
+        storage=storage,
+        source_bytes=b"source document",
+        media_type="text/plain",
+    )
+    command = _failed_extraction_command(
+        document_id=document_id, input_sha256=sha256(b"source document").hexdigest()
+    )
+    dispatcher = _handler_dispatcher(session_factory)
+    with session_factory.begin() as session:
+        version = session.get(DceVersionRecord, dce_version_id)
+        assert version is not None
+        version.lifecycle = "WITHDRAWN"
+        version.withdrawal_source = "TEST"
+        version.withdrawal_reason = "Fixture de test"
+        version.withdrawn_at = NOW
+    with pytest.raises(CommandExecutionError) as lifecycle_failure:
+        dispatcher.dispatch(
+            command=command,
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(lifecycle_failure.value.__cause__) == "DCE_VERSION_NOT_ADMITTED"
+
+    with session_factory.begin() as session:
+        version = session.get(DceVersionRecord, dce_version_id)
+        assert version is not None
+        version.lifecycle = "ADMITTED"
+        version.withdrawal_source = None
+        version.withdrawal_reason = None
+        version.withdrawn_at = None
+        version.integrity = "PARTIAL"
+    with pytest.raises(CommandExecutionError) as integrity_failure:
+        dispatcher.dispatch(
+            command=command.model_copy(update={"command_id": uuid4(), "idempotency_key": uuid4()}),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(integrity_failure.value.__cause__) == "DCE_VERSION_NOT_VERIFIED"
 
 
 @pytest.mark.db

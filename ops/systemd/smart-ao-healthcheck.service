@@ -1,0 +1,17 @@
+[Unit]
+Description=SMART AO preproduction healthcheck
+Requires=docker.service
+After=docker.service
+OnFailure=smart-ao-health-alert.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/smart-ao
+ExecStart=/opt/smart-ao/ops/healthcheck-preprod.sh
+User=root
+UMask=0077
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ReadOnlyPaths=/opt/smart-ao
+ReadWritePaths=/var/backups/smart-ao

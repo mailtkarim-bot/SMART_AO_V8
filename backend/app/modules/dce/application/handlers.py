@@ -762,6 +762,7 @@ class RecordDceDocumentClassificationRunHandler:
                         "aggregate_revision": 0,
                     },
                 ),
+                events=(),
             )
 
         if dce_version.aggregate_revision != command.expected_dce_version_revision:
@@ -987,6 +988,7 @@ class RecordDceRcAnalysisHandler:
                         "aggregate_revision": 0,
                     },
                 ),
+                events=(),
             )
 
         fragments_by_id = {fragment.id: fragment for _, _, fragment in source_rows}
@@ -1456,6 +1458,7 @@ class RecordDceRequirementMaterializationRunHandler:
                         "aggregate_revision": 0,
                     },
                 ),
+                events=(),
             )
         projection = project_requirements(signals=signals)
         if command.status != projection.status or command.failure_code != projection.failure_code:
@@ -1662,6 +1665,7 @@ class RecordCaseDceImpactRunHandler:
                         "aggregate_revision": 0,
                     },
                 ),
+                events=(),
             )
 
         impact_run = CaseDceImpactRunRecord(

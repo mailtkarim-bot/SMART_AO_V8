@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
@@ -9,8 +8,6 @@ from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
 from app.modules.dce.application.analysis import (
     DceRcAnalysisService,
     _project_rc_requirements,
@@ -35,31 +32,11 @@ from app.platform.events.dispatcher import CommandContext, CommandDispatcher, Co
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from sqlalchemy.orm import Session, sessionmaker
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-ALEMBIC_INI = REPOSITORY_ROOT / "backend" / "alembic.ini"
-DATABASE_URL = os.getenv(
-    "SMART_AO_TEST_DATABASE_URL",
-    "postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5432/smart_ao",
-)
 NOW = datetime(2026, 8, 14, 9, 0, tzinfo=UTC)
 
 
-@pytest.fixture(scope="module")
-def database_engine() -> sa.Engine:
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        yield engine
-    finally:
-        engine.dispose()
-        command.downgrade(config, "base")
 
 
-@pytest.fixture
-def session_factory(database_engine: sa.Engine) -> sessionmaker[Session]:
-    return sessionmaker(bind=database_engine, expire_on_commit=False)
 
 
 @pytest.fixture(autouse=True)
@@ -493,3 +470,142 @@ def test_rc_analysis_limit_is_terminal_and_contains_no_observation(
     assert projection.failure_code == "ANALYSIS_LIMIT"
     assert projection.source_fragments == (source,)
     assert projection.observations == ()
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_rc_analysis_rejects_non_analysable_version(session_factory, tmp_path: Path) -> None:
+    storage = LocalQuarantineStorageAdapter(root=tmp_path)
+    tenant_id, document_id, dce_version_id = _seed_admitted_document(
+        session_factory, storage=storage, source_bytes=b"Le RC existe."
+    )
+    asyncio.run(
+        _extraction_service(session_factory=session_factory, storage=storage).extract(
+            tenant_id=tenant_id, dce_document_id=document_id, now=NOW
+        )
+    )
+    service = _analysis_service(session_factory=session_factory)
+    sources = service._load_completed_fragments(  # noqa: SLF001
+        tenant_id=tenant_id, dce_version_id=dce_version_id
+    )
+    command = _recording_command(
+        dce_version_id=dce_version_id,
+        projection=_project_rc_requirements(sources=sources),
+    )
+    with session_factory.begin() as session:
+        version = session.get(DceVersionRecord, dce_version_id)
+        assert version is not None
+        version.lifecycle = "WITHDRAWN"
+        version.withdrawal_source = "TEST"
+        version.withdrawal_reason = "Fixture de test"
+        version.withdrawn_at = NOW
+    dispatcher = CommandDispatcher(
+        session_factory=session_factory,
+        handlers={"RecordDceRcAnalysis": RecordDceRcAnalysisHandler()},
+    )
+    with pytest.raises(CommandExecutionError) as failure:
+        dispatcher.dispatch(
+            command=command,
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(failure.value.__cause__) == "DCE_VERSION_NOT_ANALYSABLE"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_rc_analysis_rejects_source_count_and_manifest_mismatch(
+    session_factory, tmp_path: Path
+) -> None:
+    storage = LocalQuarantineStorageAdapter(root=tmp_path)
+    tenant_id, document_id, dce_version_id = _seed_admitted_document(
+        session_factory,
+        storage=storage,
+        source_bytes="Le mémoire technique est obligatoire.".encode(),
+    )
+    asyncio.run(
+        _extraction_service(session_factory=session_factory, storage=storage).extract(
+            tenant_id=tenant_id, dce_document_id=document_id, now=NOW
+        )
+    )
+    service = _analysis_service(session_factory=session_factory)
+    sources = service._load_completed_fragments(  # noqa: SLF001
+        tenant_id=tenant_id, dce_version_id=dce_version_id
+    )
+    valid_command = _recording_command(
+        dce_version_id=dce_version_id,
+        projection=_project_rc_requirements(sources=sources),
+    )
+    dispatcher = CommandDispatcher(
+        session_factory=session_factory,
+        handlers={"RecordDceRcAnalysis": RecordDceRcAnalysisHandler()},
+    )
+    with pytest.raises(CommandExecutionError) as count_failure:
+        dispatcher.dispatch(
+            command=valid_command.model_copy(
+                update={"source_char_count": valid_command.source_char_count + 1}
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(count_failure.value.__cause__) == "DCE_ANALYSIS_SOURCE_COUNT_REQUIRED"
+    with pytest.raises(CommandExecutionError) as manifest_failure:
+        dispatcher.dispatch(
+            command=valid_command.model_copy(
+                update={"input_manifest_sha256": "f" * 64}
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(manifest_failure.value.__cause__) == "DCE_ANALYSIS_INPUT_MANIFEST_REQUIRED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_rc_analysis_handler_replay_is_deterministic(session_factory, tmp_path: Path) -> None:
+    storage = LocalQuarantineStorageAdapter(root=tmp_path)
+    tenant_id, document_id, dce_version_id = _seed_admitted_document(
+        session_factory,
+        storage=storage,
+        source_bytes="Le mémoire technique est obligatoire.".encode(),
+    )
+    asyncio.run(
+        _extraction_service(session_factory=session_factory, storage=storage).extract(
+            tenant_id=tenant_id, dce_document_id=document_id, now=NOW
+        )
+    )
+    service = _analysis_service(session_factory=session_factory)
+    sources = service._load_completed_fragments(  # noqa: SLF001
+        tenant_id=tenant_id, dce_version_id=dce_version_id
+    )
+    command = _recording_command(
+        dce_version_id=dce_version_id,
+        projection=_project_rc_requirements(sources=sources),
+    )
+    dispatcher = CommandDispatcher(
+        session_factory=session_factory,
+        handlers={"RecordDceRcAnalysis": RecordDceRcAnalysisHandler()},
+    )
+    first = dispatcher.dispatch(
+        command=command,
+        context=CommandContext(
+            tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+        ),
+    )
+    replay = dispatcher.dispatch(
+        command=command.model_copy(
+            update={
+                "analysis_id": uuid4(),
+                "command_id": uuid4(),
+                "idempotency_key": uuid4(),
+            }
+        ),
+        context=CommandContext(
+            tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+        ),
+    )
+    assert first.result_code == "DCE_RC_ANALYSIS_RECORDED"
+    assert replay.result_code == "DCE_RC_ANALYSIS_ALREADY_RECORDED"
