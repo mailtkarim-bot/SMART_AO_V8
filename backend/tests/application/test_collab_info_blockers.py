@@ -2,6 +2,7 @@ import sys
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -20,13 +21,18 @@ from app.modules.membership.application.collab_work_task import (
     CollaboratorWorkTaskService,
     collaborator_work_task_handlers,
 )
-from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
+from app.platform.events.dispatcher import (
+    CommandDispatcher,
+    CommandExecutionError,
+)
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord
 from app.platform.security.authorization import AuthorizationPolicy
+from app.platform.security.context import ActorKind
 from app.platform.security.models import (
     CollaboratorInformationRequestRecord,
     CollaboratorInformationResponseRecord,
     CollaboratorTaskBlockerRecord,
+    CollaboratorTaskRecord,
 )
 from sqlalchemy.exc import DBAPIError
 
@@ -51,14 +57,19 @@ def _task_service(factory):
     )
 
 
-def _info_service(factory):
+def _info_service(factory, *, policy=None):
     return CollaboratorInfoBlockerService(
         session_factory=factory,
         dispatcher=CommandDispatcher(
             session_factory=factory, handlers=collaborator_info_blocker_handlers()
         ),
-        policy=AuthorizationPolicy(),
+        policy=policy or AuthorizationPolicy(),
     )
+
+
+class _DenyPolicy:
+    def authorize(self, **kwargs):
+        return SimpleNamespace(allowed=False, code="ASSIGNMENT_SCOPE_FORBIDDEN")
 
 
 def _create_info(task_id: UUID, *, expected_revision: int = 0) -> CreateInformationRequestCommand:
@@ -223,3 +234,167 @@ def test_info_blocker_rejects_revision_replay_foreign_actor_and_mutation(session
         stored.response_text = "mutation interdite"
         with pytest.raises(DBAPIError):
             session.flush()
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_info_blocker_service_rejects_actor_membership_and_policy(session_factory) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    task = _task_service(session_factory).execute(
+        actor=actor, command=_create_task(assignment_id, case_id, requirement_id), now=NOW
+    )
+    task_id = UUID(task.aggregate_refs[0]["aggregate_id"])
+    service = _info_service(session_factory)
+    with pytest.raises(PermissionError, match="COLLABORATOR_REQUIRED"):
+        service.execute(
+            actor=replace(actor, actor_kind=ActorKind.PATRON_ADMIN),
+            command=_create_info(task_id),
+            now=NOW,
+        )
+    with pytest.raises(PermissionError, match="ASSIGNMENT_SCOPE_FORBIDDEN"):
+        _info_service(session_factory, policy=_DenyPolicy()).execute(
+            actor=actor, command=_create_info(task_id), now=NOW
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_info_blocker_service_reads_workflow_and_rejects_missing_or_wrong_actor(
+    session_factory,
+) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    task = _task_service(session_factory).execute(
+        actor=actor, command=_create_task(assignment_id, case_id, requirement_id), now=NOW
+    )
+    task_id = UUID(task.aggregate_refs[0]["aggregate_id"])
+    service = _info_service(session_factory)
+    service.execute(actor=actor, command=_create_info(task_id), now=NOW)
+    workflow = service.read_workflow(actor=actor, task_id=task_id, now=NOW)
+    assert workflow[0].id == task_id
+    assert len(workflow[1]) == 1
+    with pytest.raises(PermissionError, match="NOT_FOUND_OR_FORBIDDEN"):
+        service.read_workflow(actor=actor, task_id=uuid4(), now=NOW)
+    with pytest.raises(PermissionError, match="COLLABORATOR_REQUIRED"):
+        service.read_workflow(
+            actor=replace(actor, actor_kind="PATRON_ADMIN"), task_id=task_id, now=NOW
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_info_blocker_handler_rejects_stale_request_and_closed_request(session_factory) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    task = _task_service(session_factory).execute(
+        actor=actor, command=_create_task(assignment_id, case_id, requirement_id), now=NOW
+    )
+    task_id = UUID(task.aggregate_refs[0]["aggregate_id"])
+    service = _info_service(session_factory)
+    create = _create_info(task_id)
+    service.execute(actor=actor, command=create, now=NOW)
+    with pytest.raises(CommandExecutionError, match="VERSION_CONFLICT"):
+        service.execute(
+            actor=actor,
+            command=_create_info(task_id, expected_revision=1),
+            now=NOW,
+        )
+    service.execute(
+        actor=actor,
+        command=RecordInformationRequestResponseCommand(
+            command_id=uuid4(), idempotency_key=uuid4(), request_id=create.request_id,
+            expected_revision=0, response_text="Réponse opérationnelle", outcome="ANSWERED",
+        ),
+        now=NOW,
+    )
+    with pytest.raises(CommandExecutionError, match="REQUEST_NOT_OPEN"):
+        service.execute(
+            actor=actor,
+            command=RecordInformationRequestResponseCommand(
+                command_id=uuid4(), idempotency_key=uuid4(), request_id=create.request_id,
+                expected_revision=1, response_text="Deuxième réponse", outcome="ANSWERED",
+            ),
+            now=NOW,
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_info_blocker_handler_rejects_terminal_task_and_missing_blocker(session_factory) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    task = _task_service(session_factory).execute(
+        actor=actor, command=_create_task(assignment_id, case_id, requirement_id), now=NOW
+    )
+    task_id = UUID(task.aggregate_refs[0]["aggregate_id"])
+    service = _info_service(session_factory)
+    with session_factory.begin() as session:
+        stored = session.get(CollaboratorTaskRecord, task_id)
+        assert stored is not None
+        stored.state = "COMPLETED"
+    with pytest.raises(CommandExecutionError, match="TASK_TERMINAL"):
+        service.execute(
+            actor=actor,
+            command=DeclareTaskBlockerCommand(
+                command_id=uuid4(), idempotency_key=uuid4(), correlation_id=uuid4(),
+                task_id=task_id, expected_revision=0, blocker_id=uuid4(),
+                blocker_kind="MISSING_INFORMATION",
+                description="Bloqué",
+                resolution_owner="COLLABORATEUR",
+            ),
+            now=NOW,
+        )
+
+    with session_factory.begin() as session:
+        stored = session.get(CollaboratorTaskRecord, task_id)
+        assert stored is not None
+        stored.state = "IN_PROGRESS"
+    with pytest.raises(CommandExecutionError, match="NOT_FOUND_OR_FORBIDDEN"):
+        service.execute(
+            actor=actor,
+            command=ResolveTaskBlockerCommand(
+                command_id=uuid4(), idempotency_key=uuid4(), correlation_id=uuid4(),
+                task_id=task_id, blocker_id=uuid4(), expected_revision=0,
+                resolution_note="Impossible à résoudre.",
+            ),
+            now=NOW,
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_info_blocker_handler_rejects_already_resolved_blocker(session_factory) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    task = _task_service(session_factory).execute(
+        actor=actor, command=_create_task(assignment_id, case_id, requirement_id), now=NOW
+    )
+    task_id = UUID(task.aggregate_refs[0]["aggregate_id"])
+    service = _info_service(session_factory)
+    blocker_id = uuid4()
+    service.execute(
+        actor=actor,
+        command=DeclareTaskBlockerCommand(
+            command_id=uuid4(), idempotency_key=uuid4(), correlation_id=uuid4(),
+            task_id=task_id, expected_revision=0, blocker_id=blocker_id,
+            blocker_kind="MISSING_INFORMATION",
+            description="Blocage",
+            resolution_owner="COLLABORATEUR",
+        ),
+        now=NOW,
+    )
+    service.execute(
+        actor=actor,
+        command=ResolveTaskBlockerCommand(
+            command_id=uuid4(), idempotency_key=uuid4(), correlation_id=uuid4(),
+            task_id=task_id, blocker_id=blocker_id, expected_revision=1,
+            resolution_note="Résolu.",
+        ),
+        now=NOW,
+    )
+    with pytest.raises(CommandExecutionError, match="BLOCKER_ALREADY_RESOLVED"):
+        service.execute(
+            actor=actor,
+            command=ResolveTaskBlockerCommand(
+                command_id=uuid4(), idempotency_key=uuid4(), correlation_id=uuid4(),
+                task_id=task_id, blocker_id=blocker_id, expected_revision=2,
+                resolution_note="Deuxième résolution.",
+            ),
+            now=NOW,
+        )
