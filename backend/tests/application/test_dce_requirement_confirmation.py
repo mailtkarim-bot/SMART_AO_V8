@@ -82,6 +82,22 @@ def test_requirement_confirmation_is_historical_and_system_is_refused(
         outcome="CONFIRMED",
         reason_code="SOURCE_REVIEWED",
     )
+    with pytest.raises(CommandExecutionError) as missing_failure:
+        dispatcher.dispatch(
+            command=command.model_copy(
+                update={
+                    "command_id": uuid4(),
+                    "idempotency_key": uuid4(),
+                    "confirmation_id": uuid4(),
+                    "requirement_id": uuid4(),
+                }
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="PATRON_ADMIN", received_at=NOW
+            ),
+        )
+    assert str(missing_failure.value.__cause__) == "NOT_FOUND_OR_FORBIDDEN"
+
     result = dispatcher.dispatch(
         command=command,
         context=CommandContext(
@@ -94,6 +110,50 @@ def test_requirement_confirmation_is_historical_and_system_is_refused(
         confirmation = session.get(DceRequirementConfirmationRecord, command.confirmation_id)
     assert current is not None and current.revision == 1
     assert confirmation is not None and confirmation.outcome == "CONFIRMED"
+
+    with pytest.raises(CommandExecutionError) as stale_failure:
+        dispatcher.dispatch(
+            command=command.model_copy(
+                update={
+                    "command_id": uuid4(),
+                    "idempotency_key": uuid4(),
+                    "confirmation_id": uuid4(),
+                }
+            ),
+            context=CommandContext(
+                tenant_id=tenant_id,
+                actor_id=uuid4(),
+                actor_kind="PATRON_ADMIN",
+                received_at=NOW,
+            ),
+        )
+    assert str(stale_failure.value.__cause__) == "DCE_REQUIREMENT_CONFIRMATION_STALE"
+
+    collaborator_command = command.model_copy(
+        update={
+            "command_id": uuid4(),
+            "idempotency_key": uuid4(),
+            "confirmation_id": uuid4(),
+            "expected_confirmation_revision": 1,
+            "outcome": "NOT_APPLICABLE",
+        }
+    )
+    with pytest.raises(CommandExecutionError) as patron_failure:
+        dispatcher.dispatch(
+            command=collaborator_command,
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="COLLABORATEUR", received_at=NOW
+            ),
+        )
+    assert str(patron_failure.value.__cause__) == "DCE_REQUIREMENT_PATRON_REQUIRED"
+
+    second = dispatcher.dispatch(
+        command=collaborator_command,
+        context=CommandContext(
+            tenant_id=tenant_id, actor_id=uuid4(), actor_kind="PATRON_ADMIN", received_at=NOW
+        ),
+    )
+    assert second.result_code == "DCE_REQUIREMENT_CONFIRMED"
     with pytest.raises(sa.exc.DBAPIError), session_factory.begin() as session:
         confirmation = session.get(DceRequirementConfirmationRecord, command.confirmation_id)
         assert confirmation is not None

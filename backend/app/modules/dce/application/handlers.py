@@ -1458,6 +1458,7 @@ class RecordDceRequirementMaterializationRunHandler:
                         "aggregate_revision": 0,
                     },
                 ),
+                events=(),
             )
         projection = project_requirements(signals=signals)
         if command.status != projection.status or command.failure_code != projection.failure_code:
@@ -1664,6 +1665,7 @@ class RecordCaseDceImpactRunHandler:
                         "aggregate_revision": 0,
                     },
                 ),
+                events=(),
             )
 
         impact_run = CaseDceImpactRunRecord(
