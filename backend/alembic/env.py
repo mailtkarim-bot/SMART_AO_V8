@@ -17,6 +17,7 @@ from app.modules.dce.infrastructure.models import (  # noqa: F401
 )
 from app.modules.decision.infrastructure.models import decision  # noqa: F401
 from app.platform.persistence import models  # noqa: F401
+from app.platform.persistence.alembic_runtime import resolve_database_url
 from app.platform.persistence.base import Base
 from app.platform.security import models as security_models  # noqa: F401
 from sqlalchemy import engine_from_config, pool
@@ -29,8 +30,18 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def _database_url() -> str:
+    return resolve_database_url(config.get_main_option("sqlalchemy.url"))
+
+
+def _database_config() -> dict[str, str]:
+    section = dict(config.get_section(config.config_ini_section) or {})
+    section["sqlalchemy.url"] = _database_url()
+    return section
+
+
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    url = _database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -45,7 +56,7 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        _database_config(),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
