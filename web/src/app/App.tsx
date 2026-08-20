@@ -6,10 +6,10 @@ import { useSubmissionActions } from "../features/submission/useSubmissionAction
 import { useEnterpriseLibrary } from "../features/enterprise/useEnterpriseLibrary";
 import { useCollaboratorWizard } from "../features/wizard/useCollaboratorWizard";
 import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
+import { useFinancialDraft } from "../features/draft/useFinancialDraft";
 import { createApiClient } from "../infrastructure/api";
 import type {
   AssignedCase,
-  DraftReport,
   FinancialCategory,
   PatronAction,
   PatronDecisionDossier,
@@ -57,20 +57,10 @@ function App() {
   const [scenarios, setScenarios] = useState<PricingScenario[]>([]);
   const [decisionDossier, setDecisionDossier] = useState<PatronDecisionDossier | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState("");
-  const [reportId, setReportId] = useState("");
-  const [draft, setDraft] = useState<DraftReport | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingDraft, setLoadingDraft] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [showConnection, setShowConnection] = useState(false);
   const [activeNav, setActiveNav] = useState("overview");
-  const [lineForm, setLineForm] = useState({
-    category: "SALES" as FinancialCategory,
-    label: "",
-    quantity_decimal: "1",
-    unit: "forfait",
-    amount_minor: "",
-  });
   const api = useMemo(() => createApiClient(baseUrl, token), [baseUrl, token]);
   const {
     enterpriseCompany,
@@ -124,6 +114,7 @@ function App() {
     completeWizardTask,
     transmitWizardSnapshot,
   } = useCollaboratorWizard(api, setMessage);
+  const financialDraft = useFinancialDraft(api, setMessage, selectedCaseId);
   const cockpit = usePatronCockpit(api, setMessage, async (caseId) => {
     setSelectedCaseId(caseId);
     await refreshScenarios(caseId);
@@ -136,7 +127,24 @@ function App() {
     refreshAssignments,
     selectAssignment,
   } = cockpit;
-  const pricingImport = usePricingImport(api, setMessage, reportId, selectedCaseId, loadDraft);
+  const pricingImport = usePricingImport(
+    api,
+    setMessage,
+    financialDraft.reportId,
+    selectedCaseId,
+    financialDraft.loadDraft,
+  );
+  const {
+    reportId,
+    draft,
+    loadingDraft,
+    lineForm,
+    setReportId,
+    setLineForm,
+    createDraft,
+    loadDraft,
+    submitLine,
+  } = financialDraft;
   const submissionActions = useSubmissionActions(api, setMessage);
   const summaryCards = draft
     ? [
@@ -198,71 +206,6 @@ function App() {
       setDecisionDossier(await api.getDecisionDossier(caseId));
     } catch {
       setDecisionDossier(null);
-    }
-  }
-
-  async function createDraft() {
-    if (!selectedCaseId) {
-      setMessage({ tone: "error", text: "Sélectionnez une affaire avant de créer un brouillon." });
-      return;
-    }
-    setLoadingDraft(true);
-    setMessage(null);
-    try {
-      const receipt = await api.createDraft(selectedCaseId);
-      const newReportId = receipt.aggregate_refs[0]?.aggregate_id;
-      if (!newReportId) throw new Error("Le serveur n’a pas retourné l’identifiant du brouillon.");
-      setReportId(newReportId);
-      const loadedDraft = await api.getDraft(selectedCaseId, newReportId);
-      setDraft(loadedDraft);
-      pricingImport.setPricingImportReportRevision(String(loadedDraft.aggregate_revision));
-      setMessage({ tone: "success", text: receipt.replayed ? "Brouillon existant rechargé." : "Nouveau brouillon créé." });
-    } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de créer le brouillon." });
-    } finally {
-      setLoadingDraft(false);
-    }
-  }
-
-  async function loadDraft() {
-    if (!selectedCaseId || !reportId.trim()) {
-      setMessage({ tone: "error", text: "Sélectionnez une affaire et renseignez l’identifiant du brouillon." });
-      return;
-    }
-    setLoadingDraft(true);
-    setMessage(null);
-    try {
-      const loadedDraft = await api.getDraft(selectedCaseId, reportId.trim());
-      setDraft(loadedDraft);
-      pricingImport.setPricingImportReportRevision(String(loadedDraft.aggregate_revision));
-      setMessage({ tone: "success", text: "Brouillon chargé en lecture seule contrôlée." });
-    } catch (error) {
-      setDraft(null);
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de charger le brouillon." });
-    } finally {
-      setLoadingDraft(false);
-    }
-  }
-
-  async function submitLine(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!draft || !selectedCaseId) return;
-    const amount = Number(lineForm.amount_minor);
-    if (!Number.isInteger(amount)) {
-      setMessage({ tone: "error", text: "Le montant doit être exprimé en centimes entiers." });
-      return;
-    }
-    try {
-      const receipt = await api.addLine(selectedCaseId, draft.report_id, {
-        ...lineForm,
-        amount_minor: amount,
-        expected_revision: draft.aggregate_revision,
-      });
-      setMessage({ tone: "success", text: receipt.replayed ? "Ajout rejoué sans doublon." : "Ligne ajoutée au brouillon." });
-      setLineForm({ ...lineForm, label: "", amount_minor: "" });
-      await loadDraft();
-    } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : "L’ajout de la ligne a échoué." });
     }
   }
 
