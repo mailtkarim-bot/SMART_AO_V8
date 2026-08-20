@@ -1,5 +1,6 @@
 from dataclasses import replace
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -16,6 +17,7 @@ from app.modules.dce.infrastructure.models.dce_requirements import (
 )
 from app.modules.dce.infrastructure.models.dce_version import DceVersionRecord
 from app.modules.membership.application.collab_work_task import (
+    CollaboratorWorkTaskHandler,
     CollaboratorWorkTaskService,
     collaborator_work_task_handlers,
 )
@@ -25,7 +27,11 @@ from app.modules.membership.application.collab_work_task_commands import (
     CreateTaskFromRequirementCommand,
     RecordTaskResultCommand,
 )
-from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
+from app.platform.events.dispatcher import (
+    CommandContext,
+    CommandDispatcher,
+    CommandExecutionError,
+)
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.capabilities import Capability, capabilities_for
@@ -258,15 +264,20 @@ def _seed(session_factory) -> tuple[ActorContext, UUID, UUID, UUID]:
     return actor, assignment_id, case_id, requirement_id
 
 
-def _service(factory):
+def _service(factory, *, policy=None):
     dispatcher = CommandDispatcher(
         session_factory=factory, handlers=collaborator_work_task_handlers()
     )
     return CollaboratorWorkTaskService(
         session_factory=factory,
         dispatcher=dispatcher,
-        policy=AuthorizationPolicy(),
+        policy=policy or AuthorizationPolicy(),
     )
+
+
+class _DenyPolicy:
+    def authorize(self, **kwargs):
+        return SimpleNamespace(allowed=False, code="ASSIGNMENT_SCOPE_FORBIDDEN")
 
 
 def _create(
@@ -402,4 +413,268 @@ def test_task_refuses_foreign_requirement_and_wrong_membership(session_factory) 
     with pytest.raises(PermissionError, match="NOT_FOUND_OR_FORBIDDEN"):
         service.execute(
             actor=wrong_actor, command=_create(assignment_id, case_id, requirement_id), now=NOW
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_task_service_rejects_non_collaborator_and_missing_membership(session_factory) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    service = _service(session_factory)
+    patron = replace(actor, actor_kind=ActorKind.PATRON_ADMIN)
+    without_membership = replace(actor, membership_id=None)
+
+    with pytest.raises(PermissionError, match="COLLABORATOR_REQUIRED"):
+        service.execute(
+            actor=patron, command=_create(assignment_id, case_id, requirement_id), now=NOW
+        )
+    with pytest.raises(PermissionError, match="MEMBERSHIP_REQUIRED"):
+        service.execute(
+            actor=without_membership,
+            command=_create(assignment_id, case_id, requirement_id),
+            now=NOW,
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_task_service_rejects_policy_denial_and_missing_assignment(session_factory) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    denied = _service(session_factory, policy=_DenyPolicy())
+    with pytest.raises(PermissionError, match="ASSIGNMENT_SCOPE_FORBIDDEN"):
+        denied.execute(
+            actor=actor, command=_create(assignment_id, case_id, requirement_id), now=NOW
+        )
+
+    service = _service(session_factory)
+    with pytest.raises(PermissionError, match="NOT_FOUND_OR_FORBIDDEN"):
+        service.list_for_case(actor=actor, case_id=uuid4(), now=NOW)
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_task_list_rejects_non_collaborator_and_policy_denial(session_factory) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    service = _service(session_factory)
+    patron = replace(actor, actor_kind=ActorKind.PATRON_ADMIN)
+    with pytest.raises(PermissionError, match="COLLABORATOR_REQUIRED"):
+        service.list_for_case(actor=patron, case_id=case_id, now=NOW)
+
+    with pytest.raises(PermissionError, match="ASSIGNMENT_SCOPE_FORBIDDEN"):
+        _service(session_factory, policy=_DenyPolicy()).list_for_case(
+            actor=actor, case_id=case_id, now=NOW
+        )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_task_handler_rejects_invalid_context_and_unsupported_command(session_factory) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    service = _service(session_factory)
+    task_id = UUID(
+        service.execute(
+            actor=actor, command=_create(assignment_id, case_id, requirement_id), now=NOW
+        ).aggregate_refs[0]["aggregate_id"]
+    )
+    handler = CollaboratorWorkTaskHandler()
+    with session_factory.begin() as session, pytest.raises(
+        CommandExecutionError, match="COLLABORATOR_REQUIRED"
+    ):
+            handler.execute(
+                session=session,
+                command=ClaimTaskCommand(
+                    command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id,
+                    expected_revision=0,
+                ),
+                context=CommandContext(
+                    tenant_id=actor.tenant_id, actor_id=actor.actor_id,
+                    actor_kind=ActorKind.PATRON_ADMIN.value, received_at=NOW,
+                    membership_id=actor.membership_id,
+                ),
+            )
+
+    with session_factory.begin() as session, pytest.raises(
+        CommandExecutionError, match="unsupported task command"
+    ):
+            handler.execute(
+                session=session,
+                command=SimpleNamespace(
+                    command_type="UnknownTaskCommand", task_id=task_id,
+                    expected_revision=0,
+                ),
+                context=CommandContext(
+                    tenant_id=actor.tenant_id, actor_id=actor.actor_id,
+                    actor_kind=ActorKind.COLLABORATEUR.value, received_at=NOW,
+                    membership_id=actor.membership_id, case_id=case_id,
+                ),
+            )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_task_handler_returns_existing_task_without_duplicate_event(session_factory) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    service = _service(session_factory)
+    command = _create(assignment_id, case_id, requirement_id)
+    service.execute(actor=actor, command=command, now=NOW)
+    handler = CollaboratorWorkTaskHandler()
+    with session_factory.begin() as session:
+        outcome = handler.execute(
+            session=session,
+            command=command,
+            context=CommandContext(
+                tenant_id=actor.tenant_id, actor_id=actor.actor_id,
+                actor_kind=ActorKind.COLLABORATEUR.value, received_at=NOW,
+                membership_id=actor.membership_id, case_id=case_id,
+            ),
+        )
+    assert outcome.result_code == "TASK_CREATED"
+    assert outcome.events == ()
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_task_handler_rejects_inactive_scope_classification_and_case_context(
+    session_factory,
+) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    service = _service(session_factory)
+    command = _create(assignment_id, case_id, requirement_id)
+    task_id = UUID(
+        service.execute(actor=actor, command=command, now=NOW).aggregate_refs[0]["aggregate_id"]
+    )
+    handler = CollaboratorWorkTaskHandler()
+    base_context = CommandContext(
+        tenant_id=actor.tenant_id, actor_id=actor.actor_id,
+        actor_kind=ActorKind.COLLABORATEUR.value, received_at=NOW,
+        membership_id=actor.membership_id, case_id=case_id,
+    )
+
+    with session_factory.begin() as session:
+        assignment = session.get(CaseAssignmentRecord, assignment_id)
+        assert assignment is not None
+        assignment.state = "SUSPENDED"
+    with session_factory.begin() as session, pytest.raises(
+        CommandExecutionError, match="ASSIGNMENT_INACTIVE"
+    ):
+            handler.execute(
+                session=session,
+                command=ClaimTaskCommand(
+                    command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id,
+                    expected_revision=0,
+                ),
+                context=base_context,
+            )
+
+    with session_factory.begin() as session:
+        assignment = session.get(CaseAssignmentRecord, assignment_id)
+        assert assignment is not None
+        assignment.state = "ACTIVE"
+        assignment.scope_actions_json = [Capability.CASE_DCE_READ.value]
+    with session_factory.begin() as session, pytest.raises(
+        CommandExecutionError, match="ASSIGNMENT_SCOPE_FORBIDDEN"
+    ):
+            handler.execute(
+                session=session,
+                command=ClaimTaskCommand(
+                    command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id,
+                    expected_revision=0,
+                ),
+                context=base_context,
+            )
+
+    with session_factory.begin() as session:
+        assignment = session.get(CaseAssignmentRecord, assignment_id)
+        assert assignment is not None
+        assignment.scope_actions_json = [Capability.WORK_TASK_WRITE.value]
+        assignment.scope_classifications_json = [DataClassification.PUBLIC_TENDER.value]
+    with session_factory.begin() as session, pytest.raises(
+        CommandExecutionError, match="ASSIGNMENT_CLASSIFICATION_FORBIDDEN"
+    ):
+            handler.execute(
+                session=session,
+                command=ClaimTaskCommand(
+                    command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id,
+                    expected_revision=0,
+                ),
+                context=base_context,
+            )
+
+    with session_factory.begin() as session:
+        assignment = session.get(CaseAssignmentRecord, assignment_id)
+        assert assignment is not None
+        assignment.scope_classifications_json = [DataClassification.INTERNAL_OPERATIONAL.value]
+    with session_factory.begin() as session, pytest.raises(
+        CommandExecutionError, match="CASE_CONTEXT_MISMATCH"
+    ):
+            handler.execute(
+                session=session,
+                command=ClaimTaskCommand(
+                    command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id,
+                    expected_revision=0,
+                ),
+                context=replace(base_context, case_id=uuid4()),
+            )
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_task_handler_rejects_non_claimable_result_and_non_completable_states(
+    session_factory,
+) -> None:
+    actor, assignment_id, case_id, requirement_id = _seed(session_factory)
+    service = _service(session_factory)
+    task_id = UUID(
+        service.execute(
+            actor=actor, command=_create(assignment_id, case_id, requirement_id), now=NOW
+        ).aggregate_refs[0]["aggregate_id"]
+    )
+    service.execute(
+        actor=actor,
+        command=ClaimTaskCommand(
+            command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id, expected_revision=0
+        ),
+        now=NOW,
+    )
+    with pytest.raises(CommandExecutionError, match="TASK_NOT_CLAIMABLE"):
+        service.execute(
+            actor=actor,
+            command=ClaimTaskCommand(
+                command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id, expected_revision=1
+            ),
+            now=NOW,
+        )
+    service.execute(
+        actor=actor,
+        command=RecordTaskResultCommand(
+            command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id,
+            expected_revision=1, result_text="Résultat", source_locator="RC:p1",
+            outcome="RECORDED",
+        ),
+        now=NOW,
+    )
+    service.execute(
+        actor=actor,
+        command=CompleteTaskCommand(
+            command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id, expected_revision=2
+        ),
+        now=NOW,
+    )
+    with pytest.raises(CommandExecutionError, match="TASK_NOT_ACTIVE"):
+        service.execute(
+            actor=actor,
+            command=RecordTaskResultCommand(
+                command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id,
+                expected_revision=3, result_text="Après clôture", source_locator="RC:p2",
+                outcome="RECORDED",
+            ),
+            now=NOW,
+        )
+    with pytest.raises(CommandExecutionError, match="TASK_NOT_COMPLETABLE"):
+        service.execute(
+            actor=actor,
+            command=CompleteTaskCommand(
+                command_id=uuid4(), idempotency_key=uuid4(), task_id=task_id, expected_revision=3
+            ),
+            now=NOW,
         )
