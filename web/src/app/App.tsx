@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { PricingPanel } from "../features/pricing/PricingPanel";
+import { usePricingImport } from "../features/pricing/usePricingImport";
 import { SubmissionPanel } from "../features/submission/SubmissionPanel";
+import { useSubmissionActions } from "../features/submission/useSubmissionActions";
 import { createApiClient } from "../infrastructure/api";
 import type {
   AssignedCase,
@@ -99,16 +101,6 @@ function App() {
   const [enterpriseVerificationReason, setEnterpriseVerificationReason] = useState<
     "DOCUMENT_ACCEPTED" | "DOCUMENT_ILLEGIBLE" | "DOCUMENT_EXPIRED" | "DOCUMENT_MISMATCH" | "DOCUMENT_DUPLICATE"
   >("DOCUMENT_ACCEPTED");
-  const [preparationPackageId, setPreparationPackageId] = useState("");
-  const [preparationRevision, setPreparationRevision] = useState("1");
-  const [submissionPackageId, setSubmissionPackageId] = useState("");
-  const [submissionExported, setSubmissionExported] = useState(false);
-  const [evidenceForm, setEvidenceForm] = useState({
-    evidence_type: "MANUAL_RECEIPT" as "MANUAL_RECEIPT" | "MANUAL_PORTAL_REFERENCE",
-    external_reference_hash: "",
-    evidence_sha256: "",
-    notes_redacted: "",
-  });
   const [selectedCaseId, setSelectedCaseId] = useState("");
   const [reportId, setReportId] = useState("");
   const [draft, setDraft] = useState<DraftReport | null>(null);
@@ -133,12 +125,9 @@ function App() {
     unit: "forfait",
     amount_minor: "",
   });
-  const [pricingImportBatchId, setPricingImportBatchId] = useState("");
-  const [pricingImportBatchRevision, setPricingImportBatchRevision] = useState("1");
-  const [pricingImportReportRevision, setPricingImportReportRevision] = useState("0");
-  const [pricingImportState, setPricingImportState] = useState<"IDLE" | "COMMITTED" | "REPLAYED">("IDLE");
-
   const api = useMemo(() => createApiClient(baseUrl, token), [baseUrl, token]);
+  const pricingImport = usePricingImport(api, setMessage, reportId, selectedCaseId, loadDraft);
+  const submissionActions = useSubmissionActions(api, setMessage);
   const summaryCards = draft
     ? [
         { label: "Ventes", value: formatMoney(draft.summary.sales_total_minor, draft.currency_code), accent: "blue" },
@@ -508,69 +497,7 @@ function App() {
     }
   }
 
-  async function prepareSubmissionPackage() {
-    if (!preparationPackageId.trim()) {
-      setMessage({ tone: "error", text: "Renseignez l’identifiant de la préparation à déposer." });
-      return;
-    }
-    try {
-      const receipt = await api.prepareSubmissionPackage(
-        preparationPackageId.trim(),
-        Number(preparationRevision),
-      );
-      const packageId = receipt.aggregate_refs[0]?.aggregate_id;
-      if (packageId) setSubmissionPackageId(packageId);
-      setMessage({
-        tone: "success",
-        text: receipt.replayed
-          ? "Paquet de dépôt déjà préparé, identifiant rechargé."
-          : "Paquet préparé pour contrôle patronal. Aucun dépôt externe n’a été effectué.",
-      });
-    } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de préparer le paquet." });
-    }
-  }
 
-  async function exportSubmissionPackage() {
-    if (!submissionPackageId.trim()) {
-      setMessage({ tone: "error", text: "Préparez ou renseignez un paquet avant de l’exporter." });
-      return;
-    }
-    try {
-      const archive = await api.downloadSubmissionPackage(submissionPackageId.trim());
-      const url = URL.createObjectURL(archive);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `submission-${submissionPackageId.trim()}.zip`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setSubmissionExported(true);
-      setMessage({ tone: "success", text: "Dossier exporté. L’audit et la notification de téléchargement ont été enregistrés." });
-    } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible d’exporter le dossier." });
-    }
-  }
-
-  async function recordSubmissionEvidence() {
-    if (!submissionPackageId.trim()) {
-      setMessage({ tone: "error", text: "Préparez ou renseignez un paquet avant d’enregistrer sa preuve." });
-      return;
-    }
-    try {
-      const receipt = await api.recordSubmissionEvidence(submissionPackageId.trim(), {
-        ...evidenceForm,
-        notes_redacted: evidenceForm.notes_redacted || undefined,
-      });
-      setMessage({
-        tone: "success",
-        text: receipt.external_submission === "NOT_PERFORMED"
-          ? "Preuve append-only enregistrée. Le dépôt externe reste à effectuer manuellement."
-          : "Preuve enregistrée.",
-      });
-    } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible d’enregistrer la preuve." });
-    }
-  }
 
   async function createDraft() {
     if (!selectedCaseId) {
@@ -586,7 +513,7 @@ function App() {
       setReportId(newReportId);
       const loadedDraft = await api.getDraft(selectedCaseId, newReportId);
       setDraft(loadedDraft);
-      setPricingImportReportRevision(String(loadedDraft.aggregate_revision));
+      pricingImport.setPricingImportReportRevision(String(loadedDraft.aggregate_revision));
       setMessage({ tone: "success", text: receipt.replayed ? "Brouillon existant rechargé." : "Nouveau brouillon créé." });
     } catch (error) {
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de créer le brouillon." });
@@ -605,56 +532,13 @@ function App() {
     try {
       const loadedDraft = await api.getDraft(selectedCaseId, reportId.trim());
       setDraft(loadedDraft);
-      setPricingImportReportRevision(String(loadedDraft.aggregate_revision));
+      pricingImport.setPricingImportReportRevision(String(loadedDraft.aggregate_revision));
       setMessage({ tone: "success", text: "Brouillon chargé en lecture seule contrôlée." });
     } catch (error) {
       setDraft(null);
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de charger le brouillon." });
     } finally {
       setLoadingDraft(false);
-    }
-  }
-
-  async function commitPricingImport() {
-    if (!selectedCaseId || !pricingImportBatchId.trim() || !reportId.trim()) {
-      setMessage({ tone: "error", text: "Sélectionnez une affaire, un batch et un brouillon avant le commit." });
-      return;
-    }
-    const expectedBatchRevision = Number(pricingImportBatchRevision);
-    const expectedReportRevision = Number(pricingImportReportRevision);
-    if (
-      !Number.isInteger(expectedBatchRevision) ||
-      expectedBatchRevision < 1 ||
-      !Number.isInteger(expectedReportRevision) ||
-      expectedReportRevision < 0
-    ) {
-      setMessage({ tone: "error", text: "Les révisions attendues doivent être des entiers valides." });
-      return;
-    }
-    try {
-      const receipt = await api.commitPricingImport(selectedCaseId, pricingImportBatchId.trim(), {
-        report_id: reportId.trim(),
-        expected_batch_revision: expectedBatchRevision,
-        expected_report_revision: expectedReportRevision,
-      });
-      const reportReference = receipt.aggregate_refs.find(
-        (reference) => reference.aggregate_type === "FinancialReportSnapshot",
-      );
-      const batchReference = receipt.aggregate_refs.find(
-        (reference) => reference.aggregate_type === "PricingImportBatch",
-      );
-      if (reportReference) setPricingImportReportRevision(String(reportReference.aggregate_revision));
-      if (batchReference) setPricingImportBatchRevision(String(batchReference.aggregate_revision));
-      setPricingImportState(receipt.replayed ? "REPLAYED" : "COMMITTED");
-      setMessage({
-        tone: "success",
-        text: receipt.replayed
-          ? "Import déjà commité : rejeu idempotent sans nouvelle ligne."
-          : "Import commité dans le brouillon financier patronal.",
-      });
-      await loadDraft();
-    } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Le commit de l’import a échoué." });
     }
   }
 
@@ -738,14 +622,14 @@ function App() {
             formatMoney={formatMoney}
             selectedCaseId={selectedCaseId}
             reportId={reportId}
-            pricingImportBatchId={pricingImportBatchId}
-            pricingImportBatchRevision={pricingImportBatchRevision}
-            pricingImportReportRevision={pricingImportReportRevision}
-            pricingImportState={pricingImportState}
-            setPricingImportBatchId={setPricingImportBatchId}
-            setPricingImportBatchRevision={setPricingImportBatchRevision}
-            setPricingImportReportRevision={setPricingImportReportRevision}
-            onCommit={() => void commitPricingImport()}
+            pricingImportBatchId={pricingImport.pricingImportBatchId}
+            pricingImportBatchRevision={pricingImport.pricingImportBatchRevision}
+            pricingImportReportRevision={pricingImport.pricingImportReportRevision}
+            pricingImportState={pricingImport.pricingImportState}
+            setPricingImportBatchId={pricingImport.setPricingImportBatchId}
+            setPricingImportBatchRevision={pricingImport.setPricingImportBatchRevision}
+            setPricingImportReportRevision={pricingImport.setPricingImportReportRevision}
+            onCommit={() => void pricingImport.commitPricingImport()}
           />
         </section>
 
@@ -785,18 +669,18 @@ function App() {
         </section>
 
         <SubmissionPanel
-          preparationPackageId={preparationPackageId}
-          preparationRevision={preparationRevision}
-          submissionPackageId={submissionPackageId}
-          submissionExported={submissionExported}
-          evidenceForm={evidenceForm}
-          setPreparationPackageId={setPreparationPackageId}
-          setPreparationRevision={setPreparationRevision}
-          setSubmissionPackageId={setSubmissionPackageId}
-          setEvidenceForm={setEvidenceForm}
-          onPrepare={() => void prepareSubmissionPackage()}
-          onExport={() => void exportSubmissionPackage()}
-          onRecordEvidence={() => void recordSubmissionEvidence()}
+          preparationPackageId={submissionActions.preparationPackageId}
+          preparationRevision={submissionActions.preparationRevision}
+          submissionPackageId={submissionActions.submissionPackageId}
+          submissionExported={submissionActions.submissionExported}
+          evidenceForm={submissionActions.evidenceForm}
+          setPreparationPackageId={submissionActions.setPreparationPackageId}
+          setPreparationRevision={submissionActions.setPreparationRevision}
+          setSubmissionPackageId={submissionActions.setSubmissionPackageId}
+          setEvidenceForm={submissionActions.setEvidenceForm}
+          onPrepare={() => void submissionActions.prepareSubmissionPackage()}
+          onExport={() => void submissionActions.exportSubmissionPackage()}
+          onRecordEvidence={() => void submissionActions.recordSubmissionEvidence()}
         />
 
         <section className="section-block draft-section" id="draft-section"><div className="section-heading"><div><span className="section-kicker">CHIFFRAGE PRIVÉ</span><h2>Brouillon financier</h2></div>{draft && <span className="draft-status"><span className="status-dot" />DRAFT · Révision {draft.aggregate_revision}</span>}</div><div className="draft-toolbar"><label><span>Affaire sélectionnée</span><select value={selectedCaseId} onChange={(event) => setSelectedCaseId(event.target.value)}><option value="">Choisir une affaire</option>{cases.map((item) => <option key={item.case_id} value={item.case_id}>{item.work_label}</option>)}</select></label><label className="report-input"><span>Identifiant du brouillon</span><input value={reportId} onChange={(event) => setReportId(event.target.value)} placeholder="UUID du snapshot DRAFT" /></label><div className="draft-actions"><button className="secondary-button" onClick={() => void createDraft()} disabled={loadingDraft}>+ Nouveau brouillon</button><button className="primary-button load-button" onClick={() => void loadDraft()} disabled={loadingDraft}>{loadingDraft ? "Chargement…" : "Lire le brouillon"}<span>→</span></button></div></div>

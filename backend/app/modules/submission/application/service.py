@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.modules.enterprise.infrastructure.models import EnterpriseDocumentRecord
 from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
 from app.modules.submission.application.commands import PrepareSubmissionPackageCommand
 from app.platform.events.dispatcher import (
@@ -40,7 +41,6 @@ from app.platform.security.models import (
     EnterpriseCapabilityProofLinkRecord,
     EnterpriseCapabilityRecord,
     EnterpriseCapabilityVersionRecord,
-    EnterpriseDocumentRecord,
     FinancialReportSnapshotRecord,
     GeneratedTechnicalDocumentRecord,
     PreparationPackageRecord,

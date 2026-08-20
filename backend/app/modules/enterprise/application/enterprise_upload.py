@@ -15,6 +15,12 @@ from app.modules.enterprise.application.enterprise_upload_commands import (
     PrepareEnterpriseDocumentUploadCommand,
     VerifyEnterpriseDocumentCommand,
 )
+from app.modules.enterprise.infrastructure.models import (
+    EnterpriseCompanyRecord,
+    EnterpriseDocumentRecord,
+    EnterpriseDocumentUploadRecord,
+    EnterpriseDocumentVerificationRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -25,12 +31,6 @@ from app.platform.events.dispatcher import (
 )
 from app.platform.security.authorization import AuthorizationPolicyPort
 from app.platform.security.context import ActorContext, ActorKind
-from app.platform.security.models import (
-    EnterpriseCompanyRecord,
-    EnterpriseDocumentRecord,
-    EnterpriseDocumentUploadRecord,
-    EnterpriseDocumentVerificationRecord,
-)
 from app.platform.storage.quarantine import (
     ContentInspectionPort,
     MalwareScanPort,

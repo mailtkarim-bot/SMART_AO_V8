@@ -16,6 +16,7 @@ from app.modules.dce.infrastructure.models.dce_requirements import (
     DceRequirementRecord,
 )
 from app.modules.dce.infrastructure.models.dce_version import DceVersionRecord
+from app.modules.enterprise.infrastructure.models import EnterpriseCompanyRecord
 from app.modules.membership.application.collab_capability import (
     CollaboratorCapabilityAssessmentService,
     collaborator_capability_handlers,
@@ -41,7 +42,6 @@ from app.platform.security.models import (
     CaseCapabilityProposalRecord,
     EnterpriseCapabilityRecord,
     EnterpriseCapabilityVersionRecord,
-    EnterpriseCompanyRecord,
     IdentityRecord,
     TenantMembershipRecord,
 )

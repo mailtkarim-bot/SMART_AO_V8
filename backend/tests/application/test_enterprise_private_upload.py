@@ -20,19 +20,18 @@ from app.modules.enterprise.application.enterprise_upload import (
 from app.modules.enterprise.application.enterprise_upload_commands import (
     VerifyEnterpriseDocumentCommand,
 )
+from app.modules.enterprise.infrastructure.models import (
+    EnterpriseCompanyRecord,
+    EnterpriseDocumentRecord,
+    EnterpriseDocumentUploadRecord,
+    EnterpriseDocumentVerificationRecord,
+)
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.persistence.models import TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
 from app.platform.security.context import ActorContext, ActorKind, MembershipState
-from app.platform.security.models import (
-    EnterpriseCompanyRecord,
-    EnterpriseDocumentRecord,
-    EnterpriseDocumentUploadRecord,
-    EnterpriseDocumentVerificationRecord,
-    IdentityRecord,
-    TenantMembershipRecord,
-)
+from app.platform.security.models import IdentityRecord, TenantMembershipRecord
 from sqlalchemy.orm import Session, sessionmaker
 
 NOW = datetime(2026, 8, 17, 12, 0, tzinfo=UTC)
