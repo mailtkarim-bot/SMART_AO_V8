@@ -45,6 +45,7 @@ from app.modules.dce.application.requirements import (
 )
 from app.modules.dce.domain.consultation import BuyerIdentity, Consultation
 from app.modules.dce.domain.dce_version import DceDocument, DceVersion
+from app.modules.dce.infrastructure.mappings import to_dce_version_persistence_state
 from app.modules.dce.infrastructure.models.case_dce_impact import (
     CaseDceImpactItemRecord,
     CaseDceImpactRunRecord,
@@ -1151,6 +1152,7 @@ class RegisterDceVersionHandler:
             provenance=command.provenance_reference or command.provenance_channel,
             received_at=command.source_received_at,
         )
+        persistence_state = to_dce_version_persistence_state(version)
         session.add(
             DceVersionRecord(
                 id=version.id,
@@ -1163,10 +1165,10 @@ class RegisterDceVersionHandler:
                 provenance_reference=command.provenance_reference,
                 provenance_url=command.provenance_url,
                 source_received_at=command.source_received_at,
-                lifecycle=version.lifecycle.value,
-                integrity=version.integrity.value,
-                classification_readiness=version.classification_readiness.value,
-                analysis_readiness=version.analysis_readiness.value,
+                lifecycle=persistence_state.lifecycle,
+                integrity=persistence_state.integrity,
+                classification_readiness=persistence_state.classification_readiness,
+                analysis_readiness=persistence_state.analysis_readiness,
                 withdrawal_source=None,
                 withdrawal_reason=None,
                 superseded_at=None,
