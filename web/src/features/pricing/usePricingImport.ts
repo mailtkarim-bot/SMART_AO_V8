@@ -11,6 +11,7 @@ type PricingImportActions = {
   pricingImportBatchRevision: string;
   pricingImportReportRevision: string;
   pricingImportState: PricingImportState;
+  pricingImportSubmitting: boolean;
   setPricingImportBatchId: Dispatch<SetStateAction<string>>;
   setPricingImportBatchRevision: Dispatch<SetStateAction<string>>;
   setPricingImportReportRevision: Dispatch<SetStateAction<string>>;
@@ -28,8 +29,10 @@ export function usePricingImport(
   const [pricingImportBatchRevision, setPricingImportBatchRevision] = useState("1");
   const [pricingImportReportRevision, setPricingImportReportRevision] = useState("0");
   const [pricingImportState, setPricingImportState] = useState<PricingImportState>("IDLE");
+  const [pricingImportSubmitting, setPricingImportSubmitting] = useState(false);
 
   async function commitPricingImport() {
+    if (pricingImportSubmitting) return;
     if (!selectedCaseId || !pricingImportBatchId.trim() || !reportId.trim()) {
       setMessage({ tone: "error", text: "Sélectionnez une affaire, un batch et un brouillon avant le commit." });
       return;
@@ -45,6 +48,7 @@ export function usePricingImport(
       setMessage({ tone: "error", text: "Les révisions attendues doivent être des entiers valides." });
       return;
     }
+    setPricingImportSubmitting(true);
     try {
       const receipt = await api.commitPricingImport(selectedCaseId, pricingImportBatchId.trim(), {
         report_id: reportId.trim(),
@@ -69,6 +73,8 @@ export function usePricingImport(
       await onDraftReload();
     } catch (error) {
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Le commit de l’import a échoué." });
+    } finally {
+      setPricingImportSubmitting(false);
     }
   }
 
@@ -77,6 +83,7 @@ export function usePricingImport(
     pricingImportBatchRevision,
     pricingImportReportRevision,
     pricingImportState,
+    pricingImportSubmitting,
     setPricingImportBatchId,
     setPricingImportBatchRevision,
     setPricingImportReportRevision,
