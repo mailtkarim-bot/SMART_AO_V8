@@ -626,6 +626,7 @@ function App() {
             pricingImportBatchRevision={pricingImport.pricingImportBatchRevision}
             pricingImportReportRevision={pricingImport.pricingImportReportRevision}
             pricingImportState={pricingImport.pricingImportState}
+            pricingImportReloadState={pricingImport.pricingImportReloadState}
             pricingImportSubmitting={pricingImport.pricingImportSubmitting}
             setPricingImportBatchId={pricingImport.setPricingImportBatchId}
             setPricingImportBatchRevision={pricingImport.setPricingImportBatchRevision}

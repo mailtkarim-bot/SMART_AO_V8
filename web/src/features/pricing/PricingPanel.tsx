@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import type { PricingScenario } from "../../shared/types";
+import type { PricingImportReloadState } from "./usePricingImport";
 
 export type PricingImportState = "IDLE" | "COMMITTED" | "REPLAYED";
 
@@ -13,6 +14,7 @@ type PricingPanelProps = {
   pricingImportBatchRevision: string;
   pricingImportReportRevision: string;
   pricingImportState: PricingImportState;
+  pricingImportReloadState: PricingImportReloadState;
   pricingImportSubmitting: boolean;
   setPricingImportBatchId: Dispatch<SetStateAction<string>>;
   setPricingImportBatchRevision: Dispatch<SetStateAction<string>>;
@@ -29,6 +31,7 @@ export function PricingPanel({
   pricingImportBatchRevision,
   pricingImportReportRevision,
   pricingImportState,
+  pricingImportReloadState,
   pricingImportSubmitting,
   setPricingImportBatchId,
   setPricingImportBatchRevision,
@@ -123,6 +126,11 @@ export function PricingPanel({
           Le serveur verrouille le batch et le brouillon, refuse les erreurs, applique l’idempotence
           et ne retourne aucun montant dans ce receipt.
         </small>
+        {pricingImportReloadState === "FAILED" && (
+          <small className="invariant-note warning">
+            Commit confirmé. Rechargez le brouillon pour resynchroniser l’affichage.
+          </small>
+        )}
       </div>
     </>
   );
