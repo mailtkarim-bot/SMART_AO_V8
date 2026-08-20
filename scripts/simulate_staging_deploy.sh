@@ -70,7 +70,7 @@ case "${MODE}" in
     umask 077
     cat >"${SIM_ENV}" <<'EOF'
 SMART_AO_PUBLIC_HOST=staging.invalid
-SMART_AO_DATABASE_URL=postgresql+psycopg://simulation:simulation@postgres:5432/simulation
+SMART_AO_DATABASE_URL=postgresql+psycopg://postgres/simulation
 SMART_AO_JWT_SIGNING_KEY=simulation-only-key-not-for-runtime
 SMART_AO_JWT_ISSUER=smart-ao-simulation
 SMART_AO_JWT_AUDIENCE=smart-ao-simulation
