@@ -762,6 +762,7 @@ class RecordDceDocumentClassificationRunHandler:
                         "aggregate_revision": 0,
                     },
                 ),
+                events=(),
             )
 
         if dce_version.aggregate_revision != command.expected_dce_version_revision:
