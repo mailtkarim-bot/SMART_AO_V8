@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-smart_ao}
       POSTGRES_USER: ${POSTGRES_USER:-smart_ao}
@@ -36,6 +36,15 @@ services:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
     ports:
       - "8000:8000"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz/ready', timeout=3).read()"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   dce-retention-worker:
     build:
@@ -55,7 +64,7 @@ services:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
 
   clamav:
-    image: clamav/clamav:1.4_base
+    image: clamav/clamav:1.4_base@sha256:1b6920e8c32cca47ea33b1e2611d9a4740ccc622cf13b30b29f8283d60175e39
     environment:
       CLAMAV_NO_MILTERD: "true"
     volumes:
