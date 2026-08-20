@@ -6,13 +6,17 @@ from uuid import UUID, uuid4
 import pytest
 import sqlalchemy as sa
 from app.modules.dce.application.commands import (
+    ClaimDceStagedObjectUploadCommand,
     ExpireDceStagedObjectCommand,
     PrepareDceStagingCommand,
+    RecordDceStagedObjectQuarantineCommand,
     RecordDceStagedObjectScanCommand,
 )
 from app.modules.dce.application.handlers import (
+    ClaimDceStagedObjectUploadHandler,
     ExpireDceStagedObjectHandler,
     PrepareDceStagingHandler,
+    RecordDceStagedObjectQuarantineHandler,
     RecordDceStagedObjectScanHandler,
 )
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
@@ -93,6 +97,33 @@ def _prepare_command(
     )
 
 
+def _claim_command(*, storage_object_id: UUID) -> ClaimDceStagedObjectUploadCommand:
+    return ClaimDceStagedObjectUploadCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        storage_object_id=storage_object_id,
+    )
+
+
+def _quarantine_command(
+    *,
+    storage_object_id: UUID,
+    actual_byte_size: int = 100,
+    content_allowed: bool = True,
+) -> RecordDceStagedObjectQuarantineCommand:
+    return RecordDceStagedObjectQuarantineCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        storage_object_id=storage_object_id,
+        actual_byte_size=actual_byte_size,
+        sha256="b" * 64,
+        media_type="application/pdf",
+        content_allowed=content_allowed,
+    )
+
+
 def _expire_command(*, storage_object_id: UUID) -> ExpireDceStagedObjectCommand:
     return ExpireDceStagedObjectCommand(
         command_id=uuid4(),
@@ -126,8 +157,10 @@ def _dispatcher(session_factory: sessionmaker[Session]) -> CommandDispatcher:
     return CommandDispatcher(
         session_factory=session_factory,
         handlers={
+            "ClaimDceStagedObjectUpload": ClaimDceStagedObjectUploadHandler(),
             "ExpireDceStagedObject": ExpireDceStagedObjectHandler(),
             "PrepareDceStaging": PrepareDceStagingHandler(),
+            "RecordDceStagedObjectQuarantine": RecordDceStagedObjectQuarantineHandler(),
             "RecordDceStagedObjectScan": RecordDceStagedObjectScanHandler(),
         },
     )
@@ -196,6 +229,151 @@ def test_prepare_dce_staging_rejects_expired_intent_without_durable_side_effect(
     with session_factory() as session:
         assert session.scalar(sa.select(sa.func.count()).select_from(DceStagedObjectRecord)) == 0
         assert session.scalar(sa.select(sa.func.count()).select_from(CommandReceiptRecord)) == 0
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_claim_staged_object_rejects_expired_or_already_claimed_objects(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, consultation_id = _seed_consultation(session_factory)
+    dispatcher = _dispatcher(session_factory)
+    active = _prepare_command(consultation_id=consultation_id)
+    dispatcher.dispatch(command=active, context=_context(tenant_id))
+
+    claimed = dispatcher.dispatch(
+        command=_claim_command(storage_object_id=active.storage_object_id),
+        context=_context(tenant_id),
+    )
+    assert claimed.result_code == "DCE_STAGING_UPLOAD_CLAIMED"
+    with pytest.raises(CommandExecutionError) as repeated:
+        dispatcher.dispatch(
+            command=_claim_command(storage_object_id=active.storage_object_id),
+            context=_context(tenant_id),
+        )
+    assert str(repeated.value.__cause__) == "DCE_STAGED_OBJECT_NOT_AWAITING_UPLOAD"
+
+    expired = _prepare_command(
+        consultation_id=consultation_id,
+        expires_at=NOW + timedelta(minutes=1),
+    )
+    dispatcher.dispatch(command=expired, context=_context(tenant_id))
+    with pytest.raises(CommandExecutionError) as expired_failure:
+        dispatcher.dispatch(
+            command=_claim_command(storage_object_id=expired.storage_object_id),
+            context=_context(tenant_id, received_at=NOW + timedelta(minutes=1)),
+        )
+    assert str(expired_failure.value.__cause__) == "DCE_STAGED_OBJECT_EXPIRED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_quarantine_rejects_size_or_media_and_requires_system_actor(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, consultation_id = _seed_consultation(session_factory)
+    dispatcher = _dispatcher(session_factory)
+
+    mismatch = _prepare_command(consultation_id=consultation_id)
+    dispatcher.dispatch(command=mismatch, context=_context(tenant_id))
+    dispatcher.dispatch(
+        command=_claim_command(storage_object_id=mismatch.storage_object_id),
+        context=_context(tenant_id),
+    )
+    with pytest.raises(CommandExecutionError) as actor_failure:
+        dispatcher.dispatch(
+            command=_quarantine_command(storage_object_id=mismatch.storage_object_id),
+            context=_context(tenant_id),
+        )
+    assert str(actor_failure.value.__cause__) == "DCE_STAGING_SYSTEM_ACTOR_REQUIRED"
+    mismatch_result = dispatcher.dispatch(
+        command=_quarantine_command(
+            storage_object_id=mismatch.storage_object_id, actual_byte_size=99
+        ),
+        context=_context(tenant_id, actor_kind="SYSTEM"),
+    )
+    assert mismatch_result.result_code == "DCE_STAGING_QUARANTINE_RECORDED"
+
+    media = _prepare_command(consultation_id=consultation_id)
+    dispatcher.dispatch(command=media, context=_context(tenant_id))
+    dispatcher.dispatch(
+        command=_claim_command(storage_object_id=media.storage_object_id),
+        context=_context(tenant_id),
+    )
+    dispatcher.dispatch(
+        command=_quarantine_command(
+            storage_object_id=media.storage_object_id, content_allowed=False
+        ),
+        context=_context(tenant_id, actor_kind="SYSTEM"),
+    )
+    with session_factory() as session:
+        mismatch_object = session.get(DceStagedObjectRecord, mismatch.storage_object_id)
+        media_object = session.get(DceStagedObjectRecord, media.storage_object_id)
+    assert mismatch_object is not None
+    assert media_object is not None
+    assert mismatch_object.rejection_code == "BYTE_SIZE_MISMATCH"
+    assert media_object.rejection_code == "MEDIA_TYPE_NOT_ALLOWED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_expire_staged_object_rejects_future_and_already_expired_objects(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, consultation_id = _seed_consultation(session_factory)
+    dispatcher = _dispatcher(session_factory)
+    prepare = _prepare_command(consultation_id=consultation_id)
+    dispatcher.dispatch(command=prepare, context=_context(tenant_id))
+
+    with pytest.raises(CommandExecutionError) as future_failure:
+        dispatcher.dispatch(
+            command=_expire_command(storage_object_id=prepare.storage_object_id),
+            context=_context(tenant_id, actor_kind="SYSTEM"),
+        )
+    assert str(future_failure.value.__cause__) == "DCE_STAGED_OBJECT_NOT_EXPIRED"
+    dispatcher.dispatch(
+        command=_expire_command(storage_object_id=prepare.storage_object_id),
+        context=_context(tenant_id, actor_kind="SYSTEM", received_at=NOW + timedelta(hours=2)),
+    )
+    with pytest.raises(CommandExecutionError) as repeated_failure:
+        dispatcher.dispatch(
+            command=_expire_command(storage_object_id=prepare.storage_object_id),
+            context=_context(tenant_id, actor_kind="SYSTEM", received_at=NOW + timedelta(hours=2)),
+        )
+    assert str(repeated_failure.value.__cause__) == "DCE_STAGED_OBJECT_NOT_EXPIRABLE"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_scan_rejects_size_mismatch_and_infected_content(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, consultation_id = _seed_consultation(session_factory)
+    dispatcher = _dispatcher(session_factory)
+    mismatch = _prepare_command(consultation_id=consultation_id)
+    dispatcher.dispatch(command=mismatch, context=_context(tenant_id))
+    _move_to_quarantine(session_factory, storage_object_id=mismatch.storage_object_id)
+    dispatcher.dispatch(
+        command=_scan_command(storage_object_id=mismatch.storage_object_id).model_copy(
+            update={"actual_byte_size": 99}
+        ),
+        context=_context(tenant_id, actor_kind="SYSTEM"),
+    )
+
+    infected = _prepare_command(consultation_id=consultation_id)
+    dispatcher.dispatch(command=infected, context=_context(tenant_id))
+    _move_to_quarantine(session_factory, storage_object_id=infected.storage_object_id)
+    dispatcher.dispatch(
+        command=_scan_command(storage_object_id=infected.storage_object_id, verdict="INFECTED"),
+        context=_context(tenant_id, actor_kind="SYSTEM"),
+    )
+    with session_factory() as session:
+        mismatch_object = session.get(DceStagedObjectRecord, mismatch.storage_object_id)
+        infected_object = session.get(DceStagedObjectRecord, infected.storage_object_id)
+    assert mismatch_object is not None
+    assert infected_object is not None
+    assert mismatch_object.rejection_code == "BYTE_SIZE_MISMATCH"
+    assert infected_object.rejection_code == "MALWARE_DETECTED"
 
 
 @pytest.mark.db
