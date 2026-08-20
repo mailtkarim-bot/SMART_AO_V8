@@ -2,15 +2,17 @@ import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ApiClient } from "../../infrastructure/api";
 
-type Message = { tone: "success" | "error"; text: string };
+type Message = { tone: "success" | "error" | "warning"; text: string };
 type SetMessage = Dispatch<SetStateAction<Message | null>>;
 export type PricingImportState = "IDLE" | "COMMITTED" | "REPLAYED";
+export type PricingImportReloadState = "NOT_ATTEMPTED" | "SUCCEEDED" | "FAILED";
 
 type PricingImportActions = {
   pricingImportBatchId: string;
   pricingImportBatchRevision: string;
   pricingImportReportRevision: string;
   pricingImportState: PricingImportState;
+  pricingImportReloadState: PricingImportReloadState;
   pricingImportSubmitting: boolean;
   setPricingImportBatchId: Dispatch<SetStateAction<string>>;
   setPricingImportBatchRevision: Dispatch<SetStateAction<string>>;
@@ -29,6 +31,8 @@ export function usePricingImport(
   const [pricingImportBatchRevision, setPricingImportBatchRevision] = useState("1");
   const [pricingImportReportRevision, setPricingImportReportRevision] = useState("0");
   const [pricingImportState, setPricingImportState] = useState<PricingImportState>("IDLE");
+  const [pricingImportReloadState, setPricingImportReloadState] =
+    useState<PricingImportReloadState>("NOT_ATTEMPTED");
   const [pricingImportSubmitting, setPricingImportSubmitting] = useState(false);
 
   async function commitPricingImport() {
@@ -49,6 +53,7 @@ export function usePricingImport(
       return;
     }
     setPricingImportSubmitting(true);
+    setPricingImportReloadState("NOT_ATTEMPTED");
     try {
       const receipt = await api.commitPricingImport(selectedCaseId, pricingImportBatchId.trim(), {
         report_id: reportId.trim(),
@@ -70,7 +75,16 @@ export function usePricingImport(
           ? "Import déjà commité : rejeu idempotent sans nouvelle ligne."
           : "Import commité dans le brouillon financier patronal.",
       });
-      await onDraftReload();
+      try {
+        await onDraftReload();
+        setPricingImportReloadState("SUCCEEDED");
+      } catch {
+        setPricingImportReloadState("FAILED");
+        setMessage({
+          tone: "warning",
+          text: "Import confirmé, mais le brouillon n’a pas pu être rechargé. Relancez sa lecture.",
+        });
+      }
     } catch (error) {
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Le commit de l’import a échoué." });
     } finally {
@@ -83,6 +97,7 @@ export function usePricingImport(
     pricingImportBatchRevision,
     pricingImportReportRevision,
     pricingImportState,
+    pricingImportReloadState,
     pricingImportSubmitting,
     setPricingImportBatchId,
     setPricingImportBatchRevision,

@@ -106,7 +106,7 @@ function App() {
   const [draft, setDraft] = useState<DraftReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(false);
-  const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [showConnection, setShowConnection] = useState(false);
   const [activeNav, setActiveNav] = useState("overview");
   const [wizardCaseId, setWizardCaseId] = useState("");
@@ -626,6 +626,7 @@ function App() {
             pricingImportBatchRevision={pricingImport.pricingImportBatchRevision}
             pricingImportReportRevision={pricingImport.pricingImportReportRevision}
             pricingImportState={pricingImport.pricingImportState}
+            pricingImportReloadState={pricingImport.pricingImportReloadState}
             pricingImportSubmitting={pricingImport.pricingImportSubmitting}
             setPricingImportBatchId={pricingImport.setPricingImportBatchId}
             setPricingImportBatchRevision={pricingImport.setPricingImportBatchRevision}
