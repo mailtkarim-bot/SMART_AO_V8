@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.pricing.application.commands import CreatePricingScenarioCommand
+from app.modules.pricing.domain.scenario import calculate_pricing_scenario_amounts
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -127,15 +128,15 @@ class PricingScenarioHandler:
             )
             + 1
         )
-        sales = snapshot.sales_total_minor * (10000 + command.sales_adjustment_bps) // 10000
-        costs = (
-            snapshot.direct_cost_total_minor
-            + snapshot.overhead_total_minor
-            + snapshot.subcontracting_total_minor
-            + snapshot.contingency_total_minor
-        ) * (10000 + command.cost_adjustment_bps) // 10000
-        margin = sales - costs
-        margin_bps = margin * 10000 // sales if sales else 0
+        amounts = calculate_pricing_scenario_amounts(
+            sales_total_minor=snapshot.sales_total_minor,
+            direct_cost_total_minor=snapshot.direct_cost_total_minor,
+            overhead_total_minor=snapshot.overhead_total_minor,
+            subcontracting_total_minor=snapshot.subcontracting_total_minor,
+            contingency_total_minor=snapshot.contingency_total_minor,
+            sales_adjustment_bps=command.sales_adjustment_bps,
+            cost_adjustment_bps=command.cost_adjustment_bps,
+        )
         record = PricingScenarioRecord(
             id=command.scenario_id,
             tenant_id=context.tenant_id,
@@ -146,10 +147,10 @@ class PricingScenarioHandler:
             version=version,
             state="DRAFT",
             assumptions_json=command.assumptions,
-            sales_total_minor=sales,
-            total_cost_minor=costs,
-            gross_margin_minor=margin,
-            gross_margin_rate_bps=margin_bps,
+            sales_total_minor=amounts.sales_total_minor,
+            total_cost_minor=amounts.total_cost_minor,
+            gross_margin_minor=amounts.gross_margin_minor,
+            gross_margin_rate_bps=amounts.gross_margin_rate_bps,
             source_snapshot_revision=snapshot.aggregate_revision,
             actor_id=context.actor_id,
             membership_id=context.membership_id,
