@@ -13,6 +13,7 @@ type PricingPanelProps = {
   pricingImportBatchRevision: string;
   pricingImportReportRevision: string;
   pricingImportState: PricingImportState;
+  pricingImportSubmitting: boolean;
   setPricingImportBatchId: Dispatch<SetStateAction<string>>;
   setPricingImportBatchRevision: Dispatch<SetStateAction<string>>;
   setPricingImportReportRevision: Dispatch<SetStateAction<string>>;
@@ -28,6 +29,7 @@ export function PricingPanel({
   pricingImportBatchRevision,
   pricingImportReportRevision,
   pricingImportState,
+  pricingImportSubmitting,
   setPricingImportBatchId,
   setPricingImportBatchRevision,
   setPricingImportReportRevision,
@@ -107,9 +109,14 @@ export function PricingPanel({
             className="primary-button"
             type="button"
             onClick={onCommit}
-            disabled={!selectedCaseId || !reportId.trim() || !pricingImportBatchId.trim()}
+            disabled={
+              pricingImportSubmitting ||
+              !selectedCaseId ||
+              !reportId.trim() ||
+              !pricingImportBatchId.trim()
+            }
           >
-            Commiter les lignes validées <span>→</span>
+            {pricingImportSubmitting ? "Commit en cours…" : "Commiter les lignes validées"} <span>→</span>
           </button>
         </div>
         <small className="invariant-note">
