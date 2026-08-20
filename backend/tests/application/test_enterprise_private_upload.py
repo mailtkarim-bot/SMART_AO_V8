@@ -113,6 +113,8 @@ def _seed(
                 activated_at=NOW,
             )
         )
+        # The tenant aggregate is persisted before module-owned Enterprise records.
+        session.flush()
         session.add(
             EnterpriseCompanyRecord(
                 id=company_id,

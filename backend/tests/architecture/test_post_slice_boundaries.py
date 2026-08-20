@@ -3,6 +3,24 @@ from __future__ import annotations
 import ast
 
 import pytest
+from app.modules.enterprise.infrastructure.models.enterprise import (
+    EnterpriseCompanyRecord,
+    EnterpriseDocumentRecord,
+    EnterpriseDocumentUploadRecord,
+    EnterpriseDocumentVerificationRecord,
+)
+from app.platform.security.models import (
+    EnterpriseCompanyRecord as LegacyEnterpriseCompanyRecord,
+)
+from app.platform.security.models import (
+    EnterpriseDocumentRecord as LegacyEnterpriseDocumentRecord,
+)
+from app.platform.security.models import (
+    EnterpriseDocumentUploadRecord as LegacyEnterpriseDocumentUploadRecord,
+)
+from app.platform.security.models import (
+    EnterpriseDocumentVerificationRecord as LegacyEnterpriseDocumentVerificationRecord,
+)
 
 from tests.support.database import REPOSITORY_ROOT
 
@@ -14,6 +32,28 @@ POST_SLICE_MODULES = (
     "pricing",
     "submission",
 )
+
+
+@pytest.mark.architecture
+def test_enterprise_records_are_module_owned_with_legacy_reexports() -> None:
+    records = (
+        EnterpriseCompanyRecord,
+        EnterpriseDocumentRecord,
+        EnterpriseDocumentUploadRecord,
+        EnterpriseDocumentVerificationRecord,
+    )
+    legacy_records = (
+        LegacyEnterpriseCompanyRecord,
+        LegacyEnterpriseDocumentRecord,
+        LegacyEnterpriseDocumentUploadRecord,
+        LegacyEnterpriseDocumentVerificationRecord,
+    )
+
+    assert all(
+        record.__module__ == "app.modules.enterprise.infrastructure.models.enterprise"
+        for record in records
+    )
+    assert records == legacy_records
 
 
 @pytest.mark.architecture
