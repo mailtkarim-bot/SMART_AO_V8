@@ -5,14 +5,12 @@ import { SubmissionPanel } from "../features/submission/SubmissionPanel";
 import { useSubmissionActions } from "../features/submission/useSubmissionActions";
 import { useEnterpriseLibrary } from "../features/enterprise/useEnterpriseLibrary";
 import { useCollaboratorWizard } from "../features/wizard/useCollaboratorWizard";
+import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
 import { createApiClient } from "../infrastructure/api";
 import type {
   AssignedCase,
   DraftReport,
   FinancialCategory,
-  PatronAssignment,
-  PatronAssignmentInteractions,
-  PatronAssignmentJournalItem,
   PatronAction,
   PatronDecisionDossier,
   PricingScenario,
@@ -55,10 +53,6 @@ function App() {
     () => localStorage.getItem("smart-ao-token") ?? "",
   );
   const [cases, setCases] = useState<AssignedCase[]>([]);
-  const [assignments, setAssignments] = useState<PatronAssignment[]>([]);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState("");
-  const [journal, setJournal] = useState<PatronAssignmentJournalItem[]>([]);
-  const [interactions, setInteractions] = useState<PatronAssignmentInteractions | null>(null);
   const [actions, setActions] = useState<PatronAction[]>([]);
   const [scenarios, setScenarios] = useState<PricingScenario[]>([]);
   const [decisionDossier, setDecisionDossier] = useState<PatronDecisionDossier | null>(null);
@@ -130,6 +124,18 @@ function App() {
     completeWizardTask,
     transmitWizardSnapshot,
   } = useCollaboratorWizard(api, setMessage);
+  const cockpit = usePatronCockpit(api, setMessage, async (caseId) => {
+    setSelectedCaseId(caseId);
+    await refreshScenarios(caseId);
+  });
+  const {
+    assignments,
+    selectedAssignmentId,
+    journal,
+    interactions,
+    refreshAssignments,
+    selectAssignment,
+  } = cockpit;
   const pricingImport = usePricingImport(api, setMessage, reportId, selectedCaseId, loadDraft);
   const submissionActions = useSubmissionActions(api, setMessage);
   const summaryCards = draft
@@ -193,47 +199,6 @@ function App() {
     } catch {
       setDecisionDossier(null);
     }
-  }
-
-  async function refreshAssignments() {
-    try {
-      const result = await api.listPatronAssignments();
-      setAssignments(result.items);
-      const first = result.items[0];
-      if (first && !selectedAssignmentId) {
-        setSelectedAssignmentId(first.assignment_id);
-        await loadAssignmentDetails(first.assignment_id);
-      }
-    } catch (error) {
-      setMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : "Impossible de charger le cockpit patron.",
-      });
-    }
-  }
-
-  async function loadAssignmentDetails(assignmentId: string) {
-    try {
-      const [journalResult, interactionsResult] = await Promise.all([
-        api.getAssignmentJournal(assignmentId),
-        api.getAssignmentInteractions(assignmentId),
-      ]);
-      setJournal(journalResult.items);
-      setInteractions(interactionsResult);
-    } catch (error) {
-      setJournal([]);
-      setInteractions(null);
-      setMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : "Impossible de charger le journal patron.",
-      });
-    }
-  }
-
-  async function selectAssignment(assignment: PatronAssignment) {
-    setSelectedAssignmentId(assignment.assignment_id);
-    setSelectedCaseId(assignment.case_id);
-    await Promise.all([loadAssignmentDetails(assignment.assignment_id), refreshScenarios(assignment.case_id)]);
   }
 
   async function createDraft() {
