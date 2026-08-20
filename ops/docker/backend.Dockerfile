@@ -7,6 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     SMART_AO_DCE_QUARANTINE_ROOT=/var/lib/smart_ao/dce-quarantine
 
 RUN apt-get update \
+    && apt-get upgrade --no-install-recommends --yes \
     && apt-get install --no-install-recommends --yes libmagic1 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 smartao \
