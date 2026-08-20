@@ -11,18 +11,17 @@ from app.modules.enterprise.application.enterprise_library import (
     EnterpriseLibraryService,
     enterprise_library_handlers,
 )
+from app.modules.enterprise.infrastructure.models import (
+    EnterpriseCompanyRecord,
+    EnterpriseDocumentRecord,
+    EnterpriseDocumentUploadRecord,
+)
 from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
 from app.platform.security.context import ActorContext, ActorKind, MembershipState
-from app.platform.security.models import (
-    EnterpriseCompanyRecord,
-    EnterpriseDocumentRecord,
-    EnterpriseDocumentUploadRecord,
-    IdentityRecord,
-    TenantMembershipRecord,
-)
+from app.platform.security.models import IdentityRecord, TenantMembershipRecord
 from sqlalchemy.orm import Session, sessionmaker
 
 NOW = datetime(2026, 8, 17, 12, 0, tzinfo=UTC)

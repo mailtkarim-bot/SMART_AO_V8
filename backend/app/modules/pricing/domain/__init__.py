@@ -1,0 +1,1 @@
+"""Pure pricing domain rules."""

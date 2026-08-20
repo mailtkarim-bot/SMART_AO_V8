@@ -84,20 +84,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Detect deployment Dockerfile
-        id: dockerfile
-        run: |
-          if [ -f Dockerfile ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "No Dockerfile currently exists; image build and scan are not applicable."
-          fi
+      - name: Verify deployment Dockerfile
+        run: test -f ops/docker/backend.Dockerfile
       - name: Build deployment image
-        if: steps.dockerfile.outputs.present == 'true'
-        run: docker build --tag smart-ao-v8:ci .
+        run: docker build --file ops/docker/backend.Dockerfile --tag smart-ao-v8:ci .
       - name: Scan deployment image
-        if: steps.dockerfile.outputs.present == 'true'
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: smart-ao-v8:ci

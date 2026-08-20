@@ -11,6 +11,10 @@ from app.modules.enterprise.application.enterprise_capability_commands import (
     AddEnterpriseCapabilityVersionCommand,
     CreateEnterpriseCapabilityCommand,
 )
+from app.modules.enterprise.infrastructure.models import (
+    EnterpriseCompanyRecord,
+    EnterpriseDocumentRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -30,8 +34,6 @@ from app.platform.security.models import (
     EnterpriseCapabilityProofLinkRecord,
     EnterpriseCapabilityRecord,
     EnterpriseCapabilityVersionRecord,
-    EnterpriseCompanyRecord,
-    EnterpriseDocumentRecord,
 )
 
 

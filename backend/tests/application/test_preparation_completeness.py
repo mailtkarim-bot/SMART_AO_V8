@@ -11,6 +11,7 @@ from app.modules.dce.infrastructure.models.dce_requirement_confirmations import 
     DceRequirementConfirmationCurrentRecord,
     DceRequirementConfirmationRecord,
 )
+from app.modules.enterprise.infrastructure.models import EnterpriseDocumentRecord
 from app.modules.preparation.application.commands import (
     EvaluatePreparationReadinessCommand,
     GenerateTechnicalDocumentCommand,
@@ -32,7 +33,6 @@ from app.platform.security.models import (
     CollaboratorTaskRecord,
     EnterpriseCapabilityProofLinkRecord,
     EnterpriseCapabilityRecord,
-    EnterpriseDocumentRecord,
     GeneratedTechnicalDocumentRecord,
     PreparationPackageRecord,
     PreparationReadinessRecord,

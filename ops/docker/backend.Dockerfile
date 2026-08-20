@@ -1,4 +1,4 @@
-FROM python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
+FROM python:3.12-slim@sha256:876416ecde9aca2bcc90e1fb0c7a9500bbf749f5788b70f82d4c5a5c2357f8b4
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -7,6 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     SMART_AO_DCE_QUARANTINE_ROOT=/var/lib/smart_ao/dce-quarantine
 
 RUN apt-get update \
+    && apt-get upgrade --no-install-recommends --yes \
     && apt-get install --no-install-recommends --yes libmagic1 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 smartao \

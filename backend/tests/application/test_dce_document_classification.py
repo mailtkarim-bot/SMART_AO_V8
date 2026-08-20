@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
+from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
@@ -12,7 +13,11 @@ from app.modules.dce.application.classification import (
     _recording_command,
     project_dce_classification,
 )
-from app.modules.dce.application.handlers import RecordDceDocumentClassificationRunHandler
+from app.modules.dce.application.commands import RecordDceDocumentClassificationRunCommand
+from app.modules.dce.application.handlers import (
+    RecordDceDocumentClassificationRunHandler,
+    _validate_classification_command,
+)
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
 from app.modules.dce.infrastructure.models.dce_classification import (
     DceDocumentClassificationEvidenceRecord,
@@ -470,6 +475,169 @@ def test_classification_handler_rejects_document_manifest_count_stale_and_integr
 
 @pytest.mark.db
 @pytest.mark.integration
+def test_classification_validator_rejects_invalid_projection_and_evidence(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, dce_version_id, _ = _seed_dce(
+        session_factory, document_texts=["Règlement de consultation"]
+    )
+    service = _service(session_factory=session_factory)
+    expected_revision, documents = service._load_documents(  # noqa: SLF001
+        tenant_id=tenant_id, dce_version_id=dce_version_id
+    )
+    projection = project_dce_classification(documents=documents)
+    command = _recording_command(
+        dce_version_id=dce_version_id,
+        expected_dce_version_revision=expected_revision,
+        projection=projection,
+    )
+    with session_factory() as session:
+        fragment = session.scalar(sa.select(DceDocumentExtractionFragmentRecord))
+    assert fragment is not None
+    fragment_records = {fragment.id: fragment}
+
+    def validate(candidate, records=fragment_records) -> None:
+        _validate_classification_command(
+            command=candidate,
+            expected_projection=projection,
+            fragment_records=records,
+        )
+
+    with pytest.raises(ValueError, match="DCE_CLASSIFICATION_PROJECTION_REQUIRED"):
+        validate(command.model_copy(update={"status": "FAILED_SAFE"}))
+    with pytest.raises(ValueError, match="DCE_CLASSIFICATION_RESULT_REQUIRED"):
+        validate(command.model_copy(update={"results": []}))
+
+    evidence = command.results[0].evidence[0]
+    with pytest.raises(ValueError, match="DCE_CLASSIFICATION_SOURCE_FRAGMENT_REQUIRED"):
+        validate(
+            command.model_copy(
+                update={
+                    "results": [
+                        command.results[0].model_copy(
+                            update={
+                                "evidence": [
+                                    evidence.model_copy(update={"fragment_id": uuid4()})
+                                ]
+                            }
+                        )
+                    ]
+                }
+            )
+        )
+    with pytest.raises(ValueError, match="DCE_CLASSIFICATION_EVIDENCE_REQUIRED"):
+        validate(
+            command.model_copy(
+                update={
+                    "results": [
+                        command.results[0].model_copy(
+                            update={
+                                "evidence": [
+                                    evidence.model_copy(update={"rule_id": "MISMATCH_V1"})
+                                ]
+                            }
+                        )
+                    ]
+                }
+            )
+        )
+    with pytest.raises(ValueError, match="DCE_CLASSIFICATION_SOURCE_OFFSET_REQUIRED"):
+        validate(
+            command,
+            records={fragment.id: SimpleNamespace(id=fragment.id, text="x")},
+        )
+    with pytest.raises(ValueError, match="DCE_CLASSIFICATION_SOURCE_EXCERPT_REQUIRED"):
+        validate(
+            command,
+            records={
+                fragment.id: SimpleNamespace(
+                    id=fragment.id, text="Z" * (evidence.end_byte_offset + 1)
+                )
+            },
+        )
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_classification_handler_rejects_empty_document_set(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, dce_version_id, _ = _seed_dce(session_factory, document_texts=[])
+    command = RecordDceDocumentClassificationRunCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        classification_run_id=uuid4(),
+        dce_version_id=dce_version_id,
+        expected_dce_version_revision=1,
+        input_manifest_sha256="a" * 64,
+        classifier_id="fixture",
+        classifier_version="1",
+        status="FAILED_SAFE",
+        document_count=1,
+        source_fragment_count=0,
+        source_char_count=0,
+        failure_code="TEST_FAILURE",
+        results=[],
+    )
+    with pytest.raises(CommandExecutionError) as failure:
+        CommandDispatcher(
+            session_factory=session_factory,
+            handlers={
+                "RecordDceDocumentClassificationRun": RecordDceDocumentClassificationRunHandler()
+            },
+        ).dispatch(
+            command=command,
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+            ),
+        )
+    assert str(failure.value.__cause__) == "DCE_DOCUMENT_REQUIRED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_classification_handler_direct_replay_is_idempotent(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, dce_version_id, _ = _seed_dce(
+        session_factory, document_texts=["Règlement de consultation"]
+    )
+    service = _service(session_factory=session_factory)
+    expected_revision, documents = service._load_documents(  # noqa: SLF001
+        tenant_id=tenant_id, dce_version_id=dce_version_id
+    )
+    command = _recording_command(
+        dce_version_id=dce_version_id,
+        expected_dce_version_revision=expected_revision,
+        projection=project_dce_classification(documents=documents),
+    )
+    dispatcher = CommandDispatcher(
+        session_factory=session_factory,
+        handlers={
+            "RecordDceDocumentClassificationRun": RecordDceDocumentClassificationRunHandler()
+        },
+    )
+    first = dispatcher.dispatch(
+        command=command,
+        context=CommandContext(
+            tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+        ),
+    )
+    replay = dispatcher.dispatch(
+        command=command.model_copy(
+            update={"command_id": uuid4(), "idempotency_key": uuid4()}
+        ),
+        context=CommandContext(
+            tenant_id=tenant_id, actor_id=uuid4(), actor_kind="SYSTEM", received_at=NOW
+        ),
+    )
+    assert first.result_code == "DCE_DOCUMENT_CLASSIFICATION_RECORDED"
+    assert replay.result_code == "DCE_DOCUMENT_CLASSIFICATION_ALREADY_RECORDED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
 def test_new_completed_extraction_creates_a_classification_history_successor(
     session_factory: sessionmaker[Session],
 ) -> None:
@@ -511,6 +679,37 @@ def test_new_completed_extraction_creates_a_classification_history_successor(
             )
         )
 
+    service.classify(tenant_id=tenant_id, dce_version_id=dce_version_id, now=NOW)
+    third_text = "Règlement de consultation Règlement de consultation"
+    with session_factory.begin() as session:
+        extraction_id, fragment_id = uuid4(), uuid4()
+        session.add(
+            DceDocumentExtractionRecord(
+                id=extraction_id,
+                tenant_id=tenant_id,
+                dce_version_id=dce_version_id,
+                dce_document_id=document_id,
+                input_sha256=sha256(third_text.encode()).hexdigest(),
+                extractor_id="fixture",
+                extractor_version="3",
+                status="COMPLETED",
+                fragment_count=1,
+                extracted_char_count=len(third_text),
+                failure_code=None,
+            )
+        )
+        session.flush()
+        session.add(
+            DceDocumentExtractionFragmentRecord(
+                id=fragment_id,
+                tenant_id=tenant_id,
+                extraction_id=extraction_id,
+                ordinal=1,
+                locator_json={"kind": "text_line", "line": 3, "part": 1},
+                text=third_text,
+                text_sha256=sha256(third_text.encode()).hexdigest(),
+            )
+        )
     service.classify(tenant_id=tenant_id, dce_version_id=dce_version_id, now=NOW)
 
     with session_factory() as session:

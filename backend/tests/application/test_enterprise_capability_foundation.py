@@ -21,6 +21,7 @@ from app.modules.enterprise.application.enterprise_library import (
     EnterpriseLibraryService,
     enterprise_library_handlers,
 )
+from app.modules.enterprise.infrastructure.models import EnterpriseDocumentUploadRecord
 from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
@@ -30,7 +31,6 @@ from app.platform.security.models import (
     EnterpriseCapabilityProofLinkRecord,
     EnterpriseCapabilityRecord,
     EnterpriseCapabilityVersionRecord,
-    EnterpriseDocumentUploadRecord,
     IdentityRecord,
     TenantMembershipRecord,
 )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from uuid import UUID, uuid4
 
@@ -106,6 +106,10 @@ def _seed_clean_staged_objects(
     tenant_id: UUID,
     consultation_id: UUID,
     command: RegisterDceVersionCommand,
+    staged_consultation_id: UUID | None = None,
+    state: str = "CLEAN",
+    expires_at: datetime | None = None,
+    media_type: str | None = "application/pdf",
 ) -> None:
     document_metadata = (
         ("c" * 64, "second.pdf", 200),
@@ -121,21 +125,21 @@ def _seed_clean_staged_objects(
                 DceStagedObjectRecord(
                     id=document.storage_object_id,
                     tenant_id=tenant_id,
-                    consultation_id=consultation_id,
+                    consultation_id=staged_consultation_id or consultation_id,
                     storage_key=f"dce-staging/{tenant_id}/{document.storage_object_id}",
                     original_filename=filename,
                     expected_byte_size=byte_size,
                     actual_byte_size=byte_size,
                     sha256=document_hash,
-                    media_type="application/pdf",
+                    media_type=media_type,
                     source_channel="MANUAL_UPLOAD",
-                    state="CLEAN",
+                    state=state,
                     scan_verdict="CLEAN",
                     scanner_name="test-scanner",
                     scanner_signature_version="test-signatures",
                     scanned_at=NOW,
                     rejection_code=None,
-                    expires_at=datetime(2026, 8, 14, 13, 0, tzinfo=UTC),
+                    expires_at=expires_at or datetime(2026, 8, 14, 13, 0, tzinfo=UTC),
                     consumed_by_dce_version_id=None,
                     consumed_at=None,
                     created_by_actor_id=None,
@@ -158,6 +162,115 @@ def _context(tenant_id: UUID) -> CommandContext:
         actor_kind="PATRON_ADMIN",
         received_at=NOW,
     )
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_register_dce_version_rejects_duplicate_document_and_storage_identifiers(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, consultation_id = _seed_consultation(session_factory)
+    command = _command(consultation_id=consultation_id)
+    dispatcher = _dispatcher(session_factory)
+    duplicate_document = command.model_copy(
+        update={
+            "documents": [command.documents[0], command.documents[0]],
+            "command_id": uuid4(),
+            "idempotency_key": uuid4(),
+        }
+    )
+    with pytest.raises(CommandExecutionError) as document_failure:
+        dispatcher.dispatch(command=duplicate_document, context=_context(tenant_id))
+    assert str(document_failure.value.__cause__) == "DCE_DOCUMENT_IDENTIFIER_DUPLICATE"
+
+    duplicate_storage = command.model_copy(
+        update={
+            "documents": [
+                command.documents[0],
+                command.documents[1].model_copy(
+                    update={"storage_object_id": command.documents[0].storage_object_id}
+                ),
+            ],
+            "command_id": uuid4(),
+            "idempotency_key": uuid4(),
+        }
+    )
+    with pytest.raises(CommandExecutionError) as storage_failure:
+        dispatcher.dispatch(command=duplicate_storage, context=_context(tenant_id))
+    assert str(storage_failure.value.__cause__) == "DCE_STAGED_OBJECT_DUPLICATE"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_register_dce_version_rejects_staging_chain_and_metadata_guards(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, consultation_id = _seed_consultation(session_factory)
+    command = _command(consultation_id=consultation_id)
+    dispatcher = _dispatcher(session_factory)
+
+    with pytest.raises(CommandExecutionError) as missing_failure:
+        dispatcher.dispatch(command=command, context=_context(tenant_id))
+    assert str(missing_failure.value.__cause__) == "DCE_STAGED_OBJECT_REQUIRED"
+
+    other_consultation_id = uuid4()
+    with session_factory.begin() as session:
+        session.add(
+            ConsultationRecord(
+                id=other_consultation_id,
+                tenant_id=tenant_id,
+                aggregate_revision=1,
+                functional_identity_hash="e" * 64,
+                buyer_legal_name="Ville autre",
+                buyer_normalized_id="VILLE-AUTRE",
+                external_reference="AO-2026-OTHER",
+                object_label="Autre consultation",
+                location_label="Lyon",
+                source_channel="MANUAL_UPLOAD",
+                source_reference="Fixture",
+                source_received_at=NOW,
+                lifecycle="OPEN",
+                freshness="CURRENT",
+                metadata_history_json=[],
+                created_by_actor_id=None,
+                updated_by_actor_id=None,
+            )
+        )
+    consultation_mismatch = _command(consultation_id=consultation_id)
+    _seed_clean_staged_objects(
+        session_factory,
+        tenant_id=tenant_id,
+        consultation_id=consultation_id,
+        staged_consultation_id=other_consultation_id,
+        command=consultation_mismatch,
+    )
+    with pytest.raises(CommandExecutionError) as consultation_failure:
+        dispatcher.dispatch(command=consultation_mismatch, context=_context(tenant_id))
+    assert str(consultation_failure.value.__cause__) == "DCE_STAGED_OBJECT_CONSULTATION_REQUIRED"
+
+    non_clean = _command(consultation_id=consultation_id)
+    _seed_clean_staged_objects(
+        session_factory,
+        tenant_id=tenant_id,
+        consultation_id=consultation_id,
+        command=non_clean,
+        state="QUARANTINED",
+    )
+    with pytest.raises(CommandExecutionError) as state_failure:
+        dispatcher.dispatch(command=non_clean, context=_context(tenant_id))
+    assert str(state_failure.value.__cause__) == "DCE_STAGED_OBJECT_NOT_CLEAN"
+
+    expired = _command(consultation_id=consultation_id)
+    _seed_clean_staged_objects(
+        session_factory,
+        tenant_id=tenant_id,
+        consultation_id=consultation_id,
+        command=expired,
+        expires_at=NOW - timedelta(minutes=1),
+    )
+    with pytest.raises(CommandExecutionError) as expiry_failure:
+        dispatcher.dispatch(command=expired, context=_context(tenant_id))
+    assert str(expiry_failure.value.__cause__) == "DCE_STAGED_OBJECT_EXPIRED"
 
 
 @pytest.mark.db

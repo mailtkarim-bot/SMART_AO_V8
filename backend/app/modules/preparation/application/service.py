@@ -8,6 +8,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.modules.enterprise.infrastructure.models import EnterpriseDocumentRecord
 from app.modules.membership.public.text_safety import contains_forbidden_text
 from app.modules.preparation.application.commands import (
     EvaluatePreparationReadinessCommand,
@@ -43,7 +44,6 @@ from app.platform.security.models import (
     EnterpriseCapabilityProofLinkRecord,
     EnterpriseCapabilityRecord,
     EnterpriseCapabilityVersionRecord,
-    EnterpriseDocumentRecord,
     GeneratedTechnicalDocumentRecord,
     PreparationPackageRecord,
     PreparationReadinessRecord,

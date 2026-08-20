@@ -11,6 +11,12 @@ from app.modules.enterprise.application.enterprise_commands import (
     CreateEnterpriseCompanyCommand,
     RegisterEnterpriseDocumentCommand,
 )
+from app.modules.enterprise.infrastructure.models import (
+    EnterpriseCompanyRecord,
+    EnterpriseDocumentRecord,
+    EnterpriseDocumentUploadRecord,
+    EnterpriseDocumentVerificationRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -26,12 +32,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    EnterpriseCompanyRecord,
-    EnterpriseDocumentRecord,
-    EnterpriseDocumentUploadRecord,
-    EnterpriseDocumentVerificationRecord,
-)
 
 
 @dataclass(frozen=True, slots=True)

@@ -7,13 +7,9 @@ import pytest
 import sqlalchemy as sa
 from app.bootstrap.application import AppRuntime, create_app
 from app.interfaces.http.routes.authentication import AuthenticationHttpRuntime
+from app.modules.enterprise.infrastructure.models import EnterpriseDocumentUploadRecord
 from app.platform.security.authentication import AuthenticationService
-from app.platform.security.models import (
-    AuthSessionRecord,
-    EnterpriseDocumentUploadRecord,
-    IdentityRecord,
-    TenantMembershipRecord,
-)
+from app.platform.security.models import AuthSessionRecord, IdentityRecord, TenantMembershipRecord
 from app.platform.security.tokens import JwtAccessTokenCodec
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
