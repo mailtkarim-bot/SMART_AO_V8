@@ -11,6 +11,7 @@ from app.modules.dce.application.commands import (
     PrepareDceStagingCommand,
     RecordDceStagedObjectQuarantineCommand,
     RecordDceStagedObjectScanCommand,
+    RejectDceStagedObjectUploadCommand,
 )
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
@@ -18,6 +19,7 @@ from app.modules.dce.application.handlers import (
     PrepareDceStagingHandler,
     RecordDceStagedObjectQuarantineHandler,
     RecordDceStagedObjectScanHandler,
+    RejectDceStagedObjectUploadHandler,
 )
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
@@ -106,6 +108,16 @@ def _claim_command(*, storage_object_id: UUID) -> ClaimDceStagedObjectUploadComm
     )
 
 
+def _reject_command(*, storage_object_id: UUID) -> RejectDceStagedObjectUploadCommand:
+    return RejectDceStagedObjectUploadCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        storage_object_id=storage_object_id,
+        rejection_code="UPLOAD_INTERRUPTED",
+    )
+
+
 def _quarantine_command(
     *,
     storage_object_id: UUID,
@@ -162,6 +174,7 @@ def _dispatcher(session_factory: sessionmaker[Session]) -> CommandDispatcher:
             "PrepareDceStaging": PrepareDceStagingHandler(),
             "RecordDceStagedObjectQuarantine": RecordDceStagedObjectQuarantineHandler(),
             "RecordDceStagedObjectScan": RecordDceStagedObjectScanHandler(),
+            "RejectDceStagedObjectUpload": RejectDceStagedObjectUploadHandler(),
         },
     )
 
@@ -374,6 +387,58 @@ def test_scan_rejects_size_mismatch_and_infected_content(
     assert infected_object is not None
     assert mismatch_object.rejection_code == "BYTE_SIZE_MISMATCH"
     assert infected_object.rejection_code == "MALWARE_DETECTED"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_staging_handlers_reject_stale_consultation_and_invalid_states(
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id, consultation_id = _seed_consultation(session_factory)
+    dispatcher = _dispatcher(session_factory)
+    stale = _prepare_command(consultation_id=consultation_id).model_copy(
+        update={"consultation_revision": 3}
+    )
+    with pytest.raises(CommandExecutionError) as stale_failure:
+        dispatcher.dispatch(command=stale, context=_context(tenant_id))
+    assert str(stale_failure.value.__cause__) == "CONSULTATION_REQUIRED_OR_STALE"
+
+    quarantine = _prepare_command(consultation_id=consultation_id)
+    dispatcher.dispatch(command=quarantine, context=_context(tenant_id))
+    with pytest.raises(CommandExecutionError) as quarantine_failure:
+        dispatcher.dispatch(
+            command=_quarantine_command(storage_object_id=quarantine.storage_object_id),
+            context=_context(tenant_id, actor_kind="SYSTEM"),
+        )
+    assert str(quarantine_failure.value.__cause__) == "DCE_STAGED_OBJECT_NOT_UPLOADING"
+
+    rejected = _prepare_command(consultation_id=consultation_id)
+    dispatcher.dispatch(command=rejected, context=_context(tenant_id))
+    dispatcher.dispatch(
+        command=_claim_command(storage_object_id=rejected.storage_object_id),
+        context=_context(tenant_id),
+    )
+    with pytest.raises(CommandExecutionError) as actor_failure:
+        dispatcher.dispatch(
+            command=_reject_command(storage_object_id=rejected.storage_object_id),
+            context=_context(tenant_id),
+        )
+    assert str(actor_failure.value.__cause__) == "DCE_STAGING_SYSTEM_ACTOR_REQUIRED"
+    with pytest.raises(CommandExecutionError) as state_failure:
+        dispatcher.dispatch(
+            command=_reject_command(storage_object_id=quarantine.storage_object_id),
+            context=_context(tenant_id, actor_kind="SYSTEM"),
+        )
+    assert str(state_failure.value.__cause__) == "DCE_STAGED_OBJECT_NOT_UPLOADING"
+
+    scan = _prepare_command(consultation_id=consultation_id)
+    dispatcher.dispatch(command=scan, context=_context(tenant_id))
+    with pytest.raises(CommandExecutionError) as scan_failure:
+        dispatcher.dispatch(
+            command=_scan_command(storage_object_id=scan.storage_object_id),
+            context=_context(tenant_id, actor_kind="SYSTEM"),
+        )
+    assert str(scan_failure.value.__cause__) == "DCE_STAGED_OBJECT_NOT_QUARANTINED"
 
 
 @pytest.mark.db

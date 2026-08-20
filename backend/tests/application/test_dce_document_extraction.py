@@ -14,7 +14,10 @@ from app.modules.dce.application.extraction import (
     DceDocumentExtractionService,
     _project_document,
 )
-from app.modules.dce.application.handlers import RecordDceDocumentExtractionHandler
+from app.modules.dce.application.handlers import (
+    RecordDceDocumentExtractionHandler,
+    _validate_extraction_fragments,
+)
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
 from app.modules.dce.infrastructure.models.dce_extraction import (
     DceDocumentExtractionFragmentRecord,
@@ -212,6 +215,55 @@ def _failed_extraction_command(
     )
 
 
+def test_extraction_fragment_validator_rejects_ordinal_locator_and_hash() -> None:
+    fragment = {
+        "ordinal": 1,
+        "locator_json": {"kind": "paragraph"},
+        "text": "abc",
+        "text_sha256": sha256(b"abc").hexdigest(),
+    }
+    command = RecordDceDocumentExtractionCommand(
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=uuid4(),
+        extraction_id=uuid4(),
+        dce_document_id=uuid4(),
+        input_sha256="a" * 64,
+        extractor_id="fixture",
+        extractor_version="1",
+        status="COMPLETED",
+        extracted_char_count=3,
+        failure_code=None,
+        fragments=[fragment],
+    )
+    with pytest.raises(ValueError, match="DCE_EXTRACTION_FRAGMENT_ORDINAL_REQUIRED"):
+        _validate_extraction_fragments(
+            command=command.model_copy(
+                update={"fragments": [command.fragments[0].model_copy(update={"ordinal": 2})]}
+            )
+        )
+    with pytest.raises(ValueError, match="DCE_EXTRACTION_FRAGMENT_LOCATOR_REQUIRED"):
+        _validate_extraction_fragments(
+            command=command.model_copy(
+                update={
+                    "fragments": [
+                        command.fragments[0].model_copy(update={"locator_json": {"kind": 1}})
+                    ]
+                }
+            )
+        )
+    with pytest.raises(ValueError, match="DCE_EXTRACTION_FRAGMENT_HASH_REQUIRED"):
+        _validate_extraction_fragments(
+            command=command.model_copy(
+                update={
+                    "fragments": [
+                        command.fragments[0].model_copy(update={"text_sha256": "0" * 64})
+                    ]
+                }
+            )
+        )
+
+
 @pytest.mark.db
 @pytest.mark.integration
 def test_extraction_handler_rejects_missing_storage_and_input_hash_mismatch(
@@ -226,6 +278,15 @@ def test_extraction_handler_rejects_missing_storage_and_input_hash_mismatch(
         media_type="text/plain",
     )
     dispatcher = _handler_dispatcher(session_factory)
+
+    with pytest.raises(CommandExecutionError) as actor_failure:
+        dispatcher.dispatch(
+            command=_failed_extraction_command(document_id=document_id, input_sha256="a" * 64),
+            context=CommandContext(
+                tenant_id=tenant_id, actor_id=uuid4(), actor_kind="USER", received_at=NOW
+            ),
+        )
+    assert str(actor_failure.value.__cause__) == "DCE_EXTRACTION_SYSTEM_ACTOR_REQUIRED"
 
     with pytest.raises(CommandExecutionError) as missing_failure:
         dispatcher.dispatch(
