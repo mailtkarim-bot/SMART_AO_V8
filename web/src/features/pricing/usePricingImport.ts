@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ApiClient } from "../../infrastructure/api";
 
@@ -28,6 +28,10 @@ export function usePricingImport(
   const [pricingImportBatchRevision, setPricingImportBatchRevision] = useState("1");
   const [pricingImportReportRevision, setPricingImportReportRevision] = useState("0");
   const [pricingImportState, setPricingImportState] = useState<PricingImportState>("IDLE");
+
+  useEffect(() => {
+    setPricingImportState("IDLE");
+  }, [selectedCaseId, reportId, pricingImportBatchId]);
 
   async function commitPricingImport() {
     if (!selectedCaseId || !pricingImportBatchId.trim() || !reportId.trim()) {
