@@ -987,6 +987,7 @@ class RecordDceRcAnalysisHandler:
                         "aggregate_revision": 0,
                     },
                 ),
+                events=(),
             )
 
         fragments_by_id = {fragment.id: fragment for _, _, fragment in source_rows}
