@@ -12,13 +12,13 @@ import type {
 type Message = { tone: "success" | "error" | "warning"; text: string };
 type SetMessage = Dispatch<SetStateAction<Message | null>>;
 
-type EnterpriseCapabilityForm = {
+export type EnterpriseCapabilityForm = {
   capability_kind: EnterpriseCapabilityKind;
   name: string;
   summary: string;
 };
 
-type EnterpriseCapabilityVersionForm = {
+export type EnterpriseCapabilityVersionForm = {
   capability_id: string;
   expected_revision: string;
   title: string;
@@ -28,7 +28,7 @@ type EnterpriseCapabilityVersionForm = {
   usage_scope: string;
 };
 
-type EnterpriseCompanyForm = {
+export type EnterpriseCompanyForm = {
   legal_name: string;
   trade_name: string;
   siren: string;
@@ -40,14 +40,14 @@ type EnterpriseCompanyForm = {
   country_code: string;
 };
 
-type EnterpriseDocumentForm = {
+export type EnterpriseDocumentForm = {
   document_kind: EnterpriseDocumentKind;
   document_label: string;
   expires_at: string;
 };
 
-type EnterpriseVerificationOutcome = "VALIDATED" | "REJECTED";
-type EnterpriseVerificationReason =
+export type EnterpriseVerificationOutcome = "VALIDATED" | "REJECTED";
+export type EnterpriseVerificationReason =
   | "DOCUMENT_ACCEPTED"
   | "DOCUMENT_ILLEGIBLE"
   | "DOCUMENT_EXPIRED"
