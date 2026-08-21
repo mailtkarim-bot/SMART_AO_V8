@@ -13,6 +13,11 @@ import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
 import { FinancialDraftPanel } from "../features/draft/FinancialDraftPanel";
 import { useFinancialDraft } from "../features/draft/useFinancialDraft";
 import { createApiClient } from "../infrastructure/api";
+import {
+  API_BASE_URL_STORAGE_KEY,
+  assertRuntimeApiUrl,
+  resolveApiBaseUrl,
+} from "../infrastructure/runtimeConfig";
 import type {
   AssignedCase,
   FinancialCategory,
@@ -49,8 +54,8 @@ const formatDate = (value: string) =>
   }).format(new Date(value));
 
 function App() {
-  const [baseUrl, setBaseUrl] = useState(
-    () => localStorage.getItem("smart-ao-api-url") ?? "http://localhost:8000",
+  const [baseUrl, setBaseUrl] = useState(() =>
+    resolveApiBaseUrl(localStorage, import.meta.env.VITE_API_BASE_URL, window.location.protocol),
   );
   const [token, setToken] = useState(
     () => localStorage.getItem("smart-ao-token") ?? "",
@@ -219,11 +224,20 @@ function App() {
 
   function saveConnection(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    localStorage.setItem("smart-ao-api-url", baseUrl);
-    localStorage.setItem("smart-ao-token", token);
-    setShowConnection(false);
-    setMessage({ tone: "success", text: "Connexion enregistrée dans ce navigateur." });
-    void refreshCases();
+    try {
+      const normalizedBaseUrl = assertRuntimeApiUrl(baseUrl, window.location.protocol);
+      setBaseUrl(normalizedBaseUrl);
+      localStorage.setItem(API_BASE_URL_STORAGE_KEY, normalizedBaseUrl);
+      localStorage.setItem("smart-ao-token", token.trim());
+      setShowConnection(false);
+      setMessage({ tone: "success", text: "Connexion enregistrée dans ce navigateur." });
+      void refreshCases();
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "URL API invalide.",
+      });
+    }
   }
 
   return (
