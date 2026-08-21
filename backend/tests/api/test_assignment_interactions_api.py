@@ -294,8 +294,8 @@ def _patron_create_payload(target_membership_id: UUID) -> dict[str, str | int | 
         "expected_case_revision": 5,
         "scope_actions": ["case.dce.read", "assignment.history.read"],
         "scope_classifications": ["INTERNAL_OPERATIONAL"],
-        "starts_at": "2026-08-14T12:00:00Z",
-        "ends_at": "2026-08-21T12:00:00Z",
+        "starts_at": "2020-01-01T00:00:00Z",
+        "ends_at": "2099-12-31T23:59:59Z",
     }
 
 
