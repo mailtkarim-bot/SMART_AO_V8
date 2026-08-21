@@ -8,7 +8,7 @@ import type { DraftReport, FinancialCategory } from "../../shared/types";
 type Message = { tone: "success" | "error" | "warning"; text: string };
 type SetMessage = Dispatch<SetStateAction<Message | null>>;
 
-type LineForm = {
+export type FinancialLineForm = {
   category: FinancialCategory;
   label: string;
   quantity_decimal: string;
@@ -16,7 +16,7 @@ type LineForm = {
   amount_minor: string;
 };
 
-const initialLineForm: LineForm = {
+const initialLineForm: FinancialLineForm = {
   category: "SALES",
   label: "",
   quantity_decimal: "1",
@@ -32,7 +32,7 @@ export function useFinancialDraft(
   const [reportId, setReportId] = useState("");
   const [draft, setDraft] = useState<DraftReport | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(false);
-  const [lineForm, setLineForm] = useState<LineForm>(initialLineForm);
+  const [lineForm, setLineForm] = useState<FinancialLineForm>(initialLineForm);
 
   async function createDraft() {
     if (!selectedCaseId) {
