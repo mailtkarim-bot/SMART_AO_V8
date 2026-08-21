@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`OPS/VPS-DEPLOY-HEALTH-DIGESTS-01` — réconciliation métier et durcissement architectural publiés sur la branche `ops/vps-deploy-health-digests-01`. Le dépôt couvre désormais la génération documentaire technique contrôlée, le cockpit patron unifié dans le périmètre courant, le wizard collaborateur, la préparation contrôlée d’un paquet de dépôt, les frontières d’import testées et l’arborescence enterprise séparée de membership. Le système prépare et contrôle un paquet ; il ne revendique jamais un dépôt externe réalisé. L’exécution sur un VPS réel reste volontairement hors environnement disponible.
+`FRONTEND-BUSINESS-VIEWS-01` — les frontières frontend métier sont désormais extraites et testées dans les features Enterprise, wizard, cockpit, décision, submission, pricing et draft. Le dépôt couvre la génération documentaire technique contrôlée, le cockpit patron, le wizard collaborateur, la préparation contrôlée d’un paquet de dépôt et le chiffrage privé. Le système prépare et contrôle un paquet ; il ne revendique jamais un dépôt externe réalisé. L’exécution Docker réelle reste bloquée par l’absence de Docker dans le sandbox et doit être reprise sur l’ordinateur de l’utilisateur.
 
 > **Vue propriétaire :** lire d’abord [`PROJECT_PROGRESS_REPORT.md`](PROJECT_PROGRESS_REPORT.md) pour la photographie métier globale, les capacités réellement livrées, les limites actuelles et l’ordre de travail recommandé. Lire ensuite ce fichier pour reprendre l’exécution technique d’un slice.
 
@@ -9,12 +9,12 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | [`9b8b7c1`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/9b8b7c14723df7c4b80cb240b78ceb0760624154) — couverture du module de configuration runtime, avec seuil global confirmé à 85,04 %. |
-| Branche | `ops/vps-deploy-health-digests-01`, PR [#10](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/10). |
-| Corrections et durcissement récents | `025c36d` anti-brute-force ; `aac4de0` fixtures PostgreSQL ; `0ecb24c`/`0ab3cbc` observabilité et runtime non-root ; `d4b33fe` dépendances frontend figées ; `e3eafc7` couverture/concurrence ; `bdce65a` frontières préparation ; `4c995d2` arborescence enterprise ; `dd6b254` génération documentaire ; `3bf046d` cockpit patron. |
-| Validation courante | **435 tests backend verts dans la CI finale**, seuil de couverture `85 %` validé, Ruff, Alembic, detect-secrets, SAST, audit de dépendances et build frontend TypeScript strict verts. Les tests ciblés import atteignent 100 % de couverture du service de prévisualisation. |
-| CI | Workflow final [#32150099196](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32150099196) vert sur `9b8b7c1`, avec backend, frontend et image-security ; 435 tests et 85,04 % de couverture branchée confirmés. |
-| Frontière restante | Le gate VPS réel, l’URL HTTPS backend, le raccordement frontend à cette URL et le rapport opérateur de restauration restent ouverts, car aucun VPS utilisateur n’est disponible. |
+| Commit courant | [`a72b6bf`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/a72b6bf) — fusion de l’extraction EnterpriseLibraryPanel et de la séparation pricing. |
+| Branche | `main`. |
+| Corrections et durcissement récents | PR #32 cockpit patron ; PR #33 wizard collaborateur ; PR #34 brouillon financier ; PR #35 dossier de décision ; PR #36 bibliothèque Enterprise. |
+| Validation courante | **53 tests frontend Vitest verts dans 13 fichiers**, build TypeScript strict + Vite vert. La CI PR #36 `32474338731` est verte sur backend, frontend et image-security. |
+| CI | Le run push main déclenché après la PR #35 `32473550620` est vert ; la PR #36 dispose du run complet `32474338731` vert. |
+| Frontière restante | Le gate Docker réel, l’URL HTTPS backend, le raccordement frontend à cette URL et le rapport opérateur de restauration restent ouverts. Le contrôle statique staging est PASS, mais Docker est absent du sandbox et le verdict réel demeure NO-GO. |
 
 ## Ce qui est terminé
 
