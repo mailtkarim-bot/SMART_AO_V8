@@ -43,8 +43,10 @@ def downgrade() -> None:
         "case_assignment_change_events",
         type_="check",
     )
+    # Existing append-only rows cannot be deleted during a rollback. Keep the
+    # expanded catalogue so downgrade remains data-preserving and repeatable.
     op.create_check_constraint(
         "reason",
         "case_assignment_change_events",
-        _reason_check(include_reactivation_reasons=False),
+        _reason_check(include_reactivation_reasons=True),
     )
