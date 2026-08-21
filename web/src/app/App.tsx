@@ -4,6 +4,7 @@ import { usePricingImport } from "../features/pricing/usePricingImport";
 import { SubmissionPanel } from "../features/submission/SubmissionPanel";
 import { useSubmissionActions } from "../features/submission/useSubmissionActions";
 import { useEnterpriseLibrary } from "../features/enterprise/useEnterpriseLibrary";
+import { CollaboratorWizardPanel } from "../features/wizard/CollaboratorWizardPanel";
 import { useCollaboratorWizard } from "../features/wizard/useCollaboratorWizard";
 import { PatronCockpitPanel } from "../features/cockpit/PatronCockpitPanel";
 import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
@@ -288,17 +289,31 @@ function App() {
 
         <section className="section-block" id="review-section"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Configurez votre Bearer token puis actualisez pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
 
-        <section className="section-block wizard-section" id="collaborator-wizard-section">
-          <div className="section-heading"><div><span className="section-kicker">PARCOURS COLLABORATEUR</span><h2>Wizard de préparation</h2></div><span className="count-pill">{wizardPackage?.state ?? "À charger"}</span></div>
-          <div className="wizard-toolbar"><label><span>Identifiant de l’affaire</span><input value={wizardCaseId} onChange={(event) => setWizardCaseId(event.target.value)} placeholder="UUID de l’affaire" /></label><label><span>Identifiant du package</span><input value={wizardPackageId} onChange={(event) => setWizardPackageId(event.target.value)} placeholder="UUID de préparation" /></label><button className="primary-button" type="button" onClick={() => void loadCollaboratorWizard()}>Charger le wizard <span>→</span></button></div>
-          {!wizardPackage ? <div className="empty-card"><strong>Le wizard est prêt à être chargé</strong><p>Les projections de préparation et les tâches sont lues dans le périmètre collaborateur autorisé. Aucune donnée financière n’est exposée ici.</p></div> : <div className="wizard-body">
-            <div className="wizard-steps"><div className="wizard-step complete"><span>1</span><strong>Tâches</strong><small>{wizardTasks.filter((task) => task.state === "COMPLETED").length}/{wizardTasks.length} terminées</small></div><div className={`wizard-step ${wizardPackage.latest_readiness ? "complete" : ""}`}><span>2</span><strong>Complétude</strong><small>{wizardPackage.latest_readiness?.state ?? "À vérifier"}</small></div><div className={`wizard-step ${wizardPackage.generated_documents.length ? "complete" : ""}`}><span>3</span><strong>Document</strong><small>{wizardPackage.generated_documents.length ? "Généré" : "À générer"}</small></div><div className="wizard-step"><span>4</span><strong>Transmission</strong><small>Contrôle patron</small></div></div>
-            <div className="wizard-grid"><div className="detail-panel"><div className="panel-heading"><div><h3>Tâches de l’affaire</h3><p>Chaque résultat est structuré, révisé et traçable.</p></div><span className="rule-tag">{wizardTasks.length} tâche{wizardTasks.length > 1 ? "s" : ""}</span></div>{wizardTasks.length === 0 ? <p className="panel-empty">Aucune tâche projetée.</p> : <div className="wizard-task-list">{wizardTasks.map((task) => <button type="button" className={`wizard-task ${task.task_id === wizardTaskId ? "selected" : ""}`} key={task.task_id} onClick={() => setWizardTaskId(task.task_id)}><div><strong>{task.title}</strong><small>{task.task_kind} · {task.priority} · Révision {task.aggregate_revision}</small></div><span className={`state-badge state-${task.state.toLowerCase()}`}>{task.state}</span></button>)}</div>}{wizardTaskId && <div className="wizard-task-actions"><button className="secondary-button" type="button" onClick={() => void claimWizardTask()}>Prendre en charge</button><label><span>Résultat</span><textarea rows={2} value={wizardResultText} onChange={(event) => setWizardResultText(event.target.value)} placeholder="Constat ou preuve structurée, sans donnée financière" /></label><label><span>Issue</span><select value={wizardOutcome} onChange={(event) => setWizardOutcome(event.target.value as "RECORDED" | "NOT_APPLICABLE" | "UNABLE_TO_COMPLETE")}><option value="RECORDED">Enregistré</option><option value="NOT_APPLICABLE">Non applicable</option><option value="UNABLE_TO_COMPLETE">Impossible à compléter</option></select></label><div className="wizard-action-row"><button className="primary-button" type="button" onClick={() => void recordWizardTaskResult()}>Enregistrer le résultat</button><button className="secondary-button" type="button" onClick={() => void completeWizardTask()}>Clôturer</button></div></div>}</div>
-              <div className="detail-panel"><div className="panel-heading"><div><h3>Complétude et production</h3><p>La readiness est recalculée côté serveur avant toute génération.</p></div></div><div className="wizard-action-row"><button className="primary-button" type="button" onClick={() => void evaluateWizardReadiness()}>Vérifier la complétude</button><button className="secondary-button" type="button" disabled={!wizardPackage.latest_readiness} onClick={() => void generateWizardDocument()}>Générer la réponse technique</button></div>{wizardPackage.latest_readiness ? <div className="readiness-card"><div className="case-top"><strong>{wizardPackage.latest_readiness.state}</strong><span>Révision {wizardPackage.latest_readiness.revision}</span></div><p>{wizardPackage.latest_readiness.checked_task_count} tâche(s) et {wizardPackage.latest_readiness.checked_requirement_count} exigence(s) contrôlée(s).</p>{wizardPackage.latest_readiness.blocker_codes.length > 0 && <div className="code-list"><strong>Blocages</strong>{wizardPackage.latest_readiness.blocker_codes.map((code) => <span key={code}>{code}</span>)}</div>}{wizardPackage.latest_readiness.warning_codes.length > 0 && <div className="code-list warning"><strong>Avertissements</strong>{wizardPackage.latest_readiness.warning_codes.map((code) => <span key={code}>{code}</span>)}</div>}</div> : <p className="panel-empty">La complétude n’a pas encore été vérifiée.</p>}{wizardPackage.generated_documents.length > 0 && <div className="document-list">{wizardPackage.generated_documents.map((document) => <div className="document-row" key={document.document_id}><strong>{document.document_kind}</strong><span>v{document.version} · {document.state}</span></div>)}</div>}</div>
-              <div className="detail-panel wizard-transmission"><div className="panel-heading"><div><h3>Transmettre au patron</h3><p>Cette transmission ne dépose jamais le dossier sur un portail externe.</p></div></div><label><span>Snapshot préparé</span><input value={wizardSnapshotId} onChange={(event) => setWizardSnapshotId(event.target.value)} placeholder="UUID du snapshot" /></label><label><span>Identifiant de transmission</span><input value={wizardTransmissionId} onChange={(event) => setWizardTransmissionId(event.target.value)} placeholder="UUID de transmission" /></label><button className="primary-button" type="button" onClick={() => void transmitWizardSnapshot()}>Transmettre au patron <span>→</span></button><small className="invariant-note">Sortie : contexte non financier, blocages et preuves structurées uniquement.</small></div>
-            </div>
-          </div>}
-        </section>
+        <CollaboratorWizardPanel
+          wizardCaseId={wizardCaseId}
+          wizardPackageId={wizardPackageId}
+          wizardPackage={wizardPackage}
+          wizardTasks={wizardTasks}
+          wizardTaskId={wizardTaskId}
+          wizardResultText={wizardResultText}
+          wizardOutcome={wizardOutcome}
+          wizardSnapshotId={wizardSnapshotId}
+          wizardTransmissionId={wizardTransmissionId}
+          setWizardCaseId={setWizardCaseId}
+          setWizardPackageId={setWizardPackageId}
+          setWizardTaskId={setWizardTaskId}
+          setWizardResultText={setWizardResultText}
+          setWizardOutcome={setWizardOutcome}
+          setWizardSnapshotId={setWizardSnapshotId}
+          setWizardTransmissionId={setWizardTransmissionId}
+          onLoad={() => void loadCollaboratorWizard()}
+          onClaimTask={() => void claimWizardTask()}
+          onRecordResult={() => void recordWizardTaskResult()}
+          onCompleteTask={() => void completeWizardTask()}
+          onEvaluateReadiness={() => void evaluateWizardReadiness()}
+          onGenerateDocument={() => void generateWizardDocument()}
+          onTransmitSnapshot={() => void transmitWizardSnapshot()}
+        />
 
         <PatronCockpitPanel
           assignments={assignments}
