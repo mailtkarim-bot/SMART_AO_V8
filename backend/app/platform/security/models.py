@@ -1509,6 +1509,12 @@ class PricingImportBatchRecord(TenantScopedRecord, Base):
         sa.ForeignKeyConstraint(
             ["tenant_id"], ["tenants.id"], name="fk_pricing_import_batches__tenant", ondelete="RESTRICT"
         ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "case_id"],
+            ["cases.tenant_id", "cases.id"],
+            name="fk_pricing_import_batches__case",
+            ondelete="RESTRICT",
+        ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_pricing_import_batches__tenant_id"),
         sa.UniqueConstraint("tenant_id", "command_id", name="uq_pricing_import_batches__command"),
         sa.CheckConstraint(
