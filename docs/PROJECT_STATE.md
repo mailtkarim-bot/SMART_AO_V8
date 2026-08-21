@@ -9,11 +9,11 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | [`491a705`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/491a705) — fusion de la sonde frontend de readiness backend dans la PR #42. |
+| Commit courant | [`1700802`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/1700802) — fusion de la réconciliation documentaire, du test d’intégration App.tsx et du plan du prochain lot métier dans la PR #43. |
 | Branche | `main`. |
 | Corrections et durcissement récents | PR #32 cockpit patron ; PR #33 wizard collaborateur ; PR #34 brouillon financier ; PR #35 dossier de décision ; PR #36 bibliothèque Enterprise ; PR #38 validation runtime API ; PR #40 stabilité assignment/Alembic ; PR #42 readiness frontend. |
 | Validation courante | Le commit publié `491a705` validait **60 tests frontend Vitest verts dans 15 fichiers**. Le test d’intégration App.tsx ajouté dans le présent lot porte la validation locale à **61 tests dans 16 fichiers** ; build TypeScript strict + Vite vert. |
-| CI | La CI de PR #42 `32485404332` est verte sur backend, frontend et image-security ; la CI de `main` après fusion `32486093902` est également verte sur les trois jobs. |
+| CI | La CI de PR #43 `32494741709` est verte sur backend, frontend et image-security ; la CI de `main` après fusion `32496048642` est également verte sur les trois jobs. |
 | Frontière restante | Le gate Docker réel, l’URL HTTPS backend, le raccordement frontend à cette URL et le rapport opérateur de restauration restent ouverts. Le contrôle statique staging est PASS, mais Docker est absent du sandbox et le verdict réel demeure NO-GO. |
 
 ## Ce qui est terminé
@@ -106,6 +106,7 @@
 - `COLLABORATOR-WIZARD-FRONTEND-01` est livré par [`2e21460`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/2e21460555d1d5b384def233d9c352d20e995cd3), CI [#32141390485](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32141390485) verte : wizard frontend chargé par package/case, tâches collaborateur, prise en charge, résultats structurés, clôture, readiness, génération technique et transmission snapshot au patron avec rappel explicite `NOT_PERFORMED`.
 - `PRICING-IMPORT-PREVIEW-01` est livré par [`ea664e7`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/ea664e7039111167b22cedad06d90db3c57c20b5), puis durci par [`652805e`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/652805eb88c86e89c8d2a29ca3935175ad162bcf) et [`2686d11`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/2686d1144e5cb4941267b841b43bdfb2af2eb1e8). La route patronale `POST /api/v1/patron/cases/{case_id}/pricing-import/preview` accepte uniquement des `.xlsx`, rejette macros, archives surdimensionnées, types non autorisés et classeurs invalides, normalise les colonnes DPGF/BPU/Excel, calcule des centimes déterministes sans persister le fichier brut et conserve les erreurs par ligne. Les contrats restent patronaux et financiers privés ; la CI finale [#32147725328](https://github.com/mailtkarim-bot/SMART_AO_V8/actions/runs/32147725328) est verte.
 - `FRONTEND-READINESS-PROBE-01` est livré par la fusion [`491a705`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/491a705), PR #42. Le client API typé appelle `/healthz/ready`, `useBackendReadiness` expose les états `idle|checking|ready|not_ready|error`, et la modale de connexion affiche l’état ainsi que `database` et `clamav`. Le commit publié comptait 60 cas dans 15 fichiers ; le présent lot ajoute un test d’intégration de rendu d’App.tsx, portant la suite locale à 61 cas dans 16 fichiers. La CI de PR `32485404332` et celle de `main` `32486093902` sont vertes.
+- `FRONTEND-READINESS-INTEGRATION-TEST-01` est publié par la fusion [`1700802`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/1700802), PR #43. `web/src/app/App.test.tsx` rend l’orchestrateur, ouvre la configuration API et vérifie l’affichage utilisateur de `Backend prêt`, `PostgreSQL : ok` et `ClamAV : ok`. La validation locale et CI compte désormais **61 tests frontend dans 16 fichiers** ; la CI PR `32494741709` et la CI main `32496048642` sont vertes.
 
 ## Prochaine action unique
 
