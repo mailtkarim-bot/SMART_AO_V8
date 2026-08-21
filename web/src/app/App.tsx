@@ -13,6 +13,7 @@ import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
 import { FinancialDraftPanel } from "../features/draft/FinancialDraftPanel";
 import { useFinancialDraft } from "../features/draft/useFinancialDraft";
 import { createApiClient } from "../infrastructure/api";
+import { useBackendReadiness } from "../features/connection/useBackendReadiness";
 import {
   API_BASE_URL_STORAGE_KEY,
   assertRuntimeApiUrl,
@@ -70,6 +71,11 @@ function App() {
   const [showConnection, setShowConnection] = useState(false);
   const [activeNav, setActiveNav] = useState("overview");
   const api = useMemo(() => createApiClient(baseUrl, token), [baseUrl, token]);
+  const {
+    backendReadiness,
+    backendReadinessState,
+    checkBackendReadiness,
+  } = useBackendReadiness(api);
   const {
     enterpriseCompany,
     enterpriseCapabilities,
@@ -229,6 +235,7 @@ function App() {
       setBaseUrl(normalizedBaseUrl);
       localStorage.setItem(API_BASE_URL_STORAGE_KEY, normalizedBaseUrl);
       localStorage.setItem("smart-ao-token", token.trim());
+      void checkBackendReadiness(createApiClient(normalizedBaseUrl, token));
       setShowConnection(false);
       setMessage({ tone: "success", text: "Connexion enregistrée dans ce navigateur." });
       void refreshCases();
@@ -400,7 +407,7 @@ function App() {
         <footer className="footer"><span>SMART_AO V8</span><span>Architecture sécurisée · Tenant-scoped · Auditée</span><span>API {baseUrl}</span></footer>
       </main>
 
-      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2>Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>Le token est conservé uniquement dans le stockage local de ce navigateur. Il n’est jamais envoyé ailleurs que vers l’URL configurée.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><label><span>Bearer token</span><textarea required rows={4} value={token} onChange={(event) => setToken(event.target.value)} placeholder="eyJhbGciOiJIUzI1NiIs…" /></label><button className="primary-button" type="submit">Enregistrer et charger <span>→</span></button></form></div>}
+      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2>Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>Le token est conservé uniquement dans le stockage local de ce navigateur. Il n’est jamais envoyé ailleurs que vers l’URL configurée.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><div className={`readiness-indicator readiness-${backendReadinessState}`} role="status"><strong>{backendReadinessState === "checking" ? "Vérification en cours…" : backendReadinessState === "ready" ? "Backend prêt" : backendReadinessState === "not_ready" ? "Backend non prêt" : backendReadinessState === "error" ? "Backend inaccessible" : "Backend non vérifié"}</strong>{backendReadiness && <small>PostgreSQL : {backendReadiness.checks.database} · ClamAV : {backendReadiness.checks.clamav}</small>}</div><label><span>Bearer token</span><textarea required rows={4} value={token} onChange={(event) => setToken(event.target.value)} placeholder="eyJhbGciOiJIUzI1NiIs…" /></label><button className="primary-button" type="submit">Enregistrer et charger <span>→</span></button></form></div>}
     </div>
   );
 }
