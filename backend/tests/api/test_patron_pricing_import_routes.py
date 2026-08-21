@@ -39,12 +39,13 @@ def _runtime(*, resolver_error=None):
     )
 
 
-def _client(*, service=None, commit_service=None, resolver_error=None):
+def _client(*, service=None, commit_service=None, creation_service=None, resolver_error=None):
     app = FastAPI()
     app.include_router(
         build_patron_pricing_import_router(
             service=service or _PreviewService(),
             commit_service=commit_service,
+            creation_service=creation_service,
             security_runtime=_runtime(resolver_error=resolver_error),
         )
     )
@@ -212,3 +213,110 @@ def test_pricing_import_preview_rejects_unknown_document_kind():
         headers=_headers(),
     )
     assert response.status_code == 422
+
+
+class _CreationService:
+    def __init__(self, *, error=None, replayed=False):
+        self.error = error
+        self.replayed = replayed
+        self.calls = []
+        self.batch_id = uuid4()
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        command = kwargs["command"]
+        return SimpleNamespace(
+            status="SUCCEEDED",
+            command_id=str(command.command_id),
+            idempotency_key=str(command.idempotency_key),
+            result_code="PRICING_IMPORT_PREVIEWED",
+            aggregate_refs=[
+                {
+                    "aggregate_type": "PricingImportBatch",
+                    "aggregate_id": str(self.batch_id),
+                    "aggregate_revision": 1,
+                }
+            ],
+            event_ids=[str(uuid4())],
+            replayed=self.replayed,
+        )
+
+
+def _creation_headers():
+    return {
+        **_headers(),
+        "X-Command-Id": str(uuid4()),
+        "Idempotency-Key": str(uuid4()),
+        "X-Correlation-Id": str(uuid4()),
+    }
+
+
+def test_pricing_import_preview_persists_normalized_rows_with_server_hash():
+    import hashlib
+
+    creation_service = _CreationService()
+    payload = b"normalized-preview-source"
+    client = _client(creation_service=creation_service)
+    response = client.post(
+        f"/api/v1/patron/cases/{uuid4()}/pricing-import/preview?document_kind=DPGF",
+        files={
+            "upload": (
+                "dpgf.xlsx",
+                payload,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        headers=_creation_headers(),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["batch_id"] == str(creation_service.batch_id)
+    assert body["state"] == "PREVIEWED"
+    assert body["result_code"] == "PRICING_IMPORT_PREVIEWED"
+    assert body["replayed"] is False
+    assert "source_sha256" not in body
+    assert creation_service.calls[0]["command"].source_sha256 == hashlib.sha256(payload).hexdigest()
+    assert str(creation_service.calls[0]["command"].case_id) == response.json()["case_id"]
+
+
+def test_pricing_import_preview_replay_returns_200_and_replayed_receipt():
+    creation_service = _CreationService(replayed=True)
+    response = _client(creation_service=creation_service).post(
+        f"/api/v1/patron/cases/{uuid4()}/pricing-import/preview",
+        files={"upload": ("pricing.xlsx", b"source", "application/octet-stream")},
+        headers=_creation_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["replayed"] is True
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code", "detail"),
+    [
+        (PermissionError("FORBIDDEN"), 403, "FORBIDDEN"),
+        (CommandExecutionError("IDEMPOTENCY_KEY_REUSED"), 409, "IDEMPOTENCY_KEY_REUSED"),
+        (CommandExecutionError("IMPORT_ROWS_INVALID"), 422, "IMPORT_ROWS_INVALID"),
+    ],
+)
+def test_pricing_import_preview_creation_maps_service_errors(error, status_code, detail):
+    response = _client(creation_service=_CreationService(error=error)).post(
+        f"/api/v1/patron/cases/{uuid4()}/pricing-import/preview",
+        files={"upload": ("pricing.xlsx", b"source", "application/octet-stream")},
+        headers=_creation_headers(),
+    )
+    assert response.status_code == status_code
+    assert response.json() == {"detail": detail}
+
+
+def test_pricing_import_preview_requires_command_metadata_when_persistence_is_enabled():
+    response = _client(creation_service=_CreationService()).post(
+        f"/api/v1/patron/cases/{uuid4()}/pricing-import/preview",
+        files={"upload": ("pricing.xlsx", b"source", "application/octet-stream")},
+        headers=_headers(),
+    )
+    assert response.status_code == 422
+    assert response.json() == {"detail": "COMMAND_METADATA_REQUIRED"}
