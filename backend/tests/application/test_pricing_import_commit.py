@@ -233,3 +233,68 @@ def test_collaborator_cannot_commit_financial_import(session_factory):
             command=_command(case_id, report_id, batch.id),
             now=NOW,
         )
+
+
+def test_commit_rejects_report_revision_conflict(session_factory):
+    actor, case_id, report_id, _ = _seed_draft(session_factory)
+    batch, rows = _batch_and_rows(actor, case_id)
+    with session_factory.begin() as session:
+        session.add(batch)
+        session.add_all(rows)
+
+    command = _command(case_id, report_id, batch.id, expected_report_revision=1)
+    with pytest.raises(CommandExecutionError, match="VERSION_CONFLICT"):
+        _service(session_factory).commit(actor=actor, command=command, now=NOW)
+
+
+def test_commit_rejects_published_snapshot(session_factory):
+    actor, case_id, report_id, _ = _seed_draft(session_factory)
+    batch, rows = _batch_and_rows(actor, case_id)
+    with session_factory.begin() as session:
+        session.add(batch)
+        session.add_all(rows)
+        snapshot = session.get(FinancialReportSnapshotRecord, report_id)
+        assert snapshot is not None
+        snapshot.state = "PUBLISHED"
+        snapshot.published_at = NOW
+
+    with pytest.raises(CommandExecutionError, match="FINANCIAL_REPORT_NOT_DRAFT"):
+        _service(session_factory).commit(
+            actor=actor,
+            command=_command(case_id, report_id, batch.id),
+            now=NOW,
+        )
+
+
+def test_commit_rejects_a_new_command_after_batch_is_committed(session_factory):
+    actor, case_id, report_id, _ = _seed_draft(session_factory)
+    batch, rows = _batch_and_rows(actor, case_id)
+    with session_factory.begin() as session:
+        session.add(batch)
+        session.add_all(rows)
+
+    service = _service(session_factory)
+    service.commit(actor=actor, command=_command(case_id, report_id, batch.id), now=NOW)
+
+    with pytest.raises(CommandExecutionError, match="IMPORT_ALREADY_COMMITTED"):
+        service.commit(
+            actor=actor,
+            command=_command(case_id, report_id, batch.id),
+            now=NOW,
+        )
+
+
+def test_commit_does_not_cross_tenant_boundaries(session_factory):
+    actor, case_id, report_id, _ = _seed_draft(session_factory)
+    other_actor, _, _, _ = _seed_draft(session_factory)
+    batch, rows = _batch_and_rows(actor, case_id)
+    with session_factory.begin() as session:
+        session.add(batch)
+        session.add_all(rows)
+
+    with pytest.raises(CommandExecutionError, match="IMPORT_NOT_FOUND_OR_FORBIDDEN"):
+        _service(session_factory).commit(
+            actor=other_actor,
+            command=_command(case_id, report_id, batch.id),
+            now=NOW,
+        )

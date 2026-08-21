@@ -2,7 +2,11 @@ from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
-from app.platform.security.models import PricingImportBatchRecord, PricingImportRowRecord
+from app.platform.security.models import (
+    PricingImportBatchRecord,
+    PricingImportRowRecord,
+    PricingImportTransitionRecord,
+)
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from tests.application.test_financial_report_draft_lines import _seed_draft
@@ -99,3 +103,38 @@ def test_pricing_import_registry_rejects_invalid_source_and_bounds(session_facto
     invalid_rows.valid_row_count = 2
     with pytest.raises(IntegrityError), session_factory.begin() as session:
         session.add(invalid_rows)
+
+    invalid_money = _batch(actor=actor, case_id=case_id)
+    invalid_money.total_minor = -1
+    with pytest.raises(IntegrityError), session_factory.begin() as session:
+        session.add(invalid_money)
+
+    row_batch = _batch(actor=actor, case_id=case_id)
+    with session_factory.begin() as session:
+        session.add(row_batch)
+    invalid_row = _row(actor=actor, batch_id=row_batch.id, row_number=0)
+    with pytest.raises(IntegrityError), session_factory.begin() as session:
+        session.add(invalid_row)
+
+
+def test_pricing_import_registry_closes_transition_states_and_versions(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    batch = _batch(actor=actor, case_id=case_id)
+    with session_factory.begin() as session:
+        session.add(batch)
+
+    transition = PricingImportTransitionRecord(
+        id=uuid4(),
+        tenant_id=actor.tenant_id,
+        batch_id=batch.id,
+        from_state="DRAFT",
+        to_state="PREVIEWED",
+        version=1,
+        actor_id=actor.actor_id,
+        membership_id=actor.membership_id,
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+        correlation_id=actor.correlation_id,
+    )
+    with pytest.raises(IntegrityError), session_factory.begin() as session:
+        session.add(transition)
