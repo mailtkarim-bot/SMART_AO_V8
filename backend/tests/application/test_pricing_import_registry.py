@@ -147,3 +147,23 @@ def test_pricing_import_registry_rejects_cross_tenant_case_reference(session_fac
 
     with pytest.raises(IntegrityError), session_factory.begin() as session:
         session.add(invalid_batch)
+
+
+def test_pricing_import_registry_rejects_negative_or_empty_normalized_row_fields(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    batch = _batch(actor=actor, case_id=case_id)
+    with session_factory.begin() as session:
+        session.add(batch)
+
+    invalid_values = (
+        {"unit_price_minor": -1},
+        {"total_minor": -1},
+        {"designation": ""},
+        {"quantity_decimal": ""},
+    )
+    for values in invalid_values:
+        invalid_row = _row(actor=actor, batch_id=batch.id, row_number=uuid4().int % 100000 + 2)
+        for field, value in values.items():
+            setattr(invalid_row, field, value)
+        with pytest.raises(IntegrityError), session_factory.begin() as session:
+            session.add(invalid_row)
