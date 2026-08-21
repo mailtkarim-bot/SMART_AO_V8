@@ -8,7 +8,7 @@ from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.patron_pricing_import import (
     build_patron_pricing_import_router,
 )
-from app.platform.events.dispatcher import CommandExecutionError
+from app.platform.events.dispatcher import CommandExecutionError, IdempotencyKeyReusedError
 from app.platform.security.authenticated_context import UnauthenticatedError
 from app.platform.security.context import ActorContext, ActorKind, MembershipState
 from fastapi import FastAPI
@@ -320,3 +320,73 @@ def test_pricing_import_preview_requires_command_metadata_when_persistence_is_en
     )
     assert response.status_code == 422
     assert response.json() == {"detail": "COMMAND_METADATA_REQUIRED"}
+
+
+class _StatefulIdempotentCreationService(_CreationService):
+    def __init__(self):
+        super().__init__()
+        self._source_by_key = {}
+        self._receipt_by_key = {}
+
+    def create(self, **kwargs):
+        command = kwargs["command"]
+        key = command.idempotency_key
+        previous_source = self._source_by_key.get(key)
+        if previous_source is not None:
+            if previous_source != command.source_sha256:
+                raise IdempotencyKeyReusedError("IDEMPOTENCY_KEY_REUSED")
+            previous = self._receipt_by_key[key]
+            return SimpleNamespace(**{**previous.__dict__, "replayed": True})
+
+        receipt = super().create(**kwargs)
+        self._source_by_key[key] = command.source_sha256
+        self._receipt_by_key[key] = receipt
+        return receipt
+
+
+def test_pricing_import_preview_same_http_command_replays_without_new_batch():
+    creation_service = _StatefulIdempotentCreationService()
+    headers = _creation_headers()
+    case_id = uuid4()
+    files = {"upload": ("pricing.xlsx", b"same-source", "application/octet-stream")}
+    client = _client(creation_service=creation_service)
+
+    first = client.post(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/preview",
+        files=files,
+        headers=headers,
+    )
+    replay = client.post(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/preview",
+        files=files,
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert replay.status_code == 200
+    assert first.json()["batch_id"] == replay.json()["batch_id"]
+    assert replay.json()["replayed"] is True
+    assert len(creation_service._receipt_by_key) == 1
+
+
+def test_pricing_import_preview_reused_key_with_changed_source_returns_409():
+    creation_service = _StatefulIdempotentCreationService()
+    headers = _creation_headers()
+    case_id = uuid4()
+    client = _client(creation_service=creation_service)
+
+    first = client.post(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/preview",
+        files={"upload": ("pricing.xlsx", b"source-a", "application/octet-stream")},
+        headers=headers,
+    )
+    conflict = client.post(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/preview",
+        files={"upload": ("pricing.xlsx", b"source-b", "application/octet-stream")},
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert conflict.status_code == 409
+    assert conflict.json() == {"detail": "IDEMPOTENCY_KEY_REUSED"}
+    assert len(creation_service._receipt_by_key) == 1
