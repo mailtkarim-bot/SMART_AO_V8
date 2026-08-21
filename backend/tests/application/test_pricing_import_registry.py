@@ -138,3 +138,12 @@ def test_pricing_import_registry_closes_transition_states_and_versions(session_f
     )
     with pytest.raises(IntegrityError), session_factory.begin() as session:
         session.add(transition)
+
+
+def test_pricing_import_registry_rejects_cross_tenant_case_reference(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    other_actor, _, _, _ = _seed_draft(session_factory)
+    invalid_batch = _batch(actor=other_actor, case_id=case_id)
+
+    with pytest.raises(IntegrityError), session_factory.begin() as session:
+        session.add(invalid_batch)
