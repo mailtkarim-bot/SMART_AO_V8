@@ -342,3 +342,12 @@ export type CollaboratorTaskList = {
   case_id: string;
   tasks: CollaboratorTask[];
 };
+
+export type BackendReadiness = {
+  status: "ok" | "not_ready";
+  service: "smart-ao-v8";
+  checks: {
+    database: "unknown" | "ok" | "failed";
+    clamav: "unknown" | "ok" | "failed";
+  };
+};

@@ -1,5 +1,6 @@
 import type {
   AssignedCase,
+  BackendReadiness,
   CommandReceipt,
   DraftReport,
   FinancialCategory,
@@ -56,6 +57,7 @@ export function createApiClient(baseUrl: string, token: string) {
   }
 
   return {
+    getBackendReadiness: () => request<BackendReadiness>("/healthz/ready"),
     listAssignedCases: () => request<AssignedCase[]>("/api/v1/cases/assigned"),
     listPatronAssignments: () =>
       request<{ items: PatronAssignment[] }>("/api/v1/patron/assignments"),
