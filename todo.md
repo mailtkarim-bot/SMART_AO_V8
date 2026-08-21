@@ -18,6 +18,7 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 
 ## Tâches réellement restantes
 
+- [ ] **PRICING-IMPORT-PERSISTENCE-01** — transformer la prévisualisation patronale DPGF/BPU/Excel en lot normalisé persistant `PREVIEWED`, puis committer atomiquement ses lignes valides dans un brouillon `DRAFT`. Suivre [`docs/NEXT_BUSINESS_LOT_PRICING_IMPORT_PERSISTENCE_01.md`](docs/NEXT_BUSINESS_LOT_PRICING_IMPORT_PERSISTENCE_01.md) et le contrat normatif associé ; préserver tenant résolu serveur, confidentialité financière, append-only, révision optimiste et idempotence.
 - [ ] **Gate VPS réel**, lorsque l’utilisateur disposera d’un VPS : builder les images digest-pinnées, lancer PostgreSQL/ClamAV/Caddy, exécuter le test EICAR, vérifier HTTPS et `/healthz/ready`, installer les timers systemd, tester la sauvegarde hors VPS, la restauration isolée et la supervision externe.
 - [ ] **Raccordement frontend à l’API publiée**, uniquement après réception et vérification d’une URL HTTPS backend réelle ; ne pas fixer `VITE_API_BASE_URL` avant cette preuve.
 - [ ] **Rapport opérateur de restauration**, à produire pendant le gate VPS réel avec hashes, échantillon documentaire, contrôle tenant, état outbox, logs, backup hors hôte et preuve de rotation des secrets.
