@@ -1,8 +1,35 @@
+from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.platform.events.command_contracts import ApplicationCommand
+
+
+class CreatePricingImportRowCommand(BaseModel):
+    """One normalized row produced by the server-side preview validator."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    row_number: int = Field(ge=1)
+    code: str | None = None
+    designation: str | None = None
+    unit: str | None = None
+    quantity_decimal: str | None = None
+    unit_price_minor: int | None = Field(default=None, ge=0)
+    total_minor: int | None = Field(default=None, ge=0)
+    errors: list[str] = Field(default_factory=list)
+
+
+class CreatePricingImportPreviewCommand(ApplicationCommand):
+    """Persist a validated, normalized pricing preview without the source file."""
+
+    command_type = "CreatePricingImportPreview"
+
+    case_id: UUID
+    document_kind: Literal["DPGF", "BPU", "EXCEL"]
+    source_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    rows: list[CreatePricingImportRowCommand] = Field(max_length=100)
 
 
 class CommitPricingImportCommand(ApplicationCommand):

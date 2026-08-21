@@ -60,7 +60,5 @@ def downgrade() -> None:
         "unit_price_non_negative", "pricing_import_rows", "unit_price_minor >= 0"
     )
     op.create_check_constraint("total_non_negative", "pricing_import_rows", "total_minor >= 0")
-    op.alter_column("pricing_import_rows", "designation", nullable=False)
-    op.alter_column("pricing_import_rows", "quantity_decimal", nullable=False)
-    op.alter_column("pricing_import_rows", "unit_price_minor", nullable=False)
-    op.alter_column("pricing_import_rows", "total_minor", nullable=False)
+    # A PREVIEWED row may legitimately retain validation errors and NULL values.
+    # Tightening these columns would make a downgrade fail or destroy append-only data.
