@@ -15,7 +15,10 @@ class CreatePricingImportRowCommand(BaseModel):
     code: str | None = None
     designation: str | None = None
     unit: str | None = None
-    quantity_decimal: str | None = None
+    quantity_decimal: str | None = Field(
+        default=None,
+        pattern=r"^(0|[1-9][0-9]*)(\.[0-9]+)?$",
+    )
     unit_price_minor: int | None = Field(default=None, ge=0)
     total_minor: int | None = Field(default=None, ge=0)
     errors: list[str] = Field(default_factory=list)
