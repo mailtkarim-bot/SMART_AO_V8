@@ -10,9 +10,14 @@ from app.modules.pricing.application.import_commands import (
 )
 from app.modules.pricing.application.import_creation import (
     PricingImportCreationService,
+    _validate_rows,
     pricing_import_creation_handlers,
 )
-from app.platform.events.dispatcher import CommandDispatcher, IdempotencyKeyReusedError
+from app.platform.events.dispatcher import (
+    CommandDispatcher,
+    CommandExecutionError,
+    IdempotencyKeyReusedError,
+)
 from app.platform.persistence.models import (
     CommandReceiptRecord,
     DomainEventRecord,
@@ -258,4 +263,58 @@ def test_creation_command_rejects_raw_file_and_invalid_source_hash():
             document_kind="DPGF",
             source_sha256="not-a-hash",
             rows=[],
+        )
+
+
+def test_normalized_row_quantity_must_be_canonical_decimal():
+    for quantity in ("01", "1,5", "1E2", "-1"):
+        with pytest.raises(ValidationError):
+            CreatePricingImportRowCommand(
+                row_number=2,
+                designation="Lot",
+                quantity_decimal=quantity,
+                total_minor=100,
+            )
+
+
+def test_validate_rows_rejects_empty_required_fields_without_error_codes():
+    row = CreatePricingImportRowCommand(
+        row_number=2,
+        designation="   ",
+        quantity_decimal="1",
+        total_minor=100,
+    )
+    with pytest.raises(CommandExecutionError, match="IMPORT_ROWS_INVALID"):
+        _validate_rows([row])
+
+
+def test_creation_rejects_duplicate_row_numbers_without_partial_persistence(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    rows = [
+        CreatePricingImportRowCommand(
+            row_number=2,
+            designation="Lot A",
+            quantity_decimal="1",
+            total_minor=100,
+        ),
+        CreatePricingImportRowCommand(
+            row_number=2,
+            designation="Lot B",
+            quantity_decimal="1",
+            total_minor=200,
+        ),
+    ]
+    command = _command(case_id, rows=rows)
+
+    with pytest.raises(CommandExecutionError, match="IMPORT_ROW_NUMBER_DUPLICATE"):
+        _service(session_factory).create(actor=actor, command=command, now=NOW)
+
+    with session_factory() as session:
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(PricingImportBatchRecord)
+                .where(PricingImportBatchRecord.tenant_id == actor.tenant_id)
+            )
+            == 0
         )

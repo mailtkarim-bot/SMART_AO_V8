@@ -198,7 +198,13 @@ def _validate_rows(rows: list[CreatePricingImportRowCommand]) -> tuple[
     for row in rows:
         if row.errors:
             continue
-        if row.designation is None or row.quantity_decimal is None or row.total_minor is None:
+        if (
+            not row.designation
+            or not row.designation.strip()
+            or not row.quantity_decimal
+            or not row.quantity_decimal.strip()
+            or row.total_minor is None
+        ):
             raise CommandExecutionError("IMPORT_ROWS_INVALID")
     return tuple(rows)
 
