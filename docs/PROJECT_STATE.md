@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`FRONTEND-BUSINESS-VIEWS-01` — les frontières frontend métier sont extraites et testées dans les features Enterprise, wizard, cockpit, décision, submission, pricing et draft. Le runtime API est maintenant centralisé et refuse les URL non conformes avant persistance. Le système prépare et contrôle un paquet ; il ne revendique jamais un dépôt externe réalisé. L’exécution Docker réelle reste bloquée par l’absence de Docker dans le sandbox et doit être reprise sur l’ordinateur de l’utilisateur.
+`FRONTEND-BUSINESS-VIEWS-01` — les frontières frontend métier sont extraites et testées dans les features Enterprise, wizard, cockpit, décision, submission, pricing et draft. Le runtime API est maintenant centralisé et refuse les URL non conformes avant persistance. Les fixtures d’affectation et le downgrade Alembic sont stabilisés pour rester déterministes et non destructifs. Le système prépare et contrôle un paquet ; il ne revendique jamais un dépôt externe réalisé. L’exécution Docker réelle reste bloquée par l’absence de Docker dans le sandbox et doit être reprise sur l’ordinateur de l’utilisateur.
 
 > **Vue propriétaire :** lire d’abord [`PROJECT_PROGRESS_REPORT.md`](PROJECT_PROGRESS_REPORT.md) pour la photographie métier globale, les capacités réellement livrées, les limites actuelles et l’ordre de travail recommandé. Lire ensuite ce fichier pour reprendre l’exécution technique d’un slice.
 
@@ -9,11 +9,11 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | [`d673c1d`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/d673c1d) — fusion du durcissement runtime de l’URL API frontend. |
+| Commit courant | [`52b906d`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/52b906d) — fusion de la stabilisation des fenêtres d’affectation et du downgrade Alembic. |
 | Branche | `main`. |
-| Corrections et durcissement récents | PR #32 cockpit patron ; PR #33 wizard collaborateur ; PR #34 brouillon financier ; PR #35 dossier de décision ; PR #36 bibliothèque Enterprise ; PR #38 validation runtime API. |
-| Validation courante | **57 tests frontend Vitest verts dans 14 fichiers**, build TypeScript strict + Vite vert. La CI corrigée PR #38 `32478225877` est verte sur backend, frontend et image-security. |
-| CI | Le run push main `32478738952` est vert sur backend, frontend et image-security. |
+| Corrections et durcissement récents | PR #32 cockpit patron ; PR #33 wizard collaborateur ; PR #34 brouillon financier ; PR #35 dossier de décision ; PR #36 bibliothèque Enterprise ; PR #38 validation runtime API ; PR #40 stabilité assignment/Alembic. |
+| Validation courante | **57 tests frontend Vitest verts dans 14 fichiers**, build TypeScript strict + Vite vert. La CI PR #40 `32481205940` est verte sur backend, frontend et image-security ; le test de réactivation et la suite API ciblée sont stabilisés. |
+| CI | Le run push main `32481773297` est vert sur backend, frontend et image-security. Le run précédent `32480225089` avait correctement exposé la dépendance temporelle de la fixture et n’est pas utilisé comme état vert. |
 | Frontière restante | Le gate Docker réel, l’URL HTTPS backend, le raccordement frontend à cette URL et le rapport opérateur de restauration restent ouverts. Le contrôle statique staging est PASS, mais Docker est absent du sandbox et le verdict réel demeure NO-GO. |
 
 ## Ce qui est terminé
