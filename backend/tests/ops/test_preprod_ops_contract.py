@@ -98,3 +98,24 @@ def test_deploy_validates_libpq_password_alignment() -> None:
     deploy_script = (OPS / "deploy-preprod.sh").read_text(encoding="utf-8")
     assert "PGPASSWORD" in deploy_script
     assert 'PGPASSWORD}" == "${POSTGRES_PASSWORD}' in deploy_script
+
+
+def test_healthcheck_validates_application_json_payloads() -> None:
+    healthcheck = (OPS / "healthcheck-preprod.sh").read_text(encoding="utf-8")
+    assert 'live_body="$(curl' in healthcheck
+    assert 'ready_body="$(curl' in healthcheck
+    assert '"process"[[:space:]]*:[[:space:]]*"ok"' in healthcheck
+    assert '"database"[[:space:]]*:[[:space:]]*"ok"' in healthcheck
+    assert '"clamav"[[:space:]]*:[[:space:]]*"ok"' in healthcheck
+
+
+def test_backend_docker_context_excludes_demonstrations_and_tests() -> None:
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+    assert "backend/app/demonstrations/" in dockerignore
+    assert "backend/tests/" in dockerignore
+
+
+def test_ci_audits_frontend_production_dependencies() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "name: Frontend dependency audit" in workflow
+    assert "pnpm audit --prod --audit-level high" in workflow

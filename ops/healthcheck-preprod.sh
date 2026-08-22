@@ -33,12 +33,24 @@ main() {
   [[ "${SMART_AO_PUBLIC_HOST:-}" != "" ]] || fail "SMART_AO_PUBLIC_HOST is required"
   [[ "${MAX_BACKUP_AGE_HOURS}" =~ ^[0-9]+$ ]] || fail "SMART_AO_MAX_BACKUP_AGE_HOURS must be an integer"
 
-  curl --fail --silent --show-error --max-time 10 \
+  local live_body ready_body
+  live_body="$(curl --fail --silent --show-error --max-time 10 \
     --resolve "${SMART_AO_PUBLIC_HOST}:443:127.0.0.1" \
-    "https://${SMART_AO_PUBLIC_HOST}/healthz/live" >/dev/null
-  curl --fail --silent --show-error --max-time 10 \
+    "https://${SMART_AO_PUBLIC_HOST}/healthz/live")"
+  grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' <<<"${live_body}" \
+    || fail "application liveness payload is not healthy"
+  grep -Eq '"process"[[:space:]]*:[[:space:]]*"ok"' <<<"${live_body}" \
+    || fail "application liveness process check is not healthy"
+
+  ready_body="$(curl --fail --silent --show-error --max-time 10 \
     --resolve "${SMART_AO_PUBLIC_HOST}:443:127.0.0.1" \
-    "https://${SMART_AO_PUBLIC_HOST}/healthz/ready" >/dev/null
+    "https://${SMART_AO_PUBLIC_HOST}/healthz/ready")"
+  grep -Eq '"status"[[:space:]]*:[[:space:]]*"ok"' <<<"${ready_body}" \
+    || fail "application readiness payload is not healthy"
+  grep -Eq '"database"[[:space:]]*:[[:space:]]*"ok"' <<<"${ready_body}" \
+    || fail "application database readiness check is not healthy"
+  grep -Eq '"clamav"[[:space:]]*:[[:space:]]*"ok"' <<<"${ready_body}" \
+    || fail "application ClamAV readiness check is not healthy"
 
   local services
   services="$(compose ps --format '{{.Service}} {{.Health}}')"

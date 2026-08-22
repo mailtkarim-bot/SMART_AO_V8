@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Any, Protocol
 from uuid import UUID, uuid4
@@ -191,7 +191,7 @@ class CommandDispatcher:
                 receipt.result_code = outcome.result_code
                 receipt.response_body_json = result.as_receipt_body()
                 receipt.event_ids_json = list(event_ids)
-                receipt.completed_at = context.received_at
+                receipt.completed_at = datetime.now(tz=UTC)
                 return result
         except (IdempotencyKeyReusedError, CommandInProgressError):
             raise

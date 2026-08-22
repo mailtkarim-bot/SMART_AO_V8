@@ -1,0 +1,11 @@
+# Production backend image must not contain executable demos or test fixtures.
+backend/app/demonstrations/
+backend/tests/
+**/__pycache__/
+**/*.pyc
+.git/
+.github/
+
+# Documentation and frontend are not inputs to backend.Dockerfile.
+docs/
+web/
