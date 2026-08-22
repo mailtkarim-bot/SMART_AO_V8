@@ -43,6 +43,9 @@ connectors = [
 notifications = [
   "aiosmtplib>=5.1,<6.0",
 ]
+calendar = [
+  "icalendar>=7.3,<8.0",
+]
 
 [dependency-groups]
 dev = [

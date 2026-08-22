@@ -197,3 +197,12 @@ def test_smtp_credentials_are_allowlisted_only_for_backend() -> None:
     assert "SMART_AO_SMTP_USERNAME" in backend
     assert "SMART_AO_SMTP_PASSWORD" not in retention
     assert "SMART_AO_SMTP_PASSWORD" not in webhook
+
+
+def test_optional_calendar_build_flag_is_explicit() -> None:
+    dockerfile = (OPS / "docker/backend.Dockerfile").read_text(encoding="utf-8")
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    assert "ARG SMART_AO_INSTALL_CALENDAR=0" in dockerfile
+    assert 'pip install --no-cache-dir ".[calendar]"' in dockerfile
+    assert "SMART_AO_INSTALL_CALENDAR" in compose
+    assert "SMART_AO_CALENDAR_ENABLED: ${SMART_AO_CALENDAR_ENABLED:-0}" in compose

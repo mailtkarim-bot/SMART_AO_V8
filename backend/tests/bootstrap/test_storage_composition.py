@@ -129,3 +129,21 @@ def test_app_runtime_builds_smtp_notifier_when_explicitly_enabled(monkeypatch) -
         "start_tls": None,
         "timeout_seconds": 10.0,
     }
+
+
+def test_app_runtime_keeps_calendar_export_disabled_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("SMART_AO_CALENDAR_ENABLED", raising=False)
+
+    assert application._build_submission_deadline_calendar() is None
+
+
+def test_app_runtime_builds_calendar_export_when_explicitly_enabled(monkeypatch) -> None:
+    class FakeCalendar:
+        pass
+
+    monkeypatch.setenv("SMART_AO_CALENDAR_ENABLED", "1")
+    monkeypatch.setattr(application, "IcsSubmissionDeadlineCalendar", FakeCalendar)
+
+    calendar = application._build_submission_deadline_calendar()
+
+    assert isinstance(calendar, FakeCalendar)

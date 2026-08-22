@@ -215,6 +215,7 @@ from app.modules.pricing.application.transition_service import (
     PricingScenarioTransitionService,
     pricing_scenario_transition_handlers,
 )
+from app.modules.submission.application.calendar import SubmissionDeadlineCalendarPort
 from app.modules.submission.application.evidence_service import (
     SubmissionEvidenceService,
     submission_evidence_handlers,
@@ -222,6 +223,7 @@ from app.modules.submission.application.evidence_service import (
 from app.modules.submission.application.notifications import SubmissionExportNotificationPort
 from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
 from app.modules.submission.application.signature_service import submission_signature_handlers
+from app.modules.submission.infrastructure.ics_calendar import IcsSubmissionDeadlineCalendar
 from app.modules.submission.infrastructure.smtp_notifications import (
     AioSmtpSubmissionExportNotifier,
 )
@@ -253,6 +255,7 @@ class AppRuntime:
     preparation_storage: GeneratedDocumentStorage
     company_registry: CompanyRegistryPort | None = None
     submission_export_notifier: SubmissionExportNotificationPort | None = None
+    submission_deadline_calendar: SubmissionDeadlineCalendarPort | None = None
 
     @classmethod
     def create(
@@ -264,6 +267,7 @@ class AppRuntime:
         preparation_storage = _build_preparation_storage()
         company_registry = _build_company_registry()
         submission_export_notifier = _build_submission_export_notifier()
+        submission_deadline_calendar = _build_submission_deadline_calendar()
         dispatcher = CommandDispatcher(
             session_factory=session_factory,
             handlers={
@@ -323,6 +327,7 @@ class AppRuntime:
             preparation_storage=preparation_storage,
             company_registry=company_registry,
             submission_export_notifier=submission_export_notifier,
+            submission_deadline_calendar=submission_deadline_calendar,
         )
 
     def get_dce_staged_object_upload_target(
@@ -527,6 +532,12 @@ def _build_submission_export_notifier() -> SubmissionExportNotificationPort | No
         start_tls=(start_tls_value == "1") if start_tls_value else None,
         timeout_seconds=float(os.getenv("SMART_AO_SMTP_TIMEOUT_SECONDS", "10")),
     )
+
+
+def _build_submission_deadline_calendar() -> SubmissionDeadlineCalendarPort | None:
+    if os.getenv("SMART_AO_CALENDAR_ENABLED", "0") != "1":
+        return None
+    return IcsSubmissionDeadlineCalendar()
 
 
 def _build_preparation_storage() -> GeneratedDocumentStorage:

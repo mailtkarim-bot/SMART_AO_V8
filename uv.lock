@@ -791,6 +791,20 @@ wheels = [
 ]
 
 [[package]]
+name = "icalendar"
+version = "7.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+    { name = "typing-extensions" },
+    { name = "tzdata" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/47/2b/1bbf82d316df18c3331d9a06228819c8a5814ceda545a3e9980e52ffce1b/icalendar-7.3.0.tar.gz", hash = "sha256:7bd001c8e648205e1bde5c6a5b77096598e8d0893dcf57755c6c597635620132", size = 525811, upload-time = "2026-08-19T15:10:21.05Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bb/82/50bff78b0bb0c7d7c0cb39e0ee189b92f611fff6bd7cf57f25e92d5a7551/icalendar-7.3.0-py3-none-any.whl", hash = "sha256:8355acfe17be81b368f0b1e3740817cea9b56ea889931f8f1a87c62f2d28db0b", size = 542540, upload-time = "2026-08-19T15:10:19.525Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.18"
 source = { registry = "https://pypi.org/simple" }
@@ -2208,6 +2222,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+calendar = [
+    { name = "icalendar" },
+]
 connectors = [
     { name = "httpx" },
 ]
@@ -2245,6 +2262,7 @@ requires-dist = [
     { name = "docling", marker = "extra == 'document-advanced'", specifier = ">=2.70,<3.0" },
     { name = "fastapi", specifier = ">=0.115,<1.0" },
     { name = "httpx", marker = "extra == 'connectors'", specifier = ">=0.28,<1.0" },
+    { name = "icalendar", marker = "extra == 'calendar'", specifier = ">=7.3,<8.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "ortools", specifier = ">=9.14,<10.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4.0" },
@@ -2260,7 +2278,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0,<3.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1.0" },
 ]
-provides-extras = ["rag", "document-advanced", "object-storage", "connectors", "notifications"]
+provides-extras = ["rag", "document-advanced", "object-storage", "connectors", "notifications", "calendar"]
 
 [package.metadata.requires-dev]
 dev = [
