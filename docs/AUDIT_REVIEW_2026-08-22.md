@@ -78,7 +78,7 @@ Les sujets qui exigent une décision d’architecture ou un environnement réel 
 | SSRF/DNS du webhook | Le secret HMAC est maintenant obligatoire, mais la validation destination/IP/DNS et la protection contre rebinding doivent faire l’objet d’un lot séparé avant toute URL contrôlée par un opérateur non totalement fiable. |
 | Dead-letter et plafond de retries | Les workers possèdent leases, backoff et statuts retry, mais la politique finale de dead-letter et d’alerte doit être spécifiée avant implémentation. |
 | Fraîcheur ClamAV | La capture de version est présente ; le seuil de fraîcheur doit être défini avec l’image et la politique d’exploitation réelles. |
-| Demo `app/demonstrations/m1.py` | Les clés historiques de démonstration ne représentent pas le chemin de production, mais ce code devrait être isolé ou retiré de l’image finale dans un nettoyage dédié. |
+| Demo `app/demonstrations/m1.py` | Les clés historiques de démonstration ne représentent pas le chemin de production. Le nouveau `.dockerignore` exclut désormais `backend/app/demonstrations/` et `backend/tests/` de l’image backend. Le harness reste disponible dans le dépôt pour les tests. |
 | Monitoring externe et backups hors VPS | Les scripts de backup/restore et la rotation existent, mais aucune preuve de chiffrement, transfert hors hôte, restauration isolée réelle ou supervision externe ne peut être produite sans Docker/VPS. |
 | MFA step-up effectif | Les modèles et capabilities représentent la fraîcheur MFA, mais le branchement sur les opérations sensibles reste un lot de sécurité dédié. |
 | Extraction des modèles ORM et réorganisation tests | Les dettes d’architecture sont réelles, mais un déplacement mécanique risquerait de casser les frontières sans bénéfice comportemental immédiat. |
@@ -100,14 +100,14 @@ Les sujets qui exigent une décision d’architecture ou un environnement réel 
 
 ## 3. Corrections et tests du commit `ce0154f`
 
-Le commit ajoute la migration `20260822_0049_financial_snapshot_immutability.py`, les protections d’extraction DOCX, les logs bornés, le parseur monétaire, la séparation Compose et les contrats de non-régression associés. Les nouveaux tests couvrent notamment : archive DOCX au-delà de la limite décompressée, alerte ClamAV sans fuite de message, réponse ClamAV non conforme, arrondi half-up, nombres européens, total incohérent, trigger DB de snapshot publié, allowlists Compose et validation des mots de passe préproduction.
+Le commit `ce0154f` ajoute la migration `20260822_0049_financial_snapshot_immutability.py`, les protections d’extraction DOCX, les logs bornés, le parseur monétaire, la séparation Compose et les contrats de non-régression associés. Le commit `42839b5` ajoute ensuite la validation JSON des healthchecks, l’horodatage réel `completed_at` des receipts, l’exclusion Docker des démonstrations/tests et l’audit pnpm frontend en CI. Les nouveaux tests couvrent notamment : archive DOCX au-delà de la limite décompressée, alerte ClamAV sans fuite de message, réponse ClamAV non conforme, arrondi half-up, nombres européens, total incohérent, trigger DB de snapshot publié, allowlists Compose et validation des mots de passe préproduction.
 
 ## 4. Validation locale finale
 
 | Contrôle | Résultat |
 |---|---|
-| Backend complet | **1 067 passed, 7 warnings tiers**. |
-| Tests ciblés nouveaux/impactés | **54 passed** sur DCE, pricing, ops, ClamAV et financier. |
+| Backend complet | **1 071 passed, 7 warnings tiers**. |
+| Tests ciblés nouveaux/impactés | **16 passed** sur dispatcher, ops et healthcheck, en plus des 54 tests du lot précédent. |
 | Frontend Vitest | **65 passed dans 17 fichiers**. |
 | Build frontend | `tsc -b` et `vite build` verts. |
 | Ruff | Vert sur le dépôt. |
@@ -121,11 +121,12 @@ Le commit ajoute la migration `20260822_0049_financial_snapshot_immutability.py`
 
 Le code de ce lot est poussé sur la branche de la PR #49 :
 
+- `42839b5` — `ops: make health and receipt checks truthful`
 - `ce0154f` — `security: harden dce pricing and preprod boundaries`
 - `1264fc7` — réconciliation documentaire précédente
 - `d2d1701` — première remédiation de sécurité confirmée
 
-La PR #49 reste ouverte et ne doit pas être fusionnée tant qu’un runner GitHub n’a pas exécuté les étapes backend, frontend et image-security. Les runs précédents, dont `32571448526`, échouaient avec `steps: []` et runner nul avant tout test ; ils ne constituent donc ni une preuve de réussite ni une preuve de régression du code. Le prochain lot métier `SUBMISSION-SIGNATURE-HTTP-01` reste bloqué jusqu’à une CI réellement exécutée et verte, conformément au séquencement demandé.
+Le healthcheck local valide désormais le corps JSON de liveness/readiness et la CI contient un audit pnpm de production. La PR #49 reste ouverte et ne doit pas être fusionnée tant qu’un runner GitHub n’a pas exécuté les étapes backend, frontend et image-security. Les runs précédents, dont `32571448526`, échouaient avec `steps: []` et runner nul avant tout test ; ils ne constituent donc ni une preuve de réussite ni une preuve de régression du code. Le prochain lot métier `SUBMISSION-SIGNATURE-HTTP-01` reste bloqué jusqu’à une CI réellement exécutée et verte, conformément au séquencement demandé.
 
 ## Références de code et de rapports
 
