@@ -80,12 +80,12 @@ Le pipeline actuel traite certains PDF, DOCX, XLSX et TXT de manière bornée et
 
 | Brique | Présence actuelle | Verdict |
 |---|---|---|
-| MinIO | Mentionné dans l’architecture initiale, absent de `docker-compose.yml` et `ops/docker-compose.preprod.yml` | Non intégré. |
-| S3 / `boto3` | Absent des manifests et du code | Non intégré. |
-| Stockage local privé | Adaptateurs locaux de quarantaine et de documents générés, anti-traversal, permissions et hash | Implémenté comme solution courante contrôlée. |
+| MinIO | Endpoint S3-compatible supporté par l’adaptateur privé ; aucun serveur MinIO n’est ajouté au Compose de production | **Préparé et greffé derrière un port**, mais recette Docker MinIO encore ouverte. |
+| S3 / `boto3` | Extra `object-storage` verrouillé ; adaptateur privé avec `IfNoneMatch="*"`, hash SHA-256, lecture bornée, suppression serveur et chiffrement SSE configurable | **Greffé et sélectionnable par AppRuntime** avec `SMART_AO_OBJECT_STORAGE_ENABLED=1`; bucket, credentials, permissions, lifecycle et restauration restent à valider. |
+| Stockage local privé | Adaptateurs locaux de quarantaine et de documents générés, anti-traversal, permissions et hash ; fallback AppRuntime par défaut | Implémenté et conservé comme solution courante contrôlée. |
 | PostgreSQL full-text / pgvector | Tables métier et recherche structurée présentes, mais pas de pile vectorielle activée | Partiel : source de vérité présente, recherche sémantique absente. |
 
-Le passage à MinIO/S3 est possible, mais doit être traité comme un slice d’infrastructure : contrat de clé opaque, tenant-scoping, chiffrement, URL temporaires, migration des objets, backup/restore et tests de non-fuite. Tant que ce contrat n’est pas décidé, la documentation a raison de ne pas ajouter MinIO artificiellement.
+Le passage à MinIO/S3 est maintenant câblé derrière un slice d’infrastructure : contrat de clé privé, écriture conditionnelle non-écrasante, hash, chiffrement configurable et lecture serveur bornée. Il reste à exercer sur Docker réel le bucket privé, les credentials, les permissions minimales, le lifecycle, la migration des objets, le backup/restore et les tests de non-fuite. Aucun serveur MinIO n’a été ajouté artificiellement au Compose de production.
 
 ### 4.5 Services externes métier et automatisation
 
@@ -117,13 +117,13 @@ Il est techniquement possible de commencer un raccordement maintenant, à condit
 | 1 | **OR-Tools ou HiGHS pour un cas d’optimisation concret** | Possible après figer le contrat pricing/capacité, les données autorisées, le solveur choisi, les budgets et les tests de reproductibilité. Ne pas installer les trois solveurs en même temps. |
 | 2 | **Docling ou OCR local** | Possible après constituer un corpus DCE anonymisé, mesurer CPU/RAM, séparer le worker documentaire et définir le statut “candidat à revue humaine”. |
 | 3 | **RAG local avec pgvector** | Possible après définir retrieval, citations, tenant filter, version d’index et benchmark Golden DCE. Il est préférable de commencer par pgvector plutôt que Qdrant si le besoin n’est pas encore mesuré. |
-| 4 | **MinIO/S3** | Possible lorsque le contrat de stockage objet et la stratégie de migration/backup sont validés. C’est le raccordement le plus important pour une exploitation documentaire durable, mais il touche l’infrastructure et la restauration. |
+| 4 | **MinIO/S3** | Adaptateur S3-compatible et composition AppRuntime désormais codés ; reste la recette Docker réelle, la stratégie de migration/backup et la restauration isolée. |
 | 5 | **Connecteurs BOAMP/URSSAF/INSEE/SMTP** | Possible séparément, avec secrets hors Git, idempotence, limites d’usage, audit et tests sandbox. Aucun ne doit être ajouté comme dépendance obligatoire du cœur sans cas métier validé. |
 | 6 | **Playwright E2E** | Peut être ajouté dès maintenant comme outil de preuve, mais il ne remplacera pas l’absence de VPS/Docker et d’URL HTTPS réelle. |
 
 ## 7. Ce qui empêche aujourd’hui de dire « tout est codé »
 
-Il reste des manques fonctionnels et opérationnels importants : l’OCR et le parsing avancé, la mise en production du modèle BGE et l’indexation automatique du RAG, le passage éventuel à pgvector/Qdrant, le raccordement métier complet d’OR-Tools, le stockage objet MinIO/S3, les connecteurs de veille et de vérification, les notifications e-mail/calendrier, les tests navigateur Playwright, la preuve Docker/ClamAV/HTTPS sur une machine réelle, la sauvegarde hors hôte et la restauration isolée. Le dépôt électronique externe lui-même reste volontairement non effectué et ne doit jamais être simulé comme réussi.
+Il reste des manques fonctionnels et opérationnels importants : la validation OCR et parsing avancé sur scans, la mise en production du modèle BGE et l’indexation automatique du RAG, le passage éventuel à pgvector/Qdrant, le raccordement métier complet d’OR-Tools, la recette réelle du stockage objet S3/MinIO, les connecteurs de veille et de vérification, les notifications e-mail/calendrier, les tests navigateur Playwright, la preuve Docker/ClamAV/HTTPS sur une machine réelle, la sauvegarde hors hôte et la restauration isolée. Le dépôt électronique externe lui-même reste volontairement non effectué et ne doit jamais être simulé comme réussi.
 
 Ces manques ne signifient pas que le code existant est un simple squelette. Ils signifient que **le noyau sécurisé et plusieurs slices métier sont codés, tandis que la plateforme complète décrite par la vision cible ne l’est pas encore**. Une couverture de tests élevée ne transforme pas une dépendance absente en fonctionnalité disponible.
 
@@ -136,7 +136,7 @@ La séquence raisonnable est la suivante :
 3. Précharger et vérifier BGE-M3 sur une machine dédiée, puis exécuter le job one-shot d’indexation sur une version DCE admise.
 4. Raccorder l’affectation OR-Tools à un cas pricing/capacité réel, avec validation patronale et mesure du temps de résolution.
 5. Comparer le bridge JSONB à pgvector seulement après le benchmark ; ne pas introduire Qdrant sans besoin mesuré.
-6. Ajouter ensuite OCR/Docling, MinIO/S3 et les connecteurs externes un par un, derrière des ports et des adaptateurs, avec secrets, budgets, rate limits, audit et possibilité de désactivation.
+6. Recetter sur Docker réel le parsing avancé et S3/MinIO, puis ajouter les connecteurs externes un par un, derrière des ports et des adaptateurs, avec secrets, budgets, rate limits, audit et possibilité de désactivation.
 
 ## Références locales
 

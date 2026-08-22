@@ -190,6 +190,7 @@ from app.modules.preparation.infrastructure.dce_preparation_reader import (
     SqlAlchemyPreparationDceReader,
 )
 from app.modules.preparation.infrastructure.document_storage import (
+    GeneratedDocumentStorage,
     LocalGeneratedDocumentStorage,
 )
 from app.modules.pricing.application.import_creation import (
@@ -220,6 +221,7 @@ from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.observability.http import RequestObservabilityMiddleware
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
+from app.platform.storage.object_storage import S3PrivateObjectStorage
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,7 +242,7 @@ class AppRuntime:
     session_factory: sessionmaker[Session]
     dispatcher: CommandDispatcher
     dce_upload_service: DceUploadService
-    preparation_storage: LocalGeneratedDocumentStorage
+    preparation_storage: GeneratedDocumentStorage
 
     @classmethod
     def create(
@@ -249,9 +251,7 @@ class AppRuntime:
         session_factory: sessionmaker[Session],
         dce_upload_service_factory: Callable[[CommandDispatcher], DceUploadService] | None = None,
     ) -> AppRuntime:
-        preparation_storage = LocalGeneratedDocumentStorage(
-            root=Path(os.getenv("SMART_AO_DCE_QUARANTINE_ROOT", "/var/lib/smart_ao/dce-quarantine"))
-        )
+        preparation_storage = _build_preparation_storage()
         dispatcher = CommandDispatcher(
             session_factory=session_factory,
             handlers={
@@ -475,6 +475,24 @@ def _default_enterprise_private_upload_service(
             timeout_seconds=float(os.getenv("SMART_AO_CLAMD_TIMEOUT_SECONDS", "30")),
         ),
         allowed_media_types=_ALLOWED_DCE_MEDIA_TYPES,
+    )
+
+
+def _build_preparation_storage() -> GeneratedDocumentStorage:
+    if os.getenv("SMART_AO_OBJECT_STORAGE_ENABLED", "0") != "1":
+        return LocalGeneratedDocumentStorage(
+            root=Path(os.getenv("SMART_AO_DCE_QUARANTINE_ROOT", "/var/lib/smart_ao/dce-quarantine"))
+        )
+    bucket = os.getenv("SMART_AO_OBJECT_STORAGE_BUCKET", "").strip()
+    if not bucket:
+        raise RuntimeError(
+            "SMART_AO_OBJECT_STORAGE_BUCKET is required when object storage is enabled"
+        )
+    return S3PrivateObjectStorage(
+        bucket=bucket,
+        endpoint_url=os.getenv("SMART_AO_OBJECT_STORAGE_ENDPOINT_URL") or None,
+        region_name=os.getenv("SMART_AO_OBJECT_STORAGE_REGION") or None,
+        server_side_encryption=os.getenv("SMART_AO_OBJECT_STORAGE_SSE", "AES256") or None,
     )
 
 
