@@ -55,6 +55,18 @@ class S3PrivateObjectStorage(GeneratedDocumentStorage):
             raise
         return digest
 
+    def head(self, *, storage_key: str) -> dict[str, object]:
+        response = self._client.head_object(
+            Bucket=self._bucket,
+            Key=_validate_key(storage_key),
+        )
+        metadata = response.get("Metadata", {})
+        return {
+            "content_length": response.get("ContentLength"),
+            "content_type": response.get("ContentType"),
+            "sha256": metadata.get("sha256") if isinstance(metadata, dict) else None,
+        }
+
     def read(self, *, storage_key: str) -> bytes:
         response = self._client.get_object(
             Bucket=self._bucket,

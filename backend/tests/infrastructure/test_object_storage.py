@@ -13,6 +13,13 @@ class FakeClient:
         self.put_requests: list[dict[str, object]] = []
         self.deleted: list[dict[str, str]] = []
 
+    def head_object(self, **request):
+        return {
+            "ContentLength": len(self.content),
+            "ContentType": "application/octet-stream",
+            "Metadata": {"sha256": "stored-sha"},
+        }
+
     def put_object(self, **request):
         self.put_requests.append(request)
         return {"ETag": '"etag"'}
@@ -40,6 +47,17 @@ def test_s3_write_is_private_conditional_and_hashes_content() -> None:
     assert client.put_requests[0]["ServerSideEncryption"] == "AES256"
     assert client.put_requests[0]["Metadata"] == {
         "sha256": digest,
+    }
+
+
+def test_s3_head_returns_bounded_operational_metadata() -> None:
+    client = FakeClient(content=b"stored")
+    storage = S3PrivateObjectStorage(bucket="private", client=client)
+
+    assert storage.head(storage_key="tenant/object.bin") == {
+        "content_length": 6,
+        "content_type": "application/octet-stream",
+        "sha256": "stored-sha",
     }
 
 

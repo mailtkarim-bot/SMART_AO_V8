@@ -81,7 +81,7 @@ Le pipeline actuel traite certains PDF, DOCX, XLSX et TXT de manière bornée et
 | Brique | Présence actuelle | Verdict |
 |---|---|---|
 | MinIO | Endpoint S3-compatible supporté par l’adaptateur privé ; aucun serveur MinIO n’est ajouté au Compose de production | **Préparé et greffé derrière un port**, mais recette Docker MinIO encore ouverte. |
-| S3 / `boto3` | Extra `object-storage` verrouillé ; adaptateur privé avec `IfNoneMatch="*"`, hash SHA-256, lecture bornée, suppression serveur et chiffrement SSE configurable | **Greffé et sélectionnable par AppRuntime** avec `SMART_AO_OBJECT_STORAGE_ENABLED=1`; bucket, credentials, permissions, lifecycle et restauration restent à valider. |
+| S3 / `boto3` | Extra `object-storage` verrouillé ; adaptateur privé avec `IfNoneMatch="*"`, hash SHA-256, `head`, lecture bornée, suppression serveur et chiffrement SSE configurable ; script opérateur `scripts/verify_object_storage.py` avec confirmation explicite | **Greffé et sélectionnable par AppRuntime** avec `SMART_AO_OBJECT_STORAGE_ENABLED=1`; bucket, credentials, permissions, lifecycle, restauration et recette réelle restent à valider. Le script n’écrit rien sans `--confirm-write` et n’affiche ni endpoint, ni bucket, ni secret. |
 | Stockage local privé | Adaptateurs locaux de quarantaine et de documents générés, anti-traversal, permissions et hash ; fallback AppRuntime par défaut | Implémenté et conservé comme solution courante contrôlée. |
 | PostgreSQL full-text / pgvector | Tables métier et recherche structurée présentes, mais pas de pile vectorielle activée | Partiel : source de vérité présente, recherche sémantique absente. |
 
@@ -117,7 +117,7 @@ Il est techniquement possible de commencer un raccordement maintenant, à condit
 | 1 | **OR-Tools ou HiGHS pour un cas d’optimisation concret** | Possible après figer le contrat pricing/capacité, les données autorisées, le solveur choisi, les budgets et les tests de reproductibilité. Ne pas installer les trois solveurs en même temps. |
 | 2 | **Docling ou OCR local** | Le worker documentaire one-shot et la factory optionnelle sont maintenant câblés ; il faut encore constituer un corpus DCE anonymisé, mesurer CPU/RAM, tester les scans/OCR et définir le statut “candidat à revue humaine”. |
 | 3 | **RAG local avec pgvector** | Possible après définir retrieval, citations, tenant filter, version d’index et benchmark Golden DCE. Il est préférable de commencer par pgvector plutôt que Qdrant si le besoin n’est pas encore mesuré. |
-| 4 | **MinIO/S3** | Adaptateur S3-compatible et composition AppRuntime désormais codés ; reste la recette Docker réelle, la stratégie de migration/backup et la restauration isolée. |
+| 4 | **MinIO/S3** | Adaptateur S3-compatible et composition AppRuntime désormais codés ; reste la recette Docker réelle, l’exécution contrôlée de `scripts/verify_object_storage.py`, la stratégie de migration/backup et la restauration isolée. |
 | 5 | **Connecteurs BOAMP/URSSAF** | Les ports INSEE read-only, BOAMP read-only, SMTP optionnel et export ICS local sont maintenant des premiers slices ; URSSAF reste à traiter séparément avec secrets hors Git, idempotence, limites d’usage, audit et tests sandbox. Le process outbox SMTP dédié et toute synchronisation d’agenda restent à raccorder séparément si ces usages sont retenus. |
 | 6 | **Playwright E2E** | Peut être ajouté dès maintenant comme outil de preuve, mais il ne remplacera pas l’absence de VPS/Docker et d’URL HTTPS réelle. |
 
