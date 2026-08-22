@@ -384,3 +384,17 @@ export type BackendReadiness = {
     clamav: "unknown" | "ok" | "failed";
   };
 };
+
+
+export type AuthSession = {
+  access_token: string;
+  token_type: "Bearer";
+  expires_in: number;
+};
+
+export type CurrentActor = {
+  actor_id: string;
+  identity_id: string;
+  actor_kind: string;
+  membership_state: string;
+};

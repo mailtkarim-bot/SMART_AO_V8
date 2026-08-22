@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { PricingPanel } from "../features/pricing/PricingPanel";
 import { usePricingImport } from "../features/pricing/usePricingImport";
 import { SubmissionPanel } from "../features/submission/SubmissionPanel";
@@ -12,7 +12,7 @@ import { PatronDecisionPanel } from "../features/decision/PatronDecisionPanel";
 import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
 import { FinancialDraftPanel } from "../features/draft/FinancialDraftPanel";
 import { useFinancialDraft } from "../features/draft/useFinancialDraft";
-import { createApiClient } from "../infrastructure/api";
+import { useAuthentication } from "../features/auth/useAuthentication";
 import { useBackendReadiness } from "../features/connection/useBackendReadiness";
 import {
   assertRuntimeApiUrl,
@@ -61,7 +61,9 @@ function App() {
       window.location.origin,
     ),
   );
-  const [token, setToken] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [tenantId, setTenantId] = useState("");
   const [cases, setCases] = useState<AssignedCase[]>([]);
   const [actions, setActions] = useState<PatronAction[]>([]);
   const [scenarios, setScenarios] = useState<PricingScenario[]>([]);
@@ -71,7 +73,15 @@ function App() {
   const [message, setMessage] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [showConnection, setShowConnection] = useState(false);
   const [activeNav, setActiveNav] = useState("overview");
-  const api = useMemo(() => createApiClient(baseUrl, token), [baseUrl, token]);
+  const {
+    accessToken,
+    currentActor,
+    isRestoring,
+    isAuthenticated,
+    api,
+    login,
+    logout,
+  } = useAuthentication(baseUrl);
   const {
     backendReadiness,
     backendReadinessState,
@@ -171,18 +181,18 @@ function App() {
     : [];
 
   useEffect(() => {
-    if (!token.trim()) return;
+    if (!accessToken.trim()) return;
     void refreshCases();
     void refreshAssignments();
     void refreshActions();
     void refreshEnterpriseCompany();
-  }, [token]);
+  }, [accessToken]);
 
   useEffect(() => {
-    if (!selectedCaseId || !token.trim()) return;
+    if (!selectedCaseId || !accessToken.trim()) return;
     void refreshScenarios(selectedCaseId);
     void refreshDecisionDossier(selectedCaseId);
-  }, [selectedCaseId, token]);
+  }, [selectedCaseId, accessToken]);
 
   async function refreshCases() {
     setLoading(true);
@@ -229,7 +239,7 @@ function App() {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function saveConnection(event: React.FormEvent<HTMLFormElement>) {
+  async function saveConnection(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
       const normalizedBaseUrl = assertRuntimeApiUrl(
@@ -237,14 +247,32 @@ function App() {
         window.location.protocol,
         window.location.origin,
       );
-      setBaseUrl(normalizedBaseUrl);
-      void checkBackendReadiness(createApiClient(normalizedBaseUrl, token));
+      if (normalizedBaseUrl !== baseUrl) {
+        setBaseUrl(normalizedBaseUrl);
+        setMessage({ tone: "warning", text: "URL API enregistrée. Validez de nouveau la connexion avec cette origine." });
+        return;
+      }
+      await checkBackendReadiness();
+      await login({ email: loginEmail, password: loginPassword, tenant_id: tenantId });
+      setLoginPassword("");
       setShowConnection(false);
-      setMessage({ tone: "success", text: "Connexion active dans cet onglet." });
+      setMessage({ tone: "success", text: "Connexion sécurisée active." });
     } catch (error) {
       setMessage({
         tone: "error",
-        text: error instanceof Error ? error.message : "URL API invalide.",
+        text: error instanceof Error ? error.message : "Connexion impossible.",
+      });
+    }
+  }
+
+  async function signOut() {
+    try {
+      await logout();
+      setMessage({ tone: "success", text: "Session fermée." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de fermer la session.",
       });
     }
   }
@@ -264,8 +292,9 @@ function App() {
           <button className={`nav-item ${activeNav === "submission" ? "active" : ""}`} onClick={() => navigateTo("submission-section", "submission")}><span className="nav-icon">↗</span>Dépôt</button>
         </nav>
         <div className="sidebar-bottom">
-          <button className="nav-item" onClick={() => setShowConnection(true)}><span className="nav-icon">⚙</span>Connexion API</button>
-          <div className="operator-card"><div className="avatar">PA</div><div><strong>Patron administrateur</strong><span>Accès financier contrôlé</span></div></div>
+          <button className="nav-item" onClick={() => setShowConnection(true)}><span className="nav-icon">⚙</span>{isAuthenticated ? "Session" : "Connexion"}</button>
+          {isAuthenticated && <button className="nav-item" onClick={() => void signOut()}><span className="nav-icon">↪</span>Se déconnecter</button>}
+          <div className="operator-card"><div className="avatar">{currentActor?.actor_kind === "COLLABORATEUR" ? "CO" : "PA"}</div><div><strong>{currentActor?.actor_kind ?? "Utilisateur non connecté"}</strong><span>{currentActor ? `Membership ${currentActor.membership_state}` : "Authentification requise"}</span></div></div>
         </div>
       </aside>
 
@@ -336,10 +365,10 @@ function App() {
 
         <section className="hero-grid" id="preparation-section">
           <div className="hero-card"><div className="hero-copy"><span className="hero-kicker">CETTE SEMAINE</span><h2>Décider avec la<br /><strong>bonne information.</strong></h2><p>Retrouvez vos affaires actives et reprenez chaque chiffrage là où vous l’avez laissé.</p><button className="primary-button" onClick={() => document.getElementById("draft-section")?.scrollIntoView({ behavior: "smooth" })}>Ouvrir un chiffrage <span>→</span></button></div><div className="hero-orbit"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit-core">AO<br /><small>V8</small></div></div></div>
-          <div className="metric-stack"><div className="small-metric"><span className="metric-label">AFFAIRES ACTIVES</span><strong>{cases.length.toString().padStart(2, "0")}</strong><span className="metric-meta">dans votre périmètre</span></div><div className="small-metric"><span className="metric-label">ÉTAT DE LA CONNEXION</span><strong className={token.trim() ? "text-green" : "text-amber"}>{token.trim() ? "Prête" : "À configurer"}</strong><span className="metric-meta">{baseUrl}</span></div></div>
+          <div className="metric-stack"><div className="small-metric"><span className="metric-label">AFFAIRES ACTIVES</span><strong>{cases.length.toString().padStart(2, "0")}</strong><span className="metric-meta">dans votre périmètre</span></div><div className="small-metric"><span className="metric-label">ÉTAT DE LA CONNEXION</span><strong className={isAuthenticated ? "text-green" : "text-amber"}>{isAuthenticated ? "Prête" : isRestoring ? "Restauration…" : "À configurer"}</strong><span className="metric-meta">{baseUrl}</span></div></div>
         </section>
 
-        <section className="section-block" id="review-section"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Configurez votre Bearer token puis actualisez pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
+        <section className="section-block" id="review-section"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Connectez-vous avec votre compte pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
 
         <CollaboratorWizardPanel
           wizardCaseId={wizardCaseId}
@@ -414,7 +443,7 @@ function App() {
         <footer className="footer"><span>SMART_AO V8</span><span>Architecture sécurisée · Tenant-scoped · Auditée</span><span>API {baseUrl}</span></footer>
       </main>
 
-      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2>Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>Le token reste uniquement en mémoire dans cet onglet et n’est jamais persisté. En HTTPS, l’API doit être servie par la même origine que cette application.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><div className={`readiness-indicator readiness-${backendReadinessState}`} role="status"><strong>{backendReadinessState === "checking" ? "Vérification en cours…" : backendReadinessState === "ready" ? "Backend prêt" : backendReadinessState === "not_ready" ? "Backend non prêt" : backendReadinessState === "error" ? "Backend inaccessible" : "Backend non vérifié"}</strong>{backendReadiness && <small>PostgreSQL : {backendReadiness.checks.database} · ClamAV : {backendReadiness.checks.clamav}</small>}</div><label><span>Bearer token</span><textarea required rows={4} value={token} onChange={(event) => setToken(event.target.value)} placeholder="eyJhbGciOiJIUzI1NiIs…" /></label><button className="primary-button" type="submit">Enregistrer et charger <span>→</span></button></form></div>}
+      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2>Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>La session utilise un cookie de renouvellement HttpOnly et un jeton d’accès conservé uniquement en mémoire.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><div className={`readiness-indicator readiness-${backendReadinessState}`} role="status"><strong>{backendReadinessState === "checking" ? "Vérification en cours…" : backendReadinessState === "ready" ? "Backend prêt" : backendReadinessState === "not_ready" ? "Backend non prêt" : backendReadinessState === "error" ? "Backend inaccessible" : "Backend non vérifié"}</strong>{backendReadiness && <small>PostgreSQL : {backendReadiness.checks.database} · ClamAV : {backendReadiness.checks.clamav}</small>}</div><label><span>Email</span><input required type="email" autoComplete="username" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} /></label><label><span>Tenant ID</span><input required value={tenantId} onChange={(event) => setTenantId(event.target.value)} /></label><label><span>Mot de passe</span><input required type="password" autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} /></label><button className="primary-button" type="submit">Se connecter <span>→</span></button></form></div>}
     </div>
   );
 }

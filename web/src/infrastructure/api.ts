@@ -1,5 +1,7 @@
 import type {
   AssignedCase,
+  AuthSession,
+  CurrentActor,
   BackendReadiness,
   CommandReceipt,
   DraftReport,
@@ -31,6 +33,35 @@ import type {
 
 const makeId = () => crypto.randomUUID();
 
+function readCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const prefix = `${encodeURIComponent(name)}=`;
+  const cookie = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith(prefix));
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : undefined;
+}
+
+function isAuthSession(value: unknown): value is AuthSession {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.access_token === "string" &&
+    candidate.token_type === "Bearer" &&
+    typeof candidate.expires_in === "number"
+  );
+}
+
+function apiError(status: number, body: unknown): Error & { status?: number; detail?: string } {
+  const detail = responseDetail(body);
+  const error = new Error(
+    detail ?? `La requête a échoué (${status}).`,
+  ) as Error & { status?: number; detail?: string };
+  error.status = status;
+  error.detail = detail;
+  return error;
+}
+
 async function parseResponseBody(response: Response): Promise<unknown> {
   const body = await response.text();
   if (!body) return undefined;
@@ -51,30 +82,95 @@ function responseDetail(body: unknown): string | undefined {
 
 export type ApiClient = ReturnType<typeof createApiClient>;
 
-export function createApiClient(baseUrl: string, token: string) {
+type TokenRefreshListener = (session: AuthSession) => void;
+
+export function createApiClient(
+  baseUrl: string,
+  token: string,
+  onTokenRefreshed?: TokenRefreshListener,
+) {
   const root = baseUrl.replace(/\/$/, "");
+  let currentToken = token;
+  let refreshPromise: Promise<AuthSession | null> | null = null;
+
+  async function refreshSession(): Promise<AuthSession | null> {
+    if (refreshPromise) return refreshPromise;
+    refreshPromise = (async () => {
+      const csrfToken = readCookie("smart_ao_csrf");
+      if (!csrfToken) return null;
+      const response = await fetch(`${root}/api/v1/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json", "X-CSRF-Token": csrfToken },
+      });
+      const parsed = await parseResponseBody(response);
+      if (!response.ok || !isAuthSession(parsed)) return null;
+      currentToken = parsed.access_token;
+      onTokenRefreshed?.(parsed);
+      return parsed;
+    })().finally(() => {
+      refreshPromise = null;
+    });
+    return refreshPromise;
+  }
 
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);
     headers.set("Accept", "application/json");
-    if (init.body) headers.set("Content-Type", "application/json");
-    if (token.trim()) headers.set("Authorization", `Bearer ${token.trim()}`);
+    if (init.body && !(init.body instanceof FormData)) {
+      headers.set("Content-Type", "application/json");
+    }
+    if (currentToken.trim()) {
+      headers.set("Authorization", `Bearer ${currentToken.trim()}`);
+    }
 
-    const response = await fetch(`${root}${path}`, { ...init, headers });
+    const response = await fetch(`${root}${path}`, {
+      ...init,
+      credentials: "include",
+      headers,
+    });
     const parsed = await parseResponseBody(response);
+    const canRetry = response.status === 401 && path !== "/api/v1/auth/me" &&
+      path !== "/api/v1/auth/login" && path !== "/api/v1/auth/refresh" &&
+      path !== "/api/v1/auth/logout" &&
+      (init.body === undefined || typeof init.body === "string");
+    if (canRetry && await refreshSession()) {
+      return request<T>(path, init);
+    }
     if (!response.ok) {
-      const detail = responseDetail(parsed);
-      const error = new Error(
-        detail ?? `La requête a échoué (${response.status}).`,
-      ) as Error & { status?: number; detail?: string };
-      error.status = response.status;
-      error.detail = detail;
-      throw error;
+      throw apiError(response.status, parsed);
     }
     return parsed as T;
   }
 
+  async function login(input: {
+    email: string;
+    password: string;
+    tenant_id: string;
+  }): Promise<AuthSession> {
+    const result = await request<AuthSession>("/api/v1/auth/login", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    currentToken = result.access_token;
+    onTokenRefreshed?.(result);
+    return result;
+  }
+
+  async function logout(): Promise<void> {
+    const csrfToken = readCookie("smart_ao_csrf");
+    await request<void>("/api/v1/auth/logout", {
+      method: "POST",
+      headers: csrfToken ? { "X-CSRF-Token": csrfToken } : undefined,
+    });
+    currentToken = "";
+  }
+
   return {
+    login,
+    refresh: refreshSession,
+    getCurrentActor: () => request<CurrentActor>("/api/v1/auth/me"),
+    logout,
     getBackendReadiness: () => request<BackendReadiness>("/healthz/ready"),
     listAssignedCases: () => request<AssignedCase[]>("/api/v1/cases/assigned"),
     listPatronAssignments: () =>
@@ -151,10 +247,10 @@ export function createApiClient(baseUrl: string, token: string) {
       const headers = new Headers();
       headers.set("Accept", "application/json");
       headers.set("Idempotency-Key", makeId());
-      if (token.trim()) headers.set("Authorization", `Bearer ${token.trim()}`);
+      if (currentToken.trim()) headers.set("Authorization", `Bearer ${currentToken.trim()}`);
       const response = await fetch(
         `${root}/api/v1/patron/enterprise/companies/${encodeURIComponent(companyId)}/documents/uploads/${encodeURIComponent(uploadId)}/content`,
-        { method: "PUT", headers, body: file },
+        { method: "PUT", headers, body: file, credentials: "include" },
       );
       const parsed = await parseResponseBody(response);
       if (!response.ok) {
@@ -188,7 +284,7 @@ export function createApiClient(baseUrl: string, token: string) {
       const form = new FormData();
       form.append("upload", file);
       const headers = new Headers({ Accept: "application/json" });
-      if (token.trim()) headers.set("Authorization", `Bearer ${token.trim()}`);
+      if (currentToken.trim()) headers.set("Authorization", `Bearer ${currentToken.trim()}`);
       const query = new URLSearchParams({ document_kind: documentKind });
       return fetch(
         `${root}/api/v1/patron/cases/${encodeURIComponent(caseId)}/pricing-import/preview?${query}`,
@@ -200,17 +296,11 @@ export function createApiClient(baseUrl: string, token: string) {
             "Idempotency-Key": makeId(),
           }),
           body: form,
+          credentials: "include",
         },
       ).then(async (response) => {
-        const body = await response.text();
-        const parsed = body ? JSON.parse(body) : undefined;
-        if (!response.ok) {
-          throw new Error(
-            typeof parsed?.detail === "string"
-              ? parsed.detail
-              : `La preview a échoué (${response.status}).`,
-          );
-        }
+        const parsed = await parseResponseBody(response);
+        if (!response.ok) throw apiError(response.status, parsed);
         return parsed as PricingImportPreview;
       });
     },
@@ -251,10 +341,10 @@ export function createApiClient(baseUrl: string, token: string) {
       ),
     downloadSubmissionPackage: async (submissionPackageId: string): Promise<Blob> => {
       const headers = new Headers({ Accept: "application/zip" });
-      if (token.trim()) headers.set("Authorization", `Bearer ${token.trim()}`);
+      if (currentToken.trim()) headers.set("Authorization", `Bearer ${currentToken.trim()}`);
       const response = await fetch(
         `${root}/api/v1/patron/submission-packages/${encodeURIComponent(submissionPackageId)}/export`,
-        { headers },
+        { headers, credentials: "include" },
       );
       if (!response.ok) {
         const body = await response.text();

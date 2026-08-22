@@ -117,6 +117,15 @@ class AccessTokenResponse(BaseModel):
     expires_in: int = 900
 
 
+class CurrentActorResponse(BaseModel):
+    """Minimal server-resolved identity facts safe for the browser shell."""
+
+    actor_id: UUID
+    identity_id: UUID
+    actor_kind: str
+    membership_state: str
+
+
 def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRouter:
     """Build anonymous authentication routes without coupling to business modules."""
     router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
@@ -240,6 +249,19 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
             max_age_seconds=_seconds_until(result.session_absolute_expires_at, runtime.clock.now()),
         )
         return response
+
+    @router.get("/me", response_model=CurrentActorResponse)
+    def current_actor(authorization: str | None = Header(default=None)) -> CurrentActorResponse:
+        context = _resolve_authenticated_context(
+            authorization=authorization,
+            context_resolver=runtime.context_resolver,
+        )
+        return CurrentActorResponse(
+            actor_id=context.actor_id,
+            identity_id=context.identity_id,
+            actor_kind=str(context.actor_kind),
+            membership_state=str(context.membership_state),
+        )
 
     @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
     def logout(

@@ -3,6 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 
+vi.mock("../features/auth/useAuthentication", () => ({
+  useAuthentication: () => ({
+    accessToken: "",
+    currentActor: null,
+    isRestoring: false,
+    isAuthenticated: false,
+    api: {},
+    login: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
+
 vi.mock("../features/connection/useBackendReadiness", () => ({
   useBackendReadiness: () => ({
     backendReadiness: {
@@ -23,7 +35,7 @@ describe("App readiness integration", () => {
   it("affiche l’état backend et les dépendances dans la configuration API", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Connexion API/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Connexion/ }));
 
     expect(screen.getByRole("heading", { name: "Connexion au backend" })).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Backend prêt");
