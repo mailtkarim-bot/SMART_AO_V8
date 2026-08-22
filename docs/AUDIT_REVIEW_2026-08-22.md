@@ -2,8 +2,8 @@
 
 **Date de mise à jour :** 22 août 2026
 **Branche :** `docs/pricing-http-next-lot-28`
-**HEAD vérifié :** `448382f` — `feat: connect browser authentication flow`
-**Périmètre :** six audits déjà consolidés, plus le nouveau `RAPPORT_AUDIT_SYSTEME_BTP.md` du 22 août 2026. Le nouveau rapport a été lu intégralement et confronté au HEAD `448382f`.
+**HEAD vérifié :** `295fde8` — merge de `audit/consolidated-remediation` avec conservation du flux d’authentification navigateur
+**Périmètre :** six audits déjà consolidés, le rapport système BTP et le rapport de gate Docker fournis le 22 août 2026, désormais archivés dans [`docs/operator-reports/`](operator-reports/). Les deux rapports ont été lus intégralement et confrontés au HEAD `295fde8`.
 **Méthode :** confrontation de chaque constat avec le code, les migrations, les tests, la configuration et les résultats locaux. Un finding n’est déclaré corrigé que lorsqu’il est reproduit ou directement démontré, puis couvert par un test ou un contrôle adapté.
 
 ## 1. Verdict exécutif
@@ -12,7 +12,7 @@ Les six rapports sont utiles, mais ils décrivent plusieurs HEAD historiques et 
 
 Les nouveaux risques effectivement confirmés des audits précédents ont été corrigés dans `ce0154f`, puis le nouveau rapport BTP a conduit à des corrections supplémentaires dans `0db2eff` : egress réseau de ClamAV et du worker webhook, lecture HTTP pricing bornée en chunks, exclusion des démonstrations/tests des images et audit pnpm frontend ; garde de taille décompressée pour DOCX, observabilité des erreurs ClamAV et d’extraction, parsing strict des verdicts ClamAV, arrondi monétaire commercial déterministe, normalisation des nombres européens, rejet des totaux pricing incohérents, protection PostgreSQL des snapshots financiers publiés, séparation des variables d’environnement Compose, contrôle d’alignement `PGPASSWORD`/`POSTGRES_PASSWORD` et verrouillage explicite de pnpm.
 
-Les sujets qui exigent une décision d’architecture ou un environnement réel ne sont pas artificiellement déclarés résolus. Cela concerne notamment l’authentification navigateur complète, le consommateur de projection `cockpit_projection`, la limitation de concurrence d’extraction, le stockage objet externe, le filtrage SSRF/DNS du webhook, la récupération de receipts distribués et la validation Docker/VPS.
+Les sujets qui exigent une décision d’architecture ou un environnement réel ne sont pas artificiellement déclarés résolus. Cela concerne notamment la validation HTTPS réelle du flux navigateur, le consommateur de projection `cockpit_projection`, la limitation de concurrence d’extraction, le stockage objet externe, le filtrage SSRF/DNS du webhook, la récupération de receipts distribués et la validation Docker/VPS.
 
 > **Conclusion :** le code local a été durci sur les findings reproductibles. La PR #49 ne doit toujours pas être fusionnée tant qu’un run GitHub n’a pas réellement exécuté ses étapes avec un runner attribué. L’absence de Docker/VPS dans cet environnement interdit également de déclarer le gate opérationnel terminé.
 
@@ -30,7 +30,7 @@ Les sujets qui exigent une décision d’architecture ou un environnement réel 
 | Timing oracle de login | Le chemin identité inconnue exécute un hash Argon2id factice avant le refus neutre. | Corrigé dans `d2d1701`. |
 | Import pricing chargé et contrôles ZIP incomplets | La preview pricing limite les lignes, vérifie les octets réellement décompressés et ne matérialise plus toutes les lignes avant la borne. | Corrigé dans `d2d1701`; le nouveau contrôle monétaire est ajouté dans `ce0154f`. |
 | Token et URL API frontend persistés | Le token est mémoire seulement et l’URL n’est plus lue depuis un stockage persistant ; HTTPS same-origin est imposé hors localhost. | Corrigé dans `d2d1701`; l’affirmation `localStorage` des rapports 5 et 6 est historique. |
-| Frontend sans tests et `App.tsx` de 803 lignes | Le HEAD actuel contient 17 fichiers de tests, `App.tsx` est réduit et les features pricing/submission sont extraites. | Faux/obsolète ; 65 tests frontend passent. |
+| Frontend sans tests et `App.tsx` de 803 lignes | Le HEAD actuel contient 18 fichiers de tests, `App.tsx` est réduit et les features pricing/submission sont extraites. | Faux/obsolète ; 74 tests frontend passent. |
 | OpenAPI actif en production | Le bootstrap de production désactive OpenAPI, Swagger et ReDoc tout en les conservant en développement/tests. | Corrigé dans `d2d1701`. |
 | CSP edge absente | Le Caddyfile actuel contient une CSP same-origin et une limite de corps de 150 MiB. | Corrigé dans `d2d1701`. |
 | Packaging frontend runtime/build mélangé | Vite, TypeScript et le plugin React sont sous `devDependencies`. | Corrigé dans `d2d1701`. |
@@ -68,7 +68,7 @@ Les sujets qui exigent une décision d’architecture ou un environnement réel 
 
 | Sujet | Pourquoi il reste ouvert |
 |---|---|
-| Authentification navigateur complète | Le backend possède login/refresh/logout avec cookie HttpOnly et CSRF, mais le cockpit reste un client provisoire à bearer saisi manuellement. Construire le flux utilisateur complet est un lot produit/frontend distinct, avec tests navigateur et renouvellement 401. |
+| Validation navigateur HTTPS réelle | Le backend et le cockpit possèdent désormais login/refresh/logout avec cookie HttpOnly, CSRF, profil `/auth/me`, token mémoire et renouvellement contrôlé sur 401. Les tests locaux passent, mais le parcours doit encore être exercé sur une URL HTTPS réelle avec cookies Secure. |
 | Couverture endpoint frontend | Plusieurs opérations DCE, créations/archives pricing, workflows de blocage, publications et écritures patronales ne sont pas encore consommées par le cockpit. Le chiffre exact des rapports dépend de leur HEAD ; la lacune fonctionnelle est réelle mais ne se corrige pas par un simple alias d’API. |
 | Topic `cockpit_projection` sans consommateur | Le dispatcher et certains handlers produisent ce topic alors que les workers visibles consomment surtout `submission.package.exported` et `dce_staging_retention`. Le finding structurel est confirmé ; supprimer les messages ou les marquer publiés sans projection métier serait dangereux. Il faut d’abord définir le projection builder et sa reconstruction. |
 | Recovery de receipts PROCESSING | Les statuts et index de recovery existent, mais le dispatcher crée le receipt et le handler dans une même transaction : un crash avant commit annule le receipt plutôt que de laisser durablement `PROCESSING`. Le besoin de recovery distribué peut exister pour d’autres modes d’exécution, mais le scénario décrit n’est pas démontré avec ce dispatcher. Il est donc différé, pas présenté comme corrigé. |
@@ -98,7 +98,7 @@ Les sujets qui exigent une décision d’architecture ou un environnement réel 
 | Deux tests de concurrence seulement, couverture `.coverage` racine ou compteurs LOC comme preuve de qualité | Non démontré de manière reproductible et insuffisant comme critère isolé. Les tests sont répartis dans plusieurs suites et les métriques doivent être produites par le pipeline courant. |
 | LLM, prompt injection, path traversal ou défaut d’isolation tenant dans DCE | Non reproduits ; les contrôles vérifiés sont présents. |
 
-### 2.6 Nouveau rapport système BTP : findings vérifiés au HEAD `0db2eff`
+### 2.6 Nouveau rapport système BTP : findings revérifiés au HEAD `295fde8`
 
 | Finding | Verdict au HEAD actuel | Action |
 |---|---|---|
@@ -115,37 +115,37 @@ Les sujets qui exigent une décision d’architecture ou un environnement réel 
 | H-06 — mypy/pyright absent | Confirmé comme écart documentaire si le noyau exige une vérification statique obligatoire ; ce n’est pas une faille runtime reproduite. | Ajouter progressivement le typage dans un lot qualité séparé, après le vertical slice produit. |
 | H-07 — E2E multi-modules, concurrence réelle et charge absents | Confirmé comme couverture manquante ; les tests unitaires et DB existants ne constituent pas une preuve de charge réelle. | À exécuter sur PostgreSQL/Docker réel avec critères d’arrêt, sans gonfler artificiellement la couverture. |
 | H-08 — dead-letter/alerting webhook absents | Confirmé et déjà classé dette. | À traiter avec plafond de retries, état terminal, alerte et runbook. |
-| H-09 — erreurs frontend silencieuses | Partiellement confirmé : parsing non JSON et erreurs auth sont maintenant transportés, mais certaines branches métier remettent encore l’état à vide sans feedback. | Le flux auth est corrigé ; les erreurs métier restantes seront traitées avec le cockpit et les parcours E2E. |
+| H-09 — erreurs frontend silencieuses | Confirmé puis corrigé pour les trois chargements du cockpit concernés. | `refreshActions` et `refreshScenarios` affichent maintenant l’erreur sans effacer silencieusement l’état utile ; `refreshDecisionDossier` traite 404 comme absence normale et expose les autres erreurs. Tests App dédiés ajoutés. |
 | H-10 — classification RC naïve | Risque plausible mais non mesuré comme défaut universel ; le classifieur est déterministe et borné, mais les négations/portées sont limitées. | Ajouter un corpus de cas BTP et une politique de confirmation humaine avant toute réécriture. |
 | M-11 — garde lexicale financière incomplète | Risque confirmé en théorie, mais aucune fuite reproductible démontrée dans les contrats actuels ; le système bloque déjà plusieurs motifs et filtre les contrats collaborateur. | Renforcer par tests de montants/devise et classification, sans regex destructrice non validée. |
 | M-12/M-13/M-14 — scaffolding, router/linter et drift documentaire | Plusieurs éléments sont vrais comme dette ; les démonstrations/tests sont désormais exclus des images, mais le router et l’outillage frontend restent incomplets et les chiffres historiques doivent rester datés. | Nettoyage documentaire et frontend à planifier ; aucun impact immédiat à masquer comme “prod ready”. |
 
-### 2.7 Priorité de mise en production issue du rapport BTP
+### 2.7 Priorité de mise en production issue des rapports BTP et gate Docker
 
 Le projet ne sera déclaré **prod ready** qu’après quatre preuves indépendantes : (1) CI GitHub réellement exécutée et verte, (2) déploiement Docker/VPS avec egress, migration, HTTPS, health JSON, EICAR et backups/restauration, (3) authentification navigateur exercée sur HTTPS réel sans bearer manuel, et (4) parcours métier validé sur un DCE réel. Le flux auth est maintenant implémenté et testé localement, mais sa preuve navigateur sur HTTPS réel reste ouverte. Le nouveau rapport a raison de recommander de geler les optimisations de couverture non critiques, mais les invariants de confidentialité financière, d’idempotence, d’append-only et de fail-closed restent non négociables.
 
-## 3. Corrections et tests des commits `ce0154f`, `0db2eff` et `448382f`
+## 3. Corrections et tests des commits `ce0154f`, `0db2eff`, `448382f` et `295fde8`
 
-Le commit `ce0154f` ajoute la migration `20260822_0049_financial_snapshot_immutability.py`, les protections d’extraction DOCX, les logs bornés, le parseur monétaire, la séparation Compose et les contrats de non-régression associés. Le commit `42839b5` ajoute ensuite la validation JSON des healthchecks, l’horodatage réel `completed_at` des receipts, l’exclusion Docker des démonstrations/tests et l’audit pnpm frontend en CI. Le commit `0db2eff` corrige l’egress Compose de ClamAV et du worker webhook, borne la lecture HTTP pricing par chunks et ajoute les tests de rejet 413. Le commit `448382f` ajoute le profil serveur `/api/v1/auth/me`, le hook frontend login/refresh/logout, la restauration par cookie CSRF, le rejeu contrôlé après 401 et le retrait complet du bearer manuel de la modale. Les nouveaux tests couvrent notamment : archive DOCX au-delà de la limite décompressée, alerte ClamAV sans fuite de message, réponse ClamAV non conforme, arrondi half-up, nombres européens, total incohérent, trigger DB de snapshot publié, allowlists Compose et validation des mots de passe préproduction.
+Le commit `ce0154f` ajoute la migration `20260822_0049_financial_snapshot_immutability.py`, les protections d’extraction DOCX, les logs bornés, le parseur monétaire, la séparation Compose et les contrats de non-régression associés. Le commit `42839b5` ajoute ensuite la validation JSON des healthchecks, l’horodatage réel `completed_at` des receipts, l’exclusion Docker des démonstrations/tests et l’audit pnpm frontend en CI. Le commit `0db2eff` corrige l’egress Compose de ClamAV et du worker webhook, borne la lecture HTTP pricing par chunks et ajoute les tests de rejet 413. Le commit `448382f` ajoute le profil serveur `/api/v1/auth/me`, le hook frontend login/refresh/logout, la restauration par cookie CSRF, le rejeu contrôlé après 401 et le retrait complet du bearer manuel de la modale. Le merge `295fde8` ajoute les ignores Docker spécifiques aux Dockerfiles, l’override PostgreSQL local, les defaults JWT strictement dev-only, archive les deux rapports fournis et rend visibles les erreurs des trois chargements cockpit sans réintroduire de bearer manuel. Les tests couvrent notamment : archive DOCX au-delà de la limite décompressée, alerte ClamAV sans fuite de message, réponse ClamAV non conforme, arrondi half-up, nombres européens, total incohérent, trigger DB de snapshot publié, allowlists Compose et validation des mots de passe préproduction.
 
 ## 4. Validation locale finale
 
 | Contrôle | Résultat |
 |---|---|
-| Backend complet | **1 074 passed, 7 warnings tiers**. |
-| Tests ciblés nouveaux/impactés | **7 passed** sur l’authentification backend ; frontend auth/API couvert par 7 tests dédiés, en plus des tests précédents. |
-| Frontend Vitest | **71 passed dans 18 fichiers**. |
+| Backend complet | **1 074 passed, 7 warnings tiers**, couverture **92,87 %** avec seuil strict 85,50 % atteint. |
+| Tests ciblés nouveaux/impactés | **41 passed** sur pricing et contrats ops ; les tests auth backend existants restent verts. |
+| Frontend Vitest | **74 passed dans 18 fichiers**. |
 | Build frontend | `tsc -b` et `vite build` verts. |
 | Ruff | Vert sur le dépôt. |
 | Bandit | Vert sur `backend/app`. |
 | detect-secrets | Vert avec les exclusions et la baseline prévues ; warnings de commentaires non bloquants. |
-| Alembic | `upgrade head` puis `alembic check` verts ; head `20260822_0049`. Après une suite pytest, l’upgrade doit précéder `alembic check` car certaines fixtures de test nettoient le schéma. |
+| Alembic | La base locale initialement en retard a été mise à niveau par `upgrade head`, puis `alembic check` a confirmé **No new upgrade operations detected** ; head `20260822_0049`. Après une suite pytest, l’upgrade doit précéder `alembic check` car certaines fixtures nettoient le schéma. |
 | Diff | `git diff --check` vert. |
-| Docker/Caddy/HTTPS/ClamAV réel | Non exécutés dans le sandbox. Aucun VPS n’est disponible ; ce gate reste ouvert. |
+| Docker/Caddy/HTTPS/ClamAV réel | Docker est indisponible dans le sandbox et aucun VPS n’est disponible. Le rapport opérateur fourni affirme un gate externe, mais ses logs/artifacts ne sont pas présents ici : preuve archivée, non revalidée. |
 
 ## 5. GitHub et séquencement
 
-Le code de ce lot est poussé sur la branche de la PR #49 :
+Le code de ce lot est poussé sur la branche de la PR #49. Le commit de merge `295fde8` intègre les changements retenus de `audit/consolidated-remediation` sans écraser le flux auth récent :
 
 - `448382f` — `feat: connect browser authentication flow`
 - `0db2eff` — `fix: unblock preprod egress and bound pricing uploads`
@@ -154,7 +154,7 @@ Le code de ce lot est poussé sur la branche de la PR #49 :
 - `1264fc7` — réconciliation documentaire précédente
 - `d2d1701` — première remédiation de sécurité confirmée
 
-Le healthcheck local valide désormais le corps JSON de liveness/readiness, la CI contient un audit pnpm de production, Compose donne un egress explicite uniquement à ClamAV et au worker webhook, et le frontend possède désormais un flux auth navigateur localement testé. La PR #49 reste ouverte et ne doit pas être fusionnée tant qu’un runner GitHub n’a pas exécuté les étapes backend, frontend et image-security. Le run `32585516192` sur `448382f` échoue avec `runnerName: null`, `steps: []` et zéro étape pour `backend`, `frontend` et `image-security`. Comme les runs précédents, dont `32571448526`, il s’agit d’un échec d’attribution de runner avant tout test ; ce n’est donc ni une preuve de réussite ni une preuve de régression du code. Le prochain lot métier `SUBMISSION-SIGNATURE-HTTP-01` reste bloqué jusqu’à une CI réellement exécutée et verte, conformément au séquencement demandé.
+Le healthcheck local valide désormais le corps JSON de liveness/readiness, la CI contient un audit pnpm de production, Compose donne un egress explicite uniquement à ClamAV et au worker webhook, et le frontend possède un flux auth navigateur localement testé. La PR #49 reste ouverte et ne doit pas être fusionnée tant qu’un runner GitHub n’a pas exécuté les étapes backend, frontend et image-security. Le run le plus récent `32593055484` sur `295fde8` s’est terminé en échec en quelques secondes avec `steps: []` pour `backend`, `frontend` et `image-security` ; les jobs n’ont donc exécuté aucun code. Comme les runs précédents, il s’agit d’un échec d’attribution de runner avant tout test, et non d’un verdict fonctionnel. Le prochain lot métier `SUBMISSION-SIGNATURE-HTTP-01` reste bloqué jusqu’à une CI réellement exécutée et verte, conformément au séquencement demandé.
 
 ## Références de code et de rapports
 
@@ -178,4 +178,5 @@ Le healthcheck local valide désormais le corps JSON de liveness/readiness, la C
 [18]: /home/ubuntu/upload/pasted_content_4.txt "Audit DCE joint dans cette itération"
 [19]: /home/ubuntu/upload/pasted_content_5.txt "Audit DevOps/frontend joint dans cette itération"
 [20]: /home/ubuntu/upload/pasted_content_6.txt "Audit backend/finance/outbox joint dans cette itération"
-[21]: /home/ubuntu/upload/RAPPORT_AUDIT_SYSTEME_BTP.md "Nouveau rapport système BTP du 22 août 2026"
+[21]: operator-reports/RAPPORT_AUDIT_SYSTEME_BTP.md "Rapport système BTP fourni le 22 août 2026, archivé comme preuve opérateur non reproduite localement"
+[22]: operator-reports/RAPPORT_GATE_DOCKER_2026-08-22.md "Rapport de gate Docker fourni le 22 août 2026, non revalidable dans le sandbox sans Docker"
