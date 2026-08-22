@@ -9,12 +9,12 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | [`ce0154f`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/ce0154f) — durcissement DCE, pricing, financier et préproduction après les trois audits supplémentaires. |
+| Commit courant | [`f349c08`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/f349c08) — réconciliation documentaire des six audits ; code de durcissement dans [`ce0154f`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/ce0154f). |
 | Branche | `docs/pricing-http-next-lot-28`, PR [#49](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/49), mergeable mais non fusionnée. |
 | Corrections et durcissement récents | PR #42 readiness frontend ; PR #43 test App.tsx et plan métier ; PR #44 réconciliation documentaire ; PR #45 tests pricing ; PR #46 FK composite Case ; PR #47 création PREVIEWED ; PR #48 validation canonique ; commits `a12e375`, `d2f0d2e` et `5a2c9e5` du lot HTTP pricing. |
 | Validation courante | Suite backend complète locale : **1 067 tests verts**, 7 warnings tiers. Tests ciblés du lot : **54 tests verts**. Frontend : **65 tests Vitest dans 17 fichiers** ; build TypeScript strict + Vite vert. Alembic `upgrade head/check`, Ruff, Bandit, detect-secrets et `git diff --check` sont verts. |
-| CI | Le run `32571448526` sur `d2d1701` échoue en environ 5 secondes pour backend, frontend et image-security, avec `steps: []` et aucun job exécuté. Le run du nouveau commit `ce0154f` doit encore être vérifié ; aucun run sans étapes ne constitue une validation fonctionnelle. |
-| Frontière restante | Faire exécuter une CI complète sur `ce0154f` puis fusionner PR #49. Ensuite seulement, démarrer `SUBMISSION-SIGNATURE-HTTP-01`. Le gate Docker réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
+| CI | Le dernier run `32573874017` sur `ce0154f` échoue en environ 5 secondes pour backend, frontend et image-security, avec `runnerName: null` et `steps: []`. Aucun code CI n’a été exécuté ; ce verdict est infrastructurel, pas fonctionnel. Aucun run distinct sur le commit documentaire `f349c08` n’est visible dans la liste récente. |
+| Frontière restante | Rétablir l’attribution runner puis faire exécuter une CI complète sur `f349c08`/le code `ce0154f` avant de fusionner PR #49. Ensuite seulement, démarrer `SUBMISSION-SIGNATURE-HTTP-01`. Le gate Docker réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
 
 ## Ce qui est terminé
 
