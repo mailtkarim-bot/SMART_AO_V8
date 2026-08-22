@@ -135,6 +135,8 @@ from app.modules.enterprise.infrastructure.insee_registry import (
     InseeSireneRegistry,
 )
 from app.modules.knowledge.application.service import KnowledgeRetrievalService
+from app.modules.market_watch.application.ports import PublicNoticeSearchPort
+from app.modules.market_watch.infrastructure.boamp import BoampReadOnlySearch
 from app.modules.membership.application.assignment import (
     AssignmentInteractionService,
     assignment_handlers,
@@ -256,6 +258,7 @@ class AppRuntime:
     company_registry: CompanyRegistryPort | None = None
     submission_export_notifier: SubmissionExportNotificationPort | None = None
     submission_deadline_calendar: SubmissionDeadlineCalendarPort | None = None
+    public_notice_search: PublicNoticeSearchPort | None = None
 
     @classmethod
     def create(
@@ -268,6 +271,7 @@ class AppRuntime:
         company_registry = _build_company_registry()
         submission_export_notifier = _build_submission_export_notifier()
         submission_deadline_calendar = _build_submission_deadline_calendar()
+        public_notice_search = _build_public_notice_search()
         dispatcher = CommandDispatcher(
             session_factory=session_factory,
             handlers={
@@ -328,6 +332,7 @@ class AppRuntime:
             company_registry=company_registry,
             submission_export_notifier=submission_export_notifier,
             submission_deadline_calendar=submission_deadline_calendar,
+            public_notice_search=public_notice_search,
         )
 
     def get_dce_staged_object_upload_target(
@@ -538,6 +543,18 @@ def _build_submission_deadline_calendar() -> SubmissionDeadlineCalendarPort | No
     if os.getenv("SMART_AO_CALENDAR_ENABLED", "0") != "1":
         return None
     return IcsSubmissionDeadlineCalendar()
+
+
+def _build_public_notice_search() -> PublicNoticeSearchPort | None:
+    if os.getenv("SMART_AO_BOAMP_ENABLED", "0") != "1":
+        return None
+    return BoampReadOnlySearch(
+        base_url=os.getenv(
+            "SMART_AO_BOAMP_BASE_URL",
+            "https://www.boamp.fr/api/explore/v2.1/catalog/datasets/boamp/records",
+        ),
+        timeout_seconds=float(os.getenv("SMART_AO_BOAMP_TIMEOUT_SECONDS", "5")),
+    )
 
 
 def _build_preparation_storage() -> GeneratedDocumentStorage:

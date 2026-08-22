@@ -147,3 +147,28 @@ def test_app_runtime_builds_calendar_export_when_explicitly_enabled(monkeypatch)
     calendar = application._build_submission_deadline_calendar()
 
     assert isinstance(calendar, FakeCalendar)
+
+
+def test_app_runtime_keeps_boamp_search_disabled_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("SMART_AO_BOAMP_ENABLED", raising=False)
+
+    assert application._build_public_notice_search() is None
+
+
+def test_app_runtime_builds_boamp_search_when_explicitly_enabled(monkeypatch) -> None:
+    class FakeSearch:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+    monkeypatch.setenv("SMART_AO_BOAMP_ENABLED", "1")
+    monkeypatch.setenv("SMART_AO_BOAMP_BASE_URL", "https://boamp.example.test/records")
+    monkeypatch.setenv("SMART_AO_BOAMP_TIMEOUT_SECONDS", "9")
+    monkeypatch.setattr(application, "BoampReadOnlySearch", FakeSearch)
+
+    search = application._build_public_notice_search()
+
+    assert isinstance(search, FakeSearch)
+    assert search.kwargs == {
+        "base_url": "https://boamp.example.test/records",
+        "timeout_seconds": 9.0,
+    }

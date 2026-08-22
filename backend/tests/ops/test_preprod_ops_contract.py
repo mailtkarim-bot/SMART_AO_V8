@@ -206,3 +206,14 @@ def test_optional_calendar_build_flag_is_explicit() -> None:
     assert 'pip install --no-cache-dir ".[calendar]"' in dockerfile
     assert "SMART_AO_INSTALL_CALENDAR" in compose
     assert "SMART_AO_CALENDAR_ENABLED: ${SMART_AO_CALENDAR_ENABLED:-0}" in compose
+
+
+def test_boamp_public_search_is_explicit_and_secretless() -> None:
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    backend = compose.split("  backend:", maxsplit=1)[1].split(
+        "  dce-retention-worker:", maxsplit=1
+    )[0]
+    assert "SMART_AO_BOAMP_ENABLED: ${SMART_AO_BOAMP_ENABLED:-0}" in backend
+    assert "SMART_AO_BOAMP_BASE_URL" in backend
+    assert "SMART_AO_BOAMP_TIMEOUT_SECONDS" in backend
+    assert "BOAMP_API_TOKEN" not in compose
