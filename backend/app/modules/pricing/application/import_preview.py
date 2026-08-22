@@ -127,11 +127,11 @@ class PricingImportPreviewService:
 
     def _authorize(self, *, actor: ActorContext, case_id) -> None:
         if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
-            raise PermissionError("PATRON_REQUIRED")
+            raise PermissionError("FINANCIAL_REPORT_PATRON_REQUIRED")
         decision = self._policy.authorize(
             context=actor,
             request=AuthorizationRequest(
-                action=Capability.PRICING_WRITE,
+                action=Capability.FINANCIAL_REPORT_LINE_WRITE,
                 resource=AuthorizationResource(
                     resource_type="PRICING_IMPORT",
                     resource_id=case_id,

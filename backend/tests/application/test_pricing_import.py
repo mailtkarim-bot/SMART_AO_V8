@@ -101,7 +101,7 @@ def test_pricing_import_preview_refuses_collaborator_before_reading_financial_ro
         actor_kind=ActorKind.COLLABORATEUR,
         capabilities=capabilities_for(ActorKind.COLLABORATEUR),
     )
-    with pytest.raises(PermissionError, match="PATRON_REQUIRED"):
+    with pytest.raises(PermissionError, match="FINANCIAL_REPORT_PATRON_REQUIRED"):
         PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
             actor=collaborator,
             case_id=case_id,

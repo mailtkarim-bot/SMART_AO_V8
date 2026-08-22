@@ -130,7 +130,14 @@ def build_patron_pricing_import_router(
                     http_status = status.HTTP_409_CONFLICT
                 else:
                     http_status = status.HTTP_422_UNPROCESSABLE_CONTENT
-                raise HTTPException(status_code=http_status, detail=code) from error
+                detail = (
+                    "NOT_FOUND_OR_FORBIDDEN"
+                    if http_status == status.HTTP_404_NOT_FOUND
+                    else "IDEMPOTENCY_CONFLICT"
+                    if http_status == status.HTTP_409_CONFLICT
+                    else "COMMAND_REJECTED"
+                )
+                raise HTTPException(status_code=http_status, detail=detail) from error
 
             if response is not None:
                 response.status_code = (
@@ -208,7 +215,12 @@ def build_patron_pricing_import_router(
                     if code == "NOT_FOUND_OR_FORBIDDEN"
                     else status.HTTP_403_FORBIDDEN
                 )
-                raise HTTPException(status_code=http_status, detail=code) from error
+                detail = (
+                    "NOT_FOUND_OR_FORBIDDEN"
+                    if http_status == status.HTTP_404_NOT_FOUND
+                    else "FORBIDDEN"
+                )
+                raise HTTPException(status_code=http_status, detail=detail) from error
             return PricingImportBatchReadResponse(
                 batch_id=projection.batch_id,
                 case_id=projection.case_id,
@@ -290,7 +302,14 @@ def build_patron_pricing_import_router(
                     http_status = status.HTTP_409_CONFLICT
                 else:
                     http_status = status.HTTP_422_UNPROCESSABLE_CONTENT
-                raise HTTPException(status_code=http_status, detail=code) from error
+                detail = (
+                    "NOT_FOUND_OR_FORBIDDEN"
+                    if http_status == status.HTTP_404_NOT_FOUND
+                    else "CONFLICT"
+                    if http_status == status.HTTP_409_CONFLICT
+                    else "COMMAND_REJECTED"
+                )
+                raise HTTPException(status_code=http_status, detail=detail) from error
             response.status_code = (
                 status.HTTP_200_OK if receipt.replayed else status.HTTP_201_CREATED
             )

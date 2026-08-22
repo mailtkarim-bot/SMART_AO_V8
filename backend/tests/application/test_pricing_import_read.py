@@ -3,10 +3,16 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+import sqlalchemy as sa
 from app.modules.pricing.application.import_read import PricingImportReadService
-from app.platform.security.authorization import AuthorizationPolicy
-from app.platform.security.context import ActorKind
-from app.platform.security.models import PricingImportTransitionRecord
+from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
+from app.platform.security.authorization import AuthorizationDecision, AuthorizationPolicy
+from app.platform.security.capabilities import Capability
+from app.platform.security.context import ActorKind, DataClassification
+from app.platform.security.models import (
+    PricingImportTransitionRecord,
+    SecurityAuditEventRecord,
+)
 
 from tests.application.test_financial_report_draft_lines import _seed_draft
 from tests.application.test_pricing_import_commit import _batch_and_rows
@@ -14,10 +20,24 @@ from tests.application.test_pricing_import_commit import _batch_and_rows
 NOW = datetime(2026, 8, 22, 12, 0, tzinfo=UTC)
 
 
-def _service(session_factory):
+class _DenyPolicy:
+    def authorize(self, *, context, request):
+        return AuthorizationDecision.denied(reason="test")
+
+
+class _RecordingPolicy:
+    def __init__(self):
+        self.requests = []
+
+    def authorize(self, *, context, request):
+        self.requests.append(request)
+        return AuthorizationDecision.allow()
+
+
+def _service(session_factory, *, policy=None):
     return PricingImportReadService(
         session_factory=session_factory,
-        policy=AuthorizationPolicy(),
+        policy=policy or AuthorizationPolicy(),
     )
 
 
@@ -27,6 +47,57 @@ def _persist_batch(session_factory, actor, case_id):
         session.add(batch)
         session.add_all(rows)
     return batch
+
+
+def test_persisted_reader_denial_is_audited_without_business_payload(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    batch = _persist_batch(session_factory, actor, case_id)
+    service = PricingImportReadService(
+        session_factory=session_factory,
+        policy=AuditedAuthorizationPolicy(
+            policy=_DenyPolicy(),
+            session_factory=session_factory,
+            writer=SecurityAuditWriter(),
+        ),
+    )
+
+    with pytest.raises(PermissionError, match="FORBIDDEN"):
+        service.get(actor=actor, case_id=case_id, batch_id=batch.id, now=NOW)
+
+    with session_factory() as session:
+        audit = session.scalar(
+            sa.select(SecurityAuditEventRecord)
+            .where(
+                SecurityAuditEventRecord.tenant_id == actor.tenant_id,
+                SecurityAuditEventRecord.action
+                == "financial.report.line.write",
+                SecurityAuditEventRecord.resource_id == batch.id,
+            )
+            .order_by(SecurityAuditEventRecord.occurred_at.desc())
+            .limit(1)
+        )
+
+    assert audit is not None
+    assert audit.event_type == "AUTHZ_DENIED"
+    assert audit.metadata_json == {"channel": "policy"}
+    assert "total_minor" not in audit.metadata_json
+
+
+def test_persisted_reader_uses_financial_line_write_private_policy(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    batch = _persist_batch(session_factory, actor, case_id)
+    policy = _RecordingPolicy()
+
+    _service(session_factory, policy=policy).get(
+        actor=actor,
+        case_id=case_id,
+        batch_id=batch.id,
+        now=NOW,
+    )
+
+    request = policy.requests[0]
+    assert request.action == Capability.FINANCIAL_REPORT_LINE_WRITE
+    assert request.resource.classification is DataClassification.FINANCIAL_PRIVATE
 
 
 def test_patron_reads_ordered_normalized_preview_rows(session_factory):

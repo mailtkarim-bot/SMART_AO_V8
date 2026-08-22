@@ -84,7 +84,7 @@ class PricingImportReadService:
             decision = self._policy.authorize(
                 context=actor,
                 request=AuthorizationRequest(
-                    action=Capability.FINANCIAL_REPORT_READ,
+                    action=Capability.FINANCIAL_REPORT_LINE_WRITE,
                     resource=AuthorizationResource(
                         resource_type="PRICING_IMPORT",
                         resource_id=batch.id,

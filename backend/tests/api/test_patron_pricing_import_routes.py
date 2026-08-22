@@ -224,12 +224,12 @@ def test_pricing_import_commit_route_is_not_registered_without_service():
     ("error", "status_code", "detail"),
     [(PermissionError("FORBIDDEN"), 403, "FORBIDDEN"),
      (CommandExecutionError("IMPORT_NOT_FOUND_OR_FORBIDDEN"), 404,
-      "IMPORT_NOT_FOUND_OR_FORBIDDEN"),
+      "NOT_FOUND_OR_FORBIDDEN"),
      (CommandExecutionError("FINANCIAL_REPORT_NOT_FOUND_OR_FORBIDDEN"), 404,
-      "FINANCIAL_REPORT_NOT_FOUND_OR_FORBIDDEN"),
-     (CommandExecutionError("VERSION_CONFLICT"), 409, "VERSION_CONFLICT"),
-     (CommandExecutionError("IMPORT_ALREADY_COMMITTED"), 409, "IMPORT_ALREADY_COMMITTED"),
-     (CommandExecutionError("INVALID_ROW"), 422, "INVALID_ROW")],
+      "NOT_FOUND_OR_FORBIDDEN"),
+     (CommandExecutionError("VERSION_CONFLICT"), 409, "CONFLICT"),
+     (CommandExecutionError("IMPORT_ALREADY_COMMITTED"), 409, "CONFLICT"),
+     (CommandExecutionError("INVALID_ROW"), 422, "COMMAND_REJECTED")],
 )
 def test_pricing_import_commit_maps_service_errors(error, status_code, detail):
     response = _client(commit_service=_CommitService(error=error)).post(
@@ -332,8 +332,8 @@ def test_pricing_import_preview_replay_returns_200_and_replayed_receipt():
     ("error", "status_code", "detail"),
     [
         (PermissionError("FORBIDDEN"), 403, "FORBIDDEN"),
-        (CommandExecutionError("IDEMPOTENCY_KEY_REUSED"), 409, "IDEMPOTENCY_KEY_REUSED"),
-        (CommandExecutionError("IMPORT_ROWS_INVALID"), 422, "IMPORT_ROWS_INVALID"),
+        (CommandExecutionError("IDEMPOTENCY_KEY_REUSED"), 409, "IDEMPOTENCY_CONFLICT"),
+        (CommandExecutionError("IMPORT_ROWS_INVALID"), 422, "COMMAND_REJECTED"),
     ],
 )
 def test_pricing_import_preview_creation_maps_service_errors(error, status_code, detail):
@@ -422,7 +422,7 @@ def test_pricing_import_preview_reused_key_with_changed_source_returns_409():
 
     assert first.status_code == 201
     assert conflict.status_code == 409
-    assert conflict.json() == {"detail": "IDEMPOTENCY_KEY_REUSED"}
+    assert conflict.json() == {"detail": "IDEMPOTENCY_CONFLICT"}
     assert len(creation_service._receipt_by_key) == 1
 
 
@@ -477,4 +477,4 @@ def test_pricing_import_commit_maps_idempotency_key_reuse_to_409():
     )
 
     assert response.status_code == 409
-    assert response.json() == {"detail": "IDEMPOTENCY_KEY_REUSED"}
+    assert response.json() == {"detail": "CONFLICT"}

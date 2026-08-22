@@ -23,8 +23,12 @@ from app.platform.persistence.models import (
     DomainEventRecord,
     OutboxMessageRecord,
 )
-from app.platform.security.authorization import AuthorizationPolicy
-from app.platform.security.context import ActorKind
+from app.platform.security.authorization import (
+    AuthorizationDecision,
+    AuthorizationPolicy,
+)
+from app.platform.security.capabilities import Capability
+from app.platform.security.context import ActorKind, DataClassification
 from app.platform.security.models import (
     PricingImportBatchRecord,
     PricingImportRowRecord,
@@ -67,15 +71,39 @@ def _command(case_id, *, command_id=None, idempotency_key=None, rows=None):
     )
 
 
-def _service(session_factory):
+class _RecordingPolicy:
+    def __init__(self):
+        self.requests = []
+
+    def authorize(self, *, context, request):
+        self.requests.append(request)
+        return AuthorizationDecision.allow()
+
+
+def _service(session_factory, *, policy=None):
     return PricingImportCreationService(
         session_factory=session_factory,
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
             handlers=pricing_import_creation_handlers(),
         ),
-        policy=AuthorizationPolicy(),
+        policy=policy or AuthorizationPolicy(),
     )
+
+
+def test_persisted_creation_uses_financial_line_write_private_policy(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    policy = _RecordingPolicy()
+
+    _service(session_factory, policy=policy).create(
+        actor=actor,
+        command=_command(case_id),
+        now=NOW,
+    )
+
+    request = policy.requests[0]
+    assert request.action == Capability.FINANCIAL_REPORT_LINE_WRITE
+    assert request.resource.classification is DataClassification.FINANCIAL_PRIVATE
 
 
 def test_creation_persists_preview_batch_rows_and_non_financial_event(session_factory):
