@@ -2,7 +2,7 @@
 
 **Date de vérification :** 22 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**HEAD de référence :** `50ffe26` (slices knowledge/optimization publiés et validés localement)
+**HEAD de référence :** `73d3e79` (slices knowledge/optimization publiés et validés localement)
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
