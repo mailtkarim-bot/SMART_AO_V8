@@ -57,6 +57,7 @@ def _chunk(
         chunk_id=UUID(chunk_id),
         tenant_id=tenant_id,
         case_id=case_id,
+        dce_version_id=case_id,
         source_fragment_id=UUID(chunk_id),
         ordinal=1,
         text=text,
