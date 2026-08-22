@@ -187,6 +187,21 @@ def test_pricing_import_preview_returns_rows_and_query_document_kind():
     assert service.calls[0]["payload"] == b"A-1;Ouvrage"
 
 
+def test_pricing_import_preview_rejects_oversized_upload_before_service():
+    from app.modules.pricing.application.import_preview import MAX_UPLOAD_BYTES
+
+    service = _PreviewService()
+    oversized = b"x" * (MAX_UPLOAD_BYTES + 1)
+    response = _client(service=service).post(
+        f"/api/v1/patron/cases/{uuid4()}/pricing-import/preview",
+        files={"upload": ("dpgf.csv", oversized, "text/csv")},
+        headers=_headers(),
+    )
+    assert response.status_code == 413
+    assert response.json()["detail"] == "pricing_import_too_large"
+    assert service.calls == []
+
+
 @pytest.mark.parametrize(
     ("error", "status_code", "detail"),
     [(PermissionError("FORBIDDEN"), 403, "FORBIDDEN"),
@@ -478,23 +493,3 @@ def test_pricing_import_commit_maps_idempotency_key_reuse_to_409():
 
     assert response.status_code == 409
     assert response.json() == {"detail": "CONFLICT"}
-
-
-
-def test_pricing_import_preview_rejects_oversized_upload_before_service_call() -> None:
-    preview_service = _PreviewService()
-    response = _client(service=preview_service).post(
-        f"/api/v1/patron/cases/{uuid4()}/pricing-import/preview",
-        files={
-            "upload": (
-                "pricing.xlsx",
-                b"x" * (10 * 1024 * 1024 + 1),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-        },
-        headers={"Authorization": "Bearer test-token"},
-    )
-
-    assert response.status_code == 413
-    assert response.json() == {"detail": "pricing_import_too_large"}
-    assert preview_service.calls == []

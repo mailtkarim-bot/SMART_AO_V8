@@ -213,24 +213,42 @@ function App() {
     try {
       const result = await api.listPatronActions();
       setActions(result.items);
-    } catch {
-      setActions([]);
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de charger les actions.",
+      });
     }
   }
 
   async function refreshScenarios(caseId: string) {
     try {
       setScenarios(await api.listPricingScenarios(caseId));
-    } catch {
-      setScenarios([]);
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Impossible de charger les scénarios de chiffrage.",
+      });
     }
   }
 
   async function refreshDecisionDossier(caseId: string) {
     try {
       setDecisionDossier(await api.getDecisionDossier(caseId));
-    } catch {
+    } catch (error) {
       setDecisionDossier(null);
+      // 404 = pas encore de dossier de décision pour cette affaire : état normal.
+      if ((error as { status?: number }).status === 404) return;
+      setMessage({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Impossible de charger le dossier de décision.",
+      });
     }
   }
 
@@ -443,7 +461,7 @@ function App() {
         <footer className="footer"><span>SMART_AO V8</span><span>Architecture sécurisée · Tenant-scoped · Auditée</span><span>API {baseUrl}</span></footer>
       </main>
 
-      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2>Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>La session utilise un cookie de renouvellement HttpOnly et un jeton d’accès conservé uniquement en mémoire.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><div className={`readiness-indicator readiness-${backendReadinessState}`} role="status"><strong>{backendReadinessState === "checking" ? "Vérification en cours…" : backendReadinessState === "ready" ? "Backend prêt" : backendReadinessState === "not_ready" ? "Backend non prêt" : backendReadinessState === "error" ? "Backend inaccessible" : "Backend non vérifié"}</strong>{backendReadiness && <small>PostgreSQL : {backendReadiness.checks.database} · ClamAV : {backendReadiness.checks.clamav}</small>}</div><label><span>Email</span><input required type="email" autoComplete="username" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} /></label><label><span>Tenant ID</span><input required value={tenantId} onChange={(event) => setTenantId(event.target.value)} /></label><label><span>Mot de passe</span><input required type="password" autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} /></label><button className="primary-button" type="submit">Se connecter <span>→</span></button></form></div>}
+      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" role="dialog" aria-modal="true" aria-labelledby="connection-modal-title" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2 id="connection-modal-title">Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>La session utilise un cookie de renouvellement HttpOnly et un jeton d’accès conservé uniquement en mémoire.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><div className={`readiness-indicator readiness-${backendReadinessState}`} role="status"><strong>{backendReadinessState === "checking" ? "Vérification en cours…" : backendReadinessState === "ready" ? "Backend prêt" : backendReadinessState === "not_ready" ? "Backend non prêt" : backendReadinessState === "error" ? "Backend inaccessible" : "Backend non vérifié"}</strong>{backendReadiness && <small>PostgreSQL : {backendReadiness.checks.database} · ClamAV : {backendReadiness.checks.clamav}</small>}</div><label><span>Email</span><input required type="email" autoComplete="username" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} /></label><label><span>Tenant ID</span><input required value={tenantId} onChange={(event) => setTenantId(event.target.value)} /></label><label><span>Mot de passe</span><input required type="password" autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} /></label><button className="primary-button" type="submit">Se connecter <span>→</span></button></form></div>}
     </div>
   );
 }

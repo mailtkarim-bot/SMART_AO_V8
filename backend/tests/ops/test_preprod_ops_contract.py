@@ -110,10 +110,21 @@ def test_healthcheck_validates_application_json_payloads() -> None:
 
 
 def test_backend_docker_context_excludes_demonstrations_and_tests() -> None:
-    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+    dockerignore = (ROOT / "ops/docker/backend.Dockerfile.dockerignore").read_text(
+        encoding="utf-8"
+    )
     assert "backend/app/demonstrations/" in dockerignore
     assert "backend/tests/" in dockerignore
-    assert "web/" not in dockerignore
+    assert "web/" in dockerignore
+    # The frontend image must keep its own context: the shared root ignore
+    # must not exclude web/, or frontend.Dockerfile can never build.
+    root_ignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+    assert not root_ignore.startswith("web/")
+    assert "\nweb/\n" not in root_ignore
+    frontend_ignore = (ROOT / "ops/docker/frontend.Dockerfile.dockerignore").read_text(
+        encoding="utf-8"
+    )
+    assert "backend/" in frontend_ignore
 
 
 def test_ci_audits_frontend_production_dependencies() -> None:
