@@ -142,6 +142,9 @@ services:
       postgres:
         condition: service_healthy
     networks:
+      # edge grants outbound HTTPS to the external deposit portal only;
+      # internal keeps database access. No inbound exposure is declared.
+      - edge
       - internal
     security_opt:
       - no-new-privileges:true
@@ -179,6 +182,9 @@ services:
     volumes:
       - clamav_database:/var/lib/clamav
     networks:
+      # edge grants signature-database update egress; internal keeps clamd
+      # reachable only by the backend. No host ports are published.
+      - edge
       - internal
     healthcheck:
       test: ["CMD-SHELL", "clamdscan --ping 1"]

@@ -1,0 +1,5 @@
+# Backend image context: no demos, tests, docs or frontend sources.
+backend/app/demonstrations/
+backend/tests/
+docs/
+web/

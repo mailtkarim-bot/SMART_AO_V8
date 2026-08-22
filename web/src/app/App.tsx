@@ -203,24 +203,42 @@ function App() {
     try {
       const result = await api.listPatronActions();
       setActions(result.items);
-    } catch {
-      setActions([]);
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de charger les actions.",
+      });
     }
   }
 
   async function refreshScenarios(caseId: string) {
     try {
       setScenarios(await api.listPricingScenarios(caseId));
-    } catch {
-      setScenarios([]);
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Impossible de charger les scénarios de chiffrage.",
+      });
     }
   }
 
   async function refreshDecisionDossier(caseId: string) {
     try {
       setDecisionDossier(await api.getDecisionDossier(caseId));
-    } catch {
+    } catch (error) {
       setDecisionDossier(null);
+      // 404 = pas encore de dossier de décision pour cette affaire : état normal.
+      if ((error as { status?: number }).status === 404) return;
+      setMessage({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Impossible de charger le dossier de décision.",
+      });
     }
   }
 

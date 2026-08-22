@@ -13,7 +13,10 @@ from app.modules.pricing.application.import_commands import (
     CreatePricingImportRowCommand,
 )
 from app.modules.pricing.application.import_creation import PricingImportCreationService
-from app.modules.pricing.application.import_preview import PricingImportPreviewService
+from app.modules.pricing.application.import_preview import (
+    MAX_UPLOAD_BYTES,
+    PricingImportPreviewService,
+)
 from app.modules.pricing.application.import_read import PricingImportReadService
 from app.modules.pricing.application.import_service import PricingImportService
 from app.modules.pricing.public.import_contracts import (
@@ -27,9 +30,22 @@ from app.modules.pricing.public.import_contracts import (
 )
 from app.platform.events.dispatcher import CommandExecutionError, IdempotencyKeyReusedError
 
+_UPLOAD_CHUNK_BYTES = 1024 * 1024
 
-async def _read_upload(upload: UploadFile) -> bytes:
-    return await upload.read()
+
+async def _read_upload(upload: UploadFile, *, max_bytes: int = MAX_UPLOAD_BYTES) -> bytes:
+    """Read the upload in bounded chunks, rejecting oversized bodies before buffering."""
+    chunks: list[bytes] = []
+    received = 0
+    while chunk := await upload.read(_UPLOAD_CHUNK_BYTES):
+        received += len(chunk)
+        if received > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail="IMPORT_FILE_TOO_LARGE",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def build_patron_pricing_import_router(
@@ -61,7 +77,7 @@ def build_patron_pricing_import_router(
             authorization=authorization,
             context_resolver=security_runtime.context_resolver,
         )
-        payload = await _read_upload(upload)
+        payload = await _read_upload(upload, max_bytes=MAX_UPLOAD_BYTES)
         try:
             preview = service.preview(
                 actor=actor,

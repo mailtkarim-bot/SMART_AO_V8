@@ -1,11 +1,8 @@
-# Production backend image must not contain executable demos or test fixtures.
-backend/app/demonstrations/
-backend/tests/
-**/__pycache__/
-**/*.pyc
+# Shared build-context exclusions (apply to every Dockerfile).
 .git/
 .github/
-
-# Documentation and frontend are not inputs to backend.Dockerfile.
-docs/
-web/
+**/__pycache__/
+**/*.pyc
+.env
+.env.*
+!.env.example
