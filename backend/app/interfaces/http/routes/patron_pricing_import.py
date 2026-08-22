@@ -13,7 +13,10 @@ from app.modules.pricing.application.import_commands import (
     CreatePricingImportRowCommand,
 )
 from app.modules.pricing.application.import_creation import PricingImportCreationService
-from app.modules.pricing.application.import_preview import PricingImportPreviewService
+from app.modules.pricing.application.import_preview import (
+    MAX_UPLOAD_BYTES,
+    PricingImportPreviewService,
+)
 from app.modules.pricing.application.import_read import PricingImportReadService
 from app.modules.pricing.application.import_service import PricingImportService
 from app.modules.pricing.public.import_contracts import (
@@ -28,8 +31,16 @@ from app.modules.pricing.public.import_contracts import (
 from app.platform.events.dispatcher import CommandExecutionError, IdempotencyKeyReusedError
 
 
-async def _read_upload(upload: UploadFile) -> bytes:
-    return await upload.read()
+async def _read_upload(upload: UploadFile, *, max_bytes: int = MAX_UPLOAD_BYTES) -> bytes:
+    payload = bytearray()
+    while chunk := await upload.read(1024 * 1024):
+        payload.extend(chunk)
+        if len(payload) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail="pricing_import_too_large",
+            )
+    return bytes(payload)
 
 
 def build_patron_pricing_import_router(

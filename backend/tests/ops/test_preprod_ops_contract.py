@@ -82,7 +82,7 @@ def test_preprod_services_use_minimal_environment_allowlists() -> None:
         "  submission-export-webhook-worker:", maxsplit=1
     )[0]
     webhook = compose.split("  submission-export-webhook-worker:", maxsplit=1)[1].split(
-        "  postgres:", maxsplit=1
+        "\n  postgres:", maxsplit=1
     )[0]
 
     assert "SMART_AO_JWT_SIGNING_KEY" in backend
@@ -113,9 +113,23 @@ def test_backend_docker_context_excludes_demonstrations_and_tests() -> None:
     dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
     assert "backend/app/demonstrations/" in dockerignore
     assert "backend/tests/" in dockerignore
+    assert "web/" not in dockerignore
 
 
 def test_ci_audits_frontend_production_dependencies() -> None:
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "name: Frontend dependency audit" in workflow
     assert "pnpm audit --prod --audit-level high" in workflow
+
+
+def test_egress_services_join_private_and_edge_networks() -> None:
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    clamav = compose.split("  clamav:", maxsplit=1)[1].split(
+        "\n\n  volumes:", maxsplit=1
+    )[0]
+    webhook = compose.split("  submission-export-webhook-worker:", maxsplit=1)[1].split(
+        "\n  postgres:", maxsplit=1
+    )[0]
+    for service in (clamav, webhook):
+        assert "      - internal" in service
+        assert "      - edge" in service

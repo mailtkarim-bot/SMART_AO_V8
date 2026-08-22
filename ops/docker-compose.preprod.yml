@@ -143,6 +143,7 @@ services:
         condition: service_healthy
     networks:
       - internal
+      - edge
     security_opt:
       - no-new-privileges:true
 
@@ -180,6 +181,7 @@ services:
       - clamav_database:/var/lib/clamav
     networks:
       - internal
+      - edge
     healthcheck:
       test: ["CMD-SHELL", "clamdscan --ping 1"]
       interval: 15s

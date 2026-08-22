@@ -6,6 +6,5 @@ backend/tests/
 .git/
 .github/
 
-# Documentation and frontend are not inputs to backend.Dockerfile.
+# Documentation is not an input to either production image.
 docs/
-web/
