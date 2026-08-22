@@ -47,6 +47,7 @@ from app.interfaces.http.routes.dce_requirement_confirmations import (
 )
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
+from app.interfaces.http.routes.knowledge import build_knowledge_router
 from app.interfaces.http.routes.observability import build_observability_router
 from app.interfaces.http.routes.patron_actions import build_patron_action_router
 from app.interfaces.http.routes.patron_assignment_cockpit import (
@@ -129,6 +130,7 @@ from app.modules.enterprise.application.enterprise_upload import (
     EnterprisePrivateUploadService,
     enterprise_upload_handlers,
 )
+from app.modules.knowledge.application.service import KnowledgeRetrievalService
 from app.modules.membership.application.assignment import (
     AssignmentInteractionService,
     assignment_handlers,
@@ -480,6 +482,7 @@ def create_app(
     *,
     runtime: AppRuntime | None = None,
     authentication_runtime: AuthenticationHttpRuntime | None = None,
+    knowledge_service: KnowledgeRetrievalService | None = None,
     expose_api_docs: bool = True,
 ) -> FastAPI:
     app = FastAPI(
@@ -693,6 +696,14 @@ def create_app(
                 security_runtime=security_runtime,
             )
         )
+        if knowledge_service is not None:
+            app.include_router(
+                build_knowledge_router(
+                    service=knowledge_service,
+                    runtime=runtime,
+                    security_runtime=security_runtime,
+                )
+            )
         app.include_router(
             build_assigned_case_router(
                 runtime=runtime,

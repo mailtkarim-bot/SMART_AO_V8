@@ -53,6 +53,8 @@ services:
     build:
       context: ..
       dockerfile: ops/docker/backend.Dockerfile
+      args:
+        SMART_AO_INSTALL_RAG: ${SMART_AO_INSTALL_RAG:-0}
     restart: unless-stopped
     logging: *default-logging
     init: true
@@ -71,6 +73,10 @@ services:
       SMART_AO_CLAMD_HOST: clamav
       SMART_AO_CLAMD_PORT: "3310"
       SMART_AO_CLAMD_TIMEOUT_SECONDS: ${SMART_AO_CLAMD_TIMEOUT_SECONDS:-30}
+      SMART_AO_RAG_ENABLED: ${SMART_AO_RAG_ENABLED:-0}
+      SMART_AO_BGE_MODEL_ID: ${SMART_AO_BGE_MODEL_ID:-BAAI/bge-m3}
+      SMART_AO_BGE_CACHE_DIR: /var/lib/smart_ao/models
+      SMART_AO_BGE_LOCAL_FILES_ONLY: ${SMART_AO_BGE_LOCAL_FILES_ONLY:-1}
     expose:
       - "8000"
     depends_on:
@@ -80,6 +86,7 @@ services:
         condition: service_healthy
     volumes:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
+      - bge_models:/var/lib/smart_ao/models:ro
     networks:
       - internal
     healthcheck:
@@ -202,6 +209,7 @@ volumes:
   caddy_data:
   caddy_config:
   caddy_logs:
+  bge_models:
 
 networks:
   edge:

@@ -12,11 +12,17 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 smartao \
     && useradd --system --uid 10001 --gid 10001 --home-dir /app --no-create-home smartao \
-    && install --directory --owner=smartao --group=smartao --mode=0700 /var/lib/smart_ao/dce-quarantine
+    && install --directory --owner=smartao --group=smartao --mode=0700 /var/lib/smart_ao/dce-quarantine \
+    && install --directory --owner=smartao --group=smartao --mode=0700 /var/lib/smart_ao/models
 
 COPY pyproject.toml README.md ./
 COPY backend ./backend
-RUN pip install --no-cache-dir . \
+ARG SMART_AO_INSTALL_RAG=0
+RUN if [ "$SMART_AO_INSTALL_RAG" = "1" ]; then \
+        pip install --no-cache-dir ".[rag]"; \
+    else \
+        pip install --no-cache-dir .; \
+    fi \
     && chown -R smartao:smartao /app
 
 USER smartao

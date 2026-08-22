@@ -16,6 +16,7 @@ from app.modules.dce.infrastructure.models import (  # noqa: F401
     dce_version,
 )
 from app.modules.decision.infrastructure.models import decision  # noqa: F401
+from app.modules.knowledge.infrastructure import models as knowledge_models  # noqa: F401
 from app.platform.persistence import models  # noqa: F401
 from app.platform.persistence.alembic_runtime import resolve_database_url
 from app.platform.persistence.base import Base

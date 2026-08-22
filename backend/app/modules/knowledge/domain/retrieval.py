@@ -40,6 +40,7 @@ class RetrievalChunk:
     chunk_id: UUID
     tenant_id: UUID
     case_id: UUID
+    dce_version_id: UUID
     source_fragment_id: UUID
     ordinal: int
     text: str

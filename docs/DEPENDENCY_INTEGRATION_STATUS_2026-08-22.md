@@ -2,14 +2,14 @@
 
 **Date de vérification :** 22 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**HEAD vérifié :** `efa68cc`
+**HEAD de référence :** `9de9ab4` (slice knowledge/optimization en cours de validation)
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
 
 SMART_AO V8 possède aujourd’hui un **socle logiciel codé et testable**, mais il ne possède pas encore toute la panoplie d’intégrations décrite dans la spécification d’architecture initiale. Cette spécification mélange volontairement quatre catégories différentes : dépendances du noyau, composants optionnels, composants futurs et exigences d’exploitation. Une mention dans `SMART_AO_V8_ARCHITECTURE_INFRASTRUCTURE_REFERENCE.md` ne constitue donc pas une preuve d’installation ou de raccordement.
 
-Le produit est aujourd’hui dans la situation suivante : le noyau métier, la sécurité tenant-scoped, PostgreSQL/Alembic, l’upload privé, le scan ClamAV, le parsing déterministe de base, la génération documentaire contrôlée, le pricing en prévisualisation, le cockpit initial, le paquet de dépôt et le webhook HMAC sont codés dans le dépôt. En revanche, **OR-Tools/HiGHS, le RAG et les embeddings, Docling/MinerU/OCR, MinIO/S3, les connecteurs BOAMP/URSSAF/INSEE, l’e-mail SMTP, Playwright E2E et les services Redis/Qdrant/n8n ne sont pas intégrés au runtime actuel**.
+Le produit est aujourd’hui dans la situation suivante : le noyau métier, la sécurité tenant-scoped, PostgreSQL/Alembic, l’upload privé, le scan ClamAV, le parsing déterministe de base, la génération documentaire contrôlée, le pricing en prévisualisation, le cockpit initial, le paquet de dépôt et le webhook HMAC sont codés dans le dépôt. Un premier adaptateur **OR-Tools CP-SAT** et un socle **RAG local avec provider BGE optionnel, index JSONB et route de recherche protégée** viennent d’être ajoutés. En revanche, HiGHS/PuLP, l’activation opérationnelle du modèle BGE, pgvector/Qdrant, Docling/MinerU/OCR, MinIO/S3, les connecteurs BOAMP/URSSAF/INSEE, l’e-mail SMTP, Playwright E2E et les services Redis/n8n ne sont pas intégrés au runtime par défaut.
 
 > **Verdict :** on peut commencer à greffer ces briques par slices contrôlés, mais on ne peut pas dire que tout est codé ni que le produit est opérationnel de bout en bout. Le premier raccordement doit porter sur une dépendance ayant un contrat métier et un critère de recette précis ; il ne faut pas installer toute la pile cible en bloc.
 
@@ -42,7 +42,7 @@ La preuve de ces éléments vient des manifests `pyproject.toml`, `uv.lock`, `we
 
 | Brique | Présence actuelle | Ce qui manque avant raccordement |
 |---|---|---|
-| **Google OR-Tools** (`ortools`) | Absent de `pyproject.toml`, absent de `uv.lock`, aucun import applicatif | Un contrat `DOMAIN-06-PRICING` ou capacité équivalente, un modèle de décision, des bornes, une trace du solveur, des tests de déterminisme et une validation métier patronale. |
+| **Google OR-Tools** (`ortools`) | Présent dans `pyproject.toml` et `uv.lock` ; adaptateur CP-SAT isolé sous `modules/optimization` | Le contrat d’affectation entière, les bornes, le statut d’infaisabilité, le déterminisme et les tests sont codés. Il reste à relier le résultat à un vrai cas pricing/capacité, avec validation métier patronale, persistance d’un run et budget CPU/mémoire. |
 | **HiGHS** (`highspy`) | Absent des manifests et du code | Un cas d’optimisation linéaire/mixte réel, une comparaison avec OR-Tools, des budgets CPU/mémoire et un résultat reproductible. |
 | **PuLP** (`pulp`) | Absent des manifests et du code | Une nécessité de compatibilité démontrée ; ce n’est pas une source de vérité et ne doit pas être ajouté par simple anticipation. |
 | `Decimal` | Présent via la bibliothèque standard et utilisé pour les montants | Le calcul financier de base est codé ; l’optimisation combinatoire n’est pas encore un service métier. |
@@ -53,13 +53,13 @@ La prévisualisation DPGF/BPU/Excel et la persistance de lots `PREVIEWED` ne con
 
 | Brique | Présence actuelle | Verdict |
 |---|---|---|
-| RAG applicatif | Aucun pipeline embedding → index → retrieval → citations n’est présent | Non codé. |
-| Modèle **BGE** éventuel | Aucune dépendance ou image de modèle BGE trouvée | Non intégré. Si « BEG » désignait BGE, il s’agit d’un composant futur. |
-| `pgvector` | Mentionné dans l’architecture cible, absent des manifests, migrations et Compose actuels | Non intégré. |
+| RAG applicatif | Pipeline local présent : fragments DCE admis → BGE provider → registre JSONB append-only → retrieval case-scoped → route HTTP avec citation bornée | **Partiel et désactivé par défaut** : migration `0050`, service, route et commande one-shot existent ; l’indexation doit encore être déclenchée sur un corpus DCE réel et benchmarkée. |
+| Modèle **BGE** éventuel | Extra Python `rag`, provider `BAAI/bge-m3`, chargement paresseux ; image Docker installable avec `SMART_AO_INSTALL_RAG=1` | **Préparé et testable avec modèle simulé** ; les poids doivent être préchargés et validés sur l’environnement cible avant activation. |
+| `pgvector` | Toujours absent ; le premier bridge persistant stocke les vecteurs en JSONB et calcule la similarité côté Python | Non intégré ; JSONB est un socle de démarrage, pas la solution de performance finale pour un corpus volumineux. |
 | Qdrant | Mentionné comme option conditionnelle, absent du Compose et du code | Non intégré, correctement différé. |
 | Retrieval exact/structuré | Les données DCE, fragments, exigences et preuves sont persistées de façon structurée | Partiellement disponible comme base de recherche, mais ce n’est pas un RAG sémantique. |
 
-Avant de greffer un RAG, il faut figer le contrat de retrieval : filtre tenant/affaire/version, provenance obligatoire, score, nombre maximal de fragments, absence de données financières dans les appels externes, réindexation et comportement lorsque le retrieval échoue. Il faut ensuite mesurer le gain sur un corpus Golden DCE avant de choisir `pgvector`, Qdrant ou un autre index.
+Le contrat initial de retrieval est désormais figé : filtre tenant/affaire/version, provenance obligatoire, score borné, `top_k` borné, exclusion des chunks `FINANCIAL_PRIVATE`, idempotence par fragment/modèle/hash et échec fermé si le provider BGE est indisponible. La migration `0050`, le registre JSONB, la route protégée et le job one-shot existent ; il faut encore mesurer le gain sur un corpus Golden DCE, automatiser le déclenchement après admission d’une version et choisir entre JSONB optimisé, `pgvector` ou Qdrant selon les résultats.
 
 ### 4.3 Parsing avancé et OCR
 
@@ -123,7 +123,7 @@ Il est techniquement possible de commencer un raccordement maintenant, à condit
 
 ## 7. Ce qui empêche aujourd’hui de dire « tout est codé »
 
-Il reste des manques fonctionnels et opérationnels importants : l’OCR et le parsing avancé, le retrieval sémantique/RAG, l’optimisation OR-Tools/HiGHS, le stockage objet MinIO/S3, les connecteurs de veille et de vérification, les notifications e-mail/calendrier, les tests navigateur Playwright, la preuve Docker/ClamAV/HTTPS sur une machine réelle, la sauvegarde hors hôte et la restauration isolée. Le dépôt électronique externe lui-même reste volontairement non effectué et ne doit jamais être simulé comme réussi.
+Il reste des manques fonctionnels et opérationnels importants : l’OCR et le parsing avancé, la mise en production du modèle BGE et l’indexation automatique du RAG, le passage éventuel à pgvector/Qdrant, le raccordement métier complet d’OR-Tools, le stockage objet MinIO/S3, les connecteurs de veille et de vérification, les notifications e-mail/calendrier, les tests navigateur Playwright, la preuve Docker/ClamAV/HTTPS sur une machine réelle, la sauvegarde hors hôte et la restauration isolée. Le dépôt électronique externe lui-même reste volontairement non effectué et ne doit jamais être simulé comme réussi.
 
 Ces manques ne signifient pas que le code existant est un simple squelette. Ils signifient que **le noyau sécurisé et plusieurs slices métier sont codés, tandis que la plateforme complète décrite par la vision cible ne l’est pas encore**. Une couverture de tests élevée ne transforme pas une dépendance absente en fonctionnalité disponible.
 
@@ -132,11 +132,11 @@ Ces manques ne signifient pas que le code existant est un simple squelette. Ils 
 La séquence raisonnable est la suivante :
 
 1. Obtenir une CI GitHub qui exécute réellement ses étapes et valider la PR #49 ; le dernier run connu a échoué avant toute étape faute de runner.
-2. Ajouter Playwright et exécuter le flux auth sur une URL HTTPS réelle dès qu’un environnement est disponible.
-3. Choisir un premier vertical métier à forte valeur : soit optimisation pricing avec OR-Tools/HiGHS, soit OCR/parsing Docling sur un Golden DCE réel.
-4. Figer le contrat de stockage objet puis réaliser le slice MinIO/S3 avec migration et restauration testée.
-5. Ajouter ensuite le RAG local et le provider cognitif uniquement si le benchmark montre un gain, avec données minimisées, citations obligatoires et validation humaine.
-6. Brancher les services externes métier un par un, derrière des ports et des adaptateurs, avec secrets, budgets, rate limits, audit et possibilité de désactivation.
+2. Valider localement la migration 0050, le retrieval persistant et le contrat HTTP avec un corpus Golden DCE non sensible ; cette validation de contrat est désormais faite, mais pas encore le benchmark métier Golden DCE.
+3. Précharger et vérifier BGE-M3 sur une machine dédiée, puis exécuter le job one-shot d’indexation sur une version DCE admise.
+4. Raccorder l’affectation OR-Tools à un cas pricing/capacité réel, avec validation patronale et mesure du temps de résolution.
+5. Comparer le bridge JSONB à pgvector seulement après le benchmark ; ne pas introduire Qdrant sans besoin mesuré.
+6. Ajouter ensuite OCR/Docling, MinIO/S3 et les connecteurs externes un par un, derrière des ports et des adaptateurs, avec secrets, budgets, rate limits, audit et possibilité de désactivation.
 
 ## Références locales
 
