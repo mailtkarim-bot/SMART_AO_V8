@@ -195,6 +195,7 @@ from app.modules.pricing.application.import_creation import (
     pricing_import_creation_handlers,
 )
 from app.modules.pricing.application.import_preview import PricingImportPreviewService
+from app.modules.pricing.application.import_read import PricingImportReadService
 from app.modules.pricing.application.import_service import (
     PricingImportService,
     pricing_import_handlers,
@@ -616,6 +617,10 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        pricing_import_read_service = PricingImportReadService(
+            session_factory=runtime.session_factory,
+            policy=security_policy,
+        )
         pricing_import_service = PricingImportService(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
@@ -781,6 +786,7 @@ def create_app(
                 service=pricing_import_preview_service,
                 commit_service=pricing_import_service,
                 creation_service=pricing_import_creation_service,
+                read_service=pricing_import_read_service,
                 security_runtime=security_runtime,
             )
         )

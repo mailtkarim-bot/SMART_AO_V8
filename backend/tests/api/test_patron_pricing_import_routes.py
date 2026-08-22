@@ -39,13 +39,21 @@ def _runtime(*, resolver_error=None):
     )
 
 
-def _client(*, service=None, commit_service=None, creation_service=None, resolver_error=None):
+def _client(
+    *,
+    service=None,
+    commit_service=None,
+    creation_service=None,
+    read_service=None,
+    resolver_error=None,
+):
     app = FastAPI()
     app.include_router(
         build_patron_pricing_import_router(
             service=service or _PreviewService(),
             commit_service=commit_service,
             creation_service=creation_service,
+            read_service=read_service,
             security_runtime=_runtime(resolver_error=resolver_error),
         )
     )
@@ -80,6 +88,32 @@ class _PreviewService:
             rows=[
                 _Row(1, "A-1", "Ouvrage", "U", "10", 12500, 125000, []),
                 _Row(2, None, "Ligne invalide", None, None, None, None, ["CODE_REQUIRED"]),
+            ],
+        )
+
+
+class _ReadService:
+    def __init__(self, *, error=None):
+        self.error = error
+        self.calls = []
+
+    def get(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        return SimpleNamespace(
+            batch_id=kwargs["batch_id"],
+            case_id=kwargs["case_id"],
+            document_kind="DPGF",
+            state="PREVIEWED",
+            aggregate_revision=1,
+            row_count=2,
+            valid_row_count=1,
+            error_count=1,
+            total_minor=12500,
+            rows=[
+                _Row(2, "A-1", "Ouvrage", "U", "10", 1250, 12500, []),
+                _Row(3, None, None, None, None, None, None, ["DESIGNATION_REQUIRED"]),
             ],
         )
 
@@ -390,3 +424,57 @@ def test_pricing_import_preview_reused_key_with_changed_source_returns_409():
     assert conflict.status_code == 409
     assert conflict.json() == {"detail": "IDEMPOTENCY_KEY_REUSED"}
     assert len(creation_service._receipt_by_key) == 1
+
+
+
+def test_pricing_import_read_returns_private_normalized_projection():
+    read_service = _ReadService()
+    case_id = uuid4()
+    batch_id = uuid4()
+    response = _client(read_service=read_service).get(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/{batch_id}",
+        headers=_headers(),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["batch_id"] == str(batch_id)
+    assert body["case_id"] == str(case_id)
+    assert body["state"] == "PREVIEWED"
+    assert body["rows"][0]["total_minor"] == 12500
+    assert body["rows"][1]["errors"] == ["DESIGNATION_REQUIRED"]
+    assert "source_sha256" not in body
+    assert "filename" not in body
+    assert read_service.calls[0]["batch_id"] == batch_id
+
+
+@pytest.mark.parametrize(
+    ("error", "status_code", "detail"),
+    [
+        (PermissionError("NOT_FOUND_OR_FORBIDDEN"), 404, "NOT_FOUND_OR_FORBIDDEN"),
+        (PermissionError("FORBIDDEN"), 403, "FORBIDDEN"),
+    ],
+)
+def test_pricing_import_read_maps_private_access_errors(error, status_code, detail):
+    response = _client(read_service=_ReadService(error=error)).get(
+        f"/api/v1/patron/cases/{uuid4()}/pricing-import/{uuid4()}",
+        headers=_headers(),
+    )
+
+    assert response.status_code == status_code
+    assert response.json() == {"detail": detail}
+
+
+def test_pricing_import_commit_maps_idempotency_key_reuse_to_409():
+    response = _client(
+        commit_service=_CommitService(
+            error=IdempotencyKeyReusedError("IDEMPOTENCY_KEY_REUSED")
+        )
+    ).post(
+        f"/api/v1/patron/cases/{uuid4()}/pricing-import/{uuid4()}/commit",
+        json=_commit_payload(),
+        headers=_headers(),
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "IDEMPOTENCY_KEY_REUSED"}

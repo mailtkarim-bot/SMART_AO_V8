@@ -14,16 +14,18 @@ from app.modules.pricing.application.import_commands import (
 )
 from app.modules.pricing.application.import_creation import PricingImportCreationService
 from app.modules.pricing.application.import_preview import PricingImportPreviewService
+from app.modules.pricing.application.import_read import PricingImportReadService
 from app.modules.pricing.application.import_service import PricingImportService
 from app.modules.pricing.public.import_contracts import (
     CommitPricingImportRequest,
     PricingImportAggregateReferenceResponse,
+    PricingImportBatchReadResponse,
     PricingImportCommitResponse,
     PricingImportCreationRequest,
     PricingImportPreviewResponse,
     PricingImportRowResponse,
 )
-from app.platform.events.dispatcher import CommandExecutionError
+from app.platform.events.dispatcher import CommandExecutionError, IdempotencyKeyReusedError
 
 
 async def _read_upload(upload: UploadFile) -> bytes:
@@ -36,6 +38,7 @@ def build_patron_pricing_import_router(
     security_runtime: ConsultationSecurityRuntime,
     commit_service: PricingImportService | None = None,
     creation_service: PricingImportCreationService | None = None,
+    read_service: PricingImportReadService | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1/patron", tags=["patron-pricing-import"])
 
@@ -176,6 +179,61 @@ def build_patron_pricing_import_router(
             }
         )
 
+    if read_service is not None:
+
+        @router.get(
+            "/cases/{case_id}/pricing-import/{batch_id}",
+            response_model=PricingImportBatchReadResponse,
+        )
+        def read_import(
+            case_id: UUID,
+            batch_id: UUID,
+            authorization: str | None = Header(default=None),
+        ) -> PricingImportBatchReadResponse:
+            actor = _resolve_context(
+                authorization=authorization,
+                context_resolver=security_runtime.context_resolver,
+            )
+            try:
+                projection = read_service.get(
+                    actor=actor,
+                    case_id=case_id,
+                    batch_id=batch_id,
+                    now=datetime.now(tz=UTC),
+                )
+            except PermissionError as error:
+                code = str(error)
+                http_status = (
+                    status.HTTP_404_NOT_FOUND
+                    if code == "NOT_FOUND_OR_FORBIDDEN"
+                    else status.HTTP_403_FORBIDDEN
+                )
+                raise HTTPException(status_code=http_status, detail=code) from error
+            return PricingImportBatchReadResponse(
+                batch_id=projection.batch_id,
+                case_id=projection.case_id,
+                document_kind=projection.document_kind,
+                state=projection.state,
+                aggregate_revision=projection.aggregate_revision,
+                row_count=projection.row_count,
+                valid_row_count=projection.valid_row_count,
+                error_count=projection.error_count,
+                total_minor=projection.total_minor,
+                rows=[
+                    PricingImportRowResponse(
+                        row_number=row.row_number,
+                        code=row.code,
+                        designation=row.designation,
+                        unit=row.unit,
+                        quantity_decimal=row.quantity_decimal,
+                        unit_price_minor=row.unit_price_minor,
+                        total_minor=row.total_minor,
+                        errors=list(row.errors),
+                    )
+                    for row in projection.rows
+                ],
+            )
+
     if commit_service is not None:
 
         @router.post(
@@ -187,6 +245,7 @@ def build_patron_pricing_import_router(
             case_id: UUID,
             batch_id: UUID,
             request: CommitPricingImportRequest,
+            response: Response,
             authorization: str | None = Header(default=None),
         ) -> PricingImportCommitResponse:
             actor = _resolve_context(
@@ -219,11 +278,22 @@ def build_patron_pricing_import_router(
                     "FINANCIAL_REPORT_NOT_FOUND_OR_FORBIDDEN",
                 }:
                     http_status = status.HTTP_404_NOT_FOUND
-                elif code in {"VERSION_CONFLICT", "IMPORT_ALREADY_COMMITTED"}:
+                elif (
+                    isinstance(error, IdempotencyKeyReusedError)
+                    or "IDEMPOTENCY" in code
+                    or code in {
+                        "COMMAND_IN_PROGRESS",
+                        "VERSION_CONFLICT",
+                        "IMPORT_ALREADY_COMMITTED",
+                    }
+                ):
                     http_status = status.HTTP_409_CONFLICT
                 else:
                     http_status = status.HTTP_422_UNPROCESSABLE_CONTENT
                 raise HTTPException(status_code=http_status, detail=code) from error
+            response.status_code = (
+                status.HTTP_200_OK if receipt.replayed else status.HTTP_201_CREATED
+            )
             return PricingImportCommitResponse(
                 command_id=UUID(receipt.command_id),
                 idempotency_key=UUID(receipt.idempotency_key),

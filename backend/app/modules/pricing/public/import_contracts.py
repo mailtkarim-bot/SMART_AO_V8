@@ -56,6 +56,21 @@ class PricingImportCommitResponse(BaseModel):
     replayed: bool = False
 
 
+class PricingImportBatchReadResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    batch_id: UUID
+    case_id: UUID
+    document_kind: Literal["DPGF", "BPU", "EXCEL"]
+    state: Literal["PREVIEWED", "COMMITTED"]
+    aggregate_revision: int = Field(ge=1)
+    row_count: int = Field(ge=0)
+    valid_row_count: int = Field(ge=0)
+    error_count: int = Field(ge=0)
+    total_minor: int = Field(ge=0)
+    rows: list[PricingImportRowResponse]
+
+
 class PricingImportPreviewResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
