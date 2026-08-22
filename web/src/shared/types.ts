@@ -261,6 +261,39 @@ export type EnterpriseDocumentVerificationInput = {
     | "DOCUMENT_DUPLICATE";
 };
 
+export type PricingImportRow = {
+  row_number: number;
+  code: string | null;
+  designation: string | null;
+  unit: string | null;
+  quantity_decimal: string | null;
+  unit_price_minor: number | null;
+  total_minor: number | null;
+  errors: string[];
+};
+
+export type PricingImportBatchRead = {
+  batch_id: string;
+  case_id: string;
+  document_kind: "DPGF" | "BPU" | "EXCEL";
+  state: "PREVIEWED" | "COMMITTED";
+  aggregate_revision: number;
+  row_count: number;
+  valid_row_count: number;
+  error_count: number;
+  total_minor: number;
+  rows: PricingImportRow[];
+};
+
+export type PricingImportPreview = PricingImportBatchRead & {
+  filename: string;
+  result_code: "PRICING_IMPORT_PREVIEWED";
+  command_id: string;
+  idempotency_key: string;
+  event_ids: string[];
+  replayed: boolean;
+};
+
 export type CommitPricingImportRequest = {
   command_id: string;
   idempotency_key: string;

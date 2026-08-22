@@ -16,6 +16,8 @@ import type {
   PreparationPackage,
   CommitPricingImportRequest,
   PricingImportCommitReceipt,
+  PricingImportPreview,
+  PricingImportBatchRead,
   EnterpriseCompany,
   EnterpriseCompanyInput,
   EnterpriseDocumentUploadInput,
@@ -164,6 +166,44 @@ export function createApiClient(baseUrl: string, token: string) {
             ...input,
           }),
         },
+      ),
+    createPricingImportPreview: (
+      caseId: string,
+      file: File,
+      documentKind: "DPGF" | "BPU" | "EXCEL" = "EXCEL",
+    ) => {
+      const form = new FormData();
+      form.append("upload", file);
+      const headers = new Headers({ Accept: "application/json" });
+      if (token.trim()) headers.set("Authorization", `Bearer ${token.trim()}`);
+      const query = new URLSearchParams({ document_kind: documentKind });
+      return fetch(
+        `${root}/api/v1/patron/cases/${encodeURIComponent(caseId)}/pricing-import/preview?${query}`,
+        {
+          method: "POST",
+          headers: new Headers({
+            ...Object.fromEntries(headers.entries()),
+            "X-Command-Id": makeId(),
+            "Idempotency-Key": makeId(),
+          }),
+          body: form,
+        },
+      ).then(async (response) => {
+        const body = await response.text();
+        const parsed = body ? JSON.parse(body) : undefined;
+        if (!response.ok) {
+          throw new Error(
+            typeof parsed?.detail === "string"
+              ? parsed.detail
+              : `La preview a échoué (${response.status}).`,
+          );
+        }
+        return parsed as PricingImportPreview;
+      });
+    },
+    getPricingImport: (caseId: string, batchId: string) =>
+      request<PricingImportBatchRead>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/pricing-import/${encodeURIComponent(batchId)}`,
       ),
     commitPricingImport: (
       caseId: string,

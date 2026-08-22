@@ -318,11 +318,16 @@ function App() {
             pricingImportBatchRevision={pricingImport.pricingImportBatchRevision}
             pricingImportReportRevision={pricingImport.pricingImportReportRevision}
             pricingImportState={pricingImport.pricingImportState}
+            pricingImportPreview={pricingImport.pricingImportPreview}
             pricingImportReloadState={pricingImport.pricingImportReloadState}
+            pricingImportUploading={pricingImport.pricingImportUploading}
+            pricingImportLoading={pricingImport.pricingImportLoading}
             pricingImportSubmitting={pricingImport.pricingImportSubmitting}
             setPricingImportBatchId={pricingImport.setPricingImportBatchId}
             setPricingImportBatchRevision={pricingImport.setPricingImportBatchRevision}
             setPricingImportReportRevision={pricingImport.setPricingImportReportRevision}
+            onPreview={(file) => void pricingImport.previewPricingImport(file)}
+            onReload={() => void pricingImport.reloadPricingImport()}
             onCommit={() => void pricingImport.commitPricingImport()}
           />
         </section>

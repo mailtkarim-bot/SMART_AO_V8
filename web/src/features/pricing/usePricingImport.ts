@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ApiClient } from "../../infrastructure/api";
+import type { PricingImportBatchRead } from "../../shared/types";
 
 type Message = { tone: "success" | "error" | "warning"; text: string };
 type SetMessage = Dispatch<SetStateAction<Message | null>>;
-export type PricingImportState = "IDLE" | "COMMITTED" | "REPLAYED";
+export type PricingImportState = "IDLE" | "PREVIEWED" | "COMMITTED" | "REPLAYED";
 export type PricingImportReloadState = "NOT_ATTEMPTED" | "SUCCEEDED" | "FAILED";
 
 type PricingImportActions = {
@@ -12,8 +13,13 @@ type PricingImportActions = {
   pricingImportBatchRevision: string;
   pricingImportReportRevision: string;
   pricingImportState: PricingImportState;
+  pricingImportPreview: PricingImportBatchRead | null;
+  pricingImportUploading: boolean;
+  pricingImportLoading: boolean;
   pricingImportReloadState: PricingImportReloadState;
   pricingImportSubmitting: boolean;
+  previewPricingImport: (file: File) => Promise<void>;
+  reloadPricingImport: () => Promise<void>;
   setPricingImportBatchId: Dispatch<SetStateAction<string>>;
   setPricingImportBatchRevision: Dispatch<SetStateAction<string>>;
   setPricingImportReportRevision: Dispatch<SetStateAction<string>>;
@@ -31,13 +37,74 @@ export function usePricingImport(
   const [pricingImportBatchRevision, setPricingImportBatchRevision] = useState("1");
   const [pricingImportReportRevision, setPricingImportReportRevision] = useState("0");
   const [pricingImportState, setPricingImportState] = useState<PricingImportState>("IDLE");
+  const [pricingImportPreview, setPricingImportPreview] =
+    useState<PricingImportBatchRead | null>(null);
+  const [pricingImportUploading, setPricingImportUploading] = useState(false);
+  const [pricingImportLoading, setPricingImportLoading] = useState(false);
   const [pricingImportReloadState, setPricingImportReloadState] =
     useState<PricingImportReloadState>("NOT_ATTEMPTED");
   const [pricingImportSubmitting, setPricingImportSubmitting] = useState(false);
 
   useEffect(() => {
     setPricingImportState("IDLE");
-  }, [selectedCaseId, reportId, pricingImportBatchId]);
+    setPricingImportPreview(null);
+    setPricingImportBatchId("");
+    setPricingImportBatchRevision("1");
+    setPricingImportReloadState("NOT_ATTEMPTED");
+  }, [selectedCaseId, reportId]);
+
+  async function previewPricingImport(file: File) {
+    if (!selectedCaseId) {
+      setMessage({ tone: "error", text: "Sélectionnez une affaire avant l’import." });
+      return;
+    }
+    setPricingImportUploading(true);
+    try {
+      const preview = await api.createPricingImportPreview(selectedCaseId, file);
+      setPricingImportPreview(preview);
+      setPricingImportBatchId(preview.batch_id);
+      setPricingImportBatchRevision(String(preview.aggregate_revision));
+      setPricingImportState("PREVIEWED");
+      setMessage({
+        tone: "success",
+        text: preview.replayed
+          ? "Preview déjà enregistrée : rejeu idempotent."
+          : "Preview validée et enregistrée dans un batch patronal.",
+      });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "La preview de l’import a échoué.",
+      });
+    } finally {
+      setPricingImportUploading(false);
+    }
+  }
+
+  async function reloadPricingImport() {
+    if (!selectedCaseId || !pricingImportBatchId.trim()) {
+      setMessage({ tone: "error", text: "Sélectionnez une affaire et un batch avant la lecture." });
+      return;
+    }
+    setPricingImportLoading(true);
+    try {
+      const projection = await api.getPricingImport(
+        selectedCaseId,
+        pricingImportBatchId.trim(),
+      );
+      setPricingImportPreview(projection);
+      setPricingImportBatchRevision(String(projection.aggregate_revision));
+      setPricingImportState(projection.state === "COMMITTED" ? "COMMITTED" : "PREVIEWED");
+      setMessage({ tone: "success", text: "Batch pricing relu côté patron." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "La lecture du batch pricing a échoué.",
+      });
+    } finally {
+      setPricingImportLoading(false);
+    }
+  }
 
   async function commitPricingImport() {
     if (pricingImportSubmitting) return;
@@ -101,8 +168,13 @@ export function usePricingImport(
     pricingImportBatchRevision,
     pricingImportReportRevision,
     pricingImportState,
+    pricingImportPreview,
+    pricingImportUploading,
+    pricingImportLoading,
     pricingImportReloadState,
     pricingImportSubmitting,
+    previewPricingImport,
+    reloadPricingImport,
     setPricingImportBatchId,
     setPricingImportBatchRevision,
     setPricingImportReportRevision,

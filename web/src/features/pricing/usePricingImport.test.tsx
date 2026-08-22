@@ -3,11 +3,37 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiClient } from "../../infrastructure/api";
-import type { PricingImportCommitReceipt } from "../../shared/types";
+import type {
+  PricingImportBatchRead,
+  PricingImportCommitReceipt,
+  PricingImportPreview,
+} from "../../shared/types";
 import { usePricingImport } from "./usePricingImport";
 
 type HookMessage = { tone: "success" | "error" | "warning"; text: string };
-type CommitApi = Pick<ApiClient, "commitPricingImport">;
+type PricingApi = Partial<Pick<
+  ApiClient,
+  "commitPricingImport" | "createPricingImportPreview" | "getPricingImport"
+>>;
+
+const preview = (): PricingImportPreview => ({
+  batch_id: "batch-2",
+  case_id: "case-1",
+  document_kind: "EXCEL",
+  state: "PREVIEWED",
+  aggregate_revision: 1,
+  row_count: 2,
+  valid_row_count: 2,
+  error_count: 0,
+  total_minor: 32500,
+  rows: [],
+  filename: "pricing.xlsx",
+  result_code: "PRICING_IMPORT_PREVIEWED",
+  command_id: "command-preview",
+  idempotency_key: "idempotency-preview",
+  event_ids: ["event-preview"],
+  replayed: false,
+});
 
 const receipt = (replayed = false): PricingImportCommitReceipt => ({
   status: "SUCCEEDED",
@@ -31,7 +57,7 @@ const receipt = (replayed = false): PricingImportCommitReceipt => ({
 });
 
 function renderPricingHook(
-  api: CommitApi,
+  api: PricingApi,
   setMessage: Dispatch<SetStateAction<HookMessage | null>>,
   onDraftReload: () => Promise<void> = vi.fn().mockResolvedValue(undefined),
 ) {
@@ -53,8 +79,49 @@ function setBatch(result: { current: ReturnType<typeof usePricingImport> }) {
 }
 
 describe("usePricingImport", () => {
+  it("persists an uploaded preview and exposes its batch revision", async () => {
+    const api = {
+      createPricingImportPreview: vi.fn().mockResolvedValue(preview()),
+    } satisfies PricingApi;
+    const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
+    const { result } = renderPricingHook(api, setMessage);
+    const file = new File(["xlsx"], "pricing.xlsx");
+
+    await act(async () => {
+      await result.current.previewPricingImport(file);
+    });
+
+    expect(api.createPricingImportPreview).toHaveBeenCalledWith("case-1", file);
+    expect(result.current.pricingImportBatchId).toBe("batch-2");
+    expect(result.current.pricingImportBatchRevision).toBe("1");
+    expect(result.current.pricingImportState).toBe("PREVIEWED");
+    expect(result.current.pricingImportPreview?.total_minor).toBe(32500);
+  });
+
+  it("reloads a persisted batch and reflects its committed state", async () => {
+    const committed: PricingImportBatchRead = {
+      ...preview(),
+      state: "COMMITTED",
+      aggregate_revision: 2,
+    };
+    const api = {
+      getPricingImport: vi.fn().mockResolvedValue(committed),
+    } satisfies PricingApi;
+    const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
+    const { result } = renderPricingHook(api, setMessage);
+    setBatch(result);
+
+    await act(async () => {
+      await result.current.reloadPricingImport();
+    });
+
+    expect(api.getPricingImport).toHaveBeenCalledWith("case-1", "batch-1");
+    expect(result.current.pricingImportState).toBe("COMMITTED");
+    expect(result.current.pricingImportBatchRevision).toBe("2");
+  });
+
   it("rejects a commit without a batch", async () => {
-    const api = { commitPricingImport: vi.fn() } satisfies CommitApi;
+    const api = { commitPricingImport: vi.fn() } satisfies PricingApi;
     const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
     const { result } = renderPricingHook(api, setMessage);
 
@@ -70,7 +137,7 @@ describe("usePricingImport", () => {
   });
 
   it("commits validated rows, updates revisions and confirms reload", async () => {
-    const api = { commitPricingImport: vi.fn().mockResolvedValue(receipt()) } satisfies CommitApi;
+    const api = { commitPricingImport: vi.fn().mockResolvedValue(receipt()) } satisfies PricingApi;
     const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
     const onDraftReload = vi.fn().mockResolvedValue(undefined);
     const { result } = renderPricingHook(api, setMessage, onDraftReload);
@@ -94,7 +161,7 @@ describe("usePricingImport", () => {
   });
 
   it("keeps the commit confirmed when reload fails", async () => {
-    const api = { commitPricingImport: vi.fn().mockResolvedValue(receipt()) } satisfies CommitApi;
+    const api = { commitPricingImport: vi.fn().mockResolvedValue(receipt()) } satisfies PricingApi;
     const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
     const onDraftReload = vi.fn().mockRejectedValue(new Error("reload unavailable"));
     const { result } = renderPricingHook(api, setMessage, onDraftReload);
@@ -113,7 +180,7 @@ describe("usePricingImport", () => {
   });
 
   it("reports an idempotent replay without changing the business outcome", async () => {
-    const api = { commitPricingImport: vi.fn().mockResolvedValue(receipt(true)) } satisfies CommitApi;
+    const api = { commitPricingImport: vi.fn().mockResolvedValue(receipt(true)) } satisfies PricingApi;
     const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
     const { result } = renderPricingHook(api, setMessage);
     setBatch(result);
@@ -134,7 +201,7 @@ describe("usePricingImport", () => {
     const pending = new Promise<PricingImportCommitReceipt>((resolve) => {
       release = resolve;
     });
-    const api = { commitPricingImport: vi.fn().mockReturnValue(pending) } satisfies CommitApi;
+    const api = { commitPricingImport: vi.fn().mockReturnValue(pending) } satisfies PricingApi;
     const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
     const { result } = renderPricingHook(api, setMessage);
     setBatch(result);
@@ -159,7 +226,7 @@ describe("usePricingImport", () => {
   });
 
   it("resets the visible state when the pricing context changes", async () => {
-    const api = { commitPricingImport: vi.fn().mockResolvedValue(receipt()) } satisfies CommitApi;
+    const api = { commitPricingImport: vi.fn().mockResolvedValue(receipt()) } satisfies PricingApi;
     const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
     const onDraftReload = vi.fn().mockResolvedValue(undefined);
     const { result, rerender } = renderHook(
