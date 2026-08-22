@@ -23,6 +23,12 @@ dependencies = [
   "python-docx>=1.2.0",
   "openpyxl>=3.1.5",
   "python-multipart>=0.0.20,<1.0",
+  "ortools>=9.14,<10.0",
+]
+
+[project.optional-dependencies]
+rag = [
+  "sentence-transformers>=3.0,<6.0",
 ]
 
 [dependency-groups]
