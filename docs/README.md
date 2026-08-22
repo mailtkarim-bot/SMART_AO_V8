@@ -8,4 +8,6 @@
 
 `ROADMAP_01_PLAN_GLOBAL_CODAGE.md` donne l’ordre global des slices, leurs critères de sortie et les jalons vers la préproduction. Il est lu après `PROJECT_STATE.md`, qui reste la source de l’action immédiate.
 
+`DEPENDENCY_INTEGRATION_STATUS_2026-08-22.md` distingue les dépendances réellement installées des composants seulement prévus par l’architecture cible. Il doit être lu avant tout greffage d’un solveur, moteur OCR, index vectoriel, stockage objet ou connecteur externe.
+
 `DOCUMENTATION_CATALOG.md` relie les sources Markdown aux PDF classés par rôle ; il permet d’explorer l’ensemble du patrimoine documentaire sans chercher dans les dossiers.
