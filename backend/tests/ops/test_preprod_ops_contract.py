@@ -171,3 +171,29 @@ def test_insee_connector_is_disabled_by_default_and_secret_is_backend_only() -> 
     assert "SMART_AO_INSEE_API_TOKEN: ${SMART_AO_INSEE_API_TOKEN:-}" in backend
     assert "SMART_AO_INSEE_API_TOKEN" not in retention
     assert "SMART_AO_INSEE_API_TOKEN" not in webhook
+
+
+def test_optional_notifications_build_and_runtime_flags_are_explicit() -> None:
+    dockerfile = (OPS / "docker/backend.Dockerfile").read_text(encoding="utf-8")
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    assert "ARG SMART_AO_INSTALL_NOTIFICATIONS=0" in dockerfile
+    assert 'pip install --no-cache-dir ".[notifications]"' in dockerfile
+    assert "SMART_AO_INSTALL_NOTIFICATIONS" in compose
+    assert "SMART_AO_SMTP_ENABLED: ${SMART_AO_SMTP_ENABLED:-0}" in compose
+
+
+def test_smtp_credentials_are_allowlisted_only_for_backend() -> None:
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    backend = compose.split("  backend:", maxsplit=1)[1].split(
+        "  dce-retention-worker:", maxsplit=1
+    )[0]
+    retention = compose.split("  dce-retention-worker:", maxsplit=1)[1].split(
+        "  submission-export-webhook-worker:", maxsplit=1
+    )[0]
+    webhook = compose.split("  submission-export-webhook-worker:", maxsplit=1)[1].split(
+        "\n  postgres:", maxsplit=1
+    )[0]
+    assert "SMART_AO_SMTP_PASSWORD" in backend
+    assert "SMART_AO_SMTP_USERNAME" in backend
+    assert "SMART_AO_SMTP_PASSWORD" not in retention
+    assert "SMART_AO_SMTP_PASSWORD" not in webhook

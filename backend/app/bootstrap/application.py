@@ -219,8 +219,12 @@ from app.modules.submission.application.evidence_service import (
     SubmissionEvidenceService,
     submission_evidence_handlers,
 )
+from app.modules.submission.application.notifications import SubmissionExportNotificationPort
 from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
 from app.modules.submission.application.signature_service import submission_signature_handlers
+from app.modules.submission.infrastructure.smtp_notifications import (
+    AioSmtpSubmissionExportNotifier,
+)
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.observability.http import RequestObservabilityMiddleware
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
@@ -248,6 +252,7 @@ class AppRuntime:
     dce_upload_service: DceUploadService
     preparation_storage: GeneratedDocumentStorage
     company_registry: CompanyRegistryPort | None = None
+    submission_export_notifier: SubmissionExportNotificationPort | None = None
 
     @classmethod
     def create(
@@ -258,6 +263,7 @@ class AppRuntime:
     ) -> AppRuntime:
         preparation_storage = _build_preparation_storage()
         company_registry = _build_company_registry()
+        submission_export_notifier = _build_submission_export_notifier()
         dispatcher = CommandDispatcher(
             session_factory=session_factory,
             handlers={
@@ -316,6 +322,7 @@ class AppRuntime:
             dce_upload_service=upload_service,
             preparation_storage=preparation_storage,
             company_registry=company_registry,
+            submission_export_notifier=submission_export_notifier,
         )
 
     def get_dce_staged_object_upload_target(
@@ -495,6 +502,30 @@ def _build_company_registry() -> CompanyRegistryPort | None:
         token=token,
         base_url=os.getenv("SMART_AO_INSEE_BASE_URL", "https://api.insee.fr/api-sirene/3.11"),
         timeout_seconds=float(os.getenv("SMART_AO_INSEE_TIMEOUT_SECONDS", "5")),
+    )
+
+
+def _build_submission_export_notifier() -> SubmissionExportNotificationPort | None:
+    if os.getenv("SMART_AO_SMTP_ENABLED", "0") != "1":
+        return None
+    hostname = os.getenv("SMART_AO_SMTP_HOST", "").strip()
+    sender = os.getenv("SMART_AO_SMTP_FROM", "").strip()
+    if not hostname:
+        raise RuntimeError("SMART_AO_SMTP_HOST is required when SMTP is enabled")
+    if not sender:
+        raise RuntimeError("SMART_AO_SMTP_FROM is required when SMTP is enabled")
+    username = os.getenv("SMART_AO_SMTP_USERNAME") or None
+    password = os.getenv("SMART_AO_SMTP_PASSWORD") or None
+    start_tls_value = os.getenv("SMART_AO_SMTP_START_TLS", "")
+    return AioSmtpSubmissionExportNotifier(
+        hostname=hostname,
+        port=int(os.getenv("SMART_AO_SMTP_PORT", "587")),
+        sender=sender,
+        username=username,
+        password=password,
+        use_tls=os.getenv("SMART_AO_SMTP_USE_TLS", "0") == "1",
+        start_tls=(start_tls_value == "1") if start_tls_value else None,
+        timeout_seconds=float(os.getenv("SMART_AO_SMTP_TIMEOUT_SECONDS", "10")),
     )
 
 

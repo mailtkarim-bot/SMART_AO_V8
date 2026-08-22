@@ -20,6 +20,7 @@ COPY backend ./backend
 ARG SMART_AO_INSTALL_RAG=0
 ARG SMART_AO_INSTALL_DOCUMENT_ADVANCED=0
 ARG SMART_AO_INSTALL_CONNECTORS=0
+ARG SMART_AO_INSTALL_NOTIFICATIONS=0
 RUN pip install --no-cache-dir . \
     && if [ "$SMART_AO_INSTALL_RAG" = "1" ]; then \
         pip install --no-cache-dir ".[rag]"; \
@@ -29,6 +30,9 @@ RUN pip install --no-cache-dir . \
     fi \
     && if [ "$SMART_AO_INSTALL_CONNECTORS" = "1" ]; then \
         pip install --no-cache-dir ".[connectors]"; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_NOTIFICATIONS" = "1" ]; then \
+        pip install --no-cache-dir ".[notifications]"; \
     fi \
     && chown -R smartao:smartao /app
 

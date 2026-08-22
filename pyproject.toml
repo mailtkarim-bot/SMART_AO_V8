@@ -40,6 +40,9 @@ object-storage = [
 connectors = [
   "httpx>=0.28,<1.0",
 ]
+notifications = [
+  "aiosmtplib>=5.1,<6.0",
+]
 
 [dependency-groups]
 dev = [

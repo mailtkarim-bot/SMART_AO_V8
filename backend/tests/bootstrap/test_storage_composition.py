@@ -80,3 +80,52 @@ def test_app_runtime_builds_insee_registry_when_explicitly_enabled(monkeypatch) 
         "base_url": "https://api.insee.fr/api-sirene/3.11",
         "timeout_seconds": 5.0,
     }
+
+
+def test_app_runtime_keeps_smtp_notifications_disabled_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("SMART_AO_SMTP_ENABLED", raising=False)
+    monkeypatch.delenv("SMART_AO_SMTP_HOST", raising=False)
+    monkeypatch.delenv("SMART_AO_SMTP_FROM", raising=False)
+
+    assert application._build_submission_export_notifier() is None
+
+
+def test_app_runtime_requires_smtp_host_and_sender_when_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("SMART_AO_SMTP_ENABLED", "1")
+    monkeypatch.delenv("SMART_AO_SMTP_HOST", raising=False)
+    monkeypatch.delenv("SMART_AO_SMTP_FROM", raising=False)
+
+    with pytest.raises(RuntimeError, match="SMTP_HOST"):
+        application._build_submission_export_notifier()
+
+    monkeypatch.setenv("SMART_AO_SMTP_HOST", "smtp.example.test")
+    with pytest.raises(RuntimeError, match="SMTP_FROM"):
+        application._build_submission_export_notifier()
+
+
+def test_app_runtime_builds_smtp_notifier_when_explicitly_enabled(monkeypatch) -> None:
+    class FakeNotifier:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+    monkeypatch.setenv("SMART_AO_SMTP_ENABLED", "1")
+    monkeypatch.setenv("SMART_AO_SMTP_HOST", "smtp.example.test")
+    monkeypatch.setenv("SMART_AO_SMTP_FROM", "no-reply@example.test")
+    monkeypatch.setenv("SMART_AO_SMTP_PORT", "465")
+    monkeypatch.setenv("SMART_AO_SMTP_USE_TLS", "1")
+    monkeypatch.setenv("SMART_AO_SMTP_START_TLS", "")
+    monkeypatch.setattr(application, "AioSmtpSubmissionExportNotifier", FakeNotifier)
+
+    notifier = application._build_submission_export_notifier()
+
+    assert isinstance(notifier, FakeNotifier)
+    assert notifier.kwargs == {
+        "hostname": "smtp.example.test",
+        "port": 465,
+        "sender": "no-reply@example.test",
+        "username": None,
+        "password": None,
+        "use_tls": True,
+        "start_tls": None,
+        "timeout_seconds": 10.0,
+    }
