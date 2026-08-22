@@ -2199,6 +2199,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+connectors = [
+    { name = "httpx" },
+]
 document-advanced = [
     { name = "docling" },
     { name = "pymupdf" },
@@ -2228,6 +2231,7 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'object-storage'", specifier = ">=1.40,<2.0" },
     { name = "docling", marker = "extra == 'document-advanced'", specifier = ">=2.70,<3.0" },
     { name = "fastapi", specifier = ">=0.115,<1.0" },
+    { name = "httpx", marker = "extra == 'connectors'", specifier = ">=0.28,<1.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "ortools", specifier = ">=9.14,<10.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4.0" },
@@ -2243,7 +2247,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0,<3.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1.0" },
 ]
-provides-extras = ["rag", "document-advanced", "object-storage"]
+provides-extras = ["rag", "document-advanced", "object-storage", "connectors"]
 
 [package.metadata.requires-dev]
 dev = [

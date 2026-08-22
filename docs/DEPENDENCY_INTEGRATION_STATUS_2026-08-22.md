@@ -2,14 +2,14 @@
 
 **Date de vérification :** 22 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**HEAD de référence :** `73d3e79` (slices knowledge/optimization publiés et validés localement)
+**HEAD de référence :** `15f2e74` (stockage objet privé S3/MinIO intégré ; slice INSEE read-only en cours)
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
 
 SMART_AO V8 possède aujourd’hui un **socle logiciel codé et testable**, mais il ne possède pas encore toute la panoplie d’intégrations décrite dans la spécification d’architecture initiale. Cette spécification mélange volontairement quatre catégories différentes : dépendances du noyau, composants optionnels, composants futurs et exigences d’exploitation. Une mention dans `SMART_AO_V8_ARCHITECTURE_INFRASTRUCTURE_REFERENCE.md` ne constitue donc pas une preuve d’installation ou de raccordement.
 
-Le produit est aujourd’hui dans la situation suivante : le noyau métier, la sécurité tenant-scoped, PostgreSQL/Alembic, l’upload privé, le scan ClamAV, le parsing déterministe de base, la génération documentaire contrôlée, le pricing en prévisualisation, le cockpit initial, le paquet de dépôt et le webhook HMAC sont codés dans le dépôt. Un premier adaptateur **OR-Tools CP-SAT** et un socle **RAG local avec provider BGE optionnel, index JSONB et route de recherche protégée** viennent d’être ajoutés. En revanche, HiGHS/PuLP, l’activation opérationnelle du modèle BGE, pgvector/Qdrant, Docling/MinerU/OCR, MinIO/S3, les connecteurs BOAMP/URSSAF/INSEE, l’e-mail SMTP, Playwright E2E et les services Redis/n8n ne sont pas intégrés au runtime par défaut.
+Le produit est aujourd’hui dans la situation suivante : le noyau métier, la sécurité tenant-scoped, PostgreSQL/Alembic, l’upload privé, le scan ClamAV, le parsing déterministe de base, la génération documentaire contrôlée, le pricing en prévisualisation, le cockpit initial, le paquet de dépôt et le webhook HMAC sont codés dans le dépôt. Un premier adaptateur **OR-Tools CP-SAT**, un socle **RAG local avec provider BGE optionnel**, le parsing avancé Docling/PyMuPDF et un stockage objet privé S3-compatible viennent d’être ajoutés. Un adaptateur INSEE Sirene read-only est maintenant câblé derrière un port enterprise et désactivé par défaut. En revanche, HiGHS/PuLP, l’activation opérationnelle du modèle BGE, pgvector/Qdrant, la recette Docling/MinerU/OCR, la recette MinIO/S3, BOAMP/URSSAF, l’e-mail SMTP, Playwright E2E et les services Redis/n8n ne sont pas intégrés au runtime par défaut.
 
 > **Verdict :** on peut commencer à greffer ces briques par slices contrôlés, mais on ne peut pas dire que tout est codé ni que le produit est opérationnel de bout en bout. Le premier raccordement doit porter sur une dépendance ayant un contrat métier et un critère de recette précis ; il ne faut pas installer toute la pile cible en bloc.
 
@@ -30,7 +30,7 @@ La documentation doit donc être lue ainsi : **“Obligatoire” dans l’archit
 | Identité et sécurité | Argon2, PyJWT, python-magic, audit et policy applicative | Codés ; tenant, acteur, membership, CSRF et refresh cookie sont résolus côté serveur. |
 | Documents de base | `pypdf`, `python-docx`, `openpyxl` | Utilisés par l’extraction déterministe et l’import pricing borné. |
 | Antivirus | Adaptateur ClamAV TCP `INSTREAM`, quarantaine locale privée | Codé et fail-closed ; l’exécution réelle EICAR reste à prouver sur Docker. |
-| Stockage courant | Adaptateurs locaux privés par filesystem, permissions et hash | Codé pour le sandbox et le premier déploiement contrôlé ; pas encore un stockage objet S3/MinIO. |
+| Stockage courant | Adaptateurs locaux privés par filesystem, permissions et hash ; adaptateur S3-compatible optionnel | Local par défaut ; S3/MinIO est greffé derrière `GeneratedDocumentStorage`, mais la recette Docker/bucket/backup réelle reste ouverte. |
 | Frontend | React, React DOM, TypeScript, Vite, Vitest, Testing Library | Cockpit initial et features métier présents ; 74 tests frontend ont passé localement. |
 | Qualité Python | pytest, pytest-cov, Ruff, Bandit, detect-secrets, pip-audit | Présents et utilisés par les contrôles locaux/CI prévus. |
 
@@ -93,7 +93,7 @@ Le passage à MinIO/S3 est maintenant câblé derrière un slice d’infrastruct
 |---|---|---|
 | Provider LLM/cognitif externe | Aucun SDK, endpoint, secret ou adaptateur | Absent ; aucune donnée DCE n’est envoyée à une IA. |
 | BOAMP | Mention documentaire seulement | Aucun connecteur d’import ou de déduplication. |
-| URSSAF / INSEE | Mention documentaire seulement | Aucun connecteur de vérification ou de référentiel. |
+| URSSAF / INSEE | INSEE : extra `connectors` optionnel, port `CompanyRegistryPort`, adaptateur Sirene read-only et composition AppRuntime ; URSSAF toujours absent | INSEE est **câblé et testé avec faux client**, activable seulement avec `SMART_AO_INSEE_ENABLED=1` et token runtime ; aucune requête réelle ni persistance automatique n’a été validée. URSSAF reste non intégré. |
 | SMTP / `aiosmtplib` | Absent du manifest et du code | Pas d’e-mail transactionnel intégré. |
 | ICS / `icalendar` | Absent | Pas d’export calendrier intégré. |
 | n8n | Documenté comme intégration future | Aucun workflow connecté. |
@@ -118,7 +118,7 @@ Il est techniquement possible de commencer un raccordement maintenant, à condit
 | 2 | **Docling ou OCR local** | Possible après constituer un corpus DCE anonymisé, mesurer CPU/RAM, séparer le worker documentaire et définir le statut “candidat à revue humaine”. |
 | 3 | **RAG local avec pgvector** | Possible après définir retrieval, citations, tenant filter, version d’index et benchmark Golden DCE. Il est préférable de commencer par pgvector plutôt que Qdrant si le besoin n’est pas encore mesuré. |
 | 4 | **MinIO/S3** | Adaptateur S3-compatible et composition AppRuntime désormais codés ; reste la recette Docker réelle, la stratégie de migration/backup et la restauration isolée. |
-| 5 | **Connecteurs BOAMP/URSSAF/INSEE/SMTP** | Possible séparément, avec secrets hors Git, idempotence, limites d’usage, audit et tests sandbox. Aucun ne doit être ajouté comme dépendance obligatoire du cœur sans cas métier validé. |
+| 5 | **Connecteurs BOAMP/URSSAF/SMTP** | Le port INSEE read-only est maintenant un premier slice ; les autres restent à traiter séparément avec secrets hors Git, idempotence, limites d’usage, audit et tests sandbox. Aucun ne doit être ajouté comme dépendance obligatoire du cœur sans cas métier validé. |
 | 6 | **Playwright E2E** | Peut être ajouté dès maintenant comme outil de preuve, mais il ne remplacera pas l’absence de VPS/Docker et d’URL HTTPS réelle. |
 
 ## 7. Ce qui empêche aujourd’hui de dire « tout est codé »
@@ -136,7 +136,7 @@ La séquence raisonnable est la suivante :
 3. Précharger et vérifier BGE-M3 sur une machine dédiée, puis exécuter le job one-shot d’indexation sur une version DCE admise.
 4. Raccorder l’affectation OR-Tools à un cas pricing/capacité réel, avec validation patronale et mesure du temps de résolution.
 5. Comparer le bridge JSONB à pgvector seulement après le benchmark ; ne pas introduire Qdrant sans besoin mesuré.
-6. Recetter sur Docker réel le parsing avancé et S3/MinIO, puis ajouter les connecteurs externes un par un, derrière des ports et des adaptateurs, avec secrets, budgets, rate limits, audit et possibilité de désactivation.
+6. Recetter sur Docker réel le parsing avancé et S3/MinIO ; exécuter ensuite une recette INSEE avec token opérateur et données non sensibles, puis ajouter BOAMP/URSSAF/SMTP un par un derrière des ports et adaptateurs, avec secrets, budgets, rate limits, audit et possibilité de désactivation.
 
 ## Références locales
 

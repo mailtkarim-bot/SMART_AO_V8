@@ -144,3 +144,30 @@ def test_egress_services_join_private_and_edge_networks() -> None:
     for service in (clamav, webhook):
         assert "      - internal" in service
         assert "      - edge" in service
+
+
+def test_optional_dependency_build_flags_are_explicit() -> None:
+    dockerfile = (OPS / "docker/backend.Dockerfile").read_text(encoding="utf-8")
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    assert "ARG SMART_AO_INSTALL_CONNECTORS=0" in dockerfile
+    assert 'pip install --no-cache-dir ".[connectors]"' in dockerfile
+    assert "SMART_AO_INSTALL_CONNECTORS" in compose
+    assert "SMART_AO_INSTALL_RAG" in compose
+    assert "SMART_AO_INSTALL_DOCUMENT_ADVANCED" in compose
+
+
+def test_insee_connector_is_disabled_by_default_and_secret_is_backend_only() -> None:
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    backend = compose.split("  backend:", maxsplit=1)[1].split(
+        "  dce-retention-worker:", maxsplit=1
+    )[0]
+    retention = compose.split("  dce-retention-worker:", maxsplit=1)[1].split(
+        "  submission-export-webhook-worker:", maxsplit=1
+    )[0]
+    webhook = compose.split("  submission-export-webhook-worker:", maxsplit=1)[1].split(
+        "\n  postgres:", maxsplit=1
+    )[0]
+    assert "SMART_AO_INSEE_ENABLED: ${SMART_AO_INSEE_ENABLED:-0}" in backend
+    assert "SMART_AO_INSEE_API_TOKEN: ${SMART_AO_INSEE_API_TOKEN:-}" in backend
+    assert "SMART_AO_INSEE_API_TOKEN" not in retention
+    assert "SMART_AO_INSEE_API_TOKEN" not in webhook

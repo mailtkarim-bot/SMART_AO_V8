@@ -46,3 +46,37 @@ def test_app_runtime_builds_s3_storage_only_when_enabled(monkeypatch) -> None:
         "region_name": "eu-west-1",
         "server_side_encryption": "AES256",
     }
+
+
+def test_app_runtime_keeps_insee_disabled_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("SMART_AO_INSEE_ENABLED", raising=False)
+    monkeypatch.delenv("SMART_AO_INSEE_API_TOKEN", raising=False)
+
+    assert application._build_company_registry() is None
+
+
+def test_app_runtime_requires_insee_token_when_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("SMART_AO_INSEE_ENABLED", "1")
+    monkeypatch.delenv("SMART_AO_INSEE_API_TOKEN", raising=False)
+
+    with pytest.raises(RuntimeError, match="INSEE_API_TOKEN"):
+        application._build_company_registry()
+
+
+def test_app_runtime_builds_insee_registry_when_explicitly_enabled(monkeypatch) -> None:
+    class FakeRegistry:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+    monkeypatch.setenv("SMART_AO_INSEE_ENABLED", "1")
+    monkeypatch.setenv("SMART_AO_INSEE_API_TOKEN", "runtime-secret")
+    monkeypatch.setattr(application, "InseeSireneRegistry", FakeRegistry)
+
+    registry = application._build_company_registry()
+
+    assert isinstance(registry, FakeRegistry)
+    assert registry.kwargs == {
+        "token": "runtime-secret",
+        "base_url": "https://api.insee.fr/api-sirene/3.11",
+        "timeout_seconds": 5.0,
+    }

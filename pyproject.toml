@@ -37,6 +37,9 @@ document-advanced = [
 object-storage = [
   "boto3>=1.40,<2.0",
 ]
+connectors = [
+  "httpx>=0.28,<1.0",
+]
 
 [dependency-groups]
 dev = [

@@ -19,12 +19,16 @@ COPY pyproject.toml README.md ./
 COPY backend ./backend
 ARG SMART_AO_INSTALL_RAG=0
 ARG SMART_AO_INSTALL_DOCUMENT_ADVANCED=0
+ARG SMART_AO_INSTALL_CONNECTORS=0
 RUN pip install --no-cache-dir . \
     && if [ "$SMART_AO_INSTALL_RAG" = "1" ]; then \
         pip install --no-cache-dir ".[rag]"; \
     fi \
     && if [ "$SMART_AO_INSTALL_DOCUMENT_ADVANCED" = "1" ]; then \
         pip install --no-cache-dir ".[document-advanced]"; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_CONNECTORS" = "1" ]; then \
+        pip install --no-cache-dir ".[connectors]"; \
     fi \
     && chown -R smartao:smartao /app
 

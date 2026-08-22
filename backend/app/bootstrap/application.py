@@ -130,6 +130,10 @@ from app.modules.enterprise.application.enterprise_upload import (
     EnterprisePrivateUploadService,
     enterprise_upload_handlers,
 )
+from app.modules.enterprise.infrastructure.insee_registry import (
+    CompanyRegistryPort,
+    InseeSireneRegistry,
+)
 from app.modules.knowledge.application.service import KnowledgeRetrievalService
 from app.modules.membership.application.assignment import (
     AssignmentInteractionService,
@@ -243,6 +247,7 @@ class AppRuntime:
     dispatcher: CommandDispatcher
     dce_upload_service: DceUploadService
     preparation_storage: GeneratedDocumentStorage
+    company_registry: CompanyRegistryPort | None = None
 
     @classmethod
     def create(
@@ -252,6 +257,7 @@ class AppRuntime:
         dce_upload_service_factory: Callable[[CommandDispatcher], DceUploadService] | None = None,
     ) -> AppRuntime:
         preparation_storage = _build_preparation_storage()
+        company_registry = _build_company_registry()
         dispatcher = CommandDispatcher(
             session_factory=session_factory,
             handlers={
@@ -309,6 +315,7 @@ class AppRuntime:
             dispatcher=dispatcher,
             dce_upload_service=upload_service,
             preparation_storage=preparation_storage,
+            company_registry=company_registry,
         )
 
     def get_dce_staged_object_upload_target(
@@ -475,6 +482,19 @@ def _default_enterprise_private_upload_service(
             timeout_seconds=float(os.getenv("SMART_AO_CLAMD_TIMEOUT_SECONDS", "30")),
         ),
         allowed_media_types=_ALLOWED_DCE_MEDIA_TYPES,
+    )
+
+
+def _build_company_registry() -> CompanyRegistryPort | None:
+    if os.getenv("SMART_AO_INSEE_ENABLED", "0") != "1":
+        return None
+    token = os.getenv("SMART_AO_INSEE_API_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError("SMART_AO_INSEE_API_TOKEN is required when INSEE is enabled")
+    return InseeSireneRegistry(
+        token=token,
+        base_url=os.getenv("SMART_AO_INSEE_BASE_URL", "https://api.insee.fr/api-sirene/3.11"),
+        timeout_seconds=float(os.getenv("SMART_AO_INSEE_TIMEOUT_SECONDS", "5")),
     )
 
 
