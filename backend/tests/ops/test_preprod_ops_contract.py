@@ -217,3 +217,14 @@ def test_boamp_public_search_is_explicit_and_secretless() -> None:
     assert "SMART_AO_BOAMP_BASE_URL" in backend
     assert "SMART_AO_BOAMP_TIMEOUT_SECONDS" in backend
     assert "BOAMP_API_TOKEN" not in compose
+
+
+def test_dce_extraction_wrapper_is_one_shot_and_uses_private_env() -> None:
+    wrapper = (OPS / "run-dce-extraction-preprod.sh").read_text(encoding="utf-8")
+    assert '[[ $# -ne 2 ]]' in wrapper
+    assert 'stat -c \'%a\' "$ENV_FILE"' in wrapper
+    assert '"$ENV_FILE"' in wrapper
+    assert "run --rm --no-deps --no-ansi backend" in wrapper
+    assert "python -m app.workers.dce_extraction" in wrapper
+    assert "--tenant-id \"$tenant_id\"" in wrapper
+    assert "--dce-document-id \"$dce_document_id\"" in wrapper

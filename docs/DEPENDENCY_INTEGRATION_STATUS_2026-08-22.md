@@ -74,7 +74,7 @@ Le contrat initial de retrieval est désormais figé : filtre tenant/affaire/ver
 | OCR cloud premium | Aucun provider, secret, adaptateur ou politique d’envoi configuré | Non greffé. |
 | Extraction déterministe actuelle | `pypdf`, `python-docx`, `openpyxl`, limites anti-bombes et fragments sourcés ; fallback conservé même avec l’extra avancé | Codée et non régressée ; les adaptateurs avancés restent candidats à revue humaine. |
 
-Le pipeline actuel traite certains PDF, DOCX, XLSX et TXT de manière bornée et déterministe. Le nouveau port avancé peut utiliser PyMuPDF pour des blocs PDF localisés et Docling pour des formats complexes, mais il ne constitue pas encore une preuve de lecture robuste de scans/plans/tableaux ni un OCR métier validé. L’image peut installer l’extra séparément ; l’activation nécessite des plafonds CPU/RAM, un corpus Golden DCE, une exécution hors requête HTTP et une politique de revue humaine.
+Le pipeline actuel traite certains PDF, DOCX, XLSX et TXT de manière bornée et déterministe. Le port avancé peut utiliser PyMuPDF pour des blocs PDF localisés et Docling pour des formats complexes ; la factory est désormais appelée par le worker one-shot `app.workers.dce_extraction`, déclenchable par le wrapper `ops/run-dce-extraction-preprod.sh`. Cela ne constitue pas encore une preuve de lecture robuste de scans/plans/tableaux ni un OCR métier validé. L’image peut installer l’extra séparément ; l’activation nécessite des plafonds CPU/RAM, un corpus Golden DCE, une exécution hors requête HTTP et une politique de revue humaine.
 
 ### 4.4 Stockage objet et infrastructure de recherche
 
@@ -115,7 +115,7 @@ Il est techniquement possible de commencer un raccordement maintenant, à condit
 | Priorité | Raccordement | Pourquoi maintenant / condition de sortie |
 |---:|---|---|
 | 1 | **OR-Tools ou HiGHS pour un cas d’optimisation concret** | Possible après figer le contrat pricing/capacité, les données autorisées, le solveur choisi, les budgets et les tests de reproductibilité. Ne pas installer les trois solveurs en même temps. |
-| 2 | **Docling ou OCR local** | Possible après constituer un corpus DCE anonymisé, mesurer CPU/RAM, séparer le worker documentaire et définir le statut “candidat à revue humaine”. |
+| 2 | **Docling ou OCR local** | Le worker documentaire one-shot et la factory optionnelle sont maintenant câblés ; il faut encore constituer un corpus DCE anonymisé, mesurer CPU/RAM, tester les scans/OCR et définir le statut “candidat à revue humaine”. |
 | 3 | **RAG local avec pgvector** | Possible après définir retrieval, citations, tenant filter, version d’index et benchmark Golden DCE. Il est préférable de commencer par pgvector plutôt que Qdrant si le besoin n’est pas encore mesuré. |
 | 4 | **MinIO/S3** | Adaptateur S3-compatible et composition AppRuntime désormais codés ; reste la recette Docker réelle, la stratégie de migration/backup et la restauration isolée. |
 | 5 | **Connecteurs BOAMP/URSSAF** | Les ports INSEE read-only, BOAMP read-only, SMTP optionnel et export ICS local sont maintenant des premiers slices ; URSSAF reste à traiter séparément avec secrets hors Git, idempotence, limites d’usage, audit et tests sandbox. Le process outbox SMTP dédié et toute synchronisation d’agenda restent à raccorder séparément si ces usages sont retenus. |
