@@ -411,3 +411,19 @@ def test_patron_reads_current_financial_draft_projection_after_line_write(
     assert len(projection.lines) == 1
     assert projection.lines[0].category == "SALES"
     assert projection.lines[0].amount_minor == 125_000
+
+
+def test_published_financial_snapshot_is_immutable_at_database_boundary(session_factory):
+    _, _, snapshot_id, _ = _seed_draft(session_factory)
+    with session_factory.begin() as session:
+        snapshot = session.get(FinancialReportSnapshotRecord, snapshot_id)
+        assert snapshot is not None
+        snapshot.state = "PUBLISHED"
+        snapshot.published_at = NOW
+
+    with pytest.raises(sa.exc.DBAPIError, match="immutable"), session_factory.begin() as session:
+        session.execute(
+            sa.update(FinancialReportSnapshotRecord)
+            .where(FinancialReportSnapshotRecord.id == snapshot_id)
+            .values(sales_total_minor=1)
+        )

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from io import BytesIO
 from zipfile import BadZipFile, ZipFile
 
@@ -202,8 +202,12 @@ def _parse_row(
         errors.append("QUANTITY_INVALID")
     if total is None and unit_price is None:
         errors.append("PRICE_REQUIRED")
-    if total is None and unit_price is not None and quantity is not None:
-        total = int((Decimal(quantity) * Decimal(unit_price)).to_integral_value())
+    if unit_price is not None and quantity is not None:
+        calculated_total = _calculate_total_minor(quantity=quantity, unit_price_minor=unit_price)
+        if total is None:
+            total = calculated_total
+        elif total != calculated_total:
+            errors.append("TOTAL_PRICE_MISMATCH")
     return PricingImportRow(
         row_number=row_number,
         code=code,
@@ -225,11 +229,8 @@ def _text(value: object) -> str | None:
 def _decimal_text(value: object, *, default: str | None = None) -> str | None:
     if value in (None, ""):
         return default
-    try:
-        decimal = Decimal(str(value).replace(",", "."))
-    except (InvalidOperation, ValueError):
-        return None
-    if decimal < 0:
+    decimal = _decimal(value)
+    if decimal is None or decimal < 0:
         return None
     return format(decimal, "f")
 
@@ -237,10 +238,31 @@ def _decimal_text(value: object, *, default: str | None = None) -> str | None:
 def _minor(value: object) -> int | None:
     if value in (None, ""):
         return None
+    decimal = _decimal(value)
+    if decimal is None or decimal < 0:
+        return None
+    return int((decimal * 100).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def _calculate_total_minor(*, quantity: str, unit_price_minor: int) -> int:
+    return int(
+        (Decimal(quantity) * Decimal(unit_price_minor)).to_integral_value(
+            rounding=ROUND_HALF_UP
+        )
+    )
+
+
+def _decimal(value: object) -> Decimal | None:
+    text = str(value).strip().replace("\u00a0", "").replace(" ", "")
+    if "," in text and "." in text:
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    else:
+        text = text.replace(",", ".")
     try:
-        decimal = Decimal(str(value).replace(",", "."))
+        decimal = Decimal(text)
     except (InvalidOperation, ValueError):
         return None
-    if decimal < 0:
-        return None
-    return int((decimal * 100).to_integral_value())
+    return decimal if decimal.is_finite() else None

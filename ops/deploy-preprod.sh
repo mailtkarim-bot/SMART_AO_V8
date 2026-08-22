@@ -43,10 +43,11 @@ load_environment() {
   # shellcheck disable=SC1090
   source "${ENV_FILE}"
   set +a
-  for variable in SMART_AO_PUBLIC_HOST SMART_AO_DATABASE_URL SMART_AO_JWT_SIGNING_KEY SMART_AO_JWT_ISSUER SMART_AO_JWT_AUDIENCE POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD; do
+  for variable in SMART_AO_PUBLIC_HOST SMART_AO_DATABASE_URL SMART_AO_JWT_SIGNING_KEY SMART_AO_JWT_ISSUER SMART_AO_JWT_AUDIENCE POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD PGPASSWORD; do
     [[ -n "${!variable:-}" ]] || fail "${variable} is required"
     [[ "${!variable}" != REPLACE_WITH_* ]] || fail "${variable} still contains a placeholder"
   done
+  [[ "${PGPASSWORD}" == "${POSTGRES_PASSWORD}" ]] || fail "PGPASSWORD must match POSTGRES_PASSWORD for the configured application role"
 }
 
 compose() {

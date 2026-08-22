@@ -167,7 +167,8 @@ def test_clamd_scan_streams_file_and_returns_clean(tmp_path: Path, monkeypatch):
 @pytest.mark.parametrize(
     ("response", "verdict"),
     [(b"stream: Eicar-Test-Signature FOUND\x00", "INFECTED"),
-     (b"unexpected response\x00", "ERROR")],
+     (b"unexpected response\x00", "ERROR"),
+     (b"not-a-stream-ok\x00", "ERROR")],
 )
 def test_clamd_scan_maps_infected_and_unknown_verdicts(
     tmp_path: Path, monkeypatch, response, verdict
@@ -190,6 +191,12 @@ def test_clamd_scan_maps_infected_and_unknown_verdicts(
 
 
 def test_clamd_scan_fails_closed_on_connection_error(tmp_path: Path, monkeypatch):
+    logged: list[tuple[str, dict[str, str]]] = []
+
+    def capture_warning(message: str, *, extra: dict[str, str]) -> None:
+        logged.append((message, extra))
+
+    monkeypatch.setattr(quarantine.logger, "warning", capture_warning)
     storage = LocalQuarantineStorageAdapter(root=tmp_path)
 
     async def failing_open_connection(host, port):
@@ -205,6 +212,10 @@ def test_clamd_scan_fails_closed_on_connection_error(tmp_path: Path, monkeypatch
     assert result.verdict == "ERROR"
     assert result.scanner_name == "clamd"
     assert result.scanner_signature_version == "unavailable"
+    assert logged == [(
+        "dce_clamav_scan_failed",
+        {"scanner_name": "clamd", "error_type": "OSError"},
+    )]
 
 
 def test_clamd_version_decodes_and_truncates_response(tmp_path: Path, monkeypatch):

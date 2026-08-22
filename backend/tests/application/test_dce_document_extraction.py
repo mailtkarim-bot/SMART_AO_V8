@@ -7,6 +7,7 @@ from io import BytesIO
 from pathlib import Path
 from uuid import UUID, uuid4
 
+import app.modules.dce.application.extraction as extraction_module
 import pytest
 import sqlalchemy as sa
 from app.modules.dce.application.commands import RecordDceDocumentExtractionCommand
@@ -598,3 +599,20 @@ def test_pdf_and_text_limits_fail_safe_without_fragments(monkeypatch: pytest.Mon
     )
     assert text_projection.status == "REJECTED_LIMIT"
     assert text_projection.fragments == ()
+
+
+def test_docx_projection_rejects_archive_over_decompressed_limit(monkeypatch) -> None:
+    document = Document()
+    document.add_paragraph("Document DCE de test")
+    payload = BytesIO()
+    document.save(payload)
+
+    monkeypatch.setattr(extraction_module, "MAX_DOCX_UNCOMPRESSED_BYTES", 1)
+    projection = _project_document(
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        source_bytes=payload.getvalue(),
+    )
+
+    assert projection.status == "REJECTED_LIMIT"
+    assert projection.failure_code == "EXTRACTION_LIMIT"
+    assert projection.fragments == ()

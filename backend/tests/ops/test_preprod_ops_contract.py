@@ -69,3 +69,32 @@ def test_preprod_trusts_forwarded_client_ip_only_on_internal_proxy_network() -> 
     assert "--forwarded-allow-ips=172.30.0.0/24" in dockerfile
     assert "subnet: 172.30.0.0/24" in compose
     assert 'backend:\n' in compose and '      - internal\n' in compose
+
+
+def test_preprod_services_use_minimal_environment_allowlists() -> None:
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    assert "env_file:" not in compose
+
+    backend = compose.split("  backend:", maxsplit=1)[1].split(
+        "  dce-retention-worker:", maxsplit=1
+    )[0]
+    retention = compose.split("  dce-retention-worker:", maxsplit=1)[1].split(
+        "  submission-export-webhook-worker:", maxsplit=1
+    )[0]
+    webhook = compose.split("  submission-export-webhook-worker:", maxsplit=1)[1].split(
+        "  postgres:", maxsplit=1
+    )[0]
+
+    assert "SMART_AO_JWT_SIGNING_KEY" in backend
+    assert "SMART_AO_JWT_SIGNING_KEY" not in retention
+    assert "SMART_AO_JWT_SIGNING_KEY" not in webhook
+    assert "SMART_AO_EXPORT_WEBHOOK_SECRET" in webhook
+    assert "POSTGRES_PASSWORD" not in backend
+    assert "POSTGRES_PASSWORD" not in retention
+    assert "POSTGRES_PASSWORD" not in webhook
+
+
+def test_deploy_validates_libpq_password_alignment() -> None:
+    deploy_script = (OPS / "deploy-preprod.sh").read_text(encoding="utf-8")
+    assert "PGPASSWORD" in deploy_script
+    assert 'PGPASSWORD}" == "${POSTGRES_PASSWORD}' in deploy_script

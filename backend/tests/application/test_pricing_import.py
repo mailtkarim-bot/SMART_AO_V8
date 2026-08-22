@@ -381,3 +381,33 @@ def test_pricing_import_preview_rejects_zip_bomb_metadata(session_factory, monke
             content_type=None,
             payload=b"metadata-only",
         )
+
+
+def test_pricing_import_normalizes_european_amounts_and_rejects_inconsistent_total(
+    session_factory,
+):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    preview = PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+        actor=actor,
+        case_id=case_id,
+        document_kind="BPU",
+        filename="amounts.xlsx",
+        content_type=None,
+        payload=_xlsx(
+            [
+                ["Désignation", "Quantité", "Prix unitaire", "Total"],
+                ["Arrondi commercial", 1, 1.005, None],
+                ["Format européen", "1,5", "1 234,56", "1 851,84"],
+                ["Total incohérent", 2, 10, 19],
+            ]
+        ),
+    )
+
+    assert preview.rows[0].unit_price_minor == 101
+    assert preview.rows[0].total_minor == 101
+    assert preview.rows[1].unit_price_minor == 123456
+    assert preview.rows[1].total_minor == 185184
+    assert preview.rows[1].errors == ()
+    assert preview.rows[2].errors == ("TOTAL_PRICE_MISMATCH",)
+    assert preview.valid_row_count == 2
+    assert preview.total_minor == 185285

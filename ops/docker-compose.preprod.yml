@@ -56,13 +56,21 @@ services:
     restart: unless-stopped
     logging: *default-logging
     init: true
-    env_file:
-      - .env.preprod
     environment:
       SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+      SMART_AO_JWT_SIGNING_KEY: ${SMART_AO_JWT_SIGNING_KEY:?SMART_AO_JWT_SIGNING_KEY is required}
+      SMART_AO_JWT_ISSUER: ${SMART_AO_JWT_ISSUER:?SMART_AO_JWT_ISSUER is required}
+      SMART_AO_JWT_AUDIENCE: ${SMART_AO_JWT_AUDIENCE:?SMART_AO_JWT_AUDIENCE is required}
+      SMART_AO_LOGIN_MAX_FAILURES: ${SMART_AO_LOGIN_MAX_FAILURES:-5}
+      SMART_AO_LOGIN_FAILURE_WINDOW_SECONDS: ${SMART_AO_LOGIN_FAILURE_WINDOW_SECONDS:-900}
+      SMART_AO_LOGIN_BASE_LOCKOUT_SECONDS: ${SMART_AO_LOGIN_BASE_LOCKOUT_SECONDS:-30}
+      SMART_AO_LOGIN_MAX_LOCKOUT_SECONDS: ${SMART_AO_LOGIN_MAX_LOCKOUT_SECONDS:-900}
       SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
       SMART_AO_CLAMD_HOST: clamav
       SMART_AO_CLAMD_PORT: "3310"
+      SMART_AO_CLAMD_TIMEOUT_SECONDS: ${SMART_AO_CLAMD_TIMEOUT_SECONDS:-30}
     expose:
       - "8000"
     depends_on:
@@ -94,10 +102,10 @@ services:
     restart: unless-stopped
     logging: *default-logging
     init: true
-    env_file:
-      - .env.preprod
     environment:
       SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
       SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
       SMART_AO_RETENTION_BATCH_SIZE: ${SMART_AO_RETENTION_BATCH_SIZE:-50}
       SMART_AO_RETENTION_LEASE_SECONDS: ${SMART_AO_RETENTION_LEASE_SECONDS:-120}
@@ -120,11 +128,12 @@ services:
     restart: unless-stopped
     logging: *default-logging
     init: true
-    env_file:
-      - .env.preprod
     environment:
       SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
       SMART_AO_EXPORT_WEBHOOK_URL: ${SMART_AO_EXPORT_WEBHOOK_URL:-}
+      SMART_AO_EXPORT_WEBHOOK_SECRET: ${SMART_AO_EXPORT_WEBHOOK_SECRET:-}
       SMART_AO_EXPORT_WEBHOOK_BATCH_SIZE: ${SMART_AO_EXPORT_WEBHOOK_BATCH_SIZE:-50}
       SMART_AO_EXPORT_WEBHOOK_LEASE_SECONDS: ${SMART_AO_EXPORT_WEBHOOK_LEASE_SECONDS:-120}
       SMART_AO_EXPORT_WEBHOOK_POLL_SECONDS: ${SMART_AO_EXPORT_WEBHOOK_POLL_SECONDS:-30}
