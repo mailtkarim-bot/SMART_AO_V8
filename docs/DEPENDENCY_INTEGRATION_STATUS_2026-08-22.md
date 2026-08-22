@@ -65,16 +65,16 @@ Le contrat initial de retrieval est désormais figé : filtre tenant/affaire/ver
 
 | Brique | Présence actuelle | Verdict |
 |---|---|---|
-| PyMuPDF / `fitz` | Non présent dans le manifest actuel | Non intégré ; l’extraction PDF utilise `pypdf`. |
+| PyMuPDF / `fitz` | Extra `document-advanced` verrouillé ; adaptateur PDF par blocs avec page/bbox et smoke test réel validé | **Greffé derrière un port optionnel** ; non activé par défaut, et le fallback `pypdf` reste inchangé. |
 | `pdfplumber` | Absent des manifests et du code | Non intégré. |
 | `pypdfium2` | Absent | Non intégré. |
-| **Docling** | Mentionné dans l’architecture cible, absent de `pyproject.toml`, `uv.lock`, Dockerfile et imports | Non greffé. |
-| **MinerU** | Prévu comme exception lourde CPU/GPU, absent du runtime | Non greffé. |
-| Tesseract / OCR français | Aucun binaire ou binding présent dans le dépôt et aucune étape Compose | Non greffé. |
+| **Docling** | Extra `document-advanced` verrouillé ; adaptateur `DocumentConverter` + export Markdown, factory d’activation et test simulé de provenance | **Greffé derrière un port optionnel** ; l’image peut l’installer avec `SMART_AO_INSTALL_DOCUMENT_ADVANCED=1`, mais les modèles/recettes doivent être validés avant activation. |
+| **MinerU** | Toujours absent du manifest et du runtime | Différé correctement : aucun besoin démontré après le premier slice Docling/PyMuPDF ; comparaison seulement sur un corpus Golden DCE. |
+| Tesseract / OCR français | Docling annonce un support OCR, mais aucun binaire Tesseract autonome ni recette OCR n’est encore activé dans Compose | **Préparé indirectement via Docling, non validé opérationnellement** ; il faut un corpus de scans, budgets CPU/RAM et revue humaine. |
 | OCR cloud premium | Aucun provider, secret, adaptateur ou politique d’envoi configuré | Non greffé. |
-| Extraction déterministe actuelle | `pypdf`, `python-docx`, `openpyxl`, limites anti-bombes et fragments sourcés | Codée dans un périmètre volontairement limité ; pas une couverture de tous les DCE scannés. |
+| Extraction déterministe actuelle | `pypdf`, `python-docx`, `openpyxl`, limites anti-bombes et fragments sourcés ; fallback conservé même avec l’extra avancé | Codée et non régressée ; les adaptateurs avancés restent candidats à revue humaine. |
 
-Le pipeline actuel sait traiter certains PDF, DOCX, XLSX et TXT de manière bornée et déterministe. Il ne sait pas encore assurer la lecture robuste de scans, plans, tableaux complexes et documents nécessitant OCR. L’ajout de Docling ou MinerU n’est donc pas un simple `pip install` : il nécessite une image worker dédiée, des plafonds CPU/RAM, un corpus de tests et une politique de revue humaine.
+Le pipeline actuel traite certains PDF, DOCX, XLSX et TXT de manière bornée et déterministe. Le nouveau port avancé peut utiliser PyMuPDF pour des blocs PDF localisés et Docling pour des formats complexes, mais il ne constitue pas encore une preuve de lecture robuste de scans/plans/tableaux ni un OCR métier validé. L’image peut installer l’extra séparément ; l’activation nécessite des plafonds CPU/RAM, un corpus Golden DCE, une exécution hors requête HTTP et une politique de revue humaine.
 
 ### 4.4 Stockage objet et infrastructure de recherche
 

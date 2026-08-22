@@ -48,6 +48,12 @@ class PrivateDocumentStoragePort(Protocol):
     async def read_bytes(self, *, storage_key: str, max_bytes: int) -> bytes: ...
 
 
+class AdvancedDocumentExtractionPort(Protocol):
+    """Optional local parser port; it must return only bounded source fragments."""
+
+    def extract(self, *, media_type: str, source_bytes: bytes) -> ExtractionProjection: ...
+
+
 @dataclass(frozen=True, slots=True)
 class ExtractedFragment:
     ordinal: int
@@ -75,10 +81,12 @@ class DceDocumentExtractionService:
         session_factory: sessionmaker[Session],
         dispatcher: CommandDispatcher,
         storage: PrivateDocumentStoragePort,
+        advanced_extractor: AdvancedDocumentExtractionPort | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._dispatcher = dispatcher
         self._storage = storage
+        self._advanced_extractor = advanced_extractor
 
     async def extract(
         self,
@@ -124,6 +132,7 @@ class DceDocumentExtractionService:
                     projection = _project_document(
                         media_type=document.media_type,
                         source_bytes=source_bytes,
+                        advanced_extractor=self._advanced_extractor,
                     )
         command = _recording_command(
             document=document,
@@ -213,8 +222,20 @@ def _recording_command(
     )
 
 
-def _project_document(*, media_type: str, source_bytes: bytes) -> ExtractionProjection:
+def _project_document(
+    *,
+    media_type: str,
+    source_bytes: bytes,
+    advanced_extractor: AdvancedDocumentExtractionPort | None = None,
+) -> ExtractionProjection:
     try:
+        if advanced_extractor is not None:
+            advanced_projection = advanced_extractor.extract(
+                media_type=media_type,
+                source_bytes=source_bytes,
+            )
+            if advanced_projection.status != "UNSUPPORTED":
+                return advanced_projection
         fragments = tuple(_extract_fragments(media_type=media_type, source_bytes=source_bytes))
         if not fragments:
             return ExtractionProjection(

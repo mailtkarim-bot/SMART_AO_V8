@@ -18,10 +18,13 @@ RUN apt-get update \
 COPY pyproject.toml README.md ./
 COPY backend ./backend
 ARG SMART_AO_INSTALL_RAG=0
-RUN if [ "$SMART_AO_INSTALL_RAG" = "1" ]; then \
+ARG SMART_AO_INSTALL_DOCUMENT_ADVANCED=0
+RUN pip install --no-cache-dir . \
+    && if [ "$SMART_AO_INSTALL_RAG" = "1" ]; then \
         pip install --no-cache-dir ".[rag]"; \
-    else \
-        pip install --no-cache-dir .; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_DOCUMENT_ADVANCED" = "1" ]; then \
+        pip install --no-cache-dir ".[document-advanced]"; \
     fi \
     && chown -R smartao:smartao /app
 
