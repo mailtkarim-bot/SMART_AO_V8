@@ -9,12 +9,12 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | [`4fddd19`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/4fddd19) — fixtures retrieval alignées après les slices RAG/BGE/OR-Tools publiés par `9de9ab4` et `5c0a698`. |
+| Commit courant | [`3384390`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/3384390) — état documentaire final des slices RAG/BGE/OR-Tools publiés par `9de9ab4`, `5c0a698` et `4fddd19`. |
 | Branche | `docs/pricing-http-next-lot-28`, PR [#49](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/49), mergeable mais non fusionnée. |
 | Corrections et durcissement récents | PR #42 readiness frontend ; PR #43 test App.tsx et plan métier ; PR #44 réconciliation documentaire ; PR #45 tests pricing ; PR #46 FK composite Case ; PR #47 création PREVIEWED ; PR #48 validation canonique ; commits `a12e375`, `d2f0d2e` et `5a2c9e5` du lot HTTP pricing. |
 | Validation courante | Suite backend complète locale : **1 088 tests verts**, 7 warnings tiers, couverture **92,20 %** avec seuil strict 85,50 % atteint. Le nouveau sous-ensemble knowledge/optimization compte 14 tests ciblés verts ; frontend précédent : **74 tests Vitest dans 18 fichiers**, build TypeScript strict + Vite vert. Ruff, Alembic `upgrade head/check` et `git diff --check` sont verts. Docker n’est pas disponible dans le sandbox ; les poids BGE n’ont pas été téléchargés ni exécutés ici. |
-| CI | Le run `32593055484` sur `295fde8`, y compris sa relance manuelle à 19:15 UTC, est terminé en échec avant exécution pour backend, frontend et image-security : chaque job a `runner_name: ""`, `steps: []` et aucune étape n’a été exécutée. Il s’agit d’un problème d’attribution de runner, pas d’un verdict fonctionnel. |
-| Frontière restante | Rétablir l’attribution runner puis faire exécuter une CI complète sur `4fddd19` avant de fusionner PR #49 vers `main`. Ensuite seulement, démarrer `SUBMISSION-SIGNATURE-HTTP-01`. Pour le RAG, précharger BGE-M3 dans l’image optionnelle, indexer une DCE admise non sensible, mesurer précision/latence et automatiser le job après admission. Le gate Docker réel, l’URL HTTPS backend, l’exercice HTTPS du flux auth et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
+| CI | Le dernier run `32596846974` sur `3384390` est terminé en échec avant exécution pour backend, frontend et image-security : les trois jobs ont `steps: []` et aucune étape n’a été exécutée. Il s’agit toujours d’un problème d’attribution de runner, pas d’un verdict fonctionnel. |
+| Frontière restante | Rétablir l’attribution runner puis faire exécuter une CI complète sur `3384390` avant de fusionner PR #49 vers `main`. Ensuite seulement, démarrer `SUBMISSION-SIGNATURE-HTTP-01`. Pour le RAG, précharger BGE-M3 dans l’image optionnelle, indexer une DCE admise non sensible, mesurer précision/latence et automatiser le job après admission. Le gate Docker réel, l’URL HTTPS backend, l’exercice HTTPS du flux auth et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
 
 ## Ce qui est terminé
 

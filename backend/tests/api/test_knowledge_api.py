@@ -88,11 +88,12 @@ def test_knowledge_search_returns_bounded_source_citation(monkeypatch) -> None:
         "source_fragment_id": str(FRAGMENT_ID),
         "dce_version_id": str(VERSION_ID),
         "score": 0.91,
-        "excerpt": "Le délai de réponse est fixé à dix jours.",
         "locator": {"page": 4},
         "embedding_model": "fake-bge-m3",
     }
     assert "storage_key" not in payload["results"][0]
+    assert "excerpt" not in payload["results"][0]
+    assert "text" not in payload["results"][0]
     assert policy.requests[0].resource.tenant_id == TENANT_ID
 
 

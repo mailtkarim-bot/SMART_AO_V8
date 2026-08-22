@@ -82,7 +82,6 @@ def build_knowledge_router(
                     source_fragment_id=result.chunk.source_fragment_id,
                     dce_version_id=result.chunk.dce_version_id,
                     score=result.score,
-                    excerpt=result.chunk.text[:1_000],
                     locator=result.chunk.locator,
                     embedding_model=result.embedding_model,
                 )
