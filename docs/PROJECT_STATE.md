@@ -9,12 +9,12 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | [`51c27cb`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/51c27cb) — cadrage du lot `SUBMISSION-SIGNATURE-HTTP-01`, après le code pricing frontend dans [`5a2c9e5`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/5a2c9e5). |
+| Commit courant | [`cf0e727`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/cf0e727) — alignement final de PROJECT_STATE avec le cadrage `SUBMISSION-SIGNATURE-HTTP-01`. |
 | Branche | `docs/pricing-http-next-lot-28`, PR [#49](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/49), mergeable mais non fusionnée. |
 | Corrections et durcissement récents | PR #42 readiness frontend ; PR #43 test App.tsx et plan métier ; PR #44 réconciliation documentaire ; PR #45 tests pricing ; PR #46 FK composite Case ; PR #47 création PREVIEWED ; PR #48 validation canonique ; commits `a12e375`, `d2f0d2e` et `5a2c9e5` du lot HTTP pricing. |
 | Validation courante | Suite backend complète locale : **1 057 tests verts**. Module pricing : **70 tests ciblés verts** avec PostgreSQL. Frontend : **64 tests Vitest dans 16 fichiers** ; build TypeScript strict + Vite vert. Alembic `upgrade head/check`, Ruff, detect-secrets et `git diff --check` sont verts. |
-| CI | La relance du run PR #49 `32543747042` sur `125e67d` échoue encore en environ 2 minutes avant exécution (`runnerName: null`) pour backend, frontend et image-security ; aucun code n’a été exécuté. Le push documentaire `51c27cb` n’a pas encore produit de nouveau run au moment de la vérification. Les runs précédents `32543702513`, `32543684672` et `32543640999` présentent le même défaut, et aucun runner GitHub-hosted n’est disponible (`total_count: 0`). Ce verdict est infrastructurel et ne constitue pas une validation fonctionnelle négative. |
-| Frontière restante | Faire exécuter une CI complète sur `51c27cb` puis fusionner PR #49. Ensuite seulement, démarrer `SUBMISSION-SIGNATURE-HTTP-01`. Le gate Docker réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
+| CI | La relance `32543747042` sur `125e67d` et les runs déclenchés par le cadrage `32544818858` sur `51c27cb` et `32544832839` sur `cf0e727` échouent tous avant exécution avec `runnerName: null` pour backend, frontend et image-security ; aucun code n’a été exécuté. Aucun runner GitHub-hosted n’est disponible (`total_count: 0`). Ce verdict est infrastructurel et ne constitue pas une validation fonctionnelle négative. |
+| Frontière restante | Faire exécuter une CI complète sur `cf0e727` puis fusionner PR #49. Ensuite seulement, démarrer `SUBMISSION-SIGNATURE-HTTP-01`. Le gate Docker réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
 
 ## Ce qui est terminé
 
@@ -113,7 +113,7 @@
 
 ## Prochaine action unique
 
-Faire exécuter une CI complète sur le commit [`51c27cb`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/51c27cb), puis fusionner PR #49 si les jobs backend, frontend et image-security sont réellement démarrés et verts. Après fusion, commencer `SUBMISSION-SIGNATURE-HTTP-01` conformément au cadrage dédié. Le gate VPS reste la frontière opérationnelle indépendante lorsque l’utilisateur disposera d’un VPS.
+Faire exécuter une CI complète sur le commit [`cf0e727`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/cf0e727), puis fusionner PR #49 si les jobs backend, frontend et image-security sont réellement démarrés et verts. Après fusion, commencer `SUBMISSION-SIGNATURE-HTTP-01` conformément au cadrage dédié. Le gate VPS reste la frontière opérationnelle indépendante lorsque l’utilisateur disposera d’un VPS.
 
 ## Décisions ouvertes
 
