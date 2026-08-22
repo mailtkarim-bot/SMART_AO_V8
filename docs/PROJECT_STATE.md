@@ -1,7 +1,7 @@
 # PROJECT_STATE
 
 ## Slice courant
-`PRICING-IMPORT-HTTP-PERSISTENCE-01` — les sept étapes sont implémentées sur la branche `docs/pricing-http-next-lot-28` : DTOs HTTP fermés, preview XLSX persistée en `PREVIEWED`, idempotence HTTP, lecture patronale tenant-scoped, commit atomique vers `DRAFT`, capability `financial.report.line.write` avec classification `FINANCIAL_PRIVATE`, policy auditée et hook frontend upload/lecture/commit. Le commit `d2d1701` ajoute les remédiations confirmées par les trois audits : Caddy/proxy, HMAC webhook, égalisation login, borne XLSX, stockage frontend mémoire, origine HTTPS, CSP, docs OpenAPI de production, parsing API défensif, packaging et isolation PostgreSQL. Le prochain lot `SUBMISSION-SIGNATURE-HTTP-01` est cadré mais ne doit commencer qu’après validation réelle de la PR #49. L’exécution Docker réelle reste bloquée par l’absence de Docker dans le sandbox et doit être reprise sur l’ordinateur de l’utilisateur.
+`PRICING-IMPORT-HTTP-PERSISTENCE-01` — les sept étapes sont implémentées sur la branche `docs/pricing-http-next-lot-28` : DTOs HTTP fermés, preview XLSX persistée en `PREVIEWED`, idempotence HTTP, lecture patronale tenant-scoped, commit atomique vers `DRAFT`, capability `financial.report.line.write` avec classification `FINANCIAL_PRIVATE`, policy auditée et hook frontend upload/lecture/commit. Les commits `d2d1701` et `ce0154f` ajoutent les remédiations confirmées par les six audits : Caddy/proxy, HMAC webhook, égalisation login, bornes XLSX/DOCX, observabilité ClamAV/extraction, calcul pricing half-up et cohérence des totaux, snapshot financier publié immuable en DB, stockage frontend mémoire, origine HTTPS, CSP, docs OpenAPI de production, parsing API défensif, packaging pnpm, séparation des secrets Compose, validation PGPASSWORD et isolation PostgreSQL. Le prochain lot `SUBMISSION-SIGNATURE-HTTP-01` est cadré mais ne doit commencer qu’après validation réelle de la PR #49. L’exécution Docker réelle reste bloquée par l’absence de Docker dans le sandbox et doit être reprise sur l’ordinateur de l’utilisateur.
 
 > **Vue propriétaire :** lire d’abord [`PROJECT_PROGRESS_REPORT.md`](PROJECT_PROGRESS_REPORT.md) pour la photographie métier globale, les capacités réellement livrées, les limites actuelles et l’ordre de travail recommandé. Lire ensuite ce fichier pour reprendre l’exécution technique d’un slice.
 
@@ -9,12 +9,12 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | [`d2d1701`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/d2d1701) — remédiations confirmées par les trois audits et rapport consolidé. |
+| Commit courant | [`ce0154f`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/ce0154f) — durcissement DCE, pricing, financier et préproduction après les trois audits supplémentaires. |
 | Branche | `docs/pricing-http-next-lot-28`, PR [#49](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/49), mergeable mais non fusionnée. |
 | Corrections et durcissement récents | PR #42 readiness frontend ; PR #43 test App.tsx et plan métier ; PR #44 réconciliation documentaire ; PR #45 tests pricing ; PR #46 FK composite Case ; PR #47 création PREVIEWED ; PR #48 validation canonique ; commits `a12e375`, `d2f0d2e` et `5a2c9e5` du lot HTTP pricing. |
-| Validation courante | Suite backend complète locale : **1 061 tests verts**, 7 warnings tiers. Correctifs ciblés : 60 tests verts. Frontend : **65 tests Vitest dans 17 fichiers** ; build TypeScript strict + Vite vert. Alembic `upgrade head/check`, Ruff, detect-secrets et `git diff --check` sont verts. |
-| CI | Le nouveau run `32571448526` sur `d2d1701` échoue encore en environ 5 secondes pour backend, frontend et image-security, avec `steps: []` et aucun job exécuté ; il confirme la panne d’attribution runner, comme les runs précédents. Ce verdict est infrastructurel et ne constitue pas une validation fonctionnelle négative. |
-| Frontière restante | Faire exécuter une CI complète sur `d2d1701` puis fusionner PR #49. Ensuite seulement, démarrer `SUBMISSION-SIGNATURE-HTTP-01`. Le gate Docker réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
+| Validation courante | Suite backend complète locale : **1 067 tests verts**, 7 warnings tiers. Tests ciblés du lot : **54 tests verts**. Frontend : **65 tests Vitest dans 17 fichiers** ; build TypeScript strict + Vite vert. Alembic `upgrade head/check`, Ruff, Bandit, detect-secrets et `git diff --check` sont verts. |
+| CI | Le run `32571448526` sur `d2d1701` échoue en environ 5 secondes pour backend, frontend et image-security, avec `steps: []` et aucun job exécuté. Le run du nouveau commit `ce0154f` doit encore être vérifié ; aucun run sans étapes ne constitue une validation fonctionnelle. |
+| Frontière restante | Faire exécuter une CI complète sur `ce0154f` puis fusionner PR #49. Ensuite seulement, démarrer `SUBMISSION-SIGNATURE-HTTP-01`. Le gate Docker réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
 
 ## Ce qui est terminé
 

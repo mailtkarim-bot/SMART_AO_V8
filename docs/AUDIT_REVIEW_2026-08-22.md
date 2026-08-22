@@ -1,108 +1,151 @@
-# Revue de pertinence de l’audit SMART_AO V8
+# Revue consolidée des audits SMART_AO V8
 
-**Date :** 22 août 2026  
-**Périmètre :** HEAD de la branche `docs/pricing-http-next-lot-28` et fichiers présents dans le dépôt  
-**Méthode :** confrontation des affirmations de l’audit avec le code, la configuration, les tests et les contrôles locaux ; aucune correction n’est retenue sans reproduction ou preuve directe.
+**Date de mise à jour :** 22 août 2026
+**Branche :** `docs/pricing-http-next-lot-28`
+**HEAD vérifié :** `ce0154f` — `security: harden dce pricing and preprod boundaries`
+**Périmètre :** première série de trois audits déjà consolidée, plus les trois nouvelles pièces jointes `pasted_content_4.txt`, `pasted_content_5.txt` et `pasted_content_6.txt`.
+**Méthode :** confrontation de chaque constat avec le code, les migrations, les tests, la configuration et les résultats locaux. Un finding n’est déclaré corrigé que lorsqu’il est reproduit ou directement démontré, puis couvert par un test ou un contrôle adapté.
 
 ## 1. Verdict exécutif
 
-Les trois rapports sont **partiellement pertinents** et doivent être lus comme des photographies prises à des HEAD différents. Les deux premiers P0 sont déjà corrigés dans le dépôt : Alembic résout bien `SMART_AO_DATABASE_URL` et Trivy cible déjà `ops/docker/backend.Dockerfile`. Le troisième P0 est confirmé : le matcher Caddy `/healthz` ne couvrait pas `/healthz/live` ni `/healthz/ready`, qui pouvaient donc tomber sur le frontend.
+Les six rapports sont utiles, mais ils décrivent plusieurs HEAD historiques et répètent certains constats. Les rapports joints 4 à 6 ont été lus intégralement et fusionnés avec la première matrice. Leurs affirmations sur Alembic, Trivy, Caddy, le webhook non signé, le frontend sans tests et le token en `localStorage` n’étaient plus toutes valables au HEAD actuel : plusieurs avaient déjà été corrigées dans `d2d1701` ou étaient fondées sur un état antérieur.
 
-Les risques confirmés ont été corrigés sans abandonner les autres rapports : rate limiting derrière Caddy, timing oracle login, webhook non authentifié, import XLSX matérialisant toutes les lignes, parsing JSON frontend non défensif, token frontend persisté en `localStorage`, URL API arbitrairement persistable, classement des dépendances de build et interférence de fixture PostgreSQL dans la suite globale. La limite Caddy de 150 MiB et la signature HMAC réduisent également les risques opérationnels d’upload et de notification.
+Les nouveaux risques effectivement confirmés ont été corrigés dans `ce0154f` : garde de taille décompressée pour DOCX, observabilité des erreurs ClamAV et d’extraction, parsing strict des verdicts ClamAV, arrondi monétaire commercial déterministe, normalisation des nombres européens, rejet des totaux pricing incohérents, protection PostgreSQL des snapshots financiers publiés, séparation des variables d’environnement Compose, contrôle d’alignement `PGPASSWORD`/`POSTGRES_PASSWORD` et verrouillage explicite de pnpm.
 
-Les critiques d’architecture restent pour l’essentiel des **dettes de structuration réelles mais non bloquantes pour le comportement corrigé**. Plusieurs affirmations chiffrées sont obsolètes : le fichier `platform/security/models.py` mesure 2 481 lignes et contient 47 déclarations `__tablename__`, et non 2 687 lignes/51 tables ; les markers pytest sont déclarés en mode strict et deux tests `schema/domain` sont collectés ; le frontend compte 17 fichiers de tests, `App.tsx` mesure 420 lignes, et plusieurs features sont déjà extraites.
+Les sujets qui exigent une décision d’architecture ou un environnement réel ne sont pas artificiellement déclarés résolus. Cela concerne notamment l’authentification navigateur complète, le consommateur de projection `cockpit_projection`, la limitation de concurrence d’extraction, le stockage objet externe, le filtrage SSRF/DNS du webhook, la récupération de receipts distribués et la validation Docker/VPS.
 
-> **Conclusion :** l’audit a correctement identifié une faiblesse Caddy et plusieurs durcissements utiles, mais son verdict « trois P0 confirmés » était excessif au moment de la revue. Après les correctifs ci-dessous, le code local est plus sûr ; la validation Docker/Caddy réelle et la CI GitHub restent nécessaires avant toute décision de déploiement.
+> **Conclusion :** le code local a été durci sur les findings reproductibles. La PR #49 ne doit toujours pas être fusionnée tant qu’un run GitHub n’a pas réellement exécuté ses étapes avec un runner attribué. L’absence de Docker/VPS dans cet environnement interdit également de déclarer le gate opérationnel terminé.
 
-## 2. Matrice des constats
+## 2. Matrice fusionnée des constats
 
-| Constat de l’audit | Pertinence | Preuve vérifiée | Décision |
-|---|---|---|---|
-| Alembic ignore `SMART_AO_DATABASE_URL` | **Faux / déjà corrigé** | `backend/alembic/env.py` appelle `resolve_database_url()` pour offline et online. | Aucun changement supplémentaire. |
-| Trivy scanne un Dockerfile racine inexistant | **Faux / déjà corrigé** | `.github/workflows/ci.yml` vérifie, construit et scanne `ops/docker/backend.Dockerfile`. | Aucun changement supplémentaire. |
-| `/healthz/live` et `/healthz/ready` tombent sur le SPA | **Vrai** | `ops/Caddyfile` ne traitait que le chemin exact `/healthz`. | Corrigé par un matcher `/healthz /healthz/*` reverse-proxy vers `backend:8000`, avec test de contrat ops. |
-| Rate limiter aveugle derrière Caddy | **Vrai** | `authentication.py` utilisait `request.client.host`, tandis que l’image Uvicorn n’activait pas les proxy headers ; le refresh pouvait partager l’IP du proxy. | Corrigé par `--proxy-headers`, CIDR interne fixe `172.30.0.0/24` et réseau Compose préproduction correspondant. |
-| JWT `verify_exp/verify_iat` désactivés | **Partiellement vrai** | PyJWT est configuré avec ces vérifications désactivées, mais l’application compare ensuite `iat` et `exp` avec son horloge injectée, indispensable aux tests et au contrôle temporel déterministe. | Pas de suppression mécanique : conserver le contrôle applicatif et documenter ce choix ; une refonte devra fournir une horloge à la bibliothèque JWT avant modification. |
-| Webhook d’export sans HMAC | **Vrai** | `_post_json()` envoyait le JSON sans signature lorsqu’une URL était configurée. | Corrigé : secret obligatoire pour livrer, HMAC-SHA256 dans `X-SMART-AO-Signature`, secret documenté hors Git, tests adaptés. |
-| Timing oracle login | **Vrai** | Une identité inconnue quittait `AuthenticationService.login()` avant tout appel au vérificateur de mot de passe. | Corrigé par une vérification Argon2id factice constante et un test d’intégration dédié. |
-| Import XLSX pricing matérialisant toutes les lignes | **Vrai** | `list(sheet.iter_rows(...))` chargeait la feuille avant la borne `MAX_ROWS` ; la somme du central directory ne suffisait pas comme preuve de taille réelle. | Corrigé par itération bornée et lecture cumulée des octets réellement décompressés. |
-| Uploads quasi illimités | **Partiellement vrai** | Le service applicatif conserve une borne historique de 2 000 000 000 octets ; le backend de préproduction n’est toutefois pas publié et aucun plafond Caddy n’existait. | Réduction de la surface externe : Caddy limite désormais le corps à 150 MiB. La politique métier d’une limite applicative configurable reste à cadrer séparément. |
-| Backups non chiffrés et jamais externalisés | **Non démontré comme bug de code ; risque opérationnel réel** | Les scripts et exemples exigent un répertoire de backup et documentent le transfert hors VPS, mais aucun VPS réel ni stockage externe n’est disponible dans cet environnement. | Maintenu comme gate VPS bloquant, sans prétendre l’avoir validé. |
-| MFA « schema-only » | **Partiellement vrai** | Le modèle et la policy savent représenter la fraîcheur MFA, mais aucun appel applicatif `mfa_required=True` n’est actuellement branché sur une opération sensible. | Dette de périmètre à traiter dans un lot step-up dédié ; pas de correction spéculative ici. |
-| `platform/security/models.py` trop monolithique | **Vrai comme dette d’architecture, chiffres obsolètes** | Le fichier compte 2 481 lignes et 47 tables déclarées. | À planifier en extraction progressive ; non bloquant pour les correctifs présents. |
-| Suite globale non isolée par le benchmark de performance | **Vrai et reproduit** | Le benchmark créait puis détruisait lui-même le schéma avec `downgrade(base)`, provoquant des erreurs `UndefinedTable` ou des collisions selon l’ordre global. | Corrigé : le benchmark utilise désormais la fixture `database_engine` et ne gère plus le cycle Alembic. La suite globale passe. |
-| Six modules sans `domain/` | **Vrai** | `enterprise`, `membership`, `patron_action`, `preparation` et `submission` n’ont pas encore de couche `domain/` dédiée ; `__pycache__` est ignoré. | Dette ARC-01 à traiter par bounded context, sans déplacement mécanique non testé. |
-| Imports directs d’infrastructure inter-modules | **Partiellement vrai** | Des imports historiques existent encore ; les tests d’architecture couvrent déjà plusieurs frontières, mais pas une interdiction exhaustive de toute dépendance future. | Ajouter progressivement des tests AST et remplacer les dépendances au fil des slices. |
-| `cockpit_projection` sans consommateur / `ProcessInboxRecord` mort | **Non confirmé dans cette revue** | L’affirmation n’a pas été établie par un scénario de régression reproductible pendant ce correctif. | Ne pas supprimer sans cartographie runtime et test de reconstruction. |
-| Markers pytest fantômes | **Faux / obsolète** | `pyproject.toml` déclare `schema`, `domain`, `application`, `integration`, `db`, `api`, `architecture`, `concurrency`, `security`, `process`, `e2e`, avec `strict-markers`. | Aucun changement ; mesurer l’usage réel séparément si nécessaire. |
-| Dossier `process/` vide | **Vrai mais non bloquant** | Seul `__init__.py` est présent. Les tests de workers/outbox existent cependant dans `backend/tests/application`. | Réorganiser les tests process dans un lot qualité dédié, sans déplacer à l’aveugle. |
-| Seulement deux tests de concurrence | **Non confirmé comme chiffre actuel** | Le dépôt contient des tests de concurrence et d’idempotence répartis dans plusieurs suites ; le chiffre de l’audit ne correspond pas à une mesure reproduite ici. | Produire une cartographie de couverture process/concurrency avant toute conclusion. |
-| `.coverage` racine à 68 % | **Non démontré** | Aucun contrôle de couverture comparable n’a été produit dans cette revue. | Ne pas utiliser cet artefact isolé comme indicateur de qualité. |
-| Documentation de couverture obsolète | **Vraisemblable mais non bloquant** | Des compteurs historiques subsistent dans des documents antérieurs aux derniers slices. | Réconcilier les métriques dans une mise à jour documentaire dédiée. |
-| Frontend JWT en `localStorage` et URL API persistable | **Vrai pour le HEAD audité, corrigé** | `App.tsx` lisait et écrivait `smart-ao-token` et `smart-ao-api-url`; `runtimeConfig` acceptait une destination distante persistée. | Token supprimé du stockage persistant ; URL non relue depuis le stockage et origine HTTPS imposée hors localhost. |
-| App.tsx monolithique et zéro test frontend | **Faux / obsolète** | `App.tsx` compte 420 lignes, les comportements sont séparés sous `web/src/features/`, 17 fichiers de tests sont présents et Vitest passe. | Aucun refactoring mécanique supplémentaire. |
-| Parsing JSON frontend sans garde | **Vrai comme défaut de robustesse** | Plusieurs appels `JSON.parse` directs pouvaient transformer une réponse HTML de proxy en exception non maîtrisée. | Corrigé par `parseResponseBody()` et test d’une réponse non JSON. |
-| Dépendances Vite/TypeScript classées en runtime | **Vrai comme nettoyage packaging** | Les outils de build étaient sous `dependencies` malgré une image finale Nginx statique. | Déplacés vers `devDependencies` et lockfile régénéré sans changement de versions. |
-| Documentation OpenAPI active dans le backend | **Vrai en accès interne, faible en exposition edge** | FastAPI activait les routes par défaut ; Caddy ne les routait pas, mais une exposition directe du backend les rendrait accessibles. | Corrigé pour le bootstrap production avec `openapi_url`, `docs_url` et `redoc_url` à `None`; le développement conserve les docs. |
-| Headers sécurité incomplets côté edge | **Vrai partiellement** | Caddy avait déjà HSTS, nosniff, X-Frame-Options et Referrer-Policy mais pas de CSP. | CSP restrictive same-origin ajoutée au Caddyfile ; les headers applicatifs indépendants de l’edge restent un durcissement ultérieur. |
+### 2.1 Findings confirmés et corrigés avant ce lot
 
-## 3. Correctifs appliqués
+| Finding | Vérification au HEAD actuel | Décision |
+|---|---|---|
+| Alembic ignore `SMART_AO_DATABASE_URL` | `backend/alembic/env.py` utilise déjà `resolve_database_url()` pour les modes online/offline. | Faux au HEAD actuel ; aucune modification supplémentaire. |
+| Trivy cible un Dockerfile racine inexistant | Le workflow vérifie, construit et scanne `ops/docker/backend.Dockerfile`. | Obsolète ; le scan n’est plus un no-op structurel. |
+| `/healthz/live` et `/healthz/ready` tombent sur le SPA | Le matcher Caddy exact de l’ancien HEAD ne couvrait pas les sous-chemins. | Corrigé dans `d2d1701` par reverse proxy du bloc `/healthz /healthz/*` vers `backend:8000`. |
+| IP client et rate limiting derrière Caddy | Uvicorn fait confiance uniquement au CIDR interne Compose `172.30.0.0/24`. | Corrigé dans `d2d1701`, avec test de contrat ops. |
+| Webhook d’export sans signature | Le worker actuel exige un secret si l’URL existe et signe le JSON en HMAC-SHA256 dans `X-SMART-AO-Signature`. | Corrigé dans `d2d1701`; le finding du rapport 6 est obsolète au HEAD actuel. |
+| Timing oracle de login | Le chemin identité inconnue exécute un hash Argon2id factice avant le refus neutre. | Corrigé dans `d2d1701`. |
+| Import pricing chargé et contrôles ZIP incomplets | La preview pricing limite les lignes, vérifie les octets réellement décompressés et ne matérialise plus toutes les lignes avant la borne. | Corrigé dans `d2d1701`; le nouveau contrôle monétaire est ajouté dans `ce0154f`. |
+| Token et URL API frontend persistés | Le token est mémoire seulement et l’URL n’est plus lue depuis un stockage persistant ; HTTPS same-origin est imposé hors localhost. | Corrigé dans `d2d1701`; l’affirmation `localStorage` des rapports 5 et 6 est historique. |
+| Frontend sans tests et `App.tsx` de 803 lignes | Le HEAD actuel contient 17 fichiers de tests, `App.tsx` est réduit et les features pricing/submission sont extraites. | Faux/obsolète ; 65 tests frontend passent. |
+| OpenAPI actif en production | Le bootstrap de production désactive OpenAPI, Swagger et ReDoc tout en les conservant en développement/tests. | Corrigé dans `d2d1701`. |
+| CSP edge absente | Le Caddyfile actuel contient une CSP same-origin et une limite de corps de 150 MiB. | Corrigé dans `d2d1701`. |
+| Packaging frontend runtime/build mélangé | Vite, TypeScript et le plugin React sont sous `devDependencies`. | Corrigé dans `d2d1701`. |
+| Panne de suite globale liée au benchmark Alembic | Le benchmark n’effectue plus de downgrade global pendant les tests. | Corrigé dans `d2d1701`; la suite complète passe. |
 
-### Routage santé Caddy
+### 2.2 Findings DCE confirmés et corrigés dans ce lot
 
-`ops/Caddyfile` traite maintenant `/healthz` et tous ses sous-chemins dans un bloc dédié reverse-proxy vers le backend. Les endpoints backend `/healthz/live` et `/healthz/ready` ne peuvent plus être satisfaits par le HTML du SPA. Un test de contrat vérifie le matcher, l’upstream backend et l’absence de réponse statique `200` dans le bloc santé.
+| Finding | Preuve et correction |
+|---|---|
+| DOCX potentiellement gonflé avant le contrôle de paragraphes | `python-docx` pouvait ouvrir l’archive avant la borne métier. `extraction.py` vérifie désormais les tailles déclarées et les octets effectivement lus dans l’archive, avec un plafond décompressé de 50 MiB avant l’appel à `Document`. |
+| Texte d’une page ou d’un paragraphe trop grand avant fragmentation | `_fragmentize()` rejette maintenant une entrée dépassant `MAX_TOTAL_CHARS` avant de produire une liste de fragments. Le buffering de la chaîne produite par la bibliothèque reste borné par les limites du format et fait partie de la dette de concurrence ci-dessous. |
+| Erreurs ClamAV silencieuses | Les deux niveaux de capture produisent désormais des événements de log bornés par type d’erreur, sans chemin privé, payload, nom de fichier ou message sensible. Le comportement fail-closed reste inchangé. |
+| Erreurs d’extraction silencieuses | Les erreurs `ValueError` de parsing et exceptions inattendues sont journalisées par type et `media_type`, tandis que la réponse persistée reste `FAILED_SAFE` ou `EXTRACTION_PARSE_FAILED` sans détail parser. |
+| Parsing ClamAV par suffixe trop permissif | Le parseur exige désormais le préfixe `stream:` et accepte exactement `ok` ou un verdict se terminant par ` found`; les réponses ressemblantes mais non conformes deviennent `ERROR`. |
+| Absence de fraîcheur minimale de signature ClamAV | La version ClamAV est capturée, mais aucune politique de version minimale n’est spécifiée par le contrat. Ce point reste une décision d’exploitation et n’a pas été inventé dans le code. |
+| MIME, chemin et fail-closed ClamAV | `libmagic`, les clés serveur, la défense anti-traversal, le flux INSTREAM réel et le rejet lorsque le scanner est indisponible ont été vérifiés comme déjà corrects. Aucun correctif spéculatif n’a été ajouté. |
+| Isolation tenant DCE | Les repositories, handlers, lecteurs, FKs composites et routes ont été vérifiés tenant-scoped. Aucun accès inter-tenant reproductible n’a été trouvé. |
+| LLM ou prompt injection dans DCE | Le module est déterministe, sans LLM, réseau d’IA, embeddings ou inférence ; les regex sont bornées et les extraits sont revalidés. Le finding est faux pour ce périmètre. |
+| TODO/stubs dans le module DCE | Le scan ne montre pas de TODO/FIXME ou scanner mocké dans ce module. Les méthodes `NotImplementedError` identifiées ailleurs sont des ports hexagonaux, pas des endpoints actifs. |
 
-### IP réelle et rate limiting
+### 2.3 Findings DevOps, pricing et financier confirmés et corrigés dans ce lot
 
-L’image backend démarre Uvicorn avec `--proxy-headers` et `--forwarded-allow-ips=172.30.0.0/24`. Le réseau `internal` du Compose préproduction est fixé à ce CIDR, et seul Caddy rejoint ce réseau avec le backend. Le backend n’est pas publié dans le Compose préproduction ; la confiance n’est donc pas ouverte à Internet. Le test ops verrouille la correspondance entre la commande et le CIDR.
+| Finding | Preuve et correction |
+|---|---|
+| `.env.preprod` injecté dans tous les services | Le Compose n’utilise plus `env_file` pour le backend et les workers. Chaque service reçoit une allowlist : JWT seulement au backend, paramètres de rétention seulement au worker de rétention, secret webhook seulement au worker webhook, et identifiants DB nécessaires à chaque processus. PostgreSQL ne reçoit que ses variables propres. |
+| `PGPASSWORD` non aligné avec le rôle PostgreSQL | Le template documente l’égalité obligatoire et `deploy-preprod.sh` exige `PGPASSWORD`, refuse les placeholders et échoue si sa valeur diffère de `POSTGRES_PASSWORD`. |
+| Toolchain pnpm non verrouillé entre CI et Docker | `web/package.json` déclare `packageManager: pnpm@11.21.0`, aligné avec le workflow. La régénération lockfile-only ne modifie pas les résolutions. |
+| Arrondi bancaire half-even du pricing | Les montants sont désormais convertis en minor units avec `ROUND_HALF_UP`, conformément à l’arrondi commercial retenu pour l’import. |
+| Artifacts de flottants Excel | Le parseur repasse par `Decimal`, rejette les valeurs non finies et normalise les séparateurs ; les valeurs comme `0.30000000000000004` sont ramenées à la minor unit half-up attendue. |
+| Total importé non cohérent avec quantité × prix unitaire | Lorsque quantité et prix unitaire existent, le total est recalculé. Un total fourni qui diffère reçoit `TOTAL_PRICE_MISMATCH` et la ligne n’est pas valide. |
+| Formats français de milliers | Les espaces, espaces insécables, virgules décimales et formats mixtes comme `1.234,56` sont normalisés de manière déterministe. |
+| Snapshot financier publié modifiable par SQL direct | La migration `20260822_0049` ajoute un trigger PostgreSQL qui interdit `UPDATE` et `DELETE` lorsque l’ancien snapshot est `PUBLISHED`. La transition `DRAFT → PUBLISHED` reste autorisée. Les lignes avaient déjà un trigger append-only. |
 
-### Signature des notifications webhook
+### 2.4 Constats vrais mais différés explicitement
 
-Lorsque `SMART_AO_EXPORT_WEBHOOK_URL` est configurée, le worker exige `SMART_AO_EXPORT_WEBHOOK_SECRET` avant toute livraison. Le corps JSON est signé en HMAC-SHA256 et transmis dans `X-SMART-AO-Signature: sha256=<hex>`. En l’absence de secret, le message est placé en retry avec un code de configuration fermé ; aucune notification non authentifiée n’est envoyée. Le secret reste hors Git et la commande webhook conserve son payload sans données financières.
+| Sujet | Pourquoi il reste ouvert |
+|---|---|
+| Authentification navigateur complète | Le backend possède login/refresh/logout avec cookie HttpOnly et CSRF, mais le cockpit reste un client provisoire à bearer saisi manuellement. Construire le flux utilisateur complet est un lot produit/frontend distinct, avec tests navigateur et renouvellement 401. |
+| Couverture endpoint frontend | Plusieurs opérations DCE, créations/archives pricing, workflows de blocage, publications et écritures patronales ne sont pas encore consommées par le cockpit. Le chiffre exact des rapports dépend de leur HEAD ; la lacune fonctionnelle est réelle mais ne se corrige pas par un simple alias d’API. |
+| Topic `cockpit_projection` sans consommateur | Le dispatcher et certains handlers produisent ce topic alors que les workers visibles consomment surtout `submission.package.exported` et `dce_staging_retention`. Le finding structurel est confirmé ; supprimer les messages ou les marquer publiés sans projection métier serait dangereux. Il faut d’abord définir le projection builder et sa reconstruction. |
+| Recovery de receipts PROCESSING | Les statuts et index de recovery existent, mais le dispatcher crée le receipt et le handler dans une même transaction : un crash avant commit annule le receipt plutôt que de laisser durablement `PROCESSING`. Le besoin de recovery distribué peut exister pour d’autres modes d’exécution, mais le scénario décrit n’est pas démontré avec ce dispatcher. Il est donc différé, pas présenté comme corrigé. |
+| Mémoire et concurrence d’extraction | La source est bornée à 128 MiB, mais chaque extraction peut encore bufferiser la source et les structures parser ; une limite de workers ou une file dédiée doit être choisie avec des mesures de charge. |
+| Stockage local versus S3/MinIO | Le stockage disque privé est réel, atomique, non-écrasant, `0600`, anti-traversal et tenant-scoped par clé résolue par DB. Le passage à un backend objet est une décision d’exploitation/VPS, pas une vulnérabilité démontrée dans l’adaptateur actuel. |
+| Clé tenant au niveau du port de stockage généré | Les appelants résolvent la ligne DB tenant-scoped avant `read()`, et le port rejette la traversée. Un contrôle tenant explicite dans le port peut être ajouté lors d’une future abstraction de stockage, mais aucun accès public direct à une clé n’est exposé actuellement. |
+| SSRF/DNS du webhook | Le secret HMAC est maintenant obligatoire, mais la validation destination/IP/DNS et la protection contre rebinding doivent faire l’objet d’un lot séparé avant toute URL contrôlée par un opérateur non totalement fiable. |
+| Dead-letter et plafond de retries | Les workers possèdent leases, backoff et statuts retry, mais la politique finale de dead-letter et d’alerte doit être spécifiée avant implémentation. |
+| Fraîcheur ClamAV | La capture de version est présente ; le seuil de fraîcheur doit être défini avec l’image et la politique d’exploitation réelles. |
+| Demo `app/demonstrations/m1.py` | Les clés historiques de démonstration ne représentent pas le chemin de production, mais ce code devrait être isolé ou retiré de l’image finale dans un nettoyage dédié. |
+| Monitoring externe et backups hors VPS | Les scripts de backup/restore et la rotation existent, mais aucune preuve de chiffrement, transfert hors hôte, restauration isolée réelle ou supervision externe ne peut être produite sans Docker/VPS. |
+| MFA step-up effectif | Les modèles et capabilities représentent la fraîcheur MFA, mais le branchement sur les opérations sensibles reste un lot de sécurité dédié. |
+| Extraction des modèles ORM et réorganisation tests | Les dettes d’architecture sont réelles, mais un déplacement mécanique risquerait de casser les frontières sans bénéfice comportemental immédiat. |
 
-### Égalisation du login
+### 2.5 Constats faux, obsolètes ou non démontrés
 
-Pour une identité ou une membership inconnue, `AuthenticationService.login()` exécute désormais le même type de vérification Argon2id sur un hash factice constant, puis retourne le refus neutre `INVALID_CREDENTIALS`. Aucun token, session ou membership n’est créé. Le test dédié vérifie que le vérificateur est appelé une fois avec un hash Argon2id.
+| Constat | Verdict |
+|---|---|
+| Alembic cassé en préproduction | Faux au HEAD vérifié : l’URL runtime est résolue par l’environnement applicatif. |
+| Trivy complètement no-op par absence de Dockerfile racine | Obsolète : le workflow vise le vrai Dockerfile `ops/docker/backend.Dockerfile` et construit l’image. |
+| Caddy `/healthz/*` répond encore au HTML SPA | Obsolète après `d2d1701`; le contrat ops verrouille le reverse proxy backend. |
+| Frontend sans tests, sans features extraites et `App.tsx` à 803 lignes | Obsolète ; 17 fichiers de tests sont présents et passent. |
+| Token frontend encore dans `localStorage` | Obsolète après `d2d1701`; le token est en mémoire d’onglet. |
+| Webhook sans HMAC au HEAD actuel | Obsolète après `d2d1701`. |
+| Absence totale de protection DB sur les lignes financières | Faux : `financial_report_lines` possède déjà un trigger append-only ; la nouvelle migration complète la protection du snapshot publié. |
+| Evidence submission nécessairement financière car sa classification est `INTERNAL_OPERATIONAL` | Non démontré : le record contient des hashes, une référence externe et des notes déjà redacted ; l’autorisation reste patronale et aucun montant n’est exposé. À revoir si le contrat métier élargit le contenu. |
+| Deux tests de concurrence seulement, couverture `.coverage` racine ou compteurs LOC comme preuve de qualité | Non démontré de manière reproductible et insuffisant comme critère isolé. Les tests sont répartis dans plusieurs suites et les métriques doivent être produites par le pipeline courant. |
+| LLM, prompt injection, path traversal ou défaut d’isolation tenant dans DCE | Non reproduits ; les contrôles vérifiés sont présents. |
 
-### Limite externe d’upload
+## 3. Corrections et tests du commit `ce0154f`
 
-Caddy rejette les corps supérieurs à 150 MiB avant l’upstream. Cette mesure réduit le risque d’épuisement de la quarantaine sur l’interface externe ; elle ne remplace pas le cadrage ultérieur d’une limite applicative par type de document et par tenant.
+Le commit ajoute la migration `20260822_0049_financial_snapshot_immutability.py`, les protections d’extraction DOCX, les logs bornés, le parseur monétaire, la séparation Compose et les contrats de non-régression associés. Les nouveaux tests couvrent notamment : archive DOCX au-delà de la limite décompressée, alerte ClamAV sans fuite de message, réponse ClamAV non conforme, arrondi half-up, nombres européens, total incohérent, trigger DB de snapshot publié, allowlists Compose et validation des mots de passe préproduction.
 
-## 4. Validation réalisée
+## 4. Validation locale finale
 
 | Contrôle | Résultat |
 |---|---|
-| Tests ciblés correctifs | **40 passed** sur worker webhook, ops et authentification ; **39 passed** sur pricing import HTTP ; test frontend API ajouté. |
-| Ruff global | **Passé** sur le dépôt après corrections. |
-| Suite backend consolidée | **1 061 passed, 7 warnings**, après correction de l’isolation du benchmark. |
-| Frontend consolidé | **65 passed dans 17 fichiers**, build TypeScript strict/Vite passé. |
-| Migrations avant correctifs | `alembic upgrade head` et `alembic check` passés. |
-| Docker/Caddy réels | Non exécutés dans le sandbox ; à valider sur l’ordinateur Docker de l’utilisateur ou un VPS. |
+| Backend complet | **1 067 passed, 7 warnings tiers**. |
+| Tests ciblés nouveaux/impactés | **54 passed** sur DCE, pricing, ops, ClamAV et financier. |
+| Frontend Vitest | **65 passed dans 17 fichiers**. |
+| Build frontend | `tsc -b` et `vite build` verts. |
+| Ruff | Vert sur le dépôt. |
+| Bandit | Vert sur `backend/app`. |
+| detect-secrets | Vert avec les exclusions et la baseline prévues ; warnings de commentaires non bloquants. |
+| Alembic | `upgrade head` puis `alembic check` verts ; head `20260822_0049`. Après une suite pytest, l’upgrade doit précéder `alembic check` car certaines fixtures de test nettoient le schéma. |
+| Diff | `git diff --check` vert. |
+| Docker/Caddy/HTTPS/ClamAV réel | Non exécutés dans le sandbox. Aucun VPS n’est disponible ; ce gate reste ouvert. |
 
-Les changements exigent une nouvelle suite backend complète et les contrôles CI avant fusion. La dernière CI GitHub connue reste inutilisable comme preuve fonctionnelle lorsque les jobs terminent avec `runnerName: null` avant exécution.
+## 5. GitHub et séquencement
 
-## 5. Findings conservés comme travaux ultérieurs
+Le code de ce lot est poussé sur la branche de la PR #49 :
 
-Les sujets suivants restent légitimes mais ne sont pas corrigés par ce patch : extraction progressive des modèles ORM hors de `platform/security/models.py`, généralisation des tests d’architecture d’imports, structuration des tests `process`, activation d’un véritable step-up MFA sur opérations sensibles, limite applicative configurable d’upload, filtrage SSRF DNS/IP du webhook, dead-letter après un nombre maximal de retries, HMAC du hash d’IP d’audit, enforcement DB de l’append-only, chiffrement et externalisation vérifiés des backups, authentification frontend de production et validation opérationnelle Docker/Caddy/ClamAV/HTTPS.
+- `ce0154f` — `security: harden dce pricing and preprod boundaries`
+- `1264fc7` — réconciliation documentaire précédente
+- `d2d1701` — première remédiation de sécurité confirmée
 
-Aucun de ces sujets ne doit être déclaré résolu par une simple présence de fichiers. Ils devront suivre la Definition of Done du projet : contrat, test rouge, implémentation, persistance si nécessaire, sécurité tenant, idempotence/concurrence, API, interface, test E2E, documentation et CI réellement exécutée.
+La PR #49 reste ouverte et ne doit pas être fusionnée tant qu’un runner GitHub n’a pas exécuté les étapes backend, frontend et image-security. Les runs précédents, dont `32571448526`, échouaient avec `steps: []` et runner nul avant tout test ; ils ne constituent donc ni une preuve de réussite ni une preuve de régression du code. Le prochain lot métier `SUBMISSION-SIGNATURE-HTTP-01` reste bloqué jusqu’à une CI réellement exécutée et verte, conformément au séquencement demandé.
 
-## Références
+## Références de code et de rapports
 
-[1]: ../backend/alembic/env.py "Résolution de l’URL Alembic"
-[2]: ../.github/workflows/ci.yml "Workflow CI et scan Trivy"
-[3]: ../ops/Caddyfile "Configuration Caddy"
-[4]: ../ops/docker/backend.Dockerfile "Commande Uvicorn du backend"
-[5]: ../ops/docker-compose.preprod.yml "Compose préproduction et réseau interne"
-[6]: ../backend/app/platform/security/authentication.py "Authentification et hash factice"
-[7]: ../backend/app/workers/submission_export_webhook.py "Worker webhook et signature HMAC"
-[8]: ../backend/tests/ops/test_preprod_ops_contract.py "Contrats de configuration ops"
-[9]: ../backend/tests/security/test_authentication_services.py "Tests d’authentification"
-[10]: ../backend/tests/application/test_submission_export_webhook.py "Tests du worker webhook"
-[11]: ../pyproject.toml "Markers pytest et seuils de qualité"
-[12]: ../web/src/app/App.tsx "Orchestrateur frontend actuel"
-[13]: ../web/src/infrastructure/runtimeConfig.ts "Validation de l’origine API frontend"
-[14]: ../web/src/infrastructure/api.ts "Parsing défensif des réponses API"
-[15]: ../backend/app/modules/pricing/application/import_preview.py "Import XLSX borné et streaming"
-[16]: ../backend/tests/db/test_assignment_change_journal_performance.py "Isolation du benchmark PostgreSQL"
-[17]: https://fastapi.tiangolo.com/tutorial/metadata/ "FastAPI official documentation: OpenAPI and docs URLs"
+[1]: ../backend/app/modules/dce/application/extraction.py "Extraction DCE et limites de formats"
+[2]: ../backend/app/modules/dce/application/upload.py "Orchestration upload DCE et échecs fail-closed"
+[3]: ../backend/app/modules/dce/infrastructure/quarantine.py "Stockage privé, libmagic et ClamAV INSTREAM"
+[4]: ../backend/app/modules/pricing/application/import_preview.py "Preview XLSX, calculs et limites pricing"
+[5]: ../backend/alembic/versions/20260822_0049_financial_snapshot_immutability.py "Trigger DB d’immutabilité des snapshots publiés"
+[6]: ../ops/docker-compose.preprod.yml "Allowlist d’environnement Compose préproduction"
+[7]: ../ops/deploy-preprod.sh "Validation de configuration et alignement PostgreSQL"
+[8]: ../web/package.json "Toolchain pnpm frontend"
+[9]: ../.github/workflows/ci.yml "Workflow CI courant"
+[10]: ../backend/tests/application/test_dce_document_extraction.py "Tests extraction DCE"
+[11]: ../backend/tests/application/test_pricing_import.py "Tests pricing import"
+[12]: ../backend/tests/application/test_financial_report_draft_lines.py "Tests PostgreSQL financier"
+[13]: ../backend/tests/infrastructure/test_quarantine.py "Tests ClamAV et quarantaine"
+[14]: ../backend/tests/ops/test_preprod_ops_contract.py "Contrats ops préproduction"
+[15]: /home/ubuntu/upload/pasted_content.txt "Première pièce jointe d’audit consolidée précédemment"
+[16]: /home/ubuntu/upload/pasted_content_2.txt "Deuxième pièce jointe d’audit consolidée précédemment"
+[17]: /home/ubuntu/upload/pasted_content_3.txt "Troisième pièce jointe d’audit consolidée précédemment"
+[18]: /home/ubuntu/upload/pasted_content_4.txt "Audit DCE joint dans cette itération"
+[19]: /home/ubuntu/upload/pasted_content_5.txt "Audit DevOps/frontend joint dans cette itération"
+[20]: /home/ubuntu/upload/pasted_content_6.txt "Audit backend/finance/outbox joint dans cette itération"
