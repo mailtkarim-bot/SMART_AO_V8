@@ -2,8 +2,8 @@
 
 **Date de mise à jour :** 22 août 2026
 **Branche :** `docs/pricing-http-next-lot-28`
-**HEAD vérifié :** `0db2eff` — `fix: make preprod egress and pricing uploads safe`
-**Périmètre :** six audits déjà consolidés, plus le nouveau `RAPPORT_AUDIT_SYSTEME_BTP.md` du 22 août 2026. Le nouveau rapport a été lu intégralement et confronté au HEAD `0db2eff`.
+**HEAD vérifié :** `448382f` — `feat: connect browser authentication flow`
+**Périmètre :** six audits déjà consolidés, plus le nouveau `RAPPORT_AUDIT_SYSTEME_BTP.md` du 22 août 2026. Le nouveau rapport a été lu intégralement et confronté au HEAD `448382f`.
 **Méthode :** confrontation de chaque constat avec le code, les migrations, les tests, la configuration et les résultats locaux. Un finding n’est déclaré corrigé que lorsqu’il est reproduit ou directement démontré, puis couvert par un test ou un contrôle adapté.
 
 ## 1. Verdict exécutif
@@ -108,33 +108,33 @@ Les sujets qui exigent une décision d’architecture ou un environnement réel 
 | C-05 — import ventes uniquement, coûts/BT01 absents | Partiellement confirmé. `import_service.py` force encore `SALES` et le coût de revient/BT01 n’existent pas ; en revanche qty×PU et le total importé sont maintenant réconciliés dans `import_preview.py`. | Réconciliation déjà corrigée ; coût, coefficients et BT01 restent un lot métier dédié. |
 | C-06 — aucune écriture HTTP Decision/Case | Confirmé pour la surface actuelle : la route patron décision est en lecture seule et les transitions write ne sont pas exposées par cette surface. | À traiter dans le lot métier “décision opérable”, avec permissions, idempotence et audit. |
 | H-01 — `platform/security/models.py` monolithique | Dette structurelle confirmée, sans faille démontrée. | Refactor incrémental après stabilisation produit ; pas de déplacement mécanique avant couverture de frontières. |
-| H-02 — JWT en `localStorage` | Faux au HEAD actuel : le token n’est plus persisté. La lacune réelle est l’absence de login/refresh/logout navigateur et la saisie bearer provisoire. | À traiter dans le lot auth frontend ; ne pas réintroduire de stockage local. |
+| H-02 — JWT en `localStorage` | Faux au HEAD actuel : le token n’est pas persisté. Le login, la restauration par cookie refresh + CSRF, le logout et le profil `/auth/me` sont maintenant raccordés côté navigateur. | Corrigé localement dans `448382f`; valider encore sur HTTPS réel avec cookies Secure. |
 | H-03 — upload pricing lu intégralement avant limite | Partiellement corrigé dans `0db2eff` : la route lit par chunks et rejette au-delà de 10 MiB avant d’appeler le service ; la preview reste volontairement bornée en mémoire pour son hash et son parsing. | Test HTTP 413 ajouté ; un passage streaming disque complet peut rester une optimisation ultérieure. |
 | H-04 — rate limiter process-local et rotation JWT mono-clé | Confirmé comme limite de scale-out. La confiance IP derrière Caddy est déjà bornée au CIDR interne. | Redis/PG partagé et rotation `kid` à spécifier avant multi-réplique ; pas de correction spéculative locale. |
 | H-05 — CSP absente et métriques publiquement exposées | Partiellement obsolète : CSP présente depuis `d2d1701`, et `/metrics` n’est pas routé par Caddy vers le backend public. L’absence de throttling global et le health public sont des choix à revoir. | Pas de duplication de correctif ; revue d’exposition et throttling à intégrer au gate ops. |
 | H-06 — mypy/pyright absent | Confirmé comme écart documentaire si le noyau exige une vérification statique obligatoire ; ce n’est pas une faille runtime reproduite. | Ajouter progressivement le typage dans un lot qualité séparé, après le vertical slice produit. |
 | H-07 — E2E multi-modules, concurrence réelle et charge absents | Confirmé comme couverture manquante ; les tests unitaires et DB existants ne constituent pas une preuve de charge réelle. | À exécuter sur PostgreSQL/Docker réel avec critères d’arrêt, sans gonfler artificiellement la couverture. |
 | H-08 — dead-letter/alerting webhook absents | Confirmé et déjà classé dette. | À traiter avec plafond de retries, état terminal, alerte et runbook. |
-| H-09 — erreurs frontend silencieuses | Partiellement confirmé : parsing non JSON corrigé, mais certaines branches UI remettent l’état à vide sans feedback. | À corriger dans le lot auth/cockpit, avec tests d’erreur visibles. |
+| H-09 — erreurs frontend silencieuses | Partiellement confirmé : parsing non JSON et erreurs auth sont maintenant transportés, mais certaines branches métier remettent encore l’état à vide sans feedback. | Le flux auth est corrigé ; les erreurs métier restantes seront traitées avec le cockpit et les parcours E2E. |
 | H-10 — classification RC naïve | Risque plausible mais non mesuré comme défaut universel ; le classifieur est déterministe et borné, mais les négations/portées sont limitées. | Ajouter un corpus de cas BTP et une politique de confirmation humaine avant toute réécriture. |
 | M-11 — garde lexicale financière incomplète | Risque confirmé en théorie, mais aucune fuite reproductible démontrée dans les contrats actuels ; le système bloque déjà plusieurs motifs et filtre les contrats collaborateur. | Renforcer par tests de montants/devise et classification, sans regex destructrice non validée. |
 | M-12/M-13/M-14 — scaffolding, router/linter et drift documentaire | Plusieurs éléments sont vrais comme dette ; les démonstrations/tests sont désormais exclus des images, mais le router et l’outillage frontend restent incomplets et les chiffres historiques doivent rester datés. | Nettoyage documentaire et frontend à planifier ; aucun impact immédiat à masquer comme “prod ready”. |
 
 ### 2.7 Priorité de mise en production issue du rapport BTP
 
-Le projet ne sera déclaré **prod ready** qu’après quatre preuves indépendantes : (1) CI GitHub réellement exécutée et verte, (2) déploiement Docker/VPS avec egress, migration, HTTPS, health JSON, EICAR et backups/restauration, (3) authentification navigateur réelle sans bearer manuel, et (4) parcours métier validé sur un DCE réel. Le nouveau rapport a raison de recommander de geler les optimisations de couverture non critiques, mais les invariants de confidentialité financière, d’idempotence, d’append-only et de fail-closed restent non négociables.
+Le projet ne sera déclaré **prod ready** qu’après quatre preuves indépendantes : (1) CI GitHub réellement exécutée et verte, (2) déploiement Docker/VPS avec egress, migration, HTTPS, health JSON, EICAR et backups/restauration, (3) authentification navigateur exercée sur HTTPS réel sans bearer manuel, et (4) parcours métier validé sur un DCE réel. Le flux auth est maintenant implémenté et testé localement, mais sa preuve navigateur sur HTTPS réel reste ouverte. Le nouveau rapport a raison de recommander de geler les optimisations de couverture non critiques, mais les invariants de confidentialité financière, d’idempotence, d’append-only et de fail-closed restent non négociables.
 
-## 3. Corrections et tests des commits `ce0154f` et `0db2eff`
+## 3. Corrections et tests des commits `ce0154f`, `0db2eff` et `448382f`
 
-Le commit `ce0154f` ajoute la migration `20260822_0049_financial_snapshot_immutability.py`, les protections d’extraction DOCX, les logs bornés, le parseur monétaire, la séparation Compose et les contrats de non-régression associés. Le commit `42839b5` ajoute ensuite la validation JSON des healthchecks, l’horodatage réel `completed_at` des receipts, l’exclusion Docker des démonstrations/tests et l’audit pnpm frontend en CI. Le commit `0db2eff` corrige l’egress Compose de ClamAV et du worker webhook, borne la lecture HTTP pricing par chunks et ajoute les tests de rejet 413. Les nouveaux tests couvrent notamment : archive DOCX au-delà de la limite décompressée, alerte ClamAV sans fuite de message, réponse ClamAV non conforme, arrondi half-up, nombres européens, total incohérent, trigger DB de snapshot publié, allowlists Compose et validation des mots de passe préproduction.
+Le commit `ce0154f` ajoute la migration `20260822_0049_financial_snapshot_immutability.py`, les protections d’extraction DOCX, les logs bornés, le parseur monétaire, la séparation Compose et les contrats de non-régression associés. Le commit `42839b5` ajoute ensuite la validation JSON des healthchecks, l’horodatage réel `completed_at` des receipts, l’exclusion Docker des démonstrations/tests et l’audit pnpm frontend en CI. Le commit `0db2eff` corrige l’egress Compose de ClamAV et du worker webhook, borne la lecture HTTP pricing par chunks et ajoute les tests de rejet 413. Le commit `448382f` ajoute le profil serveur `/api/v1/auth/me`, le hook frontend login/refresh/logout, la restauration par cookie CSRF, le rejeu contrôlé après 401 et le retrait complet du bearer manuel de la modale. Les nouveaux tests couvrent notamment : archive DOCX au-delà de la limite décompressée, alerte ClamAV sans fuite de message, réponse ClamAV non conforme, arrondi half-up, nombres européens, total incohérent, trigger DB de snapshot publié, allowlists Compose et validation des mots de passe préproduction.
 
 ## 4. Validation locale finale
 
 | Contrôle | Résultat |
 |---|---|
-| Backend complet | **1 073 passed, 7 warnings tiers**. |
-| Tests ciblés nouveaux/impactés | **41 passed** sur route pricing, dispatcher et contrats ops, en plus des 54 tests du lot précédent. |
-| Frontend Vitest | **65 passed dans 17 fichiers**. |
+| Backend complet | **1 074 passed, 7 warnings tiers**. |
+| Tests ciblés nouveaux/impactés | **7 passed** sur l’authentification backend ; frontend auth/API couvert par 7 tests dédiés, en plus des tests précédents. |
+| Frontend Vitest | **71 passed dans 18 fichiers**. |
 | Build frontend | `tsc -b` et `vite build` verts. |
 | Ruff | Vert sur le dépôt. |
 | Bandit | Vert sur `backend/app`. |
@@ -147,13 +147,14 @@ Le commit `ce0154f` ajoute la migration `20260822_0049_financial_snapshot_immuta
 
 Le code de ce lot est poussé sur la branche de la PR #49 :
 
+- `448382f` — `feat: connect browser authentication flow`
 - `0db2eff` — `fix: unblock preprod egress and bound pricing uploads`
 - `42839b5` — `ops: make health and receipt checks truthful`
 - `ce0154f` — `security: harden dce pricing and preprod boundaries`
 - `1264fc7` — réconciliation documentaire précédente
 - `d2d1701` — première remédiation de sécurité confirmée
 
-Le healthcheck local valide désormais le corps JSON de liveness/readiness, la CI contient un audit pnpm de production, et Compose donne un egress explicite uniquement à ClamAV et au worker webhook. La PR #49 reste ouverte et ne doit pas être fusionnée tant qu’un runner GitHub n’a pas exécuté les étapes backend, frontend et image-security. Les runs précédents, dont `32571448526`, échouaient avec `steps: []` et runner nul avant tout test ; ils ne constituent donc ni une preuve de réussite ni une preuve de régression du code. Le prochain lot métier `SUBMISSION-SIGNATURE-HTTP-01` reste bloqué jusqu’à une CI réellement exécutée et verte, conformément au séquencement demandé.
+Le healthcheck local valide désormais le corps JSON de liveness/readiness, la CI contient un audit pnpm de production, Compose donne un egress explicite uniquement à ClamAV et au worker webhook, et le frontend possède désormais un flux auth navigateur localement testé. La PR #49 reste ouverte et ne doit pas être fusionnée tant qu’un runner GitHub n’a pas exécuté les étapes backend, frontend et image-security. Le run `32585516192` sur `448382f` échoue avec `runnerName: null`, `steps: []` et zéro étape pour `backend`, `frontend` et `image-security`. Comme les runs précédents, dont `32571448526`, il s’agit d’un échec d’attribution de runner avant tout test ; ce n’est donc ni une preuve de réussite ni une preuve de régression du code. Le prochain lot métier `SUBMISSION-SIGNATURE-HTTP-01` reste bloqué jusqu’à une CI réellement exécutée et verte, conformément au séquencement demandé.
 
 ## Références de code et de rapports
 
