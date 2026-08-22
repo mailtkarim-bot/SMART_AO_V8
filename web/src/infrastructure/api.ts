@@ -31,6 +31,24 @@ import type {
 
 const makeId = () => crypto.randomUUID();
 
+async function parseResponseBody(response: Response): Promise<unknown> {
+  const body = await response.text();
+  if (!body) return undefined;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+}
+
+function responseDetail(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("detail" in body)) {
+    return undefined;
+  }
+  const detail = (body as { detail?: unknown }).detail;
+  return typeof detail === "string" ? detail : undefined;
+}
+
 export type ApiClient = ReturnType<typeof createApiClient>;
 
 export function createApiClient(baseUrl: string, token: string) {
@@ -43,16 +61,14 @@ export function createApiClient(baseUrl: string, token: string) {
     if (token.trim()) headers.set("Authorization", `Bearer ${token.trim()}`);
 
     const response = await fetch(`${root}${path}`, { ...init, headers });
-    const body = await response.text();
-    const parsed = body ? JSON.parse(body) : undefined;
+    const parsed = await parseResponseBody(response);
     if (!response.ok) {
+      const detail = responseDetail(parsed);
       const error = new Error(
-        typeof parsed?.detail === "string"
-          ? parsed.detail
-          : `La requête a échoué (${response.status}).`,
+        detail ?? `La requête a échoué (${response.status}).`,
       ) as Error & { status?: number; detail?: string };
       error.status = response.status;
-      error.detail = parsed?.detail;
+      error.detail = detail;
       throw error;
     }
     return parsed as T;
@@ -140,13 +156,10 @@ export function createApiClient(baseUrl: string, token: string) {
         `${root}/api/v1/patron/enterprise/companies/${encodeURIComponent(companyId)}/documents/uploads/${encodeURIComponent(uploadId)}/content`,
         { method: "PUT", headers, body: file },
       );
-      const body = await response.text();
-      const parsed = body ? JSON.parse(body) : undefined;
+      const parsed = await parseResponseBody(response);
       if (!response.ok) {
         throw new Error(
-          typeof parsed?.detail === "string"
-            ? parsed.detail
-            : `Le téléversement a échoué (${response.status}).`,
+          responseDetail(parsed) ?? `Le téléversement a échoué (${response.status}).`,
         );
       }
       return parsed as EnterpriseUploadReceipt;

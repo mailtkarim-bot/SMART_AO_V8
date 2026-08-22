@@ -15,7 +15,6 @@ import { useFinancialDraft } from "../features/draft/useFinancialDraft";
 import { createApiClient } from "../infrastructure/api";
 import { useBackendReadiness } from "../features/connection/useBackendReadiness";
 import {
-  API_BASE_URL_STORAGE_KEY,
   assertRuntimeApiUrl,
   resolveApiBaseUrl,
 } from "../infrastructure/runtimeConfig";
@@ -56,11 +55,13 @@ const formatDate = (value: string) =>
 
 function App() {
   const [baseUrl, setBaseUrl] = useState(() =>
-    resolveApiBaseUrl(localStorage, import.meta.env.VITE_API_BASE_URL, window.location.protocol),
+    resolveApiBaseUrl(
+      import.meta.env.VITE_API_BASE_URL,
+      window.location.protocol,
+      window.location.origin,
+    ),
   );
-  const [token, setToken] = useState(
-    () => localStorage.getItem("smart-ao-token") ?? "",
-  );
+  const [token, setToken] = useState("");
   const [cases, setCases] = useState<AssignedCase[]>([]);
   const [actions, setActions] = useState<PatronAction[]>([]);
   const [scenarios, setScenarios] = useState<PricingScenario[]>([]);
@@ -175,7 +176,7 @@ function App() {
     void refreshAssignments();
     void refreshActions();
     void refreshEnterpriseCompany();
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (!selectedCaseId || !token.trim()) return;
@@ -231,14 +232,15 @@ function App() {
   function saveConnection(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      const normalizedBaseUrl = assertRuntimeApiUrl(baseUrl, window.location.protocol);
+      const normalizedBaseUrl = assertRuntimeApiUrl(
+        baseUrl,
+        window.location.protocol,
+        window.location.origin,
+      );
       setBaseUrl(normalizedBaseUrl);
-      localStorage.setItem(API_BASE_URL_STORAGE_KEY, normalizedBaseUrl);
-      localStorage.setItem("smart-ao-token", token.trim());
       void checkBackendReadiness(createApiClient(normalizedBaseUrl, token));
       setShowConnection(false);
-      setMessage({ tone: "success", text: "Connexion enregistrée dans ce navigateur." });
-      void refreshCases();
+      setMessage({ tone: "success", text: "Connexion active dans cet onglet." });
     } catch (error) {
       setMessage({
         tone: "error",
@@ -412,7 +414,7 @@ function App() {
         <footer className="footer"><span>SMART_AO V8</span><span>Architecture sécurisée · Tenant-scoped · Auditée</span><span>API {baseUrl}</span></footer>
       </main>
 
-      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2>Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>Le token est conservé uniquement dans le stockage local de ce navigateur. Il n’est jamais envoyé ailleurs que vers l’URL configurée.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><div className={`readiness-indicator readiness-${backendReadinessState}`} role="status"><strong>{backendReadinessState === "checking" ? "Vérification en cours…" : backendReadinessState === "ready" ? "Backend prêt" : backendReadinessState === "not_ready" ? "Backend non prêt" : backendReadinessState === "error" ? "Backend inaccessible" : "Backend non vérifié"}</strong>{backendReadiness && <small>PostgreSQL : {backendReadiness.checks.database} · ClamAV : {backendReadiness.checks.clamav}</small>}</div><label><span>Bearer token</span><textarea required rows={4} value={token} onChange={(event) => setToken(event.target.value)} placeholder="eyJhbGciOiJIUzI1NiIs…" /></label><button className="primary-button" type="submit">Enregistrer et charger <span>→</span></button></form></div>}
+      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2>Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>Le token reste uniquement en mémoire dans cet onglet et n’est jamais persisté. En HTTPS, l’API doit être servie par la même origine que cette application.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><div className={`readiness-indicator readiness-${backendReadinessState}`} role="status"><strong>{backendReadinessState === "checking" ? "Vérification en cours…" : backendReadinessState === "ready" ? "Backend prêt" : backendReadinessState === "not_ready" ? "Backend non prêt" : backendReadinessState === "error" ? "Backend inaccessible" : "Backend non vérifié"}</strong>{backendReadiness && <small>PostgreSQL : {backendReadiness.checks.database} · ClamAV : {backendReadiness.checks.clamav}</small>}</div><label><span>Bearer token</span><textarea required rows={4} value={token} onChange={(event) => setToken(event.target.value)} placeholder="eyJhbGciOiJIUzI1NiIs…" /></label><button className="primary-button" type="submit">Enregistrer et charger <span>→</span></button></form></div>}
     </div>
   );
 }

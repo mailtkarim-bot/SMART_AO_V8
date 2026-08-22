@@ -60,6 +60,7 @@ def build_production_app():
     return create_app(
         runtime=AppRuntime.create(session_factory=session_factory),
         authentication_runtime=authentication_runtime,
+        expose_api_docs=False,
     )
 
 

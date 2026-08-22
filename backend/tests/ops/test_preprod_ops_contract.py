@@ -50,3 +50,22 @@ def test_deploy_starts_submission_webhook_worker_explicitly() -> None:
         "compose up -d backend dce-retention-worker submission-export-webhook-worker"
         in deploy_script
     )
+
+
+def test_caddy_routes_all_health_endpoints_to_backend() -> None:
+    caddyfile = (OPS / "Caddyfile").read_text(encoding="utf-8")
+    assert "request_body {\n        max_size 150MB\n    }" in caddyfile
+    assert "Content-Security-Policy" in caddyfile
+    assert "@health path /healthz /healthz/*" in caddyfile
+    health_block = caddyfile.split("@health path", maxsplit=1)[1].split("handle {", maxsplit=1)[0]
+    assert "reverse_proxy backend:8000" in health_block
+    assert 'respond "ok" 200' not in health_block
+
+
+def test_preprod_trusts_forwarded_client_ip_only_on_internal_proxy_network() -> None:
+    dockerfile = (OPS / "docker/backend.Dockerfile").read_text(encoding="utf-8")
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    assert "--proxy-headers" in dockerfile
+    assert "--forwarded-allow-ips=172.30.0.0/24" in dockerfile
+    assert "subnet: 172.30.0.0/24" in compose
+    assert 'backend:\n' in compose and '      - internal\n' in compose

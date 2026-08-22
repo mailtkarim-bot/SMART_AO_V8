@@ -86,6 +86,7 @@ class PricingImportPreviewService:
                     raise ValueError("IMPORT_MACROS_REJECTED")
                 if sum(info.file_size for info in archive.infolist()) > MAX_UNCOMPRESSED_BYTES:
                     raise ValueError("IMPORT_ARCHIVE_TOO_LARGE")
+                _check_archive_uncompressed_size(archive)
             workbook = load_workbook(BytesIO(payload), read_only=True, data_only=True)
         except (BadZipFile, OSError, ValueError) as error:
             if isinstance(error, ValueError) and str(error).startswith("IMPORT_"):
@@ -93,16 +94,19 @@ class PricingImportPreviewService:
             raise ValueError("IMPORT_WORKBOOK_INVALID") from error
         try:
             sheet = workbook.active
-            rows = list(sheet.iter_rows(values_only=True))
-            if not rows:
+            rows = sheet.iter_rows(values_only=True)
+            header = next(rows, None)
+            if header is None:
                 raise ValueError("IMPORT_EMPTY_WORKBOOK")
-            header_map = _resolve_headers(rows[0])
+            header_map = _resolve_headers(header)
             if "designation" not in header_map:
                 raise ValueError("IMPORT_DESIGNATION_COLUMN_REQUIRED")
             parsed: list[PricingImportRow] = []
             total_minor = 0
             errors = 0
-            for row_number, values in enumerate(rows[1 : MAX_ROWS + 1], start=2):
+            for row_number, values in enumerate(rows, start=2):
+                if row_number > MAX_ROWS + 1:
+                    break
                 if not any(value not in (None, "") for value in values):
                     continue
                 item = _parse_row(row_number=row_number, values=values, header_map=header_map)
@@ -144,6 +148,18 @@ class PricingImportPreviewService:
         )
         if not decision.allowed:
             raise PermissionError(decision.code)
+
+
+def _check_archive_uncompressed_size(archive: ZipFile) -> None:
+    total_bytes = 0
+    for info in archive.infolist():
+        if getattr(info, "is_dir", lambda: False)():
+            continue
+        with archive.open(info) as member:
+            while chunk := member.read(1024 * 1024):
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UNCOMPRESSED_BYTES:
+                    raise ValueError("IMPORT_ARCHIVE_TOO_LARGE")
 
 
 def _normalize_header(value: object) -> str:

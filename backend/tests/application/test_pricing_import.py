@@ -2,6 +2,7 @@ from dataclasses import replace
 from io import BytesIO
 from uuid import uuid4
 
+import app.modules.pricing.application.import_preview as import_preview_module
 import pytest
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.patron_pricing_import import build_patron_pricing_import_router
@@ -295,6 +296,58 @@ def test_pricing_import_preview_http_contract(session_factory):
         headers={"Authorization": "Bearer test-token"},
     )
     assert denied.status_code == 403
+
+
+def test_pricing_import_preview_rejects_actual_uncompressed_size(
+    session_factory,
+    monkeypatch,
+):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+
+    class _Member:
+        def __init__(self):
+            self.remaining = import_preview_module.MAX_UNCOMPRESSED_BYTES + 1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, size):
+            chunk_size = min(size, self.remaining)
+            self.remaining -= chunk_size
+            return b"x" * chunk_size
+
+    class _Archive:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def namelist(self):
+            return []
+
+        def infolist(self):
+            return [type("Info", (), {"file_size": 1})()]
+
+        def open(self, info):
+            return _Member()
+
+    monkeypatch.setattr(import_preview_module, "ZipFile", _Archive)
+    with pytest.raises(ValueError, match="IMPORT_ARCHIVE_TOO_LARGE"):
+        PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+            actor=actor,
+            case_id=case_id,
+            document_kind="EXCEL",
+            filename="bomb.xlsx",
+            content_type=None,
+            payload=b"metadata-only",
+        )
 
 
 def test_pricing_import_preview_rejects_zip_bomb_metadata(session_factory, monkeypatch):

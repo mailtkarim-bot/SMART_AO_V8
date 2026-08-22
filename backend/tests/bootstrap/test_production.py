@@ -40,6 +40,9 @@ def test_build_production_app_returns_fastapi_application(monkeypatch, productio
 
     assert application is not None
     assert application.title
+    assert application.openapi_url is None
+    assert application.docs_url is None
+    assert application.redoc_url is None
     assert production_module.app is not None
 
 

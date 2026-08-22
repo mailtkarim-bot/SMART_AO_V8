@@ -480,11 +480,15 @@ def create_app(
     *,
     runtime: AppRuntime | None = None,
     authentication_runtime: AuthenticationHttpRuntime | None = None,
+    expose_api_docs: bool = True,
 ) -> FastAPI:
     app = FastAPI(
         title="SMART_AO V8",
         version="0.1.0",
         description="SaaS BTP d'analyse DCE et de décision d'appel d'offres.",
+        openapi_url="/openapi.json" if expose_api_docs else None,
+        docs_url="/docs" if expose_api_docs else None,
+        redoc_url="/redoc" if expose_api_docs else None,
     )
     app.add_middleware(RequestObservabilityMiddleware)
     app.include_router(build_observability_router())

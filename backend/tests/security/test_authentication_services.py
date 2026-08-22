@@ -37,6 +37,15 @@ class StubPasswordVerifier:
         return password_hash == "$argon2id$fixture" and password == "Correct#Pass123"
 
 
+class RecordingPasswordVerifier:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def verify(self, *, password_hash: str, password: str) -> bool:
+        self.calls.append((password_hash, password))
+        return False
+
+
 class SequenceTokenGenerator:
     def __init__(self, *tokens: str) -> None:
         self._tokens = deque(tokens)
@@ -200,6 +209,32 @@ def test_login_refuses_unknown_credentials_neutrally_without_creating_session(
             .select_from(RefreshTokenRecord)
             .where(RefreshTokenRecord.tenant_id == tenant_id)
         ) == 0
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_unknown_login_runs_a_dummy_password_verification(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id = _insert_tenant(database_engine)
+    verifier = RecordingPasswordVerifier()
+    service = AuthenticationService(
+        session_factory=session_factory,
+        password_verifier=verifier,
+        token_generator=SequenceTokenGenerator("unused"),
+        clock=FixedClock(),
+    )
+
+    with pytest.raises(InvalidCredentialsError):
+        service.login(
+            email="unknown@example.test",
+            password="Wrong#Pass123",
+            tenant_id=tenant_id,
+        )
+
+    assert len(verifier.calls) == 1
+    assert verifier.calls[0][0].startswith("$argon2id$")
 
 
 @pytest.mark.db

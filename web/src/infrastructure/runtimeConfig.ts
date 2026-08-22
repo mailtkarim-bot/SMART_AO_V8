@@ -1,4 +1,3 @@
-export const API_BASE_URL_STORAGE_KEY = "smart-ao-api-url";
 export const DEFAULT_API_BASE_URL = "http://localhost:8000";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
@@ -36,24 +35,34 @@ export function isLocalApiUrl(rawUrl: string): boolean {
   }
 }
 
-export function assertRuntimeApiUrl(rawUrl: string, pageProtocol: string): string {
+export function assertRuntimeApiUrl(
+  rawUrl: string,
+  pageProtocol: string,
+  pageOrigin?: string,
+): string {
   const normalized = normalizeApiBaseUrl(rawUrl);
   const parsed = new URL(normalized);
-  if (pageProtocol === "https:" && parsed.protocol !== "https:" && !isLocalApiUrl(normalized)) {
-    throw new Error("Une page HTTPS ne peut utiliser qu’une API HTTPS hors développement local.");
+  if (pageProtocol === "https:" && !isLocalApiUrl(normalized)) {
+    if (parsed.protocol !== "https:" || (pageOrigin && parsed.origin !== pageOrigin)) {
+      throw new Error("Une page HTTPS ne peut utiliser que son origine API HTTPS.");
+    }
   }
   return normalized;
 }
 
 export function resolveApiBaseUrl(
-  storage: Pick<Storage, "getItem">,
   configuredUrl: string | undefined,
   pageProtocol: string,
+  pageOrigin?: string,
 ): string {
-  const candidate = configuredUrl?.trim() || storage.getItem(API_BASE_URL_STORAGE_KEY) || DEFAULT_API_BASE_URL;
+  const candidate =
+    configuredUrl?.trim() ||
+    (pageProtocol === "https:" && pageOrigin ? pageOrigin : DEFAULT_API_BASE_URL);
   try {
-    return assertRuntimeApiUrl(candidate, pageProtocol);
+    return assertRuntimeApiUrl(candidate, pageProtocol, pageOrigin);
   } catch {
-    return DEFAULT_API_BASE_URL;
+    return pageProtocol === "https:" && pageOrigin
+      ? normalizeApiBaseUrl(pageOrigin)
+      : DEFAULT_API_BASE_URL;
   }
 }

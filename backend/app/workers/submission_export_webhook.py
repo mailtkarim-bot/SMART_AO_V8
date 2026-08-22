@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import os
 import time
@@ -35,12 +37,14 @@ class SubmissionExportWebhookWorker:
         *,
         session_factory: sessionmaker[Session],
         webhook_url: str | None,
+        webhook_secret: str | None = None,
         batch_size: int = 50,
         lease_seconds: int = 120,
         timeout_seconds: float = 10.0,
     ) -> None:
         self._session_factory = session_factory
         self._webhook_url = webhook_url
+        self._webhook_secret = webhook_secret
         self._batch_size = batch_size
         self._lease_seconds = lease_seconds
         self._timeout_seconds = timeout_seconds
@@ -87,12 +91,15 @@ class SubmissionExportWebhookWorker:
                 return self._retry(message_id, now, "INVALID_EXPORT_PAYLOAD")
             if self._webhook_url is None:
                 return self._publish(message_id, now, skipped=True)
+            if not self._webhook_secret:
+                return self._retry(message_id, now, "EXPORT_WEBHOOK_CONFIGURATION_INVALID")
         try:
             status = await asyncio.to_thread(
                 _post_json,
                 self._webhook_url,
                 payload,
                 self._timeout_seconds,
+                self._webhook_secret,
             )
         except (HTTPError, URLError, TimeoutError, OSError, ValueError):
             return self._retry(message_id, now, "EXPORT_WEBHOOK_DELIVERY_FAILED")
@@ -139,16 +146,32 @@ def _safe_payload(payload_json: object) -> dict[str, object] | None:
     return {"event_type": "submission.package.exported", "data": data}
 
 
-def _post_json(url: str, payload: dict[str, object], timeout: float) -> int:
+def _post_json(
+    url: str,
+    payload: dict[str, object],
+    timeout: float,
+    webhook_secret: str | None = None,
+) -> int:
     parsed = urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("invalid webhook URL")
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    if not webhook_secret:
+        raise ValueError("webhook secret is required")
+    signature = hmac.new(
+        webhook_secret.encode("utf-8"),
+        body,
+        hashlib.sha256,
+    ).hexdigest()
     request = Request(
         url,
         data=body,
         method="POST",
-        headers={"Content-Type": "application/json", "User-Agent": "SMART-AO-outbox/1"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "SMART-AO-outbox/1",
+            "X-SMART-AO-Signature": f"sha256={signature}",
+        },
     )
     with urlopen(request, timeout=timeout) as response:  # nosec B310 - URL scheme validated above
         return int(response.status)
@@ -173,6 +196,7 @@ def build_default_worker() -> SubmissionExportWebhookWorker:
     return SubmissionExportWebhookWorker(
         session_factory=session_factory,
         webhook_url=os.getenv("SMART_AO_EXPORT_WEBHOOK_URL") or None,
+        webhook_secret=os.getenv("SMART_AO_EXPORT_WEBHOOK_SECRET") or None,
         batch_size=int(os.getenv("SMART_AO_EXPORT_WEBHOOK_BATCH_SIZE", "50")),
         lease_seconds=int(os.getenv("SMART_AO_EXPORT_WEBHOOK_LEASE_SECONDS", "120")),
         timeout_seconds=float(os.getenv("SMART_AO_EXPORT_WEBHOOK_TIMEOUT_SECONDS", "10")),
