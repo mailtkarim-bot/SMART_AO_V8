@@ -72,10 +72,12 @@ def build_production_app():
         csrf_token_generator=SecureOpaqueTokenGenerator(),
         clock=clock,
     )
+    runtime = AppRuntime.create(session_factory=session_factory)
     return create_app(
-        runtime=AppRuntime.create(session_factory=session_factory),
+        runtime=runtime,
         authentication_runtime=authentication_runtime,
         knowledge_service=_knowledge_service_if_enabled(session_factory=session_factory),
+        public_notice_search=runtime.public_notice_search,
         expose_api_docs=False,
     )
 

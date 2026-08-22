@@ -15,6 +15,7 @@ class Capability(StrEnum):
     CONSULTATION_READ = "consultation.read"
     DCE_PREPARE = "dce.prepare"
     CASE_DCE_READ = "case.dce.read"
+    MARKET_WATCH_READ = "market.watch.read"
     DCE_REQUIREMENT_CONFIRM = "dce.requirement.confirm"
     ASSIGNMENT_ACKNOWLEDGE = "assignment.acknowledge"
     ASSIGNMENT_CLARIFY = "assignment.clarify"
@@ -58,6 +59,7 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
+        Capability.MARKET_WATCH_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.ASSIGNMENT_MANAGE,
         Capability.DOCUMENT_ADMIN_READ,
@@ -90,6 +92,7 @@ _COLLABORATOR_CAPABILITIES = frozenset(
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
+        Capability.MARKET_WATCH_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.ASSIGNMENT_ACKNOWLEDGE,
         Capability.ASSIGNMENT_CLARIFY,
@@ -111,6 +114,7 @@ _DELEGABLE_CAPABILITIES = frozenset(
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
+        Capability.MARKET_WATCH_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.WORK_TASK_READ,

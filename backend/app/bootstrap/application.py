@@ -48,6 +48,7 @@ from app.interfaces.http.routes.dce_requirement_confirmations import (
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
 from app.interfaces.http.routes.knowledge import build_knowledge_router
+from app.interfaces.http.routes.market_watch import build_market_watch_router
 from app.interfaces.http.routes.observability import build_observability_router
 from app.interfaces.http.routes.patron_actions import build_patron_action_router
 from app.interfaces.http.routes.patron_assignment_cockpit import (
@@ -136,6 +137,7 @@ from app.modules.enterprise.infrastructure.insee_registry import (
 )
 from app.modules.knowledge.application.service import KnowledgeRetrievalService
 from app.modules.market_watch.application.ports import PublicNoticeSearchPort
+from app.modules.market_watch.application.service import PublicNoticeSearchService
 from app.modules.market_watch.infrastructure.boamp import BoampReadOnlySearch
 from app.modules.membership.application.assignment import (
     AssignmentInteractionService,
@@ -580,6 +582,7 @@ def create_app(
     runtime: AppRuntime | None = None,
     authentication_runtime: AuthenticationHttpRuntime | None = None,
     knowledge_service: KnowledgeRetrievalService | None = None,
+    public_notice_search: PublicNoticeSearchPort | None = None,
     expose_api_docs: bool = True,
 ) -> FastAPI:
     app = FastAPI(
@@ -798,6 +801,13 @@ def create_app(
                 build_knowledge_router(
                     service=knowledge_service,
                     runtime=runtime,
+                    security_runtime=security_runtime,
+                )
+            )
+        if public_notice_search is not None:
+            app.include_router(
+                build_market_watch_router(
+                    service=PublicNoticeSearchService(search_port=public_notice_search),
                     security_runtime=security_runtime,
                 )
             )
