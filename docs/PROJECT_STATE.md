@@ -9,12 +9,12 @@
 
 | Élément | État |
 |---|---|
-| Commit courant | [`5a2c9e5`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/5a2c9e5) — raccordement frontend au parcours pricing HTTP persistant, après [`d2f0d2e`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/d2f0d2e) pour capability/audit. |
+| Commit courant | [`1fea843`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/1fea843) — réconciliation documentaire finale après le raccordement frontend pricing, avec [`5a2c9e5`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/5a2c9e5) pour le code frontend. |
 | Branche | `docs/pricing-http-next-lot-28`, PR [#49](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/49), mergeable mais non fusionnée. |
 | Corrections et durcissement récents | PR #42 readiness frontend ; PR #43 test App.tsx et plan métier ; PR #44 réconciliation documentaire ; PR #45 tests pricing ; PR #46 FK composite Case ; PR #47 création PREVIEWED ; PR #48 validation canonique ; commits `a12e375`, `d2f0d2e` et `5a2c9e5` du lot HTTP pricing. |
 | Validation courante | Suite backend complète locale : **1 057 tests verts**. Module pricing : **70 tests ciblés verts** avec PostgreSQL. Frontend : **64 tests Vitest dans 16 fichiers** ; build TypeScript strict + Vite vert. Alembic `upgrade head/check`, Ruff, detect-secrets et `git diff --check` sont verts. |
-| CI | Le dernier run PR #49 `32543640999` sur `5a2c9e5` échoue en environ 5 secondes avant exécution (`runnerName: null`) pour backend, frontend et image-security ; aucun code n’a été exécuté. Le push documentaire `5498da5` n’a pas produit de nouveau run au moment de la vérification et aucun runner GitHub-hosted n’est disponible (`total_count: 0`). Ce verdict est infrastructurel et ne constitue pas une validation fonctionnelle négative. |
-| Frontière restante | Faire exécuter une CI complète sur `5a2c9e5` puis fusionner PR #49. Le gate Docker réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
+| CI | Le dernier run PR #49 `32543702513` sur `1fea843` échoue en environ 5 secondes avant exécution (`runnerName: null`) pour backend, frontend et image-security ; aucun code n’a été exécuté. Les runs précédents `32543684672` et `32543640999` présentent le même défaut, et aucun runner GitHub-hosted n’est disponible (`total_count: 0`). Ce verdict est infrastructurel et ne constitue pas une validation fonctionnelle négative. |
+| Frontière restante | Faire exécuter une CI complète sur `1fea843` puis fusionner PR #49. Le gate Docker réel, l’URL HTTPS backend et le rapport opérateur de restauration restent ouverts. Le contrôle local est PASS, mais le verdict CI et VPS réel demeure NO-GO. |
 
 ## Ce qui est terminé
 
@@ -112,7 +112,7 @@
 
 ## Prochaine action unique
 
-Faire exécuter une CI complète sur le commit [`5a2c9e5`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/5a2c9e5), puis fusionner PR #49 si les jobs backend, frontend et image-security sont réellement démarrés et verts. Le gate VPS reste la frontière opérationnelle indépendante lorsque l’utilisateur disposera d’un VPS.
+Faire exécuter une CI complète sur le commit [`1fea843`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/1fea843), puis fusionner PR #49 si les jobs backend, frontend et image-security sont réellement démarrés et verts. Le gate VPS reste la frontière opérationnelle indépendante lorsque l’utilisateur disposera d’un VPS.
 
 ## Décisions ouvertes
 
