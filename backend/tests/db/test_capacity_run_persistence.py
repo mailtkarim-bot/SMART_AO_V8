@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from uuid import UUID, uuid4
 
 import pytest
@@ -10,7 +10,11 @@ from app.modules.optimization.application.capacity_planning import (
     CaseCapacityPlanningService,
 )
 from app.modules.optimization.application.resource_assignment import ResourceDemand, ResourceSupply
-from app.modules.optimization.application.run_service import CapacityRunCommand, CapacityRunService
+from app.modules.optimization.application.run_service import (
+    CapacityRunCommand,
+    CapacityRunIdempotencyConflict,
+    CapacityRunService,
+)
 from app.modules.optimization.infrastructure.models import OptimizationRunRecord
 from app.modules.optimization.infrastructure.run_repository import SqlAlchemyCapacityRunRepository
 from app.platform.persistence.models import DomainEventRecord
@@ -115,6 +119,58 @@ def test_capacity_run_is_idempotent_audited_and_append_only(
             .where(OptimizationRunRecord.id == first.run_id)
             .values(status="FEASIBLE")
         )
+
+
+@pytest.mark.db
+@pytest.mark.security
+@pytest.mark.parametrize("collision_field", ("run_id", "command_id", "idempotency_key"))
+def test_capacity_run_rejects_each_unique_key_collision(
+    session_factory: sessionmaker[Session],
+    collision_field: str,
+) -> None:
+    actor, _assignment_id, case_id, _requirement_id = _seed(session_factory)
+    input_port = MutableInputPort(_input(actor.tenant_id, case_id))
+    service = CapacityRunService(
+        planner=CaseCapacityPlanningService(input_port=input_port),
+        repository=SqlAlchemyCapacityRunRepository(session_factory),
+    )
+    first = _command(actor, case_id)
+    service.execute(first)
+    conflicting = replace(first, **{collision_field: getattr(first, collision_field)})
+    if collision_field == "run_id":
+        conflicting = replace(conflicting, command_id=uuid4(), idempotency_key=uuid4())
+    elif collision_field == "command_id":
+        conflicting = replace(conflicting, run_id=uuid4(), idempotency_key=uuid4())
+    else:
+        conflicting = replace(conflicting, run_id=uuid4(), command_id=uuid4())
+
+    with pytest.raises(CapacityRunIdempotencyConflict):
+        service.execute(conflicting)
+
+
+@pytest.mark.db
+@pytest.mark.security
+def test_capacity_run_rejects_multiple_distinct_unique_key_collisions(
+    session_factory: sessionmaker[Session],
+) -> None:
+    actor, _assignment_id, case_id, _requirement_id = _seed(session_factory)
+    input_port = MutableInputPort(_input(actor.tenant_id, case_id))
+    service = CapacityRunService(
+        planner=CaseCapacityPlanningService(input_port=input_port),
+        repository=SqlAlchemyCapacityRunRepository(session_factory),
+    )
+    first = _command(actor, case_id)
+    second = _command(actor, case_id)
+    service.execute(first)
+    service.execute(second)
+    conflicting = replace(
+        first,
+        command_id=uuid4(),
+        idempotency_key=second.idempotency_key,
+    )
+
+    with pytest.raises(CapacityRunIdempotencyConflict):
+        service.execute(conflicting)
 
 
 @pytest.mark.db

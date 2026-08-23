@@ -45,9 +45,13 @@ class SqlAlchemyCapacityRunRepository:
                 )
                 .on_conflict_do_nothing()
             )
-            inserted = session.execute(statement).rowcount == 1
-            existing = session.scalar(
-                sa.select(OptimizationRunRecord).where(
+            inserted_run_id = session.execute(
+                statement.returning(OptimizationRunRecord.id)
+            ).scalar_one_or_none()
+            inserted = inserted_run_id is not None
+            candidates = session.scalars(
+                sa.select(OptimizationRunRecord)
+                .where(
                     sa.or_(
                         sa.and_(
                             OptimizationRunRecord.tenant_id == record.tenant_id,
@@ -63,13 +67,15 @@ class SqlAlchemyCapacityRunRepository:
                         ),
                     )
                 )
-            )
-            if existing is None:
+                .order_by(OptimizationRunRecord.id)
+            ).all()
+            if not candidates:
                 raise RuntimeError("optimization run insert was not durable")
-            if not _matches(existing, record):
+            if len(candidates) != 1 or not _matches(candidates[0], record):
                 raise CapacityRunIdempotencyConflict(
                     "optimization run key was reused with a different request"
                 )
+            existing = candidates[0]
 
             audit_event = session.scalar(
                 sa.select(DomainEventRecord).where(
