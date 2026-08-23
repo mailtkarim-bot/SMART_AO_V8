@@ -57,6 +57,9 @@ from app.interfaces.http.routes.patron_assignment_cockpit import (
 from app.interfaces.http.routes.patron_assignment_management import (
     build_patron_assignment_management_router,
 )
+from app.interfaces.http.routes.patron_boamp_opportunities import (
+    build_patron_boamp_opportunity_router,
+)
 from app.interfaces.http.routes.patron_decisions import build_patron_decision_router
 from app.interfaces.http.routes.patron_enterprise_capabilities import (
     build_patron_enterprise_capability_router,
@@ -190,6 +193,9 @@ from app.modules.opportunity.application.patron_watch_profile import (
     PatronWatchProfileService,
     opportunity_watch_profile_handlers,
 )
+from app.modules.opportunity.infrastructure.boamp_qualification_repository import (
+    BoampQualificationRepository,
+)
 from app.modules.patron_action.application.service import (
     PatronActionService,
     PatronActionWriter,
@@ -282,6 +288,7 @@ class AppRuntime:
     submission_export_notifier: SubmissionExportNotificationPort | None = None
     submission_deadline_calendar: SubmissionDeadlineCalendarPort | None = None
     public_notice_search: PublicNoticeSearchPort | None = None
+    boamp_qualification_repository: BoampQualificationRepository | None = None
 
     @classmethod
     def create(
@@ -357,6 +364,7 @@ class AppRuntime:
             submission_export_notifier=submission_export_notifier,
             submission_deadline_calendar=submission_deadline_calendar,
             public_notice_search=public_notice_search,
+            boamp_qualification_repository=BoampQualificationRepository(),
         )
 
     def get_dce_staged_object_upload_target(
@@ -861,6 +869,13 @@ def create_app(
                 security_runtime=security_runtime,
             )
         )
+        if runtime.boamp_qualification_repository is not None:
+            app.include_router(
+                build_patron_boamp_opportunity_router(
+                    runtime=runtime,
+                    security_runtime=security_runtime,
+                )
+            )
         if company_registry is not None:
             app.include_router(
                 build_patron_enterprise_registry_router(
