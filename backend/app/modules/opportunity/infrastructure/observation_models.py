@@ -124,6 +124,60 @@ class BoampOpportunityObservationRecord(TenantScopedRecord, Base):
     observed_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
 
 
+class BoampOpportunityQualificationRecord(TenantScopedRecord, Base):
+    __tablename__ = "boamp_opportunity_qualifications"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name="boamp_qualifications_tenant"),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "actor_id"],
+            ["tenant_memberships.tenant_id", "tenant_memberships.identity_id"],
+            name="boamp_qualifications_actor",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "observation_id"],
+            ["boamp_opportunity_observations.tenant_id", "boamp_opportunity_observations.id"],
+            name="boamp_qualifications_observation",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_boamp_qualifications_tenant_id"),
+        sa.UniqueConstraint("tenant_id", "command_id", name="uq_boamp_qualifications_command"),
+        sa.UniqueConstraint(
+            "tenant_id", "idempotency_key", name="uq_boamp_qualifications_idempotency"
+        ),
+        sa.CheckConstraint(
+            "decision IN ('QUALIFIED', 'REJECTED', 'SNOOZED')",
+            name="boamp_qualifications_decision",
+        ),
+        sa.CheckConstraint(
+            "reason_code IN ('RELEVANT_PUBLIC_SIGNAL', 'NOT_RELEVANT', "
+            "'INSUFFICIENT_PUBLIC_DATA', 'EXPIRED')",
+            name="boamp_qualifications_reason",
+        ),
+        sa.CheckConstraint("score_snapshot BETWEEN 0 AND 100", name="boamp_qualifications_score"),
+        sa.CheckConstraint(
+            "score_version = 'BOAMP_PUBLIC_V1'", name="boamp_qualifications_score_version"
+        ),
+        sa.Index(
+            "ix_boamp_qualifications_tenant_observation_created",
+            "tenant_id",
+            "observation_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    observation_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    decision: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    reason_code: Mapped[str] = mapped_column(sa.String(40), nullable=False)
+    score_snapshot: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    score_version: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+
+
 class BoampIngestionObservationLinkRecord(TenantScopedRecord, Base):
     __tablename__ = "boamp_ingestion_observation_links"
     __table_args__ = (
