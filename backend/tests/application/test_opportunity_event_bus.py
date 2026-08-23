@@ -11,6 +11,7 @@ from app.platform.events.external_bus import (
     InMemoryExternalEventBus,
 )
 from app.workers.opportunity_event_bus import (
+    BOAMP_INGESTION_TOPIC,
     BOAMP_QUALIFICATION_TOPIC,
     OpportunityEventBusWorker,
     _safe_payload,
@@ -50,12 +51,16 @@ class _SessionFactory:
         return _Context(self.session)
 
 
-def _message(*, payload: dict[str, object] | None = None) -> SimpleNamespace:
+def _message(
+    *,
+    payload: dict[str, object] | None = None,
+    topic: str = BOAMP_QUALIFICATION_TOPIC,
+) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
         event_id=uuid4(),
         tenant_id=uuid4(),
-        topic=BOAMP_QUALIFICATION_TOPIC,
+        topic=topic,
         payload_json=payload
         or {
             "qualification_id": str(uuid4()),
@@ -74,9 +79,23 @@ def _message(*, payload: dict[str, object] | None = None) -> SimpleNamespace:
 
 def test_safe_payload_rejects_extra_fields_and_invalid_decision() -> None:
     valid = _message().payload_json
-    assert _safe_payload(valid) == valid
-    assert _safe_payload({**valid, "title": "secret-rich-data"}) is None
-    assert _safe_payload({**valid, "decision": "AUTO_CONVERT"}) is None
+    assert _safe_payload(BOAMP_QUALIFICATION_TOPIC, valid) == valid
+    assert _safe_payload(
+        BOAMP_QUALIFICATION_TOPIC, {**valid, "title": "secret-rich-data"}
+    ) is None
+    assert _safe_payload(
+        BOAMP_QUALIFICATION_TOPIC, {**valid, "decision": "AUTO_CONVERT"}
+    ) is None
+
+
+def test_safe_payload_accepts_minimal_ingestion_event() -> None:
+    payload = {
+        "ingestion_run_id": str(uuid4()),
+        "observation_count": 2,
+        "request_hash": "b" * 64,
+    }
+    assert _safe_payload(BOAMP_INGESTION_TOPIC, payload) == payload
+    assert _safe_payload(BOAMP_INGESTION_TOPIC, {**payload, "title": "forbidden"}) is None
 
 
 def test_in_memory_bus_records_minimal_delivery() -> None:
@@ -115,6 +134,27 @@ def test_worker_publishes_only_after_bus_acknowledgement() -> None:
     assert message.status == "PUBLISHED"
     assert message.published_at is not None
     assert len(deliveries) == 1
+
+
+def test_worker_publishes_ingestion_event_on_its_allowlisted_topic() -> None:
+    message = _message(
+        topic=BOAMP_INGESTION_TOPIC,
+        payload={
+            "ingestion_run_id": str(uuid4()),
+            "observation_count": 1,
+            "request_hash": "c" * 64,
+        },
+    )
+    deliveries: list[dict[str, object]] = []
+    worker = OpportunityEventBusWorker(
+        session_factory=_SessionFactory(message),
+        bus=InMemoryExternalEventBus(deliveries),
+    )
+
+    result = worker.run_once(now=datetime(2026, 8, 23, 12, tzinfo=UTC))
+
+    assert result.delivered == 1
+    assert deliveries[0]["topic"] == BOAMP_INGESTION_TOPIC
 
 
 def test_worker_without_bus_does_not_mark_message_published() -> None:

@@ -18,7 +18,9 @@ from app.platform.events.external_bus import (
 )
 from app.platform.persistence.models import OutboxMessageRecord
 
+BOAMP_INGESTION_TOPIC = "opportunity.boamp.ingestion.recorded"
 BOAMP_QUALIFICATION_TOPIC = "opportunity.boamp.qualification.recorded"
+BOAMP_TOPICS = frozenset({BOAMP_INGESTION_TOPIC, BOAMP_QUALIFICATION_TOPIC})
 PROCESS_NAME = "opportunity-event-bus"
 
 
@@ -64,7 +66,7 @@ class OpportunityEventBusWorker:
                 session.scalars(
                     sa.select(OutboxMessageRecord)
                     .where(
-                        OutboxMessageRecord.topic == BOAMP_QUALIFICATION_TOPIC,
+                        OutboxMessageRecord.topic.in_(BOAMP_TOPICS),
                         OutboxMessageRecord.status.in_(("PENDING", "RETRY")),
                         sa.or_(
                             OutboxMessageRecord.next_attempt_at.is_(None),
@@ -84,11 +86,11 @@ class OpportunityEventBusWorker:
     def _process_message(self, message_id: UUID, now: datetime) -> EventBusRunResult:
         with self._session_factory() as session:
             message = session.get(OutboxMessageRecord, message_id)
-            if message is None or message.topic != BOAMP_QUALIFICATION_TOPIC:
+            if message is None or message.topic not in BOAMP_TOPICS:
                 return EventBusRunResult(skipped=1)
-            payload = _safe_payload(message.payload_json)
+            payload = _safe_payload(message.topic, message.payload_json)
             if payload is None:
-                return self._retry(message_id, now, "INVALID_BOAMP_QUALIFICATION_PAYLOAD")
+                return self._retry(message_id, now, "INVALID_BOAMP_EVENT_PAYLOAD")
             if self._bus is None:
                 return EventBusRunResult(skipped=1)
             event_id = message.event_id
@@ -97,7 +99,7 @@ class OpportunityEventBusWorker:
             self._bus.publish(
                 event_id=event_id,
                 tenant_id=tenant_id,
-                topic=BOAMP_QUALIFICATION_TOPIC,
+                topic=message.topic,
                 payload=payload,
             )
         except (ExternalEventBusDeliveryError, OSError, ValueError):
@@ -129,17 +131,31 @@ class OpportunityEventBusWorker:
         return EventBusRunResult(retried=1)
 
 
-def _safe_payload(payload_json: object) -> dict[str, object] | None:
+def _safe_payload(topic: str, payload_json: object) -> dict[str, object] | None:
     if not isinstance(payload_json, dict):
         return None
-    allowed = {"qualification_id", "observation_id", "decision", "reason_code"}
-    if set(payload_json) != allowed:
-        return None
-    if not all(isinstance(payload_json[key], str) for key in allowed):
-        return None
-    if payload_json["decision"] not in {"QUALIFIED", "REJECTED", "SNOOZED"}:
-        return None
-    return dict(payload_json)
+    if topic == BOAMP_INGESTION_TOPIC:
+        allowed = {"ingestion_run_id", "observation_count", "request_hash"}
+        if set(payload_json) != allowed:
+            return None
+        if not isinstance(payload_json["ingestion_run_id"], str):
+            return None
+        if not isinstance(payload_json["observation_count"], int):
+            return None
+        request_hash = payload_json["request_hash"]
+        if not isinstance(request_hash, str) or len(request_hash) != 64:
+            return None
+        return dict(payload_json)
+    if topic == BOAMP_QUALIFICATION_TOPIC:
+        allowed = {"qualification_id", "observation_id", "decision", "reason_code"}
+        if set(payload_json) != allowed:
+            return None
+        if not all(isinstance(payload_json[key], str) for key in allowed):
+            return None
+        if payload_json["decision"] not in {"QUALIFIED", "REJECTED", "SNOOZED"}:
+            return None
+        return dict(payload_json)
+    return None
 
 
 def _merge(first: EventBusRunResult, second: EventBusRunResult) -> EventBusRunResult:
