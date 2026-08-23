@@ -18,6 +18,9 @@ from app.modules.dce.infrastructure.models import (  # noqa: F401
 from app.modules.decision.infrastructure.models import decision  # noqa: F401
 from app.modules.knowledge.infrastructure import models as knowledge_models  # noqa: F401
 from app.modules.opportunity.infrastructure import models as opportunity_models  # noqa: F401
+from app.modules.opportunity.infrastructure import (
+    observation_models as opportunity_observation_models,  # noqa: F401
+)
 from app.modules.optimization.infrastructure import models as optimization_models  # noqa: F401
 from app.platform.persistence import models  # noqa: F401
 from app.platform.persistence.alembic_runtime import resolve_database_url
