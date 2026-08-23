@@ -48,11 +48,16 @@ class KnowledgeRetrievalService:
         *,
         tenant_id: UUID,
         case_id: UUID,
+        dce_version_id: UUID,
         query: str,
         top_k: int,
     ) -> list[RetrievalResult]:
         return self._retrieval.retrieve(
             query=query,
-            scope=RetrievalScope(tenant_id=tenant_id, case_id=case_id),
+            scope=RetrievalScope(
+                tenant_id=tenant_id,
+                case_id=case_id,
+                dce_version_id=dce_version_id,
+            ),
             top_k=top_k,
         )

@@ -21,6 +21,7 @@ class DataClassification(StrEnum):
 class RetrievalScope:
     tenant_id: UUID
     case_id: UUID
+    dce_version_id: UUID
     allowed_classifications: frozenset[DataClassification] = field(
         default_factory=lambda: frozenset(
             {
@@ -61,6 +62,7 @@ class RetrievalChunk:
         return (
             self.tenant_id == scope.tenant_id
             and self.case_id == scope.case_id
+            and self.dce_version_id == scope.dce_version_id
             and self.classification in scope.allowed_classifications
         )
 

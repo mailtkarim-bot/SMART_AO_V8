@@ -9,6 +9,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, status
 
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.dce_versions import _resolve_context
+from app.modules.dce.application.queries import CaseDceReadingAvailability
 from app.modules.knowledge.application.service import KnowledgeRetrievalService
 from app.modules.knowledge.public.contracts import KnowledgeSearchResponse, KnowledgeSearchResult
 from app.platform.security.authorization import AuthorizationRequest, AuthorizationResource
@@ -62,10 +63,24 @@ def build_knowledge_router(
                     detail="NOT_FOUND_OR_FORBIDDEN",
                 )
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN")
+        lookup = runtime.get_case_dce_reading(
+            tenant_id=context.tenant_id,
+            case_id=case_id,
+        )
+        if (
+            lookup is None
+            or lookup.availability is not CaseDceReadingAvailability.AVAILABLE
+            or lookup.reading is None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="COMMAND_REJECTED",
+            )
         try:
             results = service.search_case_dce(
                 tenant_id=context.tenant_id,
                 case_id=case_id,
+                dce_version_id=lookup.reading.dce_version_id,
                 query=q,
                 top_k=top_k,
             )

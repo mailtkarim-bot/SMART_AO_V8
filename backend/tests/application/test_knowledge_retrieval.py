@@ -18,6 +18,8 @@ TENANT_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 TENANT_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 CASE_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001")
 CASE_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0001")
+VERSION_A = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002")
+VERSION_B = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0002")
 
 
 @dataclass
@@ -57,7 +59,7 @@ def _chunk(
         chunk_id=UUID(chunk_id),
         tenant_id=tenant_id,
         case_id=case_id,
-        dce_version_id=case_id,
+        dce_version_id=VERSION_A if case_id == CASE_A else VERSION_B,
         source_fragment_id=UUID(chunk_id),
         ordinal=1,
         text=text,
@@ -86,7 +88,11 @@ def test_retrieval_is_tenant_and_case_scoped(retrieval_service: RagRetrievalServ
 
     results = retrieval_service.retrieve(
         query="pénalité de retard",
-        scope=RetrievalScope(tenant_id=TENANT_A, case_id=CASE_A),
+        scope=RetrievalScope(
+            tenant_id=TENANT_A,
+            case_id=CASE_A,
+            dce_version_id=VERSION_A,
+        ),
         top_k=5,
     )
 
@@ -95,6 +101,45 @@ def test_retrieval_is_tenant_and_case_scoped(retrieval_service: RagRetrievalServ
     ]
     assert all(result.chunk.tenant_id == TENANT_A for result in results)
     assert all(result.chunk.case_id == CASE_A for result in results)
+
+
+def test_retrieval_excludes_superseded_dce_version(
+    retrieval_service: RagRetrievalService,
+) -> None:
+    retrieval_service.index(
+        chunks=[
+            _chunk(
+                chunk_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0105",
+                tenant_id=TENANT_A,
+                case_id=CASE_A,
+                text="délai de chantier",
+            )
+        ]
+    )
+    superseded_chunk = RetrievalChunk(
+        chunk_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0106"),
+        tenant_id=TENANT_A,
+        case_id=CASE_A,
+        dce_version_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003"),
+        source_fragment_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0106"),
+        ordinal=1,
+        text="délai de chantier",
+        locator={"page": 2},
+        classification=DataClassification.INTERNAL_OPERATIONAL,
+    )
+    retrieval_service.index(chunks=[superseded_chunk])
+
+    results = retrieval_service.retrieve(
+        query="pénalité de retard",
+        scope=RetrievalScope(
+            tenant_id=TENANT_A,
+            case_id=CASE_A,
+            dce_version_id=VERSION_A,
+        ),
+        top_k=5,
+    )
+
+    assert [result.chunk.dce_version_id for result in results] == [VERSION_A]
 
 
 def test_retrieval_excludes_financial_private_chunks_by_default(
@@ -120,7 +165,11 @@ def test_retrieval_excludes_financial_private_chunks_by_default(
 
     results = retrieval_service.retrieve(
         query="prix interne confidentiel",
-        scope=RetrievalScope(tenant_id=TENANT_A, case_id=CASE_A),
+        scope=RetrievalScope(
+            tenant_id=TENANT_A,
+            case_id=CASE_A,
+            dce_version_id=VERSION_A,
+        ),
         top_k=5,
     )
 
@@ -133,14 +182,22 @@ def test_retrieval_requires_positive_bounded_top_k(
     with pytest.raises(ValueError, match="top_k"):
         retrieval_service.retrieve(
             query="pénalité de retard",
-            scope=RetrievalScope(tenant_id=TENANT_A, case_id=CASE_A),
+            scope=RetrievalScope(
+                tenant_id=TENANT_A,
+                case_id=CASE_A,
+                dce_version_id=VERSION_A,
+            ),
             top_k=0,
         )
 
     with pytest.raises(ValueError, match="top_k"):
         retrieval_service.retrieve(
             query="pénalité de retard",
-            scope=RetrievalScope(tenant_id=TENANT_A, case_id=CASE_A),
+            scope=RetrievalScope(
+                tenant_id=TENANT_A,
+                case_id=CASE_A,
+                dce_version_id=VERSION_A,
+            ),
             top_k=51,
         )
 
@@ -161,7 +218,11 @@ def test_retrieval_preserves_provenance_and_score(
 
     [result] = retrieval_service.retrieve(
         query="pénalité de retard",
-        scope=RetrievalScope(tenant_id=TENANT_A, case_id=CASE_A),
+        scope=RetrievalScope(
+            tenant_id=TENANT_A,
+            case_id=CASE_A,
+            dce_version_id=VERSION_A,
+        ),
         top_k=1,
     )
 

@@ -13,7 +13,7 @@ Le produit n’est toutefois pas encore **opérationnel de bout en bout**. Les d
 
 ## 2. État du code livré dans ce lot
 
-Le lot précédent étend `web/src/features/dce/` avec `DceKnowledgePanel.tsx` et `useDceKnowledge.ts`. Le nouveau lot ajoute le value object pur `backend/app/modules/knowledge/application/benchmark.py`, le contrat `docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md` et la commande `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG et scorer un rapport d’identifiants externe.
+Le lot précédent étend `web/src/features/dce/` avec `DceKnowledgePanel.tsx` et `useDceKnowledge.ts`. Le nouveau lot ajoute le value object pur `backend/app/modules/knowledge/application/benchmark.py`, le contrat `docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md` et la commande `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG et scorer un rapport d’identifiants externe. Le retrieval est également durci pour filtrer la version DCE applicable dès le scope domaine, le service, la route et la requête SQLAlchemy.
 
 La lecture affiche uniquement les champs prévus par le contrat public : fraîcheur, cycle de vie, intégrité, compteurs, exigences structurées et localisation source. La recherche envoie une requête bornée à 500 caractères et un `top_k` fixé à 5 côté client. La vue affiche le score, le modèle d’embedding et un libellé de localisation ; elle n’affiche pas le contenu intégral du fragment ni de données financières.
 
@@ -21,7 +21,7 @@ La lecture affiche uniquement les champs prévus par le contrat public : fraîch
 |---|---|---|
 | Cockpit BOAMP | Codé et intégré | Panel, hook, routes API frontend, qualification humaine fermée. |
 | Lecture DCE | Codée dans le backend et raccordée au frontend | DTO `CaseDceReadingResponse`, route `/api/v1/cases/{case_id}/dce-reading`, panel frontend. |
-| Recherche knowledge/RAG | Codée derrière une route existante et raccordée au frontend | DTO fermé, route `/api/v1/cases/{case_id}/knowledge/search`, recherche `q`/`top_k`. |
+| Recherche knowledge/RAG | Codée derrière une route existante et raccordée au frontend | DTO fermé, route `/api/v1/cases/{case_id}/knowledge/search`, recherche `q`/`top_k`, version DCE applicable résolue côté serveur et filtrée en SQL. |
 | DCE exigences | Projection et compteurs disponibles | Exigences limitées à la projection serveur, confirmation humaine non remplacée par une décision IA. |
 | RAG/BGE | Antenne activable, pas activation production | Provider optionnel, retrieval, worker et benchmark de manifeste existants ; poids et corpus réels non chargés. |
 
@@ -71,6 +71,7 @@ uv run python scripts/recipe_boamp_postgres.py --apply
 | Tests du panel DCE/RAG | **3 passed** |
 | Tests du client API | **5 passed** |
 | Tests d’intégration App | **4 passed** |
+| Tests knowledge version-scoped | **9 passed** |
 | Migration offline Alembic jusqu’à `0054` | **Passée** |
 | Migration online et tests PostgreSQL | **Non prouvés dans le sandbox** |
 | Docker réel | **Indisponible dans le sandbox** |
@@ -86,11 +87,12 @@ L’ordre recommandé est le suivant :
 
 1. faire passer le gate frontend et backend local après les lots DCE/RAG et benchmark ;
 2. commit/push du lot KNOWLEDGE-BENCHMARK-01 et mise à jour des documents canoniques — **réalisé dans `fa48c02`** ;
-3. exécuter PostgreSQL 16 et Alembic `0051`–`0054` sur Docker réel ;
-4. lancer les tests de persistence BOAMP et du worker outbox ;
-5. charger un corpus DCE non financier contrôlé et mesurer retrieval/fraîcheur/localisation ;
-6. définir ensuite le fournisseur bus réel et sa recette contrôlée ;
-7. ne lancer le gate VPS et le raccordement frontend HTTPS qu’après preuve d’une URL backend réelle.
+3. filtrer le retrieval par version DCE applicable dans le domaine, le service et SQL — **réalisé localement, en attente de commit** ;
+4. exécuter PostgreSQL 16 et Alembic `0051`–`0054` sur Docker réel ;
+5. lancer les tests de persistence BOAMP et du worker outbox ;
+6. charger un corpus DCE non financier contrôlé et mesurer retrieval/fraîcheur/localisation ;
+7. définir ensuite le fournisseur bus réel et sa recette contrôlée ;
+8. ne lancer le gate VPS et le raccordement frontend HTTPS qu’après preuve d’une URL backend réelle.
 
 ## 7. Conclusion
 

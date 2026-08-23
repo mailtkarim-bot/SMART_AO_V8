@@ -5,6 +5,7 @@ from uuid import UUID
 
 from app.interfaces.http.routes import knowledge as knowledge_route
 from app.interfaces.http.routes.knowledge import build_knowledge_router
+from app.modules.dce.application.queries import CaseDceReadingAvailability
 from app.modules.knowledge.domain.retrieval import (
     DataClassification,
     RetrievalChunk,
@@ -20,9 +21,10 @@ FRAGMENT_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003")
 
 
 class FakeKnowledgeService:
-    def search_case_dce(self, *, tenant_id, case_id, query, top_k):
+    def search_case_dce(self, *, tenant_id, case_id, dce_version_id, query, top_k):
         assert tenant_id == TENANT_ID
         assert case_id == CASE_ID
+        assert dce_version_id == VERSION_ID
         assert query == "délai"
         assert top_k == 3
         return [
@@ -57,6 +59,14 @@ class FakeRuntime:
     def get_case_tenant_id(self, *, case_id):
         assert case_id == CASE_ID
         return TENANT_ID
+
+    def get_case_dce_reading(self, *, tenant_id, case_id):
+        assert tenant_id == TENANT_ID
+        assert case_id == CASE_ID
+        return SimpleNamespace(
+            availability=CaseDceReadingAvailability.AVAILABLE,
+            reading=SimpleNamespace(dce_version_id=VERSION_ID),
+        )
 
 
 def test_knowledge_search_returns_bounded_source_citation(monkeypatch) -> None:

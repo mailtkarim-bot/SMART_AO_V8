@@ -92,6 +92,7 @@ class SqlAlchemyVectorIndex(VectorIndex):
                 .where(
                     DceFragmentEmbeddingRecord.tenant_id == scope.tenant_id,
                     DceFragmentEmbeddingRecord.case_id == scope.case_id,
+                    DceFragmentEmbeddingRecord.dce_version_id == scope.dce_version_id,
                     DceFragmentEmbeddingRecord.model_id == embedding_model,
                     DceFragmentEmbeddingRecord.classification.in_(
                         classification.value for classification in scope.allowed_classifications

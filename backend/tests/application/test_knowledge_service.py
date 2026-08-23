@@ -66,6 +66,7 @@ def test_knowledge_service_indexes_and_searches_through_ports() -> None:
     results = service.search_case_dce(
         tenant_id=TENANT_ID,
         case_id=CASE_ID,
+        dce_version_id=VERSION_ID,
         query="délai",
         top_k=1,
     )

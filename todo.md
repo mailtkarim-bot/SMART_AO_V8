@@ -39,6 +39,7 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 - [x] **Cockpit frontend BOAMP** — feature `web/src/features/opportunities`, méthodes API de lecture/qualification, sélection patronale, décisions et motifs fermés, message de rejeu idempotent et navigation intégrée à `App.tsx`. Les tests frontend et le build Vite passent ; l’appel réel attend une URL HTTPS backend vérifiée.
 - [x] **Lecture DCE/RAG frontend** — feature `web/src/features/dce`, projections `/dce-reading`, recherche `/knowledge/search`, compteurs de complétude, exigences structurées et localisations sources. Les 93 tests frontend et le build Vite passent ; PostgreSQL online, poids BGE et corpus Golden DCE restent à valider.
 - [x] **KNOWLEDGE-BENCHMARK-01** — value objects purs et `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG anonymisé, tenant-scoped et sans contenu sensible, puis calculer `recall_at_k`, moyenne et p95 à partir d’un rapport d’identifiants externe. Aucun corpus, modèle BGE ou résultat réel n’est fabriqué.
+- [x] **KNOWLEDGE-VERSION-SCOPE-01** — retrieval DCE limité à la version applicable : `RetrievalScope`, service, route HTTP et requête SQLAlchemy portent et filtrent `dce_version_id` résolu côté serveur ; régression ajoutée contre les versions supersédées, sans exposition de contenu ni données financières.
 
 ## Vérifications externes encore ouvertes
 
