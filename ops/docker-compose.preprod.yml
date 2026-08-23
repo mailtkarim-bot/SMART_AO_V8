@@ -157,6 +157,48 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  dce-rc-analysis-runner:
+    profiles: ["dce-analysis"]
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: ["python", "-m", "app.workers.dce_analysis"]
+    restart: "no"
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  dce-requirements-runner:
+    profiles: ["dce-requirements"]
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: ["python", "-m", "app.workers.dce_requirements"]
+    restart: "no"
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
   submission-export-webhook-worker:
     build:
       context: ..

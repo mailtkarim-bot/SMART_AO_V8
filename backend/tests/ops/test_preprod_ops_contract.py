@@ -248,6 +248,46 @@ def test_dce_extraction_wrapper_is_one_shot_and_uses_private_env() -> None:
     assert "--dce-document-id \"$dce_document_id\"" in wrapper
 
 
+def test_dce_analysis_wrapper_is_one_shot_and_uses_private_env() -> None:
+    wrapper = (OPS / "run-dce-analysis-preprod.sh").read_text(encoding="utf-8")
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+
+    assert '[[ $# -ne 2 ]]' in wrapper
+    assert 'stat -c \'%a\' "$ENV_FILE"' in wrapper
+    assert '"$ENV_FILE"' in wrapper
+    assert "--profile dce-analysis run --rm --no-deps --no-ansi dce-rc-analysis-runner" in wrapper
+    assert "python -m app.workers.dce_analysis" in wrapper
+    assert "--tenant-id \"$tenant_id\"" in wrapper
+    assert "--dce-version-id \"$dce_version_id\"" in wrapper
+    assert "dce-rc-analysis-runner:" in compose
+    assert 'profiles: ["dce-analysis"]' in compose
+    assert 'command: ["python", "-m", "app.workers.dce_analysis"]' in compose
+    assert "restart: \"no\"" in compose
+    assert "dce-rc-analysis-runner" not in compose.split("  backend:", maxsplit=1)[1].split(
+        "  dce-retention-worker:", maxsplit=1
+    )[0]
+
+
+def test_dce_requirements_wrapper_is_one_shot_and_profiled() -> None:
+    wrapper = (OPS / "run-dce-requirements-preprod.sh").read_text(encoding="utf-8")
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+
+    assert '[[ $# -ne 3 ]]' in wrapper
+    assert 'stat -c \'%a\' "$ENV_FILE"' in wrapper
+    assert (
+        "--profile dce-requirements run --rm --no-deps --no-ansi "
+        "dce-requirements-runner"
+    ) in wrapper
+    assert "python -m app.workers.dce_requirements" in wrapper
+    assert "--tenant-id \"$tenant_id\"" in wrapper
+    assert "--dce-version-id \"$dce_version_id\"" in wrapper
+    assert "--dce-rc-analysis-id \"$dce_rc_analysis_id\"" in wrapper
+    assert "dce-requirements-runner:" in compose
+    assert 'profiles: ["dce-requirements"]' in compose
+    assert 'command: ["python", "-m", "app.workers.dce_requirements"]' in compose
+    assert "restart: \"no\"" in compose
+
+
 def test_rag_indexing_is_explicitly_opt_in_and_one_shot() -> None:
     compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
     worker = (OPS / "run-knowledge-embeddings-preprod.sh").read_text(encoding="utf-8")
