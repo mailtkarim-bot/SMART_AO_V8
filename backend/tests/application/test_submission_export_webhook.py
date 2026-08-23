@@ -296,6 +296,11 @@ def test_post_json_validates_and_sends_request(monkeypatch: pytest.MonkeyPatch) 
         return context
 
     monkeypatch.setattr(webhook_module, "urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        webhook_module.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [(None, None, None, None, ("93.184.216.34", 443))],
+    )
     status = _post_json("https://example.test/hook", {"event": "ok"}, 2.5, "test-secret")
 
     assert status == 202
@@ -305,6 +310,28 @@ def test_post_json_validates_and_sends_request(monkeypatch: pytest.MonkeyPatch) 
 def test_post_json_rejects_missing_host() -> None:
     with pytest.raises(ValueError, match="invalid webhook URL"):
         _post_json("https:///hook", {}, 1.0)
+
+
+def test_post_json_rejects_http_and_private_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(ValueError, match="invalid webhook URL"):
+        _post_json("http://example.test/hook", {}, 1.0, "test-secret")
+
+    monkeypatch.setattr(
+        webhook_module.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [(None, None, None, None, ("127.0.0.1", 443))],
+    )
+    with pytest.raises(ValueError, match="not public"):
+        _post_json("https://example.test/hook", {}, 1.0, "test-secret")
+
+
+def test_post_json_rejects_dns_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_dns(*_args: object, **_kwargs: object) -> list[object]:
+        raise OSError("no DNS")
+
+    monkeypatch.setattr(webhook_module.socket, "getaddrinfo", fail_dns)
+    with pytest.raises(ValueError, match="DNS resolution failed"):
+        _post_json("https://example.test/hook", {}, 1.0, "test-secret")
 
 
 def test_build_default_worker_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:

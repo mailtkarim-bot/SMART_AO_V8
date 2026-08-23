@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
+import socket
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -146,15 +148,40 @@ def _safe_payload(payload_json: object) -> dict[str, object] | None:
     return {"event_type": "submission.package.exported", "data": data}
 
 
+def _validate_webhook_destination(url: str) -> None:
+    parsed = urlsplit(url)
+    if parsed.scheme != "https" or not parsed.hostname or not parsed.netloc:
+        raise ValueError("invalid webhook URL")
+    try:
+        destinations = socket.getaddrinfo(
+            parsed.hostname,
+            parsed.port or 443,
+            type=socket.SOCK_STREAM,
+        )
+    except OSError as exc:
+        raise ValueError("webhook DNS resolution failed") from exc
+    if not destinations:
+        raise ValueError("webhook DNS resolution failed")
+    for destination in destinations:
+        address = ipaddress.ip_address(destination[4][0])
+        if (
+            address.is_private
+            or address.is_loopback
+            or address.is_link_local
+            or address.is_multicast
+            or address.is_reserved
+            or address.is_unspecified
+        ):
+            raise ValueError("webhook destination is not public")
+
+
 def _post_json(
     url: str,
     payload: dict[str, object],
     timeout: float,
     webhook_secret: str | None = None,
 ) -> int:
-    parsed = urlsplit(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ValueError("invalid webhook URL")
+    _validate_webhook_destination(url)
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     if not webhook_secret:
         raise ValueError("webhook secret is required")

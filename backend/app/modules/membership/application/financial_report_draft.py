@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.commands import CreateFinancialReportDraftCommand
+from app.modules.pricing.infrastructure.models import FinancialReportSnapshotRecord
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -25,7 +26,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import FinancialReportSnapshotRecord
 
 
 class PatronFinancialReportDraftCreationService:

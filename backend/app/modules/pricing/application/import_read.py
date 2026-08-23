@@ -7,6 +7,11 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.modules.pricing.infrastructure.models import (
+    PricingImportBatchRecord,
+    PricingImportRowRecord,
+    PricingImportTransitionRecord,
+)
 from app.platform.security.authorization import (
     AuthorizationPolicyPort,
     AuthorizationRequest,
@@ -14,11 +19,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    PricingImportBatchRecord,
-    PricingImportRowRecord,
-    PricingImportTransitionRecord,
-)
 
 
 @dataclass(frozen=True, slots=True)

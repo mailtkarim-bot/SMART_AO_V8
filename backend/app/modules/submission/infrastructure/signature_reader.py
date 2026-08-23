@@ -4,8 +4,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from app.modules.submission.application.signature_reader import SubmissionSignatureReader
+from app.modules.submission.infrastructure.models import SubmissionSignatureRecord
 from app.modules.submission.public.signature_contracts import SubmissionSignatureProjection
-from app.platform.security.models import SubmissionSignatureRecord
 from sqlalchemy.orm import Session, sessionmaker
 
 

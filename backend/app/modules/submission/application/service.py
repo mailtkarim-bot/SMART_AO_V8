@@ -10,10 +10,23 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.modules.enterprise.infrastructure.models import EnterpriseDocumentRecord
+from app.modules.enterprise.infrastructure.models import (
+    CaseCapabilityProposalRecord,
+    EnterpriseCapabilityProofLinkRecord,
+    EnterpriseCapabilityRecord,
+    EnterpriseCapabilityVersionRecord,
+    EnterpriseDocumentRecord,
+)
 from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
+from app.modules.preparation.infrastructure.models import (
+    GeneratedTechnicalDocumentRecord,
+    PreparationPackageRecord,
+    PreparationReadinessRecord,
+)
+from app.modules.pricing.infrastructure.models import FinancialReportSnapshotRecord
 from app.modules.submission.application.commands import PrepareSubmissionPackageCommand
 from app.modules.submission.application.notifications import SUBMISSION_EXPORT_EMAIL_TOPIC
+from app.modules.submission.infrastructure.models import SubmissionPackageRecord
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -37,17 +50,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    CaseCapabilityProposalRecord,
-    EnterpriseCapabilityProofLinkRecord,
-    EnterpriseCapabilityRecord,
-    EnterpriseCapabilityVersionRecord,
-    FinancialReportSnapshotRecord,
-    GeneratedTechnicalDocumentRecord,
-    PreparationPackageRecord,
-    PreparationReadinessRecord,
-    SubmissionPackageRecord,
-)
 
 
 class SubmissionPackageService:

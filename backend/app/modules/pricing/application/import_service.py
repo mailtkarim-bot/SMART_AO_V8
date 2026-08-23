@@ -7,6 +7,13 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.pricing.application.import_commands import CommitPricingImportCommand
+from app.modules.pricing.infrastructure.models import (
+    FinancialReportLineRecord,
+    FinancialReportSnapshotRecord,
+    PricingImportBatchRecord,
+    PricingImportRowRecord,
+    PricingImportTransitionRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -22,13 +29,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    FinancialReportLineRecord,
-    FinancialReportSnapshotRecord,
-    PricingImportBatchRecord,
-    PricingImportRowRecord,
-    PricingImportTransitionRecord,
-)
 
 
 class PricingImportService:

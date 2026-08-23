@@ -10,6 +10,10 @@ from app.modules.pricing.application.transition_commands import (
     SelectPricingScenarioCommand,
     TransitionPricingScenarioCommand,
 )
+from app.modules.pricing.infrastructure.models import (
+    PricingScenarioRecord,
+    PricingScenarioTransitionRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -25,7 +29,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import PricingScenarioRecord, PricingScenarioTransitionRecord
 
 
 class PricingScenarioTransitionService:

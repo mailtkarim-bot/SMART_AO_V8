@@ -4,6 +4,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.modules.patron_action.application.transition_commands import TransitionPatronActionCommand
+from app.modules.patron_action.infrastructure.models import (
+    PatronActionRecord,
+    PatronActionTransitionRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -19,7 +23,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import PatronActionRecord, PatronActionTransitionRecord
 
 
 class PatronActionTransitionService:

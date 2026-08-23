@@ -8,6 +8,12 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.dce.infrastructure.models.dce_requirements import DceRequirementRecord
+from app.modules.enterprise.infrastructure.models import (
+    CaseCapabilityGapRecord,
+    CaseCapabilityProposalRecord,
+    EnterpriseCapabilityRecord,
+    EnterpriseCapabilityVersionRecord,
+)
 from app.modules.membership.application.collab_capability_commands import (
     ProposeCapabilityForCaseCommand,
     ReportCapabilityGapCommand,
@@ -29,11 +35,7 @@ from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
 from app.platform.security.models import (
     CaseAssignmentRecord,
-    CaseCapabilityGapRecord,
-    CaseCapabilityProposalRecord,
     CollaboratorTaskRecord,
-    EnterpriseCapabilityRecord,
-    EnterpriseCapabilityVersionRecord,
 )
 
 

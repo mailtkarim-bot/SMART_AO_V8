@@ -22,6 +22,10 @@ from app.modules.opportunity.infrastructure import (
     observation_models as opportunity_observation_models,  # noqa: F401
 )
 from app.modules.optimization.infrastructure import models as optimization_models  # noqa: F401
+from app.modules.patron_action.infrastructure.models import patron_action  # noqa: F401
+from app.modules.preparation.infrastructure.models import preparation  # noqa: F401
+from app.modules.pricing.infrastructure.models import financial  # noqa: F401
+from app.modules.submission.infrastructure.models import submission  # noqa: F401
 from app.platform.persistence import models  # noqa: F401
 from app.platform.persistence.alembic_runtime import resolve_database_url
 from app.platform.persistence.base import Base

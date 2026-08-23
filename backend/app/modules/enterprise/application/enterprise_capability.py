@@ -12,6 +12,9 @@ from app.modules.enterprise.application.enterprise_capability_commands import (
     CreateEnterpriseCapabilityCommand,
 )
 from app.modules.enterprise.infrastructure.models import (
+    EnterpriseCapabilityProofLinkRecord,
+    EnterpriseCapabilityRecord,
+    EnterpriseCapabilityVersionRecord,
     EnterpriseCompanyRecord,
     EnterpriseDocumentRecord,
 )
@@ -30,11 +33,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    EnterpriseCapabilityProofLinkRecord,
-    EnterpriseCapabilityRecord,
-    EnterpriseCapabilityVersionRecord,
-)
 
 
 @dataclass(frozen=True, slots=True)

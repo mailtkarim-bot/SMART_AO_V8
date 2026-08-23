@@ -11,6 +11,10 @@ from app.modules.submission.application.signature_commands import (
     RequestSubmissionSignatureCommand,
 )
 from app.modules.submission.application.signature_reader import SubmissionSignatureReader
+from app.modules.submission.infrastructure.models import (
+    SubmissionPackageRecord,
+    SubmissionSignatureRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -25,7 +29,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import SubmissionPackageRecord, SubmissionSignatureRecord
 
 
 class SubmissionSignatureService:

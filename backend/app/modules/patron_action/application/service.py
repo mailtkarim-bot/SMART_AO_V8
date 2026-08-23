@@ -8,6 +8,11 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.patron_action.application.commands import CreatePatronActionCommand
+from app.modules.patron_action.infrastructure.models import (
+    PatronActionRecord,
+    PatronActionTransitionRecord,
+)
+from app.modules.patron_action.public.ports import PatronActionReference
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -23,7 +28,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import PatronActionRecord, PatronActionTransitionRecord
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,7 +172,7 @@ class PatronActionWriter:
         transmission_id: UUID,
         command_id: UUID,
         idempotency_key: UUID,
-    ) -> PatronActionRecord | None:
+    ) -> PatronActionReference | None:
         functional_key = f"preparation-transmission:{transmission_id}"
         existing = session.scalar(
             sa.select(PatronActionRecord).where(
@@ -203,10 +207,18 @@ class PatronActionWriter:
             correlation_id=context.correlation_id,
         )
         session.add(record)
-        return record
+        return PatronActionReference(
+            id=record.id,
+            case_id=record.case_id,
+            action_type=record.action_type,
+            severity=record.severity,
+            state=record.state,
+            aggregate_revision=record.aggregate_revision,
+        )
 
 
 class PatronActionHandler:
+
     """Persist the first version of an explainable patron action."""
 
     def execute(self, *, session: Session, command, context: CommandContext) -> HandlerOutcome:
