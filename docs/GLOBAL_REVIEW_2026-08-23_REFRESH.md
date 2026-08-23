@@ -2,7 +2,7 @@
 
 **Date : 23 août 2026**  
 **Branche : `docs/pricing-http-next-lot-28`**  
-**Dernier commit poussé : [`9457703`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/9457703)**
+**Dernier commit poussé : [`7d91b0a`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/7d91b0a)**
 **Auteur : Manus AI**
 
 ## 1. Verdict exécutif
@@ -42,11 +42,23 @@ La lecture affiche uniquement les champs prévus par le contrat public : fraîch
 | Playwright | Non installé | Tests Vitest composants/hooks | Parcours navigateur contre URL HTTPS réelle. |
 | Docker/VPS/Caddy/ClamAV | Préparés | Compose, pinning, healthchecks et runbooks | Exécution, EICAR, HTTPS, backup/restore et supervision. |
 
-## 4. Base de données et migrations
+## 4. Vérification du rapport d’audit joint
+
+Le rapport est **pertinent sur le verdict opérationnel**, mais certaines affirmations sont obsolètes ou insuffisamment prouvées. L’écart architectural des modèles ORM était avéré : les modèles métier ont été déplacés vers `pricing`, `preparation`, `submission`, `patron_action` et `enterprise`, avec exports de compatibilité et test d’ownership. La critique sur `pricing_scenarios` mutable était également avérée : la migration `20260823_0055` ajoute désormais un trigger `BEFORE UPDATE OR DELETE`, les transitions append-only restant la seule surface de changement d’état.
+
+La mesure de couverture du rapport était proche mais non exacte dans l’état actuel : le run local `pytest -m 'not db' --cov=backend/app` mesure **67,45 %** et échoue encore au seuil configuré de 85,50 %. Cette mesure inclut des branches de bootstrap, d’authentification et de workers qui ne sont pas entièrement exercées hors PostgreSQL. Elle ne doit pas être masquée par une exclusion artificielle ; l’objectif restant est de compléter les tests, idéalement avec les tests DB actifs.
+
+Deux remarques doivent être corrigées. Le test ICS n’a pas besoin du paquet `icalendar` : le renderer utilise son propre format et `uv run --extra calendar pytest backend/tests/infrastructure/test_ics_calendar.py` passe. Le test OR-Tools signalé ne constitue pas un échec métier démontré : l’erreur observée est une `connection refused` PostgreSQL sur `127.0.0.1:5432`, avant l’exécution du test de persistance.
+
+Les remarques de sécurité sont partiellement confirmées. Le step-up MFA existe dans `AuthorizationPolicy`, mais il n’est pas automatiquement imposé à toutes les routes sensibles ; ce point reste ouvert. Le rate limiter process-local est un choix explicitement documenté et doit être remplacé par un store partagé avant déploiement multi-réplique. Le codec JWT supporte maintenant un `kid` et une clé de vérification historique, mais la rotation réelle doit encore être configurée par l’environnement de production. Le webhook est durci : HTTPS obligatoire, résolution DNS et refus des adresses privées/réservées, avec 27 tests ciblés passés.
+
+Enfin, l’absence de preuve Docker/PostgreSQL/VPS/ClamAV/HTTPS/backup, de fournisseur bus et de corpus BGE réel est correcte. Ces éléments sont préparés par des scripts, profils Compose et runbooks, mais aucune exécution réelle ne doit être inventée. Le statut reste **NO-GO opérationnel** tant que ces preuves et une CI réellement exécutée ne sont pas disponibles.
+
+## 5. Base de données et migrations
 
 La persistence BOAMP est tenant-scoped. Les observations, liens, qualifications, événements et messages outbox utilisent les chemins transactionnels du projet. La migration `0053` porte les observations et fingerprints SHA-256 ; la migration `0054` porte les qualifications append-only et leurs contraintes. Les tests PostgreSQL du worker couvrent l’accusé fournisseur avant `PUBLISHED`, le retry après rejet et l’absence de publication lors d’une panne.
 
-La migration offline jusqu’à `20260823_0054` est générable. La tentative online demandée dans cette session n’a pas été exécutée, car le script `scripts/start_local_postgres.sh` a constaté l’absence du binaire Docker et s’est arrêté avec `POSTGRES_LOCAL_STATUS=BLOCKED_DOCKER_OR_SERVICE_UNAVAILABLE`. Il n’existe donc pas de preuve que `0054` a été appliquée sur une instance réelle dans cet environnement.
+La migration offline jusqu’à `20260823_0055` est générable. La migration `0055` protège maintenant la table `pricing_scenarios` contre les mutations directes. La tentative online demandée dans cette session n’a pas été exécutée, car le script `scripts/start_local_postgres.sh` a constaté l’absence du binaire Docker et s’est arrêté avec `POSTGRES_LOCAL_STATUS=BLOCKED_DOCKER_OR_SERVICE_UNAVAILABLE`. Il n’existe donc pas de preuve que `0054` a été appliquée sur une instance réelle dans cet environnement.
 
 Lorsque Docker sera disponible, le runbook est :
 
@@ -74,12 +86,12 @@ uv run python scripts/recipe_boamp_postgres.py --apply
 | Tests knowledge version-scoped | **9 passed** |
 | Workers DCE analyse/matérialisation et contrats opérateur | **28 passed** |
 | Test SQLAlchemy de filtre versionné | **Passé** |
-| Migration offline Alembic jusqu’à `0054` | **Passée** |
+| Migration offline Alembic jusqu’à `0055` | **Passée** |
 | Migration online et tests PostgreSQL | **Non prouvés dans le sandbox** |
 | Docker réel | **Indisponible dans le sandbox** |
 | Fournisseur bus réel | **Non configuré et non appelé** |
 
-Le lot DCE/RAG frontend a été poussé dans `238868f`, la documentation a été réconciliée dans `e5c4d05`, puis KNOWLEDGE-BENCHMARK-01 a été poussé dans `fa48c02`. Le code est validé localement ; seul le corpus réel, le cache BGE et la recette d’exécution restent externes. L’absence de preuve PostgreSQL online est indépendante des tests locaux.
+Le lot DCE/RAG frontend a été poussé dans `238868f`, la documentation a été réconciliée dans `e5c4d05`, KNOWLEDGE-BENCHMARK-01 a été poussé dans `fa48c02`, puis les runners DCE ont été publiés dans `fe488f5`. Le code de remédiation est publié dans `7d91b0a`; la présente réconciliation documentaire sera publiée séparément. Le code est validé localement ; seul le corpus réel, le cache BGE et la recette d’exécution restent externes. L’absence de preuve PostgreSQL online est indépendante des tests locaux.
 
 ## 6. Tâches ouvertes et ordre recommandé
 
@@ -91,7 +103,7 @@ L’ordre recommandé est le suivant :
 2. commit/push du lot KNOWLEDGE-BENCHMARK-01 et mise à jour des documents canoniques — **réalisé dans `fa48c02`** ;
 3. filtrer le retrieval par version DCE applicable dans le domaine, le service et SQL — **réalisé dans `93ba239`** ;
 4. ajouter les runners opérateur DCE analyse et matérialisation, profilés et sans sortie sensible — **réalisé dans `fe488f5`** ;
-5. exécuter PostgreSQL 16 et Alembic `0051`–`0054` sur Docker réel ;
+5. exécuter PostgreSQL 16 et Alembic `0051`–`0055` sur Docker réel ;
 6. lancer les tests de persistence BOAMP et du worker outbox ;
 7. charger un corpus DCE non financier contrôlé et mesurer retrieval/fraîcheur/localisation ;
 8. définir ensuite le fournisseur bus réel et sa recette contrôlée ;
@@ -111,3 +123,4 @@ L’ordre recommandé est le suivant :
 - [`docs/reference/SMART_AO_V8_DCE_DOCUMENT_EXTRACTION_01_CONTRAT.md`](reference/SMART_AO_V8_DCE_DOCUMENT_EXTRACTION_01_CONTRAT.md)
 - [`docs/reference/SMART_AO_V8_KNOWLEDGE_INDEXING_OPS_01_CONTRAT.md`](reference/SMART_AO_V8_KNOWLEDGE_INDEXING_OPS_01_CONTRAT.md)
 - [`docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md`](reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md)
+- [`backend/alembic/versions/20260823_0055_pricing_scenarios_immutability.py`](../backend/alembic/versions/20260823_0055_pricing_scenarios_immutability.py)

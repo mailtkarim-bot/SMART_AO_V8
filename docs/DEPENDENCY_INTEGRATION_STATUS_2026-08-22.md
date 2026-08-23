@@ -2,7 +2,7 @@
 
 **Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**Dernier commit fonctionnel de référence :** `fa48c02` (cockpit BOAMP, lecture DCE/RAG frontend et contrat de benchmark Golden identifier-only, après le gate PostgreSQL/outbox `e66840e`).
+**Dernier commit fonctionnel de référence :** `7d91b0a` (remédiation ORM métier, migration append-only pricing `0055`, durcissement webhook SSRF/DNS et codec JWT avec `kid`, après le lot DCE/RAG/benchmark).
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
@@ -34,7 +34,7 @@ La documentation doit donc être lue ainsi : **“Obligatoire” dans l’archit
 | Frontend | React, React DOM, TypeScript, Vite, Vitest, Testing Library | Cockpit BOAMP, lecture DCE/RAG et features métier présents ; 93 tests frontend et le build Vite passent localement. |
 | Qualité Python | pytest, pytest-cov, Ruff, Bandit, detect-secrets, pip-audit | Présents et utilisés par les contrôles locaux/CI prévus. |
 
-La preuve de ces éléments vient des manifests `pyproject.toml`, `uv.lock`, `web/package.json`, `web/pnpm-lock.yaml`, des imports du backend, des adaptateurs sous `backend/app/modules/*/infrastructure` et des fichiers Compose. La validation locale actuelle exécute sans PostgreSQL **820 tests non-DB avec succès** ; **455 tests DB** sont correctement identifiés mais nécessitent le service PostgreSQL. Les anciennes mesures de couverture restent historiques et ne constituent pas une preuve d’intégration réelle.
+La preuve de ces éléments vient des manifests `pyproject.toml`, `uv.lock`, `web/package.json`, `web/pnpm-lock.yaml`, des imports du backend, des adaptateurs sous `backend/app/modules/*/infrastructure` et des fichiers Compose. La validation locale actuelle exécute sans PostgreSQL **862 tests non-DB avec succès** ; **458 tests DB** sont correctement identifiés mais nécessitent le service PostgreSQL. La couverture complète hors DB est mesurée à **67,45 %**, sous le seuil strict de 85,50 % ; elle reste un travail de qualité ouvert et ne doit pas être masquée par des exclusions artificielles.
 
 ## 4. Dépendances documentées mais non greffées au runtime
 
@@ -96,9 +96,9 @@ Le passage à MinIO/S3 est maintenant câblé derrière un slice d’infrastruct
 | Profil de veille opportunité | Bounded context `opportunity` ; `WatchProfileCriteria` pur, commandes fermées, snapshot/hash canonique, models `opportunity_watch_profiles`/`opportunity_watch_profile_versions`, dispatcher/outbox, migration `0052` et routes patronales create/version/read avec capabilities `opportunity.profile.read/write` | **Persistence et HTTP codés, recette PostgreSQL online restante** ; les versions sont append-only, les projections sont tenant-scoped et l’ID initial est dérivé serveur. BOAMP est ingérable en staging puis persistable via `0053`, avec scoring public `BOAMP_PUBLIC_V1`, lecture patronale, qualification append-only via `0054`, sans conversion Case automatique. |
 | URSSAF / INSEE | INSEE : extra `connectors` optionnel, port `CompanyRegistryPort`, adaptateur Sirene read-only, route authentifiée `GET /api/v1/patron/enterprise/registry/{siren}`, capability `enterprise.registry.read` et composition AppRuntime ; URSSAF toujours absent | INSEE est **câblé derrière un port et une lecture authentifiée**, activable seulement avec `SMART_AO_INSEE_ENABLED=1` et token runtime ; aucune requête réelle ni persistance automatique n’a été validée. URSSAF reste non intégré. |
 | SMTP / `aiosmtplib` | Extra `notifications` optionnel verrouillé ; port `SubmissionExportNotificationPort`, adaptateur async TLS/STARTTLS, topic outbox dédié `submission.package.exported.smtp`, worker `app.workers.submission_export_smtp` avec lease/retry/idempotence et démarrage Compose explicite | **Worker greffé mais désactivé par défaut** ; payload SMTP limité à `submission_package_id`/`EXPORT_READY`, distinct du webhook et sans document, hash d’archive ou montant. Aucun serveur SMTP réel, compte, accusé de remise ou délivrabilité n’a été recetté. |
-| ICS / `icalendar` | Extra `calendar` optionnel verrouillé ; port `SubmissionDeadlineCalendarPort`, renderer RFC 5545 local, dates UTC et activation AppRuntime explicite | **Export de fichier greffé mais désactivé par défaut** ; aucun agenda distant, CalDAV, OAuth ou accusé de synchronisation n’est intégré. |
+| ICS / `icalendar` | Extra `calendar` optionnel verrouillé ; port `SubmissionDeadlineCalendarPort`, renderer RFC 5545 local, dates UTC et activation AppRuntime explicite | **Export de fichier greffé mais désactivé par défaut** ; le renderer n’importe pas `icalendar` et le test passe avec l’extra ; aucun agenda distant, CalDAV, OAuth ou accusé de synchronisation n’est intégré. |
 | n8n | Documenté comme intégration future | Aucun workflow connecté. |
-| Webhook d’export | Worker Python et signature HMAC du payload | La capacité technique sortante est codée ; aucune destination réelle n’est configurée ou validée dans ce sandbox. |
+| Webhook d’export | Worker Python et signature HMAC du payload | La capacité sortante est codée ; HTTPS est obligatoire, la résolution DNS est vérifiée et les adresses privées/réservées sont refusées. Aucune destination réelle n’est configurée ou validée dans ce sandbox. |
 | Signature HTTP | DTOs fermés, capabilities patronales dédiées, routes `POST` demande/callback et `GET` lecture, provider/secret runtime, callback HMAC sur corps brut, delivery idempotente, reader tenant-scoped, panneau React de suivi et `SignatureProviderTestAdapter` local | **Backend et suivi frontend greffés mais désactivés tant que provider/secret manquent**. Le provider de test produit seulement un callback `TEST_PROVIDER` déterministe en mémoire pour les tests HMAC/replay ; aucun fournisseur réel, certificat, signature qualifiée, dépôt externe ou accusé de remise n’est intégré. |
 | Redis / Celery / APScheduler | Absents, explicitement différés ou optionnels | Aucun besoin démontré pour le noyau mono-VPS actuel. |
 
@@ -123,13 +123,17 @@ Il est techniquement possible de commencer un raccordement maintenant, à condit
 | 5 | **Connecteurs BOAMP/URSSAF** | BOAMP possède un adaptateur HTTPS read-only, un script staging borné, une persistence `0053`, un scoring explicable, une lecture/qualification patronale HTTP, une qualification append-only `0054` et un worker outbox vers port bus ; les recettes réseau/PostgreSQL/bus réels restent à faire. INSEE read-only, SMTP optionnel et export ICS local sont également des premiers slices ; URSSAF reste à traiter séparément avec secrets hors Git, idempotence, limites d’usage, audit et tests sandbox. |
 | 6 | **Playwright E2E** | Peut être ajouté dès maintenant comme outil de preuve, mais il ne remplacera pas l’absence de VPS/Docker et d’URL HTTPS réelle. |
 
-## 7. Ce qui empêche aujourd’hui de dire « tout est codé »
+## 7. Vérification complémentaire du rapport d’audit
+
+Le déplacement des modèles métier et le trigger append-only `pricing_scenarios` sont maintenant codés dans `7d91b0a`. La remarque ICS du rapport est un faux positif : le test utilise le renderer local RFC 5545 et passe avec l’extra `calendar`. La remarque OR-Tools n’est pas un échec fonctionnel démontré ; les tests DB échouent ici par `connection refused` avant leur exécution. Le MFA step-up existe au niveau de la policy mais son obligation sur chaque action sensible reste à vérifier séparément. La rotation JWT par `kid` est disponible dans le codec, sans clés historiques configurées dans cet environnement. Les preuves Docker/PostgreSQL/VPS, fournisseur bus, corpus BGE et runners CI restent externes.
+
+## 8. Ce qui empêche aujourd’hui de dire « tout est codé »
 
 Il reste des manques fonctionnels et opérationnels importants : la validation OCR et parsing avancé sur scans, la mise en production du modèle BGE et l’indexation automatique du RAG, le passage éventuel à pgvector/Qdrant, le raccordement métier complet d’OR-Tools, la recette réelle du stockage objet S3/MinIO, la délivrabilité SMTP réelle et la preuve de remise du process outbox, le connecteur URSSAF et les recettes réseau stables des lectures INSEE/BOAMP authentifiées, la synchronisation d’agenda distante, les tests navigateur Playwright, la preuve Docker/ClamAV/HTTPS sur une machine réelle, la sauvegarde hors hôte et la restauration isolée. Le dépôt électronique externe lui-même reste volontairement non effectué et ne doit jamais être simulé comme réussi.
 
 Ces manques ne signifient pas que le code existant est un simple squelette. Ils signifient que **le noyau sécurisé et plusieurs slices métier sont codés, tandis que la plateforme complète décrite par la vision cible ne l’est pas encore**. Une couverture de tests élevée ne transforme pas une dépendance absente en fonctionnalité disponible.
 
-## 8. Séquence recommandée
+## 9. Séquence recommandée
 
 La séquence raisonnable est la suivante :
 
@@ -154,7 +158,7 @@ La séquence raisonnable est la suivante :
 - [`backend/app/modules/dce/infrastructure/quarantine.py`](../backend/app/modules/dce/infrastructure/quarantine.py) : stockage local privé et ClamAV actuellement implémentés.
 - [`backend/app/modules/preparation/infrastructure/document_storage.py`](../backend/app/modules/preparation/infrastructure/document_storage.py) : stockage local des documents générés.
 
-## 9. Mise à jour BOAMP HTTP et bus externe — 23 août 2026
+## 10. Mise à jour BOAMP HTTP et bus externe — 23 août 2026
 
 Le slice BOAMP est désormais greffé jusqu’à la frontière HTTP et outbox, sans prétendre à une intégration fournisseur réelle. Le routeur patronal `GET /api/v1/patron/boamp-opportunities` expose une projection minimale tenant-scoped ; `POST /api/v1/patron/boamp-opportunities/{observation_id}/qualification` accepte seulement les décisions et motifs fermés du contrat humain. Les capacités `opportunity.observation.read` et `opportunity.observation.qualify` restent réservées au patron, et l’acteur comme le tenant sont résolus côté serveur.
 

@@ -8,7 +8,7 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 - [x] **Fixtures PostgreSQL de tests centralisées** — `backend/tests/conftest.py`, `tests.support.database`, URL unique `SMART_AO_TEST_DATABASE_URL` avec fallback par concaténation, 43 modules nettoyés. Commit `aac4de0`, CI `32078237301` verte.
 - [x] **Observabilité et durcissement runtime** — `request_id`, logs JSON opérationnels, compteurs `/metrics` sans données métier, image backend digest-pinnée et utilisateur non-root avec quarantaine privée contrôlée. Commits `0ecb24c` et `0ab3cbc`, CI finale `32080763983` verte.
 - [x] **Dépendances frontend reproductibles** — suppression de `latest` dans `web/package.json`, alignement des spécificateurs avec `web/pnpm-lock.yaml`, installation `--frozen-lockfile` et build TypeScript strict. Commit `d4b33fe`, CI `32081102590` verte.
-- [x] **Couverture et concurrence déterministes** — seuil initial `85 %` dans `pyproject.toml` et la CI, deux scénarios PostgreSQL couvrant révision optimiste et receipt `PROCESSING` avant outbox. Mesure locale : `402 passed`, couverture branchée `89,32 %`. Commit `e3eafc7`, CI `32083322693` verte.
+- [x] **Couverture et concurrence déterministes** — seuil initial `85 %` dans `pyproject.toml` et la CI, scénarios PostgreSQL couvrant révision optimiste et receipt `PROCESSING` avant outbox. L’ancien jalon `89,32 %` est historique et ne constitue pas la mesure de la branche actuelle.
 
 ## État technique publié
 
@@ -41,13 +41,19 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 - [x] **KNOWLEDGE-BENCHMARK-01** — value objects purs et `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG anonymisé, tenant-scoped et sans contenu sensible, puis calculer `recall_at_k`, moyenne et p95 à partir d’un rapport d’identifiants externe. Aucun corpus, modèle BGE ou résultat réel n’est fabriqué.
 - [x] **KNOWLEDGE-VERSION-SCOPE-01** — retrieval DCE limité à la version applicable : `RetrievalScope`, service, route HTTP et requête SQLAlchemy portent et filtrent `dce_version_id` résolu côté serveur ; régression ajoutée contre les versions supersédées, sans exposition de contenu ni données financières. Publié dans `93ba239`.
 - [x] **DCE-ANALYSIS-OPS-01** — worker one-shot `app.workers.dce_analysis`, wrapper `ops/run-dce-analysis-preprod.sh` et service Compose isolé dans le profil `dce-analysis`. L’acteur SYSTEM, le tenant, la version DCE et la sortie sans extrait sont testés ; l’exécution réelle reste dépendante de Docker/PostgreSQL et d’une DCE admise. Le même lot ajoute `app.workers.dce_requirements`, `ops/run-dce-requirements-preprod.sh` et le profil `dce-requirements` pour matérialiser les exigences après l’analyse. Publié dans `fe488f5`.
+- [x] **ARC-01 / extraction ORM métier** — modèles pricing, preparation, submission, patron_action et enterprise déplacés hors de `platform/security/models.py`, exports de compatibilité conservés, imports applicatifs migrés et test d’ownership ajouté. La registry Alembic est explicitement chargée par bounded context.
+- [x] **PRICING-SCENARIO-IMMUTABILITY-01** — migration `20260823_0055` ajoutant le trigger append-only de `pricing_scenarios`; les transitions restent la seule surface de changement d’état.
+- [x] **WEBHOOK-SSRF-01** — webhook d’export limité à HTTPS, résolution DNS obligatoire et refus des adresses privées, loopback, link-local, multicast, réservées et non spécifiées ; 27 tests ciblés passent.
+- [x] **JWT-KID-01** — codec JWT émet un `kid`, accepte un jeu de clés de vérification pour rotation et conserve la compatibilité des tokens sans `kid`. Le raccordement des clés de rotation à l’environnement de production reste externe.
 
-## Vérifications externes encore ouvertes
+## Vérifications et travaux encore ouverts
+
+- [ ] **Couverture applicative** — la mesure locale complète hors DB est de **67,45 %** avec le seuil strict à `85.50 %`. Ajouter des tests utiles pour bootstrap/authentification/workers et exécuter la couverture complète avec PostgreSQL ; ne pas contourner le seuil par exclusions artificielles.
 
 - [ ] Exécuter la recette avec PostgreSQL 16 réellement accessible, puis conserver le verdict, les hashes de migration et la preuve des triggers append-only. Le sandbox actuel répond `connection refused` sur `127.0.0.1:5432`.
 - [ ] Exécuter sur un corpus DCE anonymisé le worker d’indexation, `verify_bge_model_cache.py`, le worker `run-dce-analysis-preprod.sh` et le validateur `validate_knowledge_benchmark.py`, puis conserver uniquement les métriques et identifiants autorisés.
 - [ ] Définir avec le fournisseur réel le contrat de bus, l’URL HTTPS, le mode d’authentification, les garanties de livraison et la stratégie de replay ; injecter ensuite ces paramètres hors Git et exécuter une recette contrôlée. Aucun bus réel n’est configuré dans le dépôt.
-- [ ] Rétablir des runners GitHub Actions exécutants avant de considérer une CI distante comme verte ou de fusionner la PR #49/main. Le dernier run `32656237762` sur `9457703` échoue encore avec `runnerName` absent et `steps: []` pour les trois jobs.
+- [ ] Rétablir des runners GitHub Actions exécutants avant de considérer une CI distante comme verte ou de fusionner la PR #49/main. Les derniers runs échouent avant toute étape avec `runnerName` absent et `steps: []` pour les trois jobs.
 
 ## Frontières explicitement non retenues par les audits
 
