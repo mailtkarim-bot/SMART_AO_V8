@@ -73,3 +73,8 @@ La validation complète réalisée sur le lot est la suivante :
 ## Verdict
 
 Les rapports sont suffisamment pertinents pour maintenir un **NO-GO opérationnel** et pour prioriser le prochain développement métier. Les corrections sûres du socle sont appliquées sans désactiver le seuil de couverture ni contourner les protections financières. Il serait inexact d’affirmer que l’application est déjà un produit BTP complet ou que la production est validée : le prochain travail prioritaire est désormais, dans cet ordre, le raccordement sécurisé de l’antivirus pricing, le contrat outbox/projection/rétention, le parcours MFA, puis les slices métier CCAP-RISK et COST-BASIS.
+
+
+## Preuve CI après publication
+
+Le push des commits `5f2aabf` et `234e367` a déclenché le run GitHub Actions `32673495930` sur le SHA `234e367`. Le run est terminé en échec en environ cinq secondes. Les trois jobs (`backend`, `frontend`, `image-security`) ont `steps: []`; aucune étape Ruff, mypy, detect-secrets, pytest, build ou Trivy n’a donc été exécutée. Ce résultat confirme le blocage de provisioning/runner déjà documenté et ne démontre pas un défaut fonctionnel du code.
