@@ -29,6 +29,7 @@ def test_recipe_runs_both_boamp_persistence_suites(monkeypatch) -> None:
     assert calls
     assert "tests/infrastructure/test_boamp_observation_persistence.py" in calls[0]
     assert "tests/infrastructure/test_boamp_qualification_persistence.py" in calls[0]
+    assert "tests/process/test_opportunity_event_bus_persistence.py" in calls[0]
 
 
 def test_recipe_prints_sanitized_success_verdict_without_db(capsys, monkeypatch) -> None:

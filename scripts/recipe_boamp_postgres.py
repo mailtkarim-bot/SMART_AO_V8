@@ -120,6 +120,7 @@ def _run_db_tests(*, database_url: str) -> None:
             "pytest",
             "tests/infrastructure/test_boamp_observation_persistence.py",
             "tests/infrastructure/test_boamp_qualification_persistence.py",
+            "tests/process/test_opportunity_event_bus_persistence.py",
             "-q",
         ],
         cwd=_BACKEND_ROOT,
