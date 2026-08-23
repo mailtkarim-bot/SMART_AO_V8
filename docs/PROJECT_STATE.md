@@ -9,7 +9,7 @@
 
 | Élément | État |
 |---|---|
-| Dernier commit fonctionnel | La branche `docs/pricing-http-next-lot-28` est poussée sur `origin`; le dernier commit de code est [`9bb8c90`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/9bb8c90), adaptateur signature de test. |
+| Dernier commit fonctionnel | La branche `docs/pricing-http-next-lot-28` est poussée sur `origin`; le dernier commit de code est [`798bbec`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/798bbec), recette PostgreSQL BOAMP 0053/0054. |
 | Branche | `docs/pricing-http-next-lot-28`, PR [#49](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/49), mergeable mais non fusionnée. |
 | Corrections et durcissement récents | PR #42 readiness frontend ; PR #43 test App.tsx et plan métier ; PR #44 réconciliation documentaire ; PR #45 tests pricing ; PR #46 FK composite Case ; PR #47 création PREVIEWED ; PR #48 validation canonique ; commits `a12e375`, `d2f0d2e` et `5a2c9e5` du lot HTTP pricing. |
 | Validation courante | Les tests ciblés OR-Tools capacity/run et architecture ont produit **32 succès** avant commit ; Ruff et `alembic upgrade head --sql` sont verts, avec table, FK, checks, indexes et trigger `optimization_runs` visibles dans le SQL offline. Les deux tests PostgreSQL de persistence et l’essai Alembic online sont **BLOCKED** par `127.0.0.1:5432 Connection refused` ; aucune migration DB réelle ni preuve append-only online n’est revendiquée. L’adaptateur signature de test ajoute **15 tests ciblés verts** avec les tests de commandes/services existants ; aucun appel réseau ni fournisseur réel n’a été effectué. La baseline `.secrets.baseline` est restée inchangée. Les validations antérieures du frontend, des tests pricing et du RAG restent celles documentées ci-dessous. |
@@ -161,3 +161,17 @@ Rétablir l’attribution des GitHub-hosted runners puis faire exécuter une CI 
 ## Risques bloquants
 
 Aucun risque métier bloquant identifié. Les risques techniques sont traités par petits incréments, tests et CI.
+
+## Addendum — BOAMP HTTP, bus externe et recette PostgreSQL (23 août 2026)
+
+Les trois slices suivants sont maintenant publiés sur `docs/pricing-http-next-lot-28` :
+
+| Commit | Slice | État vérifié |
+|---|---|---|
+| `4a189ea` | Routes HTTP patronales BOAMP | `GET /api/v1/patron/boamp-opportunities` pour la lecture tenant-scoped et `POST /api/v1/patron/boamp-opportunities/{observation_id}/qualification` pour la qualification humaine ; bearer, acteur/membership résolus serveur, capabilities patronales, DTOs Pydantic fermés et réponse minimale. |
+| `e2526d2` | Worker outbox vers bus externe | Port `ExternalEventBusPort`, adaptateur HTTPS générique opt-in, adaptateur mémoire de test et worker `app.workers.opportunity_event_bus`. Seul `opportunity.boamp.qualification.recorded` est consommé ; le payload est allowlisté et `PUBLISHED` n’est écrit qu’après accusé 2xx de l’adaptateur. |
+| `798bbec` | Recette PostgreSQL 0053/0054 | `scripts/recipe_boamp_postgres.py` applique optionnellement Alembic, vérifie la révision `20260823_0054`, les tables et les triggers append-only, puis lance le test de persistence. L’URL DB n’est jamais imprimée. |
+
+Les tests locaux ciblés du lot passent : **12 tests** pour routes, worker, adaptateur et CLI. La base PostgreSQL locale étant indisponible (`127.0.0.1:5432 connection refused`), la recette online, les migrations 0053/0054 et les tests d’intégration database ne sont pas déclarés exécutés. Aucun bus externe réel n’a été appelé. Sans URL et token du bus, le worker reste en attente (`RETRY`) et ne transforme jamais une notification en `PUBLISHED` : l’absence de configuration n’est donc pas traitée comme un succès.
+
+Le statut GitHub Actions demeure distinct du statut du code : les derniers jobs connus sont bloqués avant exécution, avec `steps: []` et aucun runner attribué. Il n’y a donc ni preuve CI nouvelle ni autorisation de fusion vers `main`/PR #49.
