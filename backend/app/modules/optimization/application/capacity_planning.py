@@ -21,8 +21,13 @@ class CaseCapacityPlanInput:
 
     tenant_id: UUID
     case_id: UUID
-    demands: tuple[ResourceDemand, ...]
-    supplies: tuple[ResourceSupply, ...]
+    source_revision: int = 1
+    demands: tuple[ResourceDemand, ...] = ()
+    supplies: tuple[ResourceSupply, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.source_revision < 1:
+            raise ValueError("source_revision must be positive")
 
 
 class CaseCapacityInputPort(Protocol):
@@ -63,6 +68,14 @@ class CaseCapacityPlanningService:
         self._optimizer = optimizer or ResourceAssignmentOptimizer()
 
     def plan(self, *, tenant_id: UUID, case_id: UUID) -> CaseCapacityPlan:
+        return self.plan_with_input(tenant_id=tenant_id, case_id=case_id)[1]
+
+    def plan_with_input(
+        self,
+        *,
+        tenant_id: UUID,
+        case_id: UUID,
+    ) -> tuple[CaseCapacityPlanInput, CaseCapacityPlan]:
         plan_input = self._input_port.load(tenant_id=tenant_id, case_id=case_id)
         if plan_input.tenant_id != tenant_id or plan_input.case_id != case_id:
             raise CapacityInputScopeError("capacity input scope does not match request")
@@ -70,7 +83,7 @@ class CaseCapacityPlanningService:
             demands=plan_input.demands,
             supplies=plan_input.supplies,
         )
-        return _to_plan(
+        return plan_input, _to_plan(
             tenant_id=tenant_id,
             case_id=case_id,
             demands=plan_input.demands,
