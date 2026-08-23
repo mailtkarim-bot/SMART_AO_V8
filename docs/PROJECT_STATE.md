@@ -212,3 +212,5 @@ Le rapport détaillé est `docs/AUDIT_RECONCILIATION_2026-08-23_3.md`.
 
 
 Le push du lot a déclenché le run CI `32673495930` sur `234e367`. Il s’est terminé en échec après environ cinq secondes ; les jobs `backend`, `frontend` et `image-security` ont chacun `steps: []`. Aucune étape de code n’a été exécutée. Ce run confirme le blocage de provisioning des runners et ne constitue pas un échec fonctionnel démontré. La branche reste publiée et `main`/PR #49 restent non fusionnés.
+
+Le gate backend final, après installation des extras verrouillés avec `uv sync --all-extras`, a produit **885 passed, 458 deselected, 4 warnings** en 10,08 secondes. Les deux échecs précédents provenaient uniquement de l’extra optionnel `calendar` absent de l’environnement local ; ils ont disparu sans modification applicative.

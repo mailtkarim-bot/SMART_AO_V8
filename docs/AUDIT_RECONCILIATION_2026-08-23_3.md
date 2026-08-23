@@ -60,14 +60,14 @@ La décision GO/NO-GO possède un domaine et une lecture, mais la boucle d’éc
 
 La validation complète réalisée sur le lot est la suivante :
 
-- backend non-DB : suite disponible passée ; les tests marqués DB demeurent exclus lorsque PostgreSQL n’est pas accessible ;
+- backend non-DB : **885 tests passés, 458 tests DB désélectionnés**, avec PostgreSQL non accessible dans le sandbox ;
 - Ruff backend/scripts : passé ;
 - mypy borné du noyau sécurité : passé ;
 - detect-secrets strict avec baseline : passé ; la baseline a été régénérée uniquement pour maintenir les positions des faux positifs explicitement allowlistés ;
 - tests ciblés auth/architecture/ops/domain : passés ;
 - frontend : **98 tests passés**, build Vite passé, ESLint passé avec deux avertissements React `exhaustive-deps` existants, typecheck passé ;
 - Alembic offline jusqu’à `20260823_0055` : passé, sans preuve d’exécution online ;
-- `git diff --check` : à exécuter avant commit final ;
+- `git diff --check` : passé après la mise à jour documentaire ;
 - Docker, PostgreSQL online, VPS et CI GitHub : non disponibles dans l’environnement de vérification.
 
 ## Verdict
