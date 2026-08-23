@@ -6,8 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
+from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
-from app.interfaces.http.routes.dce_versions import _resolve_context
 from app.modules.enterprise.application.enterprise_library import EnterpriseLibraryService
 from app.modules.enterprise.application.enterprise_upload import (
     EnterprisePrivateUploadService,

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
 
 import sqlalchemy as sa
@@ -23,7 +25,27 @@ def _required(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value or value.startswith("REPLACE_WITH_"):
         raise RuntimeError(f"required production setting is missing: {name}")
+    if name == "SMART_AO_JWT_SIGNING_KEY" and value.startswith("dev-only-"):
+        raise RuntimeError("development JWT signing key is forbidden in production")
     return value
+
+
+def _jwt_verification_keys() -> Mapping[str, str] | None:
+    """Parse the optional non-logged key manifest used during JWT rotation."""
+
+    raw_manifest = os.getenv("SMART_AO_JWT_VERIFICATION_KEYS_JSON", "").strip()
+    if not raw_manifest:
+        return None
+    try:
+        manifest = json.loads(raw_manifest)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("invalid SMART_AO_JWT_VERIFICATION_KEYS_JSON") from exc
+    if not isinstance(manifest, dict) or not all(
+        isinstance(key_id, str) and isinstance(key, str)
+        for key_id, key in manifest.items()
+    ):
+        raise RuntimeError("JWT verification key manifest must be an object of strings")
+    return manifest
 
 
 def _knowledge_service_if_enabled(*, session_factory: sessionmaker[Session]):
@@ -45,6 +67,7 @@ def build_production_app():
     signing_key = _required("SMART_AO_JWT_SIGNING_KEY")
     issuer = _required("SMART_AO_JWT_ISSUER")
     audience = _required("SMART_AO_JWT_AUDIENCE")
+    signing_key_id = os.getenv("SMART_AO_JWT_KEY_ID", "active").strip() or "active"
     engine = sa.create_engine(
         database_url,
         pool_pre_ping=True,
@@ -68,6 +91,8 @@ def build_production_app():
             issuer=issuer,
             audience=audience,
             clock=clock,
+            signing_key_id=signing_key_id,
+            verification_keys=_jwt_verification_keys(),
         ),
         csrf_token_generator=SecureOpaqueTokenGenerator(),
         clock=clock,

@@ -14,10 +14,13 @@ from app.modules.patron_action.application.transition_service import (
     PatronActionTransitionService,
     patron_action_transition_handlers,
 )
+from app.modules.patron_action.infrastructure.models import (
+    PatronActionRecord,
+    PatronActionTransitionRecord,
+)
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.context import ActorKind
-from app.platform.security.models import PatronActionTransitionRecord
 from sqlalchemy.orm import Session, sessionmaker
 
 from tests.application.test_collab_work_task import _seed
@@ -96,6 +99,10 @@ def test_action_transitions_are_versioned_idempotent_and_append_only(services, s
         assert record is not None
         assert record.from_state == "OPEN"
         assert record.to_state == "IN_PROGRESS"
+        action = session.get(PatronActionRecord, action_id)
+        assert action is not None
+        assert action.state == "IN_PROGRESS"
+        assert action.aggregate_revision == 2
         with pytest.raises(sa.exc.DatabaseError), session.begin_nested():
             session.execute(
                 sa.update(PatronActionTransitionRecord)

@@ -4,6 +4,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/backend \
+    PATH=/app/.venv/bin:$PATH \
     SMART_AO_DCE_QUARANTINE_ROOT=/var/lib/smart_ao/dce-quarantine
 
 RUN apt-get update \
@@ -15,28 +16,29 @@ RUN apt-get update \
     && install --directory --owner=smartao --group=smartao --mode=0700 /var/lib/smart_ao/dce-quarantine \
     && install --directory --owner=smartao --group=smartao --mode=0700 /var/lib/smart_ao/models
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md uv.lock ./
 COPY backend ./backend
 ARG SMART_AO_INSTALL_RAG=0
 ARG SMART_AO_INSTALL_DOCUMENT_ADVANCED=0
 ARG SMART_AO_INSTALL_CONNECTORS=0
 ARG SMART_AO_INSTALL_NOTIFICATIONS=0
 ARG SMART_AO_INSTALL_CALENDAR=0
-RUN pip install --no-cache-dir . \
+RUN pip install --no-cache-dir uv==0.12.1 \
+    && uv sync --frozen --no-dev --no-editable \
     && if [ "$SMART_AO_INSTALL_RAG" = "1" ]; then \
-        pip install --no-cache-dir ".[rag]"; \
+        uv sync --frozen --no-dev --no-editable --extra rag; \
     fi \
     && if [ "$SMART_AO_INSTALL_DOCUMENT_ADVANCED" = "1" ]; then \
-        pip install --no-cache-dir ".[document-advanced]"; \
+        uv sync --frozen --no-dev --no-editable --extra document-advanced; \
     fi \
     && if [ "$SMART_AO_INSTALL_CONNECTORS" = "1" ]; then \
-        pip install --no-cache-dir ".[connectors]"; \
+        uv sync --frozen --no-dev --no-editable --extra connectors; \
     fi \
     && if [ "$SMART_AO_INSTALL_NOTIFICATIONS" = "1" ]; then \
-        pip install --no-cache-dir ".[notifications]"; \
+        uv sync --frozen --no-dev --no-editable --extra notifications; \
     fi \
     && if [ "$SMART_AO_INSTALL_CALENDAR" = "1" ]; then \
-        pip install --no-cache-dir ".[calendar]"; \
+        uv sync --frozen --no-dev --no-editable --extra calendar; \
     fi \
     && chown -R smartao:smartao /app
 

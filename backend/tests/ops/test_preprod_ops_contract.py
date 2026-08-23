@@ -91,6 +91,8 @@ def test_preprod_services_use_minimal_environment_allowlists() -> None:
     )[0]
 
     assert "SMART_AO_JWT_SIGNING_KEY" in backend
+    assert "SMART_AO_JWT_KEY_ID" in backend
+    assert "SMART_AO_JWT_VERIFICATION_KEYS_JSON" in backend
     assert "SMART_AO_JWT_SIGNING_KEY" not in retention
     assert "SMART_AO_JWT_SIGNING_KEY" not in webhook
     assert "SMART_AO_JWT_SIGNING_KEY" not in smtp
@@ -134,6 +136,29 @@ def test_backend_docker_context_excludes_demonstrations_and_tests() -> None:
     assert "backend/" in frontend_ignore
 
 
+def test_dev_compose_is_loopback_bound_and_not_repurposable_as_preprod() -> None:
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    assert 'SMART_AO_ENV: development' in compose
+    assert '"127.0.0.1:5432:5432"' in compose
+    assert '"127.0.0.1:8000:8000"' in compose
+    assert compose.count("no-new-privileges:true") >= 4
+
+
+def test_frontend_image_and_service_run_non_root_with_healthcheck() -> None:
+    dockerfile = (OPS / "docker/frontend.Dockerfile").read_text(encoding="utf-8")
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    caddyfile = (OPS / "Caddyfile").read_text(encoding="utf-8")
+    assert "USER nginx" in dockerfile
+    assert "EXPOSE 8080" in dockerfile
+    assert "HEALTHCHECK" in dockerfile
+    frontend = compose.split("  frontend:\n    build:", maxsplit=1)[1].split(
+        "  backend:", maxsplit=1
+    )[0]
+    assert '      - "8080"' in frontend
+    assert "healthcheck:" in frontend
+    assert "reverse_proxy frontend:8080" in caddyfile
+
+
 def test_ci_audits_frontend_production_dependencies() -> None:
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "name: Frontend dependency audit" in workflow
@@ -157,7 +182,7 @@ def test_optional_dependency_build_flags_are_explicit() -> None:
     dockerfile = (OPS / "docker/backend.Dockerfile").read_text(encoding="utf-8")
     compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
     assert "ARG SMART_AO_INSTALL_CONNECTORS=0" in dockerfile
-    assert 'pip install --no-cache-dir ".[connectors]"' in dockerfile
+    assert "uv sync --frozen --no-dev --no-editable --extra connectors" in dockerfile
     assert "SMART_AO_INSTALL_CONNECTORS" in compose
     assert "SMART_AO_INSTALL_RAG" in compose
     assert "SMART_AO_INSTALL_DOCUMENT_ADVANCED" in compose
@@ -188,7 +213,7 @@ def test_optional_notifications_build_and_runtime_flags_are_explicit() -> None:
     dockerfile = (OPS / "docker/backend.Dockerfile").read_text(encoding="utf-8")
     compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
     assert "ARG SMART_AO_INSTALL_NOTIFICATIONS=0" in dockerfile
-    assert 'pip install --no-cache-dir ".[notifications]"' in dockerfile
+    assert "uv sync --frozen --no-dev --no-editable --extra notifications" in dockerfile
     assert "SMART_AO_INSTALL_NOTIFICATIONS" in compose
     assert "SMART_AO_SMTP_ENABLED: ${SMART_AO_SMTP_ENABLED:-0}" in compose
     assert "SMART_AO_SMTP_TO: ${SMART_AO_SMTP_TO:-}" in compose
@@ -221,7 +246,7 @@ def test_optional_calendar_build_flag_is_explicit() -> None:
     dockerfile = (OPS / "docker/backend.Dockerfile").read_text(encoding="utf-8")
     compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
     assert "ARG SMART_AO_INSTALL_CALENDAR=0" in dockerfile
-    assert 'pip install --no-cache-dir ".[calendar]"' in dockerfile
+    assert "uv sync --frozen --no-dev --no-editable --extra calendar" in dockerfile
     assert "SMART_AO_INSTALL_CALENDAR" in compose
     assert "SMART_AO_CALENDAR_ENABLED: ${SMART_AO_CALENDAR_ENABLED:-0}" in compose
 

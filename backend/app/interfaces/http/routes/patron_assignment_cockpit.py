@@ -9,8 +9,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query, status
 
+from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
-from app.interfaces.http.routes.dce_versions import _resolve_context
 from app.modules.membership.application.patron_assignment_cockpit import (
     PatronAssignmentCockpitService,
 )

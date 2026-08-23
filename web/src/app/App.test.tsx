@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import type { AssignedCase } from "../shared/types";
 
-const { overridesRef } = vi.hoisted(() => ({
+const { authRoleRef, overridesRef } = vi.hoisted(() => ({
+  authRoleRef: { current: "PATRON_ADMIN" as string },
   overridesRef: { current: {} as Record<string, unknown> },
 }));
 
@@ -24,7 +25,7 @@ vi.mock("../features/auth/useAuthentication", () => ({
     currentActor: {
       actor_id: "actor-1",
       identity_id: "identity-1",
-      actor_kind: "PATRON_ADMIN",
+      actor_kind: authRoleRef.current,
       membership_state: "ACTIVE",
     },
     isRestoring: false,
@@ -108,6 +109,7 @@ function delayedRejection(error: Error, delayMs: number): Promise<never> {
 describe("App readiness integration", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    authRoleRef.current = "PATRON_ADMIN";
     overridesRef.current = {};
   });
 
@@ -128,7 +130,19 @@ describe("App readiness integration", () => {
 describe("App error visibility", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    authRoleRef.current = "PATRON_ADMIN";
     overridesRef.current = {};
+  });
+
+  it("ne rend pas les surfaces patronales dans l’espace collaborateur", async () => {
+    authRoleRef.current = "COLLABORATEUR";
+    await renderApp();
+
+    expect(screen.getByText("ESPACE COLLABORATEUR")).toBeVisible();
+    expect(screen.queryByText("Actions à traiter")).toBeNull();
+    expect(screen.queryByText("Opportunités BOAMP")).toBeNull();
+    expect(screen.queryByText("Dépôt")).toBeNull();
+    expect(screen.queryByText("Ventes")).toBeNull();
   });
 
   it("affiche une erreur visible quand le chargement des scénarios de chiffrage échoue", async () => {

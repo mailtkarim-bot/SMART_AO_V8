@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.modules.patron_action.application.transition_commands import TransitionPatronActionCommand
+from app.modules.patron_action.domain.state import ensure_transition_allowed
 from app.modules.patron_action.infrastructure.models import (
     PatronActionRecord,
     PatronActionTransitionRecord,
@@ -144,8 +145,10 @@ class TransitionPatronActionHandler:
             raise CommandExecutionError("VERSION_CONFLICT")
         if current_state in {"COMPLETED", "ABANDONED"}:
             raise CommandExecutionError("ACTION_ALREADY_CLOSED")
-        if command.target_state == current_state:
-            raise CommandExecutionError("INVALID_STATE_TRANSITION")
+        try:
+            ensure_transition_allowed(current_state, command.target_state)
+        except ValueError as error:
+            raise CommandExecutionError("INVALID_STATE_TRANSITION") from error
         transition = PatronActionTransitionRecord(
             id=command.transition_id,
             tenant_id=context.tenant_id,
@@ -160,6 +163,8 @@ class TransitionPatronActionHandler:
             idempotency_key=command.idempotency_key,
             correlation_id=command.correlation_id,
         )
+        action.state = command.target_state
+        action.aggregate_revision = transition.aggregate_revision
         session.add(transition)
         return HandlerOutcome(
             result_code="PATRON_ACTION_TRANSITIONED",

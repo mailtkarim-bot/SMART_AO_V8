@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Header, HTTPException, Path, status
 
+from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
-from app.interfaces.http.routes.dce_versions import _resolve_context
 from app.modules.enterprise.application.registry_lookup import EnterpriseRegistryLookupService
 from app.modules.enterprise.infrastructure.insee_registry import ExternalRegistryUnavailable
 from app.modules.enterprise.public.enterprise_registry_contracts import EnterpriseRegistryResponse

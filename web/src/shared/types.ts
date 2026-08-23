@@ -408,11 +408,14 @@ export type AuthSession = {
   expires_in: number;
 };
 
+export type ActorKind = "PATRON_ADMIN" | "PATRON_DELEGATE" | "COLLABORATEUR";
+export type MembershipState = "ACTIVE" | "SUSPENDED" | "REVOKED";
+
 export type CurrentActor = {
   actor_id: string;
   identity_id: string;
-  actor_kind: string;
-  membership_state: string;
+  actor_kind: ActorKind;
+  membership_state: MembershipState;
 };
 
 

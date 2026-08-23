@@ -86,6 +86,10 @@ function App() {
     login,
     logout,
   } = useAuthentication(baseUrl);
+  const isPatron =
+    currentActor?.actor_kind === "PATRON_ADMIN" ||
+    currentActor?.actor_kind === "PATRON_DELEGATE";
+  const isCollaborator = currentActor?.actor_kind === "COLLABORATEUR";
   const {
     backendReadiness,
     backendReadinessState,
@@ -189,18 +193,22 @@ function App() {
   useEffect(() => {
     if (!accessToken.trim()) return;
     void refreshCases();
-    void refreshAssignments();
-    void refreshActions();
-    void refreshEnterpriseCompany();
-    void boamp.refreshObservations();
-  }, [accessToken]);
+    if (isPatron) {
+      void refreshAssignments();
+      void refreshActions();
+      void refreshEnterpriseCompany();
+      void boamp.refreshObservations();
+    }
+  }, [accessToken, isPatron]);
 
   useEffect(() => {
     if (!selectedCaseId || !accessToken.trim()) return;
-    void refreshScenarios(selectedCaseId);
-    void refreshDecisionDossier(selectedCaseId);
-    void dceKnowledge.loadReading(selectedCaseId);
-  }, [selectedCaseId, accessToken]);
+    if (isPatron) {
+      void refreshScenarios(selectedCaseId);
+      void refreshDecisionDossier(selectedCaseId);
+    }
+    if (isPatron || isCollaborator) void dceKnowledge.loadReading(selectedCaseId);
+  }, [selectedCaseId, accessToken, isCollaborator, isPatron]);
 
   async function refreshCases() {
     setLoading(true);
@@ -307,17 +315,17 @@ function App() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand"><span className="brand-mark">S</span><span>SMART_AO <em>V8</em></span></div>
-        <div className="workspace-label">ESPACE PATRON</div>
+        <div className="workspace-label">{isCollaborator ? "ESPACE COLLABORATEUR" : "ESPACE PATRON"}</div>
         <nav className="nav-list" aria-label="Navigation principale">
-          <button className={`nav-item ${activeNav === "overview" ? "active" : ""}`} onClick={() => navigateTo("overview-section", "overview")}><span className="nav-icon">▦</span>Vue d’ensemble</button>
+          {isPatron && <button className={`nav-item ${activeNav === "overview" ? "active" : ""}`} onClick={() => navigateTo("overview-section", "overview")}><span className="nav-icon">▦</span>Vue d’ensemble</button>}
           <button className={`nav-item ${activeNav === "preparation" ? "active" : ""}`} onClick={() => navigateTo("preparation-section", "preparation")}><span className="nav-icon">◇</span>Préparation</button>
           <button className={`nav-item ${activeNav === "review" ? "active" : ""}`} onClick={() => navigateTo("review-section", "review")}><span className="nav-icon">◌</span>Revue</button>
-          <button className={`nav-item ${activeNav === "opportunities" ? "active" : ""}`} onClick={() => navigateTo("boamp-section", "opportunities")}><span className="nav-icon">◎</span>Opportunités BOAMP</button>
+          {isPatron && <button className={`nav-item ${activeNav === "opportunities" ? "active" : ""}`} onClick={() => navigateTo("boamp-section", "opportunities")}><span className="nav-icon">◎</span>Opportunités BOAMP</button>}
           <button className={`nav-item ${activeNav === "dce" ? "active" : ""}`} onClick={() => navigateTo("dce-knowledge-section", "dce")}><span className="nav-icon">⌕</span>Lecture DCE / RAG</button>
           <button className={`nav-item ${activeNav === "wizard" ? "active" : ""}`} onClick={() => navigateTo("collaborator-wizard-section", "wizard")}><span className="nav-icon">⌁</span>Wizard collaborateur</button>
-          <button className={`nav-item ${activeNav === "library" ? "active" : ""}`} onClick={() => navigateTo("library-section", "library")}><span className="nav-icon">▤</span>Bibliothèque</button>
-          <button className={`nav-item ${activeNav === "decision" ? "active" : ""}`} onClick={() => navigateTo("decision-section", "decision")}><span className="nav-icon">◇</span>Décision</button>
-          <button className={`nav-item ${activeNav === "submission" ? "active" : ""}`} onClick={() => navigateTo("submission-section", "submission")}><span className="nav-icon">↗</span>Dépôt</button>
+          {isPatron && <button className={`nav-item ${activeNav === "library" ? "active" : ""}`} onClick={() => navigateTo("library-section", "library")}><span className="nav-icon">▤</span>Bibliothèque</button>}
+          {isPatron && <button className={`nav-item ${activeNav === "decision" ? "active" : ""}`} onClick={() => navigateTo("decision-section", "decision")}><span className="nav-icon">◇</span>Décision</button>}
+          {isPatron && <button className={`nav-item ${activeNav === "submission" ? "active" : ""}`} onClick={() => navigateTo("submission-section", "submission")}><span className="nav-icon">↗</span>Dépôt</button>}
         </nav>
         <div className="sidebar-bottom">
           <button className="nav-item" onClick={() => setShowConnection(true)}><span className="nav-icon">⚙</span>{isAuthenticated ? "Session" : "Connexion"}</button>
@@ -334,12 +342,15 @@ function App() {
 
         {message && <div className={`notice ${message.tone}`} role="status"><span>{message.tone === "success" ? "✓" : "!"}</span>{message.text}</div>}
 
-        <section className="section-block command-center-section" id="overview-section">
-          <div className="section-heading"><div><span className="section-kicker">COMMAND CENTER</span><h2>Actions à traiter</h2></div><span className="count-pill">{actions.length} ouverte{actions.length > 1 ? "s" : ""}</span></div>
-          {actions.length === 0 ? <div className="empty-card"><strong>Aucune action patronale ouverte</strong><p>Les transmissions et contrôles autorisés alimenteront cette file tenant-scopée.</p></div> : <div className="action-grid">{actions.slice(0, 6).map((action) => <article className="action-card" key={action.action_id}><div className="case-top"><span className={`state-badge state-${action.severity.toLowerCase()}`}>{action.severity}</span><span className="rule-tag">{action.state}</span></div><h3>{action.title}</h3><p>{action.why_now}</p><small>{action.recommended_action}</small></article>)}</div>}
-        </section>
+        {isPatron && (
+          <section className="section-block command-center-section" id="overview-section">
+            <div className="section-heading"><div><span className="section-kicker">COMMAND CENTER</span><h2>Actions à traiter</h2></div><span className="count-pill">{actions.length} ouverte{actions.length > 1 ? "s" : ""}</span></div>
+            {actions.length === 0 ? <div className="empty-card"><strong>Aucune action patronale ouverte</strong><p>Les transmissions et contrôles autorisés alimenteront cette file tenant-scopée.</p></div> : <div className="action-grid">{actions.slice(0, 6).map((action) => <article className="action-card" key={action.action_id}><div className="case-top"><span className={`state-badge state-${action.severity.toLowerCase()}`}>{action.severity}</span><span className="rule-tag">{action.state}</span></div><h3>{action.title}</h3><p>{action.why_now}</p><small>{action.recommended_action}</small></article>)}</div>}
+          </section>
+        )}
 
-        <EnterpriseLibraryPanel
+        {isPatron && (
+          <EnterpriseLibraryPanel
           enterpriseCompany={enterpriseCompany}
           enterpriseCapabilities={enterpriseCapabilities}
           enterpriseCapabilityForm={enterpriseCapabilityForm}
@@ -364,10 +375,12 @@ function App() {
           onCreateCapability={() => void createEnterpriseCapability()}
           onAddCapabilityVersion={() => void addEnterpriseCapabilityVersion()}
           onUploadDocument={() => void uploadEnterpriseDocument()}
-          onVerifyDocument={() => void verifyEnterpriseDocument()}
-        />
+            onVerifyDocument={() => void verifyEnterpriseDocument()}
+          />
+        )}
 
-        <section className="section-block" id="pricing-section">
+        {isPatron && (
+          <section className="section-block" id="pricing-section">
           <PricingPanel
             scenarios={scenarios}
             formatMoney={formatMoney}
@@ -388,8 +401,9 @@ function App() {
             onPreview={(file) => void pricingImport.previewPricingImport(file)}
             onReload={() => void pricingImport.reloadPricingImport()}
             onCommit={() => void pricingImport.commitPricingImport()}
-          />
-        </section>
+            />
+          </section>
+        )}
 
         <section className="hero-grid" id="preparation-section">
           <div className="hero-card"><div className="hero-copy"><span className="hero-kicker">CETTE SEMAINE</span><h2>Décider avec la<br /><strong>bonne information.</strong></h2><p>Retrouvez vos affaires actives et reprenez chaque chiffrage là où vous l’avez laissé.</p><button className="primary-button" onClick={() => document.getElementById("draft-section")?.scrollIntoView({ behavior: "smooth" })}>Ouvrir un chiffrage <span>→</span></button></div><div className="hero-orbit"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit-core">AO<br /><small>V8</small></div></div></div>
@@ -398,7 +412,8 @@ function App() {
 
         <section className="section-block" id="review-section"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Connectez-vous avec votre compte pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
 
-        <BoampOpportunityPanel
+        {isPatron && (
+          <BoampOpportunityPanel
           observations={boamp.observations}
           selectedObservationId={boamp.selectedObservationId}
           qualificationForm={boamp.qualificationForm}
@@ -408,8 +423,9 @@ function App() {
           onSelect={boamp.selectObservation}
           onDecisionChange={boamp.setDecision}
           onReasonChange={boamp.setReason}
-          onQualify={() => void boamp.qualifySelected()}
-        />
+            onQualify={() => void boamp.qualifySelected()}
+          />
+        )}
 
         <DceKnowledgePanel
           selectedCaseId={selectedCaseId}
@@ -450,17 +466,20 @@ function App() {
           onTransmitSnapshot={() => void transmitWizardSnapshot()}
         />
 
-        <PatronCockpitPanel
+        {isPatron && (
+          <PatronCockpitPanel
           assignments={assignments}
           selectedAssignmentId={selectedAssignmentId}
           journal={journal}
           interactions={interactions}
-          onSelectAssignment={(assignment) => void selectAssignment(assignment)}
-        />
+            onSelectAssignment={(assignment) => void selectAssignment(assignment)}
+          />
+        )}
 
-        <PatronDecisionPanel decisionDossier={decisionDossier} formatDate={formatDate} />
+        {isPatron && <PatronDecisionPanel decisionDossier={decisionDossier} formatDate={formatDate} />}
 
-        <SubmissionPanel
+        {isPatron && (
+          <SubmissionPanel
           preparationPackageId={submissionActions.preparationPackageId}
           preparationRevision={submissionActions.preparationRevision}
           submissionPackageId={submissionActions.submissionPackageId}
@@ -481,10 +500,12 @@ function App() {
           onRequestSignature={() => void submissionActions.requestSignature()}
           onLoadSignature={() => void submissionActions.loadSignature()}
           onExport={() => void submissionActions.exportSubmissionPackage()}
-          onRecordEvidence={() => void submissionActions.recordSubmissionEvidence()}
-        />
+            onRecordEvidence={() => void submissionActions.recordSubmissionEvidence()}
+          />
+        )}
 
-        <FinancialDraftPanel
+        {isPatron && (
+          <FinancialDraftPanel
           cases={cases}
           selectedCaseId={selectedCaseId}
           setSelectedCaseId={setSelectedCaseId}
@@ -500,8 +521,9 @@ function App() {
           submitLine={submitLine}
           formatMoney={formatMoney}
           formatDate={formatDate}
-          categoryLabel={categoryLabel}
-        />
+            categoryLabel={categoryLabel}
+          />
+        )}
 
         <footer className="footer"><span>SMART_AO V8</span><span>Architecture sécurisée · Tenant-scoped · Auditée</span><span>API {baseUrl}</span></footer>
       </main>

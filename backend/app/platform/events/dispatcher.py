@@ -167,8 +167,26 @@ class CommandDispatcher:
                     lease_expires_at=None,
                     event_ids_json=[],
                 )
-                session.add(receipt)
-                session.flush()
+                try:
+                    with session.begin_nested():
+                        session.add(receipt)
+                        session.flush()
+                except IntegrityError as error:
+                    concurrent_receipt = self._find_receipt(
+                        session=session,
+                        tenant_id=context.tenant_id,
+                        actor_id=context.actor_id,
+                        command_type=command_type,
+                        idempotency_key=command.idempotency_key,
+                    )
+                    if concurrent_receipt is None:
+                        raise CommandExecutionError(
+                            "command receipt collision could not be resolved"
+                        ) from error
+                    return self._resolve_existing_receipt(
+                        concurrent_receipt,
+                        request_hash=request_hash,
+                    )
 
                 outcome = handler.execute(session=session, command=command, context=context)
                 event_ids = self._persist_events_and_outbox(

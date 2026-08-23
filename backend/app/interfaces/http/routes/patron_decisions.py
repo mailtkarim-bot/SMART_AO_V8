@@ -4,8 +4,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, status
 
+from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
-from app.interfaces.http.routes.dce_versions import _resolve_context
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
 from app.modules.decision.public.patron_contracts import PatronDecisionDossierResponse
 

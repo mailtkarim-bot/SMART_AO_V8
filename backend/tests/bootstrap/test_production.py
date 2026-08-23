@@ -33,6 +33,28 @@ def test_required_rejects_missing_and_placeholder_values(monkeypatch, production
         production_module._required("SMART_AO_TEST_SETTING")
 
 
+def test_required_rejects_development_jwt_key(monkeypatch, production_module):
+    monkeypatch.setenv("SMART_AO_JWT_SIGNING_KEY", "dev-only-signing-key-change-me-0123456789")
+
+    with pytest.raises(RuntimeError, match="development JWT signing key"):
+        production_module._required("SMART_AO_JWT_SIGNING_KEY")
+
+
+def test_jwt_verification_key_manifest_is_optional_and_strict(monkeypatch, production_module):
+    monkeypatch.delenv("SMART_AO_JWT_VERIFICATION_KEYS_JSON", raising=False)
+    assert production_module._jwt_verification_keys() is None
+
+    monkeypatch.setenv(
+        "SMART_AO_JWT_VERIFICATION_KEYS_JSON",
+        '{"previous":"' + ("x" * 32) + '"}',
+    )
+    assert production_module._jwt_verification_keys() == {"previous": "x" * 32}
+
+    monkeypatch.setenv("SMART_AO_JWT_VERIFICATION_KEYS_JSON", "[]")
+    with pytest.raises(RuntimeError, match="must be an object"):
+        production_module._jwt_verification_keys()
+
+
 def test_build_production_app_returns_fastapi_application(monkeypatch, production_module):
     monkeypatch.setattr(production_module.sa, "create_engine", lambda *args, **kwargs: object())
 

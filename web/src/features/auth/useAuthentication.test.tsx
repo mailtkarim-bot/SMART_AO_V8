@@ -77,6 +77,42 @@ describe("useAuthentication", () => {
     );
   });
 
+  it("clears the in-memory session even when logout fails over the network", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ access_token: "access-1", token_type: "Bearer", expires_in: 900 }), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            actor_id: "actor-1",
+            identity_id: "identity-1",
+            actor_kind: "PATRON_ADMIN",
+            membership_state: "ACTIVE",
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockRejectedValueOnce(new TypeError("network unavailable"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAuthentication("https://app.example.test"));
+    await act(async () => {
+      await result.current.login({
+        email: "patron@example.test",
+        password: "x",
+        tenant_id: "tenant-1",
+      });
+      await expect(result.current.logout()).rejects.toThrow("network unavailable");
+    });
+
+    expect(result.current.accessToken).toBe("");
+    expect(result.current.currentActor).toBeNull();
+  });
+
   it("clears the in-memory session after a CSRF-protected logout", async () => {
     const fetchMock = vi
       .fn()

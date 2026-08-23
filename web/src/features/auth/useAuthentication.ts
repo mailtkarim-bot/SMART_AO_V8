@@ -30,14 +30,18 @@ export function useAuthentication(baseUrl: string): AuthenticationState {
   const handleTokenRefreshed = useCallback((session: AuthSession) => {
     setAccessToken(session.access_token);
   }, []);
+  const handleSessionExpired = useCallback(() => {
+    setAccessToken("");
+    setCurrentActor(null);
+  }, []);
 
   const api = useMemo(
-    () => createApiClient(baseUrl, accessToken, handleTokenRefreshed),
-    [accessToken, baseUrl, handleTokenRefreshed],
+    () => createApiClient(baseUrl, accessToken, handleTokenRefreshed, handleSessionExpired),
+    [accessToken, baseUrl, handleSessionExpired, handleTokenRefreshed],
   );
   const sessionApi = useMemo(
-    () => createApiClient(baseUrl, "", handleTokenRefreshed),
-    [baseUrl, handleTokenRefreshed],
+    () => createApiClient(baseUrl, "", handleTokenRefreshed, handleSessionExpired),
+    [baseUrl, handleSessionExpired, handleTokenRefreshed],
   );
 
   useEffect(() => {
@@ -54,6 +58,7 @@ export function useAuthentication(baseUrl: string): AuthenticationState {
           baseUrl,
           session.access_token,
           handleTokenRefreshed,
+          handleSessionExpired,
         );
         const actor = await authenticatedApi.getCurrentActor();
         if (!cancelled) {
@@ -74,7 +79,7 @@ export function useAuthentication(baseUrl: string): AuthenticationState {
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, handleTokenRefreshed, sessionApi]);
+  }, [baseUrl, handleSessionExpired, handleTokenRefreshed, sessionApi]);
 
   const login = useCallback(
     async (input: LoginInput) => {
@@ -83,19 +88,23 @@ export function useAuthentication(baseUrl: string): AuthenticationState {
         baseUrl,
         session.access_token,
         handleTokenRefreshed,
+        handleSessionExpired,
       );
       const actor = await authenticatedApi.getCurrentActor();
       setAccessToken(session.access_token);
       setCurrentActor(actor);
       return actor;
     },
-    [api, baseUrl, handleTokenRefreshed],
+    [api, baseUrl, handleSessionExpired, handleTokenRefreshed],
   );
 
   const logout = useCallback(async () => {
-    await api.logout();
-    setAccessToken("");
-    setCurrentActor(null);
+    try {
+      await api.logout();
+    } finally {
+      setAccessToken("");
+      setCurrentActor(null);
+    }
   }, [api]);
 
   return {

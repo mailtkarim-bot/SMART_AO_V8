@@ -5,15 +5,7 @@ import os
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
-
-class GeneratedDocumentStorage:
-    """Port for private generated-document bytes."""
-
-    def write(self, *, storage_key: str, content: bytes) -> str:
-        raise NotImplementedError
-
-    def read(self, *, storage_key: str) -> bytes:
-        raise NotImplementedError
+from app.platform.storage.ports import GeneratedDocumentStorage
 
 
 class LocalGeneratedDocumentStorage(GeneratedDocumentStorage):

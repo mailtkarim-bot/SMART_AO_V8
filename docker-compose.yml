@@ -15,14 +15,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
+    security_opt:
+      - no-new-privileges:true
 
   backend:
     build:
       context: .
       dockerfile: ops/docker/backend.Dockerfile
     environment:
-      SMART_AO_ENV: ${SMART_AO_ENV:-development}
+      SMART_AO_ENV: development
       SMART_AO_LOG_LEVEL: ${SMART_AO_LOG_LEVEL:-INFO}
       SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
       SMART_AO_JWT_SIGNING_KEY: ${SMART_AO_JWT_SIGNING_KEY:-dev-only-signing-key-change-me-0123456789}
@@ -40,7 +42,9 @@ services:
     volumes:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test:
         - CMD-SHELL
@@ -67,6 +71,8 @@ services:
         condition: service_healthy
     volumes:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
+    security_opt:
+      - no-new-privileges:true
 
   clamav:
     image: clamav/clamav:1.4_base@sha256:1b6920e8c32cca47ea33b1e2611d9a4740ccc622cf13b30b29f8283d60175e39
@@ -80,6 +86,8 @@ services:
       timeout: 10s
       retries: 40
       start_period: 90s
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   postgres_data:

@@ -42,7 +42,12 @@ services:
     logging: *default-logging
     init: true
     expose:
-      - "80"
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - edge
       - internal
@@ -69,6 +74,8 @@ services:
       SMART_AO_JWT_SIGNING_KEY: ${SMART_AO_JWT_SIGNING_KEY:?SMART_AO_JWT_SIGNING_KEY is required}
       SMART_AO_JWT_ISSUER: ${SMART_AO_JWT_ISSUER:?SMART_AO_JWT_ISSUER is required}
       SMART_AO_JWT_AUDIENCE: ${SMART_AO_JWT_AUDIENCE:?SMART_AO_JWT_AUDIENCE is required}
+      SMART_AO_JWT_KEY_ID: ${SMART_AO_JWT_KEY_ID:-active}
+      SMART_AO_JWT_VERIFICATION_KEYS_JSON: ${SMART_AO_JWT_VERIFICATION_KEYS_JSON:-}
       SMART_AO_LOGIN_MAX_FAILURES: ${SMART_AO_LOGIN_MAX_FAILURES:-5}
       SMART_AO_LOGIN_FAILURE_WINDOW_SECONDS: ${SMART_AO_LOGIN_FAILURE_WINDOW_SECONDS:-900}
       SMART_AO_LOGIN_BASE_LOCKOUT_SECONDS: ${SMART_AO_LOGIN_BASE_LOCKOUT_SECONDS:-30}

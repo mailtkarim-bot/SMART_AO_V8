@@ -154,6 +154,52 @@ describe("browser authentication transport", () => {
     );
   });
 
+  it("refreshes and retries a multipart pricing preview after a 401", async () => {
+    document.cookie = "smart_ao_csrf=csrf-1; path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "UNAUTHENTICATED" }), { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ access_token: "access-2", token_type: "Bearer", expires_in: 900 }), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ batch_id: "batch-1" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createApiClient("https://app.example.test", "access-1");
+    await expect(
+      client.createPricingImportPreview(
+        "case-1",
+        new File(["xlsx"], "pricing.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+      ),
+    ).resolves.toMatchObject({ batch_id: "batch-1" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const retryRequest = fetchMock.mock.calls[2]?.[1] as RequestInit;
+    expect(retryRequest.body).toBeInstanceOf(FormData);
+    expect(new Headers(retryRequest.headers).get("Authorization")).toBe("Bearer access-2");
+  });
+
+  it("refreshes and retries a binary submission export after a 401", async () => {
+    document.cookie = "smart_ao_csrf=csrf-1; path=/";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "UNAUTHENTICATED" }), { status: 401 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ access_token: "access-2", token_type: "Bearer", expires_in: 900 }), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(new Response("zip-bytes", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createApiClient("https://app.example.test", "access-1");
+    const archive = await client.downloadSubmissionPackage("package-1");
+    await expect(archive.text()).resolves.toBe("zip-bytes");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("logs out with the double-submit CSRF header", async () => {
     document.cookie = "smart_ao_csrf=csrf-logout; path=/";
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));

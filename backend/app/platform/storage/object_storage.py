@@ -11,7 +11,7 @@ import hashlib
 from pathlib import PurePosixPath
 from typing import Any
 
-from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
+from app.platform.storage.ports import GeneratedDocumentStorage
 
 
 class S3PrivateObjectStorage(GeneratedDocumentStorage):
