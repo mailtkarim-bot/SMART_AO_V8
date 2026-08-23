@@ -2,7 +2,7 @@
 
 **Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**HEAD de référence :** `4767bb3` (antenne d’indexation RAG BGE one-shot et opt-in séparé intégrés)
+**HEAD de référence :** `3fb13cf` (persistence/audit OR-Tools ajoutés ; l’adaptateur signature de test est en cours de documentation sur le commit suivant)
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
@@ -42,7 +42,7 @@ La preuve de ces éléments vient des manifests `pyproject.toml`, `uv.lock`, `we
 
 | Brique | Présence actuelle | Ce qui manque avant raccordement |
 |---|---|---|
-| **Google OR-Tools** (`ortools`) | Présent dans `pyproject.toml` et `uv.lock` ; adaptateur CP-SAT et service `CaseCapacityPlanningService` isolés sous `modules/optimization` | Le contrat d’affectation entière, les bornes, le statut d’infaisabilité, le déterminisme, la vérification tenant/Case et les tests sont codés. Le raccordement reste non persistant et non HTTP : il faut encore relier un input métier réel, une validation patronale, une persistance de run et un budget CPU/mémoire. |
+| **Google OR-Tools** (`ortools`) | Présent dans `pyproject.toml` et `uv.lock` ; adaptateur CP-SAT, service `CaseCapacityPlanningService`, service de run, modèle et repository isolés sous `modules/optimization` | Le contrat d’affectation entière, les bornes, le statut d’infaisibilité, le déterminisme, la vérification tenant/Case, la révision optimiste, l’idempotence, le snapshot technique non financier, le hash SHA-256 et l’événement d’audit sont codés. La migration `0051` est validée offline ; les tests PostgreSQL online et la mesure sur un cas métier réel restent à exécuter. Il n’existe toujours pas de prix officiel, de décision patronale ni de route HTTP OR-Tools. |
 | **HiGHS** (`highspy`) | Absent des manifests et du code | Un cas d’optimisation linéaire/mixte réel, une comparaison avec OR-Tools, des budgets CPU/mémoire et un résultat reproductible. |
 | **PuLP** (`pulp`) | Absent des manifests et du code | Une nécessité de compatibilité démontrée ; ce n’est pas une source de vérité et ne doit pas être ajouté par simple anticipation. |
 | `Decimal` | Présent via la bibliothèque standard et utilisé pour les montants | Le calcul financier de base est codé ; l’optimisation combinatoire n’est pas encore un service métier. |
@@ -98,10 +98,10 @@ Le passage à MinIO/S3 est maintenant câblé derrière un slice d’infrastruct
 | ICS / `icalendar` | Extra `calendar` optionnel verrouillé ; port `SubmissionDeadlineCalendarPort`, renderer RFC 5545 local, dates UTC et activation AppRuntime explicite | **Export de fichier greffé mais désactivé par défaut** ; aucun agenda distant, CalDAV, OAuth ou accusé de synchronisation n’est intégré. |
 | n8n | Documenté comme intégration future | Aucun workflow connecté. |
 | Webhook d’export | Worker Python et signature HMAC du payload | La capacité technique sortante est codée ; aucune destination réelle n’est configurée ou validée dans ce sandbox. |
-| Signature HTTP | DTOs fermés, capabilities patronales dédiées, routes `POST` demande/callback et `GET` lecture, provider/secret runtime, callback HMAC sur corps brut, delivery idempotente, reader tenant-scoped et panneau React de suivi | **Backend et suivi frontend greffés mais désactivés tant que provider/secret manquent** ; aucun fournisseur réel, certificat, signature qualifiée, dépôt externe ou accusé de remise n’est intégré. |
+| Signature HTTP | DTOs fermés, capabilities patronales dédiées, routes `POST` demande/callback et `GET` lecture, provider/secret runtime, callback HMAC sur corps brut, delivery idempotente, reader tenant-scoped, panneau React de suivi et `SignatureProviderTestAdapter` local | **Backend et suivi frontend greffés mais désactivés tant que provider/secret manquent**. Le provider de test produit seulement un callback `TEST_PROVIDER` déterministe en mémoire pour les tests HMAC/replay ; aucun fournisseur réel, certificat, signature qualifiée, dépôt externe ou accusé de remise n’est intégré. |
 | Redis / Celery / APScheduler | Absents, explicitement différés ou optionnels | Aucun besoin démontré pour le noyau mono-VPS actuel. |
 
-Le webhook HMAC, le worker SMTP et le callback HMAC de signature ne doivent pas être confondus avec un connecteur métier complet : ils sécurisent une capacité de notification ou de réception lorsqu’une destination et un secret sont configurés, mais ils ne réalisent ni signature qualifiée, ni dépôt électronique, ni accusé juridiquement vérifié, ni synchronisation avec un portail externe.
+Le webhook HMAC, le worker SMTP et le callback HMAC de signature ne doivent pas être confondus avec un connecteur métier complet : ils sécurisent une capacité de notification ou de réception lorsqu’une destination et un secret sont configurés, mais ils ne réalisent ni signature qualifiée, ni dépôt électronique, ni accusé juridiquement vérifié, ni synchronisation avec un portail externe. `SignatureProviderTestAdapter` ajoute uniquement une enveloppe de test sans transport et ne change jamais `external_submission: NOT_PERFORMED`.
 
 ## 5. Frontend et tests navigateur
 
@@ -132,12 +132,13 @@ Ces manques ne signifient pas que le code existant est un simple squelette. Ils 
 
 La séquence raisonnable est la suivante :
 
-1. Obtenir une CI GitHub qui exécute réellement ses étapes et valider la PR #49 ; le dernier run connu a échoué avant toute étape faute de runner.
-2. Valider localement la migration 0050, le retrieval persistant et le contrat HTTP avec un corpus Golden DCE non sensible ; cette validation de contrat est désormais faite, mais pas encore le benchmark métier Golden DCE.
-3. Précharger et vérifier BGE-M3 sur une machine dédiée, puis exécuter le job one-shot d’indexation sur une version DCE admise.
-4. Raccorder le service OR-Tools case-scoped à un cas pricing/capacité réel, avec validation patronale, persistence/audit et mesure du temps de résolution.
-5. Comparer le bridge JSONB à pgvector seulement après le benchmark ; ne pas introduire Qdrant sans besoin mesuré.
-6. Recetter sur Docker réel le parsing avancé et S3/MinIO ; exécuter ensuite une recette INSEE avec token opérateur et données non sensibles, puis ajouter BOAMP/URSSAF/SMTP un par un derrière des ports et adaptateurs, avec secrets, budgets, rate limits, audit et possibilité de désactivation.
+1. Obtenir une CI GitHub qui exécute réellement ses étapes et valider la PR #49 ; les runs `32636557842` ont échoué avant toute étape faute de runner.
+2. Appliquer la migration OR-Tools `0051` et exécuter les tests de persistence/append-only contre PostgreSQL réel dès qu’un service est disponible ; aucune exécution online n’est revendiquée dans le sandbox.
+3. Raccorder le service OR-Tools case-scoped à un cas capacité réel non financier, avec validation d’input, mesure du temps de résolution et revue de l’utilité métier ; ne pas en déduire un prix ou une décision.
+4. Utiliser `SignatureProviderTestAdapter` uniquement pour tests HMAC/replay locaux ; définir séparément un contrat fournisseur réel avant tout SDK, credential, certificat ou dépôt externe.
+5. Précharger et vérifier BGE-M3 sur une machine dédiée, puis exécuter le job one-shot d’indexation sur une version DCE admise.
+6. Comparer le bridge JSONB à pgvector seulement après le benchmark ; ne pas introduire Qdrant sans besoin mesuré.
+7. Recetter sur Docker réel le parsing avancé et S3/MinIO ; exécuter ensuite une recette INSEE avec token opérateur et données non sensibles, puis ajouter BOAMP/URSSAF/SMTP un par un derrière des ports et adaptateurs, avec secrets, budgets, rate limits, audit et possibilité de désactivation.
 
 ## Références locales
 
