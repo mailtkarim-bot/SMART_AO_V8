@@ -16,8 +16,9 @@ from app.modules.knowledge.infrastructure.factory import build_local_knowledge_s
 
 def main() -> None:
     args = _parse_args()
+    _require_indexing_enabled()
     database_url = os.environ["SMART_AO_DATABASE_URL"]
-    model_id = os.getenv("SMART_AO_BGE_MODEL_ID", "BAAI/bge-m3")
+    model_id = os.getenv("SMART_AO_BGE_MODEL_ID", "BAAI/bge-m3").strip()
     cache_dir = Path(os.getenv("SMART_AO_BGE_CACHE_DIR", "/var/lib/smart_ao/models"))
     engine = sa.create_engine(database_url, pool_pre_ping=True)
     session_factory: sessionmaker[Session] = sessionmaker(
@@ -35,6 +36,7 @@ def main() -> None:
         case_id=args.case_id,
         dce_version_id=args.dce_version_id,
     )
+    engine.dispose()
     print(
         json.dumps(
             {
@@ -48,6 +50,22 @@ def main() -> None:
             sort_keys=True,
         )
     )
+
+
+def _require_indexing_enabled() -> None:
+    if not _env_flag("SMART_AO_RAG_ENABLED", default=False):
+        raise SystemExit("SMART_AO_RAG_ENABLED must be enabled for indexing")
+    if not _env_flag("SMART_AO_RAG_INDEXING_ENABLED", default=False):
+        raise SystemExit("SMART_AO_RAG_INDEXING_ENABLED must be enabled explicitly")
+
+
+def _env_flag(name: str, *, default: bool) -> bool:
+    raw = os.getenv(name, "1" if default else "0").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise SystemExit(f"{name} must be a boolean flag")
 
 
 def _parse_args() -> argparse.Namespace:

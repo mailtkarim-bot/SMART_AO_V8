@@ -246,3 +246,34 @@ def test_dce_extraction_wrapper_is_one_shot_and_uses_private_env() -> None:
     assert "python -m app.workers.dce_extraction" in wrapper
     assert "--tenant-id \"$tenant_id\"" in wrapper
     assert "--dce-document-id \"$dce_document_id\"" in wrapper
+
+
+def test_rag_indexing_is_explicitly_opt_in_and_one_shot() -> None:
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    worker = (OPS / "run-knowledge-embeddings-preprod.sh").read_text(encoding="utf-8")
+
+    assert "SMART_AO_RAG_ENABLED: ${SMART_AO_RAG_ENABLED:-0}" in compose
+    assert "SMART_AO_RAG_INDEXING_ENABLED: ${SMART_AO_RAG_INDEXING_ENABLED:-0}" in compose
+    assert "SMART_AO_BGE_LOCAL_FILES_ONLY: ${SMART_AO_BGE_LOCAL_FILES_ONLY:-1}" in compose
+    assert "python -m app.workers.knowledge_embeddings" in worker
+    assert "--tenant-id \"$tenant_id\"" in worker
+    assert "--case-id \"$case_id\"" in worker
+    assert "--dce-version-id \"$dce_version_id\"" in worker
+    assert '[[ $# -ne 3 ]]' in worker
+    assert 'stat -c \'%a\' "$ENV_FILE"' in worker
+    assert "run --rm --no-deps --no-ansi backend" in worker
+    assert "ports:" not in worker
+
+
+def test_rag_runtime_does_not_receive_unrelated_credentials() -> None:
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    backend = compose.split("  backend:", maxsplit=1)[1].split(
+        "  dce-retention-worker:", maxsplit=1
+    )[0]
+
+    assert "SMART_AO_RAG_ENABLED" in backend
+    assert "SMART_AO_RAG_INDEXING_ENABLED" in backend
+    assert "SMART_AO_JWT_SIGNING_KEY" in backend
+    assert "SMART_AO_SMTP_PASSWORD" in backend
+    assert "SMART_AO_INSEE_API_TOKEN" in backend
+    assert "SMART_AO_EXPORT_WEBHOOK_SECRET" not in backend
