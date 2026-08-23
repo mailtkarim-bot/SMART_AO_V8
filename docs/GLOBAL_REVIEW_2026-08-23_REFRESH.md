@@ -2,7 +2,7 @@
 
 **Date : 23 août 2026**  
 **Branche : `docs/pricing-http-next-lot-28`**  
-**Dernier commit poussé : [`fe488f5`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/fe488f5)**
+**Dernier commit poussé : [`9457703`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/9457703)**
 **Auteur : Manus AI**
 
 ## 1. Verdict exécutif
@@ -13,7 +13,7 @@ Le produit n’est toutefois pas encore **opérationnel de bout en bout**. Les d
 
 ## 2. État du code livré dans ce lot
 
-Le lot précédent étend `web/src/features/dce/` avec `DceKnowledgePanel.tsx` et `useDceKnowledge.ts`. Le nouveau lot ajoute le value object pur `backend/app/modules/knowledge/application/benchmark.py`, le contrat `docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md` et la commande `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG et scorer un rapport d’identifiants externe. Le retrieval est également durci pour filtrer la version DCE applicable dès le scope domaine, le service, la route et la requête SQLAlchemy. Ce correctif est poussé dans `93ba239` avec une régression dédiée sur les versions supersédées. Le lot `DCE-ANALYSIS-OPS-01`, poussé dans `fe488f5`, ajoute les runners one-shot Compose profilés `dce-analysis` et `dce-requirements` ainsi que leurs wrappers opérateur ; ils exposent uniquement des reçus techniques et ne démarrent pas avec le stack standard. Les tests worker et contrats opérateur passent ; l’exécution PostgreSQL/Docker réelle reste ouverte.
+Le lot précédent étend `web/src/features/dce/` avec `DceKnowledgePanel.tsx` et `useDceKnowledge.ts`. Le nouveau lot ajoute le value object pur `backend/app/modules/knowledge/application/benchmark.py`, le contrat `docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md` et la commande `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG et scorer un rapport d’identifiants externe. Le retrieval est également durci pour filtrer la version DCE applicable dès le scope domaine, le service, la route et la requête SQLAlchemy. Ce correctif est poussé dans `93ba239` avec une régression dédiée sur les versions supersédées. Le lot `DCE-ANALYSIS-OPS-01`, poussé dans `fe488f5`, ajoute les runners one-shot Compose profilés `dce-analysis` et `dce-requirements` ainsi que leurs wrappers opérateur ; ils exposent uniquement des reçus techniques et ne démarrent pas avec le stack standard. Les tests worker et contrats opérateur passent ; l’exécution PostgreSQL/Docker réelle reste ouverte. La réconciliation documentaire correspondante est publiée dans `9457703`.
 
 La lecture affiche uniquement les champs prévus par le contrat public : fraîcheur, cycle de vie, intégrité, compteurs, exigences structurées et localisation source. La recherche envoie une requête bornée à 500 caractères et un `top_k` fixé à 5 côté client. La vue affiche le score, le modèle d’embedding et un libellé de localisation ; elle n’affiche pas le contenu intégral du fragment ni de données financières.
 

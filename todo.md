@@ -47,7 +47,7 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 - [ ] Exécuter la recette avec PostgreSQL 16 réellement accessible, puis conserver le verdict, les hashes de migration et la preuve des triggers append-only. Le sandbox actuel répond `connection refused` sur `127.0.0.1:5432`.
 - [ ] Exécuter sur un corpus DCE anonymisé le worker d’indexation, `verify_bge_model_cache.py`, le worker `run-dce-analysis-preprod.sh` et le validateur `validate_knowledge_benchmark.py`, puis conserver uniquement les métriques et identifiants autorisés.
 - [ ] Définir avec le fournisseur réel le contrat de bus, l’URL HTTPS, le mode d’authentification, les garanties de livraison et la stratégie de replay ; injecter ensuite ces paramètres hors Git et exécuter une recette contrôlée. Aucun bus réel n’est configuré dans le dépôt.
-- [ ] Rétablir des runners GitHub Actions exécutants avant de considérer une CI distante comme verte ou de fusionner la PR #49/main. Les runs `32653263423` et `32653234492` échouent avant toute étape (`steps: []`).
+- [ ] Rétablir des runners GitHub Actions exécutants avant de considérer une CI distante comme verte ou de fusionner la PR #49/main. Le dernier run `32656237762` sur `9457703` échoue encore avec `runnerName` absent et `steps: []` pour les trois jobs.
 
 ## Frontières explicitement non retenues par les audits
 
