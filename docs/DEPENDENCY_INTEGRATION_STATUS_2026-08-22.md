@@ -2,7 +2,7 @@
 
 **Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**Dernier commit fonctionnel de référence :** `23efe31` (recette PostgreSQL BOAMP étendue aux tests observations `0053` et qualification `0054`) ; la revue globale et le durcissement du worker bus sont en cours de publication.
+**Dernier commit fonctionnel de référence :** `7b37fa0` (revue globale et durcissement du worker bus externe, après l’extension de recette PostgreSQL `23efe31`).
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
