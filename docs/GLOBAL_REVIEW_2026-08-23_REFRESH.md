@@ -2,7 +2,7 @@
 
 **Date : 23 août 2026**  
 **Branche : `docs/pricing-http-next-lot-28`**  
-**Dernier commit poussé : [`fa48c02`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/fa48c02)**
+**Dernier commit poussé : [`93ba239`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/93ba239)**
 **Auteur : Manus AI**
 
 ## 1. Verdict exécutif
@@ -13,7 +13,7 @@ Le produit n’est toutefois pas encore **opérationnel de bout en bout**. Les d
 
 ## 2. État du code livré dans ce lot
 
-Le lot précédent étend `web/src/features/dce/` avec `DceKnowledgePanel.tsx` et `useDceKnowledge.ts`. Le nouveau lot ajoute le value object pur `backend/app/modules/knowledge/application/benchmark.py`, le contrat `docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md` et la commande `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG et scorer un rapport d’identifiants externe. Le retrieval est également durci pour filtrer la version DCE applicable dès le scope domaine, le service, la route et la requête SQLAlchemy.
+Le lot précédent étend `web/src/features/dce/` avec `DceKnowledgePanel.tsx` et `useDceKnowledge.ts`. Le nouveau lot ajoute le value object pur `backend/app/modules/knowledge/application/benchmark.py`, le contrat `docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md` et la commande `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG et scorer un rapport d’identifiants externe. Le retrieval est également durci pour filtrer la version DCE applicable dès le scope domaine, le service, la route et la requête SQLAlchemy. Ce correctif est poussé dans `93ba239` avec une régression dédiée sur les versions supersédées.
 
 La lecture affiche uniquement les champs prévus par le contrat public : fraîcheur, cycle de vie, intégrité, compteurs, exigences structurées et localisation source. La recherche envoie une requête bornée à 500 caractères et un `top_k` fixé à 5 côté client. La vue affiche le score, le modèle d’embedding et un libellé de localisation ; elle n’affiche pas le contenu intégral du fragment ni de données financières.
 
@@ -72,6 +72,7 @@ uv run python scripts/recipe_boamp_postgres.py --apply
 | Tests du client API | **5 passed** |
 | Tests d’intégration App | **4 passed** |
 | Tests knowledge version-scoped | **9 passed** |
+| Test SQLAlchemy de filtre versionné | **Passé** |
 | Migration offline Alembic jusqu’à `0054` | **Passée** |
 | Migration online et tests PostgreSQL | **Non prouvés dans le sandbox** |
 | Docker réel | **Indisponible dans le sandbox** |
@@ -87,7 +88,7 @@ L’ordre recommandé est le suivant :
 
 1. faire passer le gate frontend et backend local après les lots DCE/RAG et benchmark ;
 2. commit/push du lot KNOWLEDGE-BENCHMARK-01 et mise à jour des documents canoniques — **réalisé dans `fa48c02`** ;
-3. filtrer le retrieval par version DCE applicable dans le domaine, le service et SQL — **réalisé localement, en attente de commit** ;
+3. filtrer le retrieval par version DCE applicable dans le domaine, le service et SQL — **réalisé dans `93ba239`** ;
 4. exécuter PostgreSQL 16 et Alembic `0051`–`0054` sur Docker réel ;
 5. lancer les tests de persistence BOAMP et du worker outbox ;
 6. charger un corpus DCE non financier contrôlé et mesurer retrieval/fraîcheur/localisation ;
