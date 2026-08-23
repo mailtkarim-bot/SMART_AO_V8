@@ -25,8 +25,13 @@ Le profil est une préférence de veille, pas une preuve DCE, pas une décision 
 
 Le profil ne contient ni texte de DCE, ni extrait, ni embedding, ni document, ni secret, ni credential fournisseur. Le profil ne confère aucune capability de lecture BOAMP à un collaborateur et ne détermine pas seul qu’une opportunité est pertinente. Un futur service de scoring devra produire une explication structurée, conserver sa source et rester soumis à une revue patronale.
 
-Le lot suivant pourra persister le profil et exposer une lecture patronale tenant-scoped avec `command_id`, `idempotency_key`, révision optimiste, outbox et audit minimisé. L’ingestion d’avis externes, la déduplication, le scoring et la conversion contrôlée en Case resteront des lots séparés.
+La persistence est maintenant préparée par la migration `20260823_0052` : un root tenant-scoped, une table de versions immuables, FK composites, checks fermés, unicités d’idempotence et trigger PostgreSQL append-only. Le dispatcher commun écrit le root, la version, l’événement et l’outbox dans une même transaction ; les routes patronales create/version/read refusent les contextes non patronaux et ne renvoient ni `tenant_id`, ni `actor_id`, ni secrets.
+
+L’ingestion d’avis externes, la déduplication, le scoring et la conversion contrôlée en Case restent des lots séparés. La migration 0052 et les tests DB sont collectables et validés SQL offline ; la preuve online PostgreSQL et la preuve réelle du trigger restent à exécuter sur une machine disposant du serveur.
 
 ## Critères de sortie de ce sous-lot
+
+La persistence et HTTP ajoutent les critères suivants : le root et la version initiale sont créés atomiquement via le dispatcher, le rejeu ne double pas l’état ni l’outbox, une version utilise `expected_revision`, la projection est filtrée par tenant et les versions historiques ne peuvent pas être modifiées ou supprimées par PostgreSQL.
+
 
 Le noyau domaine doit être pur, sans FastAPI ni SQLAlchemy. Les tests doivent démontrer la normalisation déterministe, les catalogues fermés, les bornes, l’exclusion des doublons et la stabilité du snapshot canonique. Aucune recette BOAMP réelle n’est requise ni effectuée par ce sous-lot.

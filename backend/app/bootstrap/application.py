@@ -70,6 +70,9 @@ from app.interfaces.http.routes.patron_enterprise_registry import (
 from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
 )
+from app.interfaces.http.routes.patron_opportunity_watch_profiles import (
+    build_patron_opportunity_watch_profile_router,
+)
 from app.interfaces.http.routes.patron_pricing import build_patron_pricing_router
 from app.interfaces.http.routes.patron_pricing_import import build_patron_pricing_import_router
 from app.interfaces.http.routes.patron_submission import build_patron_submission_router
@@ -182,6 +185,10 @@ from app.modules.membership.application.patron_assignment import (
 )
 from app.modules.membership.application.patron_assignment_cockpit import (
     PatronAssignmentCockpitService,
+)
+from app.modules.opportunity.application.patron_watch_profile import (
+    PatronWatchProfileService,
+    opportunity_watch_profile_handlers,
 )
 from app.modules.patron_action.application.service import (
     PatronActionService,
@@ -329,6 +336,7 @@ class AppRuntime:
                 **pricing_scenario_transition_handlers(),
                 **pricing_import_creation_handlers(),
                 **pricing_import_handlers(),
+                **opportunity_watch_profile_handlers(),
                 **preparation_review_handlers(storage=preparation_storage),
                 **submission_handlers(),
                 **submission_evidence_handlers(),
@@ -748,6 +756,11 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        opportunity_watch_profile_service = PatronWatchProfileService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
             policy=security_policy,
@@ -842,6 +855,12 @@ def create_app(
                     security_runtime=security_runtime,
                 )
             )
+        app.include_router(
+            build_patron_opportunity_watch_profile_router(
+                service=opportunity_watch_profile_service,
+                security_runtime=security_runtime,
+            )
+        )
         if company_registry is not None:
             app.include_router(
                 build_patron_enterprise_registry_router(
