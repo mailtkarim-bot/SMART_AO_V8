@@ -98,9 +98,10 @@ Le passage à MinIO/S3 est maintenant câblé derrière un slice d’infrastruct
 | ICS / `icalendar` | Extra `calendar` optionnel verrouillé ; port `SubmissionDeadlineCalendarPort`, renderer RFC 5545 local, dates UTC et activation AppRuntime explicite | **Export de fichier greffé mais désactivé par défaut** ; aucun agenda distant, CalDAV, OAuth ou accusé de synchronisation n’est intégré. |
 | n8n | Documenté comme intégration future | Aucun workflow connecté. |
 | Webhook d’export | Worker Python et signature HMAC du payload | La capacité technique sortante est codée ; aucune destination réelle n’est configurée ou validée dans ce sandbox. |
+| Signature HTTP | DTOs fermés, capabilities patronales dédiées, routes `POST` demande/callback et `GET` lecture, provider/secret runtime, callback HMAC sur corps brut, delivery idempotente, reader tenant-scoped et panneau React de suivi | **Backend et suivi frontend greffés mais désactivés tant que provider/secret manquent** ; aucun fournisseur réel, certificat, signature qualifiée, dépôt externe ou accusé de remise n’est intégré. |
 | Redis / Celery / APScheduler | Absents, explicitement différés ou optionnels | Aucun besoin démontré pour le noyau mono-VPS actuel. |
 
-Le webhook HMAC et le worker SMTP ne doivent pas être confondus avec un connecteur métier complet : il sécurise une notification sortante lorsqu’une URL et un secret sont configurés, mais il ne réalise ni dépôt électronique, ni accusé juridiquement vérifié, ni synchronisation avec un portail externe.
+Le webhook HMAC, le worker SMTP et le callback HMAC de signature ne doivent pas être confondus avec un connecteur métier complet : ils sécurisent une capacité de notification ou de réception lorsqu’une destination et un secret sont configurés, mais ils ne réalisent ni signature qualifiée, ni dépôt électronique, ni accusé juridiquement vérifié, ni synchronisation avec un portail externe.
 
 ## 5. Frontend et tests navigateur
 

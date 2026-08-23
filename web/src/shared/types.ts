@@ -326,6 +326,22 @@ export type SubmissionEvidenceReceipt = CommandReceipt & {
   external_submission: "NOT_PERFORMED";
 };
 
+export type SubmissionSignatureReceipt = CommandReceipt & {
+  result_code: "SUBMISSION_SIGNATURE_REQUESTED" | "SUBMISSION_SIGNATURE_RECORDED";
+  external_submission: "NOT_PERFORMED";
+};
+
+export type SubmissionSignatureProjection = {
+  signature_id: string;
+  submission_package_id: string;
+  case_id: string;
+  provider: string;
+  status: "REQUESTED" | "SIGNED" | "REJECTED";
+  expected_package_version: number;
+  revision: 1 | 2;
+  external_submission: "NOT_PERFORMED";
+};
+
 export type DecisionDossierItem = Record<string, unknown>;
 
 export type PreparationReadiness = {

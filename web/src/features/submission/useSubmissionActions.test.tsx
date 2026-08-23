@@ -3,7 +3,12 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiClient } from "../../infrastructure/api";
-import type { SubmissionEvidenceReceipt, SubmissionPackageReceipt } from "../../shared/types";
+import type {
+  SubmissionEvidenceReceipt,
+  SubmissionPackageReceipt,
+  SubmissionSignatureProjection,
+  SubmissionSignatureReceipt,
+} from "../../shared/types";
 import { useSubmissionActions } from "./useSubmissionActions";
 
 type HookMessage = { tone: "success" | "error" | "warning"; text: string };
@@ -11,6 +16,8 @@ type SubmissionApi = Pick<
   ApiClient,
   "prepareSubmissionPackage" | "downloadSubmissionPackage" | "recordSubmissionEvidence"
 >;
+type SignatureApi = SubmissionApi &
+  Pick<ApiClient, "requestSubmissionSignature" | "getSubmissionSignature">;
 
 const packageReceipt = (replayed = false): SubmissionPackageReceipt => ({
   status: "SUCCEEDED",
@@ -26,6 +33,34 @@ const packageReceipt = (replayed = false): SubmissionPackageReceipt => ({
   ],
   event_ids: ["event-submission-1"],
   replayed,
+});
+
+const signatureReceipt = (): SubmissionSignatureReceipt => ({
+  status: "SUCCEEDED",
+  command_id: "command-signature-1",
+  idempotency_key: "idempotency-signature-1",
+  result_code: "SUBMISSION_SIGNATURE_REQUESTED",
+  aggregate_refs: [
+    {
+      aggregate_type: "SubmissionSignature",
+      aggregate_id: "signature-1",
+      aggregate_revision: 1,
+    },
+  ],
+  event_ids: ["event-signature-1"],
+  replayed: false,
+  external_submission: "NOT_PERFORMED",
+});
+
+const signatureProjection = (): SubmissionSignatureProjection => ({
+  signature_id: "signature-1",
+  submission_package_id: "submission-package-1",
+  case_id: "case-1",
+  provider: "TEST_PROVIDER",
+  status: "SIGNED",
+  expected_package_version: 2,
+  revision: 2,
+  external_submission: "NOT_PERFORMED",
 });
 
 const evidenceReceipt = (): SubmissionEvidenceReceipt => ({
@@ -139,6 +174,60 @@ describe("useSubmissionActions", () => {
     });
 
     vi.restoreAllMocks();
+  });
+
+  it("requests a signature with the explicit package version", async () => {
+    const api = {
+      prepareSubmissionPackage: vi.fn(),
+      downloadSubmissionPackage: vi.fn(),
+      recordSubmissionEvidence: vi.fn(),
+      requestSubmissionSignature: vi.fn().mockResolvedValue(signatureReceipt()),
+      getSubmissionSignature: vi.fn(),
+    } satisfies SignatureApi;
+    const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
+    const { result } = renderSubmissionHook(api, setMessage);
+
+    act(() => {
+      result.current.setSubmissionPackageId(" submission-package-1 ");
+      result.current.setSignaturePackageVersion("2");
+    });
+    await act(async () => {
+      await result.current.requestSignature();
+    });
+
+    expect(api.requestSubmissionSignature).toHaveBeenCalledWith("submission-package-1", 2);
+    expect(result.current.signatureId).toBe("signature-1");
+    expect(result.current.signatureStatus).toBe("REQUESTED");
+    expect(result.current.signatureRevision).toBe(1);
+    expect(setMessage).toHaveBeenCalledWith({
+      tone: "success",
+      text: "Demande de signature enregistrée. Aucun dépôt externe n’a été effectué.",
+    });
+  });
+
+  it("loads only the bounded signature projection", async () => {
+    const api = {
+      prepareSubmissionPackage: vi.fn(),
+      downloadSubmissionPackage: vi.fn(),
+      recordSubmissionEvidence: vi.fn(),
+      requestSubmissionSignature: vi.fn(),
+      getSubmissionSignature: vi.fn().mockResolvedValue(signatureProjection()),
+    } satisfies SignatureApi;
+    const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
+    const { result } = renderSubmissionHook(api, setMessage);
+
+    act(() => {
+      result.current.setSignatureId("signature-1");
+    });
+    await act(async () => {
+      await result.current.loadSignature();
+    });
+
+    expect(api.getSubmissionSignature).toHaveBeenCalledWith("signature-1");
+    expect(result.current.signatureStatus).toBe("SIGNED");
+    expect(result.current.signatureProvider).toBe("TEST_PROVIDER");
+    expect(result.current.signatureRevision).toBe(2);
+    expect(result.current.signaturePackageVersion).toBe("2");
   });
 
   it("records redacted manual evidence without changing the external submission invariant", async () => {

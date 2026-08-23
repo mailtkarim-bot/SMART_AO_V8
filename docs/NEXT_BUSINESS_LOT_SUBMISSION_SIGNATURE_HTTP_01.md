@@ -4,6 +4,8 @@
 
 Le lot suivant le parcours `PRICING-IMPORT-HTTP-PERSISTENCE-01` est `SUBMISSION-SIGNATURE-HTTP-01`. Il complète le bounded context `submission` en exposant par HTTP le service de signature électronique déjà présent dans l’application. Le lot ne simule pas un dépôt électronique, ne contacte aucun fournisseur externe et ne transforme jamais une signature en preuve de dépôt.
 
+> **État d’implémentation — 23 août 2026 :** le backend des trois opérations HTTP est maintenant câblé sur la branche de travail : DTOs fermés, capabilities patronales dédiées, provider résolu au runtime, callback HMAC sur corps brut, delivery idempotente, reader tenant-scoped et montage conditionnel du routeur. Le frontend de suivi patronal et la recette avec un fournisseur réel restent séparés; l’absence de provider ou de secret laisse la surface désactivée et aucun dépôt externe n’est affirmé.
+
 La dépendance fonctionnelle est le `SubmissionPackage` immutable déjà préparé et exportable. La dépendance technique est le service `SubmissionSignatureHandler`, la migration `20260818_0047_submission_signatures` et les commandes fermées `RequestSubmissionSignatureCommand` / `RecordSubmissionSignatureCommand` déjà codées. La sortie attendue est un parcours patronal HTTP testable, idempotent, tenant-scoped et limité à des faits de signature hashés.
 
 > **Frontière absolue :** `SIGNED` signifie uniquement qu’un callback fournisseur hash-only a été enregistré pour un manifest de soumission précis. Il ne signifie ni dépôt externe réussi, ni accusé de réception, ni attribution.
@@ -36,27 +38,27 @@ La demande de signature doit résoudre côté serveur le paquet, sa version et l
 
 ### Étape 1 — Contrat et capability
 
-Figer le contrat normatif HTTP, la capability patronale dédiée, la classification `SUBMISSION_PRIVATE` ou la classification existante la plus restrictive validée par la policy, les statuts publics et les refus neutres. Vérifier qu’aucun collaborateur, webhook généraliste ou contrat financier ne reçoit une donnée de signature.
+Le contrat HTTP, les capabilities patronales `submission.signature.read` et `submission.signature.write`, la classification `SECURITY_RESTRICTED`, les statuts publics et les refus neutres sont implémentés. Aucun collaborateur, webhook généraliste ou contrat financier ne reçoit une donnée de signature.
 
 ### Étape 2 — Adaptateur HTTP et bootstrap
 
-Créer le routeur patronal sans ORM direct, injecter les handlers via le bootstrap existant et réutiliser le dispatcher transactionnel. Le tenant, l’acteur, la membership, la capability et la configuration provider doivent être résolus côté serveur.
+Le routeur patronal est créé sans ORM direct, les handlers existants sont injectés via le bootstrap et le dispatcher transactionnel est réutilisé. Le tenant, l’acteur, la membership appelante, la capability, le provider et le secret de callback sont résolus côté serveur/runtime. Le routeur n’est monté que lorsque provider et secret sont configurés.
 
 ### Étape 3 — Projection de lecture
 
-Ajouter un reader tenant-scoped qui expose seulement l’état `REQUESTED|SIGNED|REJECTED`, l’identifiant opaque de signature, l’identifiant du paquet autorisé et la révision. Ne jamais exposer `provider_reference_hash`, `signature_sha256`, storage locator, contenu ou secrets.
+Le reader tenant-scoped expose seulement l’état `REQUESTED|SIGNED|REJECTED`, les identifiants de signature/paquet/Case, le provider fermé, la version attendue, la révision et `external_submission: NOT_PERFORMED`. Il n’expose jamais `provider_reference_hash`, `signature_sha256`, storage locator, contenu ou secrets.
 
 ### Étape 4 — Authentification du callback
 
-Définir une frontière explicite pour les callbacks : secret de webhook hors base métier, signature de requête vérifiée avant dispatch, fenêtre anti-rejeu et identifiant de livraison idempotent. En absence de fournisseur réel, utiliser un port et un faux adaptateur de test ; ne pas accepter un callback public non authentifié.
+La frontière HMAC est implémentée : secret runtime hors base métier, signature `sha256=` vérifiée sur le corps HTTP brut avant dispatch, longueur minimale du secret et identifiant de livraison réutilisé comme clé d’idempotence. Cette preuve est générique et ne constitue pas l’intégration d’un fournisseur réel; un adaptateur fournisseur et sa recette dédiée restent requis.
 
 ### Étape 5 — Tests unitaires, PostgreSQL et API
 
-Couvrir la commande, la policy, le tenant, le paquet absent, la version obsolète, le provider incohérent, la double finalisation, le rejeu, le callback mal authentifié, les triggers append-only, l’outbox et la non-fuite des hashes. Ajouter au moins un test inter-tenant réel et un test garantissant que le receipt ne contient aucun secret ni donnée financière.
+Les tests unitaires/API couvrent la policy, le tenant résolu serveur, le paquet absent, la version obsolète, le provider incohérent, la double finalisation, le rejeu par delivery ID, le callback mal authentifié, la projection minimale et la non-fuite des hashes. Les tests PostgreSQL append-only et inter-tenant du handler existant restent la preuve d’intégration à compléter dans le passage de validation complète.
 
 ### Étape 6 — Contrats OpenAPI et frontend patron
 
-Ajouter les types TypeScript et un panneau de suivi patronal limité à l’état de signature. Le frontend ne doit jamais fabriquer la preuve cryptographique ni appeler directement un fournisseur. L’interface doit distinguer `REQUESTED`, `SIGNED` et `REJECTED` de l’état de dépôt, qui reste `NOT_PERFORMED` tant qu’un accusé externe vérifiable n’est pas archivé.
+Le backend publie les contrats OpenAPI via les DTOs Pydantic; le panneau TypeScript de suivi patronal reste le prochain incrément frontend. Il ne devra jamais fabriquer la preuve cryptographique ni appeler directement un fournisseur et devra distinguer `REQUESTED`, `SIGNED` et `REJECTED` de l’état de dépôt, qui reste `NOT_PERFORMED` tant qu’un accusé externe vérifiable n’est pas archivé.
 
 ### Étape 7 — Validation et publication
 

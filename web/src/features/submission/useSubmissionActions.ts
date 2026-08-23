@@ -11,12 +11,21 @@ type SubmissionActions = {
   preparationRevision: string;
   submissionPackageId: string;
   submissionExported: boolean;
+  signatureId: string;
+  signaturePackageVersion: string;
+  signatureStatus: "REQUESTED" | "SIGNED" | "REJECTED" | null;
+  signatureProvider: string;
+  signatureRevision: number | null;
   evidenceForm: SubmissionEvidenceForm;
   setPreparationPackageId: Dispatch<SetStateAction<string>>;
   setPreparationRevision: Dispatch<SetStateAction<string>>;
   setSubmissionPackageId: Dispatch<SetStateAction<string>>;
+  setSignatureId: Dispatch<SetStateAction<string>>;
+  setSignaturePackageVersion: Dispatch<SetStateAction<string>>;
   setEvidenceForm: Dispatch<SetStateAction<SubmissionEvidenceForm>>;
   prepareSubmissionPackage: () => Promise<void>;
+  requestSignature: () => Promise<void>;
+  loadSignature: () => Promise<void>;
   exportSubmissionPackage: () => Promise<void>;
   recordSubmissionEvidence: () => Promise<void>;
 };
@@ -26,6 +35,11 @@ export function useSubmissionActions(api: ApiClient, setMessage: SetMessage): Su
   const [preparationRevision, setPreparationRevision] = useState("1");
   const [submissionPackageId, setSubmissionPackageId] = useState("");
   const [submissionExported, setSubmissionExported] = useState(false);
+  const [signatureId, setSignatureId] = useState("");
+  const [signaturePackageVersion, setSignaturePackageVersion] = useState("1");
+  const [signatureStatus, setSignatureStatus] = useState<"REQUESTED" | "SIGNED" | "REJECTED" | null>(null);
+  const [signatureProvider, setSignatureProvider] = useState("");
+  const [signatureRevision, setSignatureRevision] = useState<number | null>(null);
   const [evidenceForm, setEvidenceForm] = useState<SubmissionEvidenceForm>({
     evidence_type: "MANUAL_RECEIPT",
     external_reference_hash: "",
@@ -76,6 +90,51 @@ export function useSubmissionActions(api: ApiClient, setMessage: SetMessage): Su
     }
   }
 
+  async function requestSignature() {
+    if (!submissionPackageId.trim()) {
+      setMessage({ tone: "error", text: "Préparez ou renseignez un paquet avant de demander sa signature." });
+      return;
+    }
+    const expectedVersion = Number(signaturePackageVersion);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      setMessage({ tone: "error", text: "La révision du paquet doit être un entier positif." });
+      return;
+    }
+    try {
+      const receipt = await api.requestSubmissionSignature(submissionPackageId.trim(), expectedVersion);
+      const nextSignatureId = receipt.aggregate_refs[0]?.aggregate_id;
+      if (nextSignatureId) setSignatureId(nextSignatureId);
+      setSignatureStatus("REQUESTED");
+      setSignatureRevision(1);
+      setMessage({
+        tone: "success",
+        text: receipt.replayed
+          ? "Demande de signature déjà enregistrée; état rechargé."
+          : "Demande de signature enregistrée. Aucun dépôt externe n’a été effectué.",
+      });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de demander la signature." });
+    }
+  }
+
+  async function loadSignature() {
+    if (!signatureId.trim()) {
+      setMessage({ tone: "error", text: "Renseignez l’identifiant de signature à consulter." });
+      return;
+    }
+    try {
+      const projection = await api.getSubmissionSignature(signatureId.trim());
+      setSignatureId(projection.signature_id);
+      setSignatureStatus(projection.status);
+      setSignatureProvider(projection.provider);
+      setSignaturePackageVersion(String(projection.expected_package_version));
+      setSignatureRevision(projection.revision);
+      setMessage({ tone: "success", text: "État de signature rechargé. Le dépôt externe reste non effectué." });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de lire l’état de signature." });
+    }
+  }
+
   async function recordSubmissionEvidence() {
     if (!submissionPackageId.trim()) {
       setMessage({ tone: "error", text: "Préparez ou renseignez un paquet avant d’enregistrer sa preuve." });
@@ -102,12 +161,21 @@ export function useSubmissionActions(api: ApiClient, setMessage: SetMessage): Su
     preparationRevision,
     submissionPackageId,
     submissionExported,
+    signatureId,
+    signaturePackageVersion,
+    signatureStatus,
+    signatureProvider,
+    signatureRevision,
     evidenceForm,
     setPreparationPackageId,
     setPreparationRevision,
     setSubmissionPackageId,
+    setSignatureId,
+    setSignaturePackageVersion,
     setEvidenceForm,
     prepareSubmissionPackage,
+    requestSignature,
+    loadSignature,
     exportSubmissionPackage,
     recordSubmissionEvidence,
   };

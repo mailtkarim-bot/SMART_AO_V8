@@ -76,6 +76,9 @@ from app.interfaces.http.routes.patron_submission import build_patron_submission
 from app.interfaces.http.routes.patron_submission_evidence import (
     build_patron_submission_evidence_router,
 )
+from app.interfaces.http.routes.patron_submission_signature import (
+    build_patron_submission_signature_router,
+)
 from app.interfaces.http.routes.preparation import (
     build_preparation_review_router,
     build_preparation_router,
@@ -230,8 +233,15 @@ from app.modules.submission.application.evidence_service import (
 )
 from app.modules.submission.application.notifications import SubmissionExportNotificationPort
 from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
-from app.modules.submission.application.signature_service import submission_signature_handlers
+from app.modules.submission.application.signature_service import (
+    SubmissionSignatureReadService,
+    SubmissionSignatureService,
+    submission_signature_handlers,
+)
 from app.modules.submission.infrastructure.ics_calendar import IcsSubmissionDeadlineCalendar
+from app.modules.submission.infrastructure.signature_reader import (
+    SqlAlchemySubmissionSignatureReader,
+)
 from app.modules.submission.infrastructure.smtp_notifications import (
     AioSmtpSubmissionExportNotifier,
 )
@@ -789,6 +799,22 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        signature_provider = os.getenv("SMART_AO_SIGNATURE_PROVIDER", "").strip()
+        signature_callback_secret = os.getenv("SMART_AO_SIGNATURE_CALLBACK_SECRET", "")
+        submission_signature_service = None
+        submission_signature_read_service = None
+        if signature_provider and signature_callback_secret:
+            submission_signature_service = SubmissionSignatureService(
+                dispatcher=runtime.dispatcher,
+                policy=security_policy,
+                provider=signature_provider,
+            )
+            submission_signature_read_service = SubmissionSignatureReadService(
+                reader=SqlAlchemySubmissionSignatureReader(
+                    session_factory=runtime.session_factory,
+                ),
+                policy=security_policy,
+            )
         submission_package_service = SubmissionPackageService(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
@@ -963,6 +989,18 @@ def create_app(
                 security_runtime=security_runtime,
             )
         )
+        if (
+            submission_signature_service is not None
+            and submission_signature_read_service is not None
+        ):
+            app.include_router(
+                build_patron_submission_signature_router(
+                    service=submission_signature_service,
+                    read_service=submission_signature_read_service,
+                    security_runtime=security_runtime,
+                    callback_secret=signature_callback_secret,
+                )
+            )
         app.include_router(
             build_patron_enterprise_library_router(
                 service=enterprise_library_service,

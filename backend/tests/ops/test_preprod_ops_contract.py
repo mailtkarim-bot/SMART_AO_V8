@@ -277,3 +277,25 @@ def test_rag_runtime_does_not_receive_unrelated_credentials() -> None:
     assert "SMART_AO_SMTP_PASSWORD" in backend
     assert "SMART_AO_INSEE_API_TOKEN" in backend
     assert "SMART_AO_EXPORT_WEBHOOK_SECRET" not in backend
+
+
+def test_signature_http_configuration_is_backend_only_and_fail_closed() -> None:
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    backend = compose.split("  backend:", maxsplit=1)[1].split(
+        "  dce-retention-worker:", maxsplit=1
+    )[0]
+    retention = compose.split("  dce-retention-worker:", maxsplit=1)[1].split(
+        "  submission-export-webhook-worker:", maxsplit=1
+    )[0]
+    webhook = compose.split("  submission-export-webhook-worker:", maxsplit=1)[1].split(
+        "  submission-export-smtp-worker:", maxsplit=1
+    )[0]
+    smtp = compose.split("  submission-export-smtp-worker:", maxsplit=1)[1].split(
+        "\n  postgres:", maxsplit=1
+    )[0]
+
+    assert "SMART_AO_SIGNATURE_PROVIDER: ${SMART_AO_SIGNATURE_PROVIDER:-}" in backend
+    assert "SMART_AO_SIGNATURE_CALLBACK_SECRET: ${SMART_AO_SIGNATURE_CALLBACK_SECRET:-}" in backend
+    for unrelated_service in (retention, webhook, smtp):
+        assert "SMART_AO_SIGNATURE_CALLBACK_SECRET" not in unrelated_service
+        assert "SMART_AO_SIGNATURE_PROVIDER" not in unrelated_service

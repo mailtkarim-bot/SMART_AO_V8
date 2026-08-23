@@ -429,12 +429,21 @@ function App() {
           preparationRevision={submissionActions.preparationRevision}
           submissionPackageId={submissionActions.submissionPackageId}
           submissionExported={submissionActions.submissionExported}
+          signatureId={submissionActions.signatureId}
+          signaturePackageVersion={submissionActions.signaturePackageVersion}
+          signatureStatus={submissionActions.signatureStatus}
+          signatureProvider={submissionActions.signatureProvider}
+          signatureRevision={submissionActions.signatureRevision}
           evidenceForm={submissionActions.evidenceForm}
           setPreparationPackageId={submissionActions.setPreparationPackageId}
           setPreparationRevision={submissionActions.setPreparationRevision}
           setSubmissionPackageId={submissionActions.setSubmissionPackageId}
+          setSignatureId={submissionActions.setSignatureId}
+          setSignaturePackageVersion={submissionActions.setSignaturePackageVersion}
           setEvidenceForm={submissionActions.setEvidenceForm}
           onPrepare={() => void submissionActions.prepareSubmissionPackage()}
+          onRequestSignature={() => void submissionActions.requestSignature()}
+          onLoadSignature={() => void submissionActions.loadSignature()}
           onExport={() => void submissionActions.exportSubmissionPackage()}
           onRecordEvidence={() => void submissionActions.recordSubmissionEvidence()}
         />

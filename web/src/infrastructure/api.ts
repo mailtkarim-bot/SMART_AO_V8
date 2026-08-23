@@ -14,6 +14,8 @@ import type {
   PricingScenario,
   SubmissionEvidenceReceipt,
   SubmissionPackageReceipt,
+  SubmissionSignatureProjection,
+  SubmissionSignatureReceipt,
   CollaboratorTaskList,
   PreparationPackage,
   CommitPricingImportRequest,
@@ -469,6 +471,23 @@ export function createApiClient(
             ...input,
           }),
         },
+      ),
+    requestSubmissionSignature: (submissionPackageId: string, expectedPackageVersion: number) =>
+      request<SubmissionSignatureReceipt>(
+        `/api/v1/patron/submission-packages/${encodeURIComponent(submissionPackageId)}/signatures`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            signature_id: makeId(),
+            expected_package_version: expectedPackageVersion,
+          }),
+        },
+      ),
+    getSubmissionSignature: (signatureId: string) =>
+      request<SubmissionSignatureProjection>(
+        `/api/v1/patron/submission-signatures/${encodeURIComponent(signatureId)}`,
       ),
     recordSubmissionEvidence: (
       submissionPackageId: string,
