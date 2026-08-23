@@ -9,7 +9,7 @@
 
 | Élément | État |
 |---|---|
-| Dernier commit fonctionnel | La branche `docs/pricing-http-next-lot-28` est poussée sur `origin`; le dernier commit de code est [`793b334`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/793b334), worker BOAMP ingestion/qualification. |
+| Dernier commit fonctionnel | La branche `docs/pricing-http-next-lot-28` est poussée sur `origin`; le dernier commit de code est [`f0fa653`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/f0fa653), classification automatique des tests PostgreSQL. |
 | Branche | `docs/pricing-http-next-lot-28`, PR [#49](https://github.com/mailtkarim-bot/SMART_AO_V8/pull/49), mergeable mais non fusionnée. |
 | Corrections et durcissement récents | PR #42 readiness frontend ; PR #43 test App.tsx et plan métier ; PR #44 réconciliation documentaire ; PR #45 tests pricing ; PR #46 FK composite Case ; PR #47 création PREVIEWED ; PR #48 validation canonique ; commits `a12e375`, `d2f0d2e` et `5a2c9e5` du lot HTTP pricing. |
 | Validation courante | Les tests ciblés OR-Tools capacity/run et architecture ont produit **32 succès** avant commit ; Ruff et `alembic upgrade head --sql` sont verts, avec table, FK, checks, indexes et trigger `optimization_runs` visibles dans le SQL offline. Les deux tests PostgreSQL de persistence et l’essai Alembic online sont **BLOCKED** par `127.0.0.1:5432 Connection refused` ; aucune migration DB réelle ni preuve append-only online n’est revendiquée. L’adaptateur signature de test ajoute **15 tests ciblés verts** avec les tests de commandes/services existants ; aucun appel réseau ni fournisseur réel n’a été effectué. La baseline `.secrets.baseline` est restée inchangée. Les validations antérieures du frontend, des tests pricing et du RAG restent celles documentées ci-dessous. |
@@ -121,7 +121,7 @@
 
 ## Prochaine action unique
 
-Rétablir l’attribution des GitHub-hosted runners puis faire exécuter une CI complète sur le HEAD courant, avec étapes non vides et succès réel pour backend, frontend et image-security ; ne pas fusionner PR #49 avant cette preuve. Dès qu’un PostgreSQL est disponible, appliquer `0051` puis `0052`, exécuter les tests DB OR-Tools et opportunité, et vérifier les triggers append-only. Poursuivre ensuite S10 par l’ingestion d’opportunités derrière un port, sans scoring ni conversion Case automatique. Le provider `TEST_PROVIDER` reste réservé aux tests HTTP locaux sans réseau ; le gate Docker/VPS est une frontière opérationnelle séparée.
+Rétablir l’attribution des GitHub-hosted runners puis faire exécuter une CI complète sur le HEAD courant, avec étapes non vides et succès réel pour backend, frontend et image-security ; ne pas fusionner PR #49 avant cette preuve. Dès qu’un PostgreSQL est disponible, appliquer `0051` à `0054`, exécuter les tests DB OR-Tools et BOAMP, vérifier les triggers append-only et lancer la recette `scripts/recipe_boamp_postgres.py`. Les routes BOAMP, la qualification patronale et les deux topics outbox sont désormais codés ; il reste à définir/recetter le bus fournisseur réel. Le provider `TEST_PROVIDER` reste réservé aux tests HTTP locaux sans réseau ; le gate Docker/VPS est une frontière opérationnelle séparée.
 
 ## Décisions ouvertes
 

@@ -2,7 +2,7 @@
 
 **Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**Dernier commit fonctionnel de référence :** `793b334` (worker bus BOAMP ingestion/qualification, après les routes HTTP `4a189ea` et la recette PostgreSQL `798bbec`)
+**Dernier commit fonctionnel de référence :** `f0fa653` (marquage automatique des tests PostgreSQL, après les routes HTTP BOAMP `4a189ea`, le worker bus `e2526d2`/`793b334` et la recette `798bbec`)
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
@@ -34,7 +34,7 @@ La documentation doit donc être lue ainsi : **“Obligatoire” dans l’archit
 | Frontend | React, React DOM, TypeScript, Vite, Vitest, Testing Library | Cockpit initial et features métier présents ; 74 tests frontend ont passé localement. |
 | Qualité Python | pytest, pytest-cov, Ruff, Bandit, detect-secrets, pip-audit | Présents et utilisés par les contrôles locaux/CI prévus. |
 
-La preuve de ces éléments vient des manifests `pyproject.toml`, `uv.lock`, `web/package.json`, `web/pnpm-lock.yaml`, des imports du backend, des adaptateurs sous `backend/app/modules/*/infrastructure` et des fichiers Compose. La suite backend complète a produit 1 074 tests verts et 92,87 % de couverture lors de la dernière validation locale ; cette couverture ne prouve cependant pas l’existence des intégrations absentes.
+La preuve de ces éléments vient des manifests `pyproject.toml`, `uv.lock`, `web/package.json`, `web/pnpm-lock.yaml`, des imports du backend, des adaptateurs sous `backend/app/modules/*/infrastructure` et des fichiers Compose. La validation locale actuelle exécute sans PostgreSQL **820 tests non-DB avec succès** ; **455 tests DB** sont correctement identifiés mais nécessitent le service PostgreSQL. Les anciennes mesures de couverture restent historiques et ne constituent pas une preuve d’intégration réelle.
 
 ## 4. Dépendances documentées mais non greffées au runtime
 
@@ -116,11 +116,11 @@ Il est techniquement possible de commencer un raccordement maintenant, à condit
 
 | Priorité | Raccordement | Pourquoi maintenant / condition de sortie |
 |---:|---|---|
-| 1 | **OR-Tools ou HiGHS pour un cas d’optimisation concret** | Le premier raccordement OR-Tools case-scoped est codé sans données financières ni persistence. La sortie est un plan de capacité non décisionnel ; il faut encore valider un input métier réel, la persistence/audit et la valeur sur un cas pricing avant toute exposition HTTP. Ne pas installer les trois solveurs en même temps. |
+| 1 | **OR-Tools ou HiGHS pour un cas d’optimisation concret** | Le raccordement OR-Tools case-scoped, la persistence/audit append-only et la migration `0051` sont codés sans données financières. La validation PostgreSQL online, un input métier réel, le budget CPU/mémoire et la valeur sur un cas pricing restent à prouver avant toute exposition HTTP. Ne pas installer les trois solveurs en même temps. |
 | 2 | **Docling ou OCR local** | Le worker documentaire one-shot et la factory optionnelle sont maintenant câblés ; il faut encore constituer un corpus DCE anonymisé, mesurer CPU/RAM, tester les scans/OCR et définir le statut “candidat à revue humaine”. |
 | 3 | **RAG local avec pgvector** | Le contrat BGE/JSONB et l’antenne one-shot sont codés. Une migration pgvector ne sera envisagée qu’après corpus Golden, mesure de précision/latence/taille et comparaison avec le bridge JSONB actuel. |
 | 4 | **MinIO/S3** | Adaptateur S3-compatible et composition AppRuntime désormais codés ; reste la recette Docker réelle, l’exécution contrôlée de `scripts/verify_object_storage.py`, la stratégie de migration/backup et la restauration isolée. |
-| 5 | **Connecteurs BOAMP/URSSAF** | BOAMP possède un adaptateur HTTPS read-only, un script staging borné, une migration de persistence des observations, un scoring explicable, une lecture patronale et une qualification append-only ; la recette réseau/PostgreSQL réelle reste à faire. INSEE read-only, SMTP optionnel et export ICS local sont également des premiers slices ; URSSAF reste à traiter séparément avec secrets hors Git, idempotence, limites d’usage, audit et tests sandbox. |
+| 5 | **Connecteurs BOAMP/URSSAF** | BOAMP possède un adaptateur HTTPS read-only, un script staging borné, une persistence `0053`, un scoring explicable, une lecture/qualification patronale HTTP, une qualification append-only `0054` et un worker outbox vers port bus ; les recettes réseau/PostgreSQL/bus réels restent à faire. INSEE read-only, SMTP optionnel et export ICS local sont également des premiers slices ; URSSAF reste à traiter séparément avec secrets hors Git, idempotence, limites d’usage, audit et tests sandbox. |
 | 6 | **Playwright E2E** | Peut être ajouté dès maintenant comme outil de preuve, mais il ne remplacera pas l’absence de VPS/Docker et d’URL HTTPS réelle. |
 
 ## 7. Ce qui empêche aujourd’hui de dire « tout est codé »
