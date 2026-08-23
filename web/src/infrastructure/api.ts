@@ -34,6 +34,8 @@ import type {
   BoampObservation,
   BoampQualificationInput,
   BoampQualificationReceipt,
+  CaseDceReading,
+  KnowledgeSearchResponse,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -209,6 +211,16 @@ export function createApiClient(
           }),
         },
       ),
+    getCaseDceReading: (caseId: string) =>
+      request<CaseDceReading>(
+        `/api/v1/cases/${encodeURIComponent(caseId)}/dce-reading`,
+      ),
+    searchCaseKnowledge: (caseId: string, query: string, topK = 5) => {
+      const params = new URLSearchParams({ q: query, top_k: String(topK) });
+      return request<KnowledgeSearchResponse>(
+        `/api/v1/cases/${encodeURIComponent(caseId)}/knowledge/search?${params.toString()}`,
+      );
+    },
     getDecisionDossier: (caseId: string) =>
       request<PatronDecisionDossier>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decision-dossier`,

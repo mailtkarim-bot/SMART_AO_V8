@@ -455,3 +455,51 @@ export type BoampQualificationForm = {
 };
 
 export type BoampOpportunity = BoampObservation;
+
+
+export type CaseDceReading = {
+  case_id: string;
+  work_label: string;
+  case_lifecycle: string;
+  commercial_stage: string;
+  dce_freshness: string;
+  availability: "AVAILABLE";
+  dce: {
+    dce_version_id: string;
+    lifecycle: string;
+    integrity: string;
+    classification_readiness: string;
+    analysis_readiness: string;
+    source_received_at: string;
+  };
+  counters: {
+    total: number;
+    pending_human_confirmation: number;
+    confirmed: number;
+    review_required: number;
+    not_applicable: number;
+  };
+  requirements: Array<{
+    requirement_id: string;
+    requirement_type: string;
+    directive_signal: string;
+    confirmation_outcome: string;
+    uncertainty_status: string;
+    document_family: string;
+    source_locator_label: string;
+  }>;
+};
+
+export type KnowledgeSearchResult = {
+  source_fragment_id: string;
+  dce_version_id: string;
+  score: number;
+  locator: Record<string, unknown>;
+  embedding_model: string;
+};
+
+export type KnowledgeSearchResponse = {
+  case_id: string;
+  query: string;
+  results: KnowledgeSearchResult[];
+};

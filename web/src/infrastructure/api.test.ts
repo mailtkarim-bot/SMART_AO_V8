@@ -74,6 +74,29 @@ describe("BOAMP transport", () => {
     expect(body.command_id).toEqual(expect.any(String));
     expect(body.idempotency_key).toEqual(expect.any(String));
   });
+
+  it("reads DCE metadata and searches knowledge with encoded query parameters", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ case_id: "case-1", availability: "AVAILABLE" }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ case_id: "case-1", query: "délai", results: [] }), { status: 200 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiClient("https://app.example.test", "access-1");
+
+    await expect(client.getCaseDceReading("case/1")).resolves.toMatchObject({ availability: "AVAILABLE" });
+    await expect(client.searchCaseKnowledge("case/1", "délai d’exécution", 5)).resolves.toMatchObject({ results: [] });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://app.example.test/api/v1/cases/case%2F1/dce-reading",
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "https://app.example.test/api/v1/cases/case%2F1/knowledge/search?q=d%C3%A9lai+d%E2%80%99ex%C3%A9cution&top_k=5",
+    );
+  });
 });
 
 describe("browser authentication transport", () => {

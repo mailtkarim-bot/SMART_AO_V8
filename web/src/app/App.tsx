@@ -14,6 +14,8 @@ import { BoampOpportunityPanel } from "../features/opportunities/BoampOpportunit
 import { useBoampOpportunities } from "../features/opportunities/useBoampOpportunities";
 import { FinancialDraftPanel } from "../features/draft/FinancialDraftPanel";
 import { useFinancialDraft } from "../features/draft/useFinancialDraft";
+import { DceKnowledgePanel } from "../features/dce/DceKnowledgePanel";
+import { useDceKnowledge } from "../features/dce/useDceKnowledge";
 import { useAuthentication } from "../features/auth/useAuthentication";
 import { useBackendReadiness } from "../features/connection/useBackendReadiness";
 import {
@@ -147,6 +149,7 @@ function App() {
     await refreshScenarios(caseId);
   });
   const boamp = useBoampOpportunities(api, setMessage);
+  const dceKnowledge = useDceKnowledge(api, setMessage, selectedCaseId);
   const {
     assignments,
     selectedAssignmentId,
@@ -196,6 +199,7 @@ function App() {
     if (!selectedCaseId || !accessToken.trim()) return;
     void refreshScenarios(selectedCaseId);
     void refreshDecisionDossier(selectedCaseId);
+    void dceKnowledge.loadReading(selectedCaseId);
   }, [selectedCaseId, accessToken]);
 
   async function refreshCases() {
@@ -309,6 +313,7 @@ function App() {
           <button className={`nav-item ${activeNav === "preparation" ? "active" : ""}`} onClick={() => navigateTo("preparation-section", "preparation")}><span className="nav-icon">◇</span>Préparation</button>
           <button className={`nav-item ${activeNav === "review" ? "active" : ""}`} onClick={() => navigateTo("review-section", "review")}><span className="nav-icon">◌</span>Revue</button>
           <button className={`nav-item ${activeNav === "opportunities" ? "active" : ""}`} onClick={() => navigateTo("boamp-section", "opportunities")}><span className="nav-icon">◎</span>Opportunités BOAMP</button>
+          <button className={`nav-item ${activeNav === "dce" ? "active" : ""}`} onClick={() => navigateTo("dce-knowledge-section", "dce")}><span className="nav-icon">⌕</span>Lecture DCE / RAG</button>
           <button className={`nav-item ${activeNav === "wizard" ? "active" : ""}`} onClick={() => navigateTo("collaborator-wizard-section", "wizard")}><span className="nav-icon">⌁</span>Wizard collaborateur</button>
           <button className={`nav-item ${activeNav === "library" ? "active" : ""}`} onClick={() => navigateTo("library-section", "library")}><span className="nav-icon">▤</span>Bibliothèque</button>
           <button className={`nav-item ${activeNav === "decision" ? "active" : ""}`} onClick={() => navigateTo("decision-section", "decision")}><span className="nav-icon">◇</span>Décision</button>
@@ -404,6 +409,19 @@ function App() {
           onDecisionChange={boamp.setDecision}
           onReasonChange={boamp.setReason}
           onQualify={() => void boamp.qualifySelected()}
+        />
+
+        <DceKnowledgePanel
+          selectedCaseId={selectedCaseId}
+          reading={dceKnowledge.reading}
+          results={dceKnowledge.results}
+          query={dceKnowledge.query}
+          loading={dceKnowledge.loading}
+          searching={dceKnowledge.searching}
+          onQueryChange={dceKnowledge.setQuery}
+          onLoad={() => void dceKnowledge.loadReading()}
+          onSearch={() => void dceKnowledge.searchKnowledge()}
+          onResetSearch={dceKnowledge.resetSearch}
         />
 
         <CollaboratorWizardPanel

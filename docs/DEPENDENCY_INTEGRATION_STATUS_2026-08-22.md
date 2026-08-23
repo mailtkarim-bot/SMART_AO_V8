@@ -2,7 +2,7 @@
 
 **Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**Dernier commit fonctionnel de référence :** `7b37fa0` (revue globale et durcissement du worker bus externe, après l’extension de recette PostgreSQL `23efe31`).
+**Dernier commit fonctionnel de référence :** `3f61741` (cockpit BOAMP frontend, après le gate PostgreSQL/outbox `e66840e`). Le lot DCE/RAG frontend est validé localement et en cours de commit séparé.
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
@@ -31,7 +31,7 @@ La documentation doit donc être lue ainsi : **“Obligatoire” dans l’archit
 | Documents de base | `pypdf`, `python-docx`, `openpyxl` | Utilisés par l’extraction déterministe et l’import pricing borné. |
 | Antivirus | Adaptateur ClamAV TCP `INSTREAM`, quarantaine locale privée | Codé et fail-closed ; l’exécution réelle EICAR reste à prouver sur Docker. |
 | Stockage courant | Adaptateurs locaux privés par filesystem, permissions et hash ; adaptateur S3-compatible optionnel | Local par défaut ; S3/MinIO est greffé derrière `GeneratedDocumentStorage`, mais la recette Docker/bucket/backup réelle reste ouverte. |
-| Frontend | React, React DOM, TypeScript, Vite, Vitest, Testing Library | Cockpit initial et features métier présents ; 74 tests frontend ont passé localement. |
+| Frontend | React, React DOM, TypeScript, Vite, Vitest, Testing Library | Cockpit BOAMP, lecture DCE/RAG et features métier présents ; 93 tests frontend et le build Vite passent localement. |
 | Qualité Python | pytest, pytest-cov, Ruff, Bandit, detect-secrets, pip-audit | Présents et utilisés par les contrôles locaux/CI prévus. |
 
 La preuve de ces éléments vient des manifests `pyproject.toml`, `uv.lock`, `web/package.json`, `web/pnpm-lock.yaml`, des imports du backend, des adaptateurs sous `backend/app/modules/*/infrastructure` et des fichiers Compose. La validation locale actuelle exécute sans PostgreSQL **820 tests non-DB avec succès** ; **455 tests DB** sont correctement identifiés mais nécessitent le service PostgreSQL. Les anciennes mesures de couverture restent historiques et ne constituent pas une preuve d’intégration réelle.
@@ -53,7 +53,7 @@ La prévisualisation DPGF/BPU/Excel et la persistance de lots `PREVIEWED` ne con
 
 | Brique | Présence actuelle | Verdict |
 |---|---|---|
-| RAG applicatif | Pipeline local présent : fragments DCE admis → BGE provider → registre JSONB append-only → retrieval case-scoped → route HTTP avec citation bornée ; worker one-shot durci par `SMART_AO_RAG_ENABLED` + `SMART_AO_RAG_INDEXING_ENABLED` et wrapper opérateur UUID-scoped | **Partiel et désactivé par défaut** : migration `0050`, service, route, commande one-shot et antenne Ops existent ; l’indexation doit encore être exécutée sur un corpus DCE réel et benchmarkée. Aucun déclenchement automatique après admission n’est activé. |
+| RAG applicatif | Pipeline local présent : fragments DCE admis → BGE provider → registre JSONB append-only → retrieval case-scoped → route HTTP avec citation bornée ; worker one-shot durci par `SMART_AO_RAG_ENABLED` + `SMART_AO_RAG_INDEXING_ENABLED` et wrapper opérateur UUID-scoped | **Partiel et désactivé par défaut** : migration `0050`, service, route, commande one-shot, antenne Ops, client frontend et panel de recherche sourcée existent ; l’indexation doit encore être exécutée sur un corpus DCE réel et benchmarkée. Aucun déclenchement automatique après admission n’est activé. |
 | Modèle **BGE** éventuel | Extra Python `rag`, provider `BAAI/bge-m3`, chargement paresseux ; image Docker installable avec `SMART_AO_INSTALL_RAG=1` | **Préparé et testable avec modèle simulé** ; les poids doivent être préchargés et validés sur l’environnement cible avant activation. |
 | `pgvector` | Toujours absent ; le premier bridge persistant stocke les vecteurs en JSONB et calcule la similarité côté Python | Non intégré ; JSONB est un socle de démarrage, pas la solution de performance finale pour un corpus volumineux. |
 | Qdrant | Mentionné comme option conditionnelle, absent du Compose et du code | Non intégré, correctement différé. |
