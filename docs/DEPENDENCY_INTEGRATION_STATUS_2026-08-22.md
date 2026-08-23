@@ -2,7 +2,7 @@
 
 **Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**HEAD de référence :** `3fb13cf` (persistence/audit OR-Tools ajoutés ; l’adaptateur signature de test est en cours de documentation sur le commit suivant)
+**Dernier commit fonctionnel de référence :** `9bb8c90` (adaptateur signature de test déterministe ajouté après la persistence/audit OR-Tools `3fb13cf`)
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
