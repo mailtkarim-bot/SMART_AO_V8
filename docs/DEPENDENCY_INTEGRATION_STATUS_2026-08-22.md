@@ -1,15 +1,15 @@
 # SMART_AO V8 — État réel des dépendances et intégrations
 
-**Date de vérification :** 22 août 2026
+**Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**HEAD de référence :** `15f2e74` (stockage objet privé S3/MinIO intégré ; slice INSEE read-only en cours)
+**HEAD de référence :** `4767bb3` (antenne d’indexation RAG BGE one-shot et opt-in séparé intégrés)
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
 
 SMART_AO V8 possède aujourd’hui un **socle logiciel codé et testable**, mais il ne possède pas encore toute la panoplie d’intégrations décrite dans la spécification d’architecture initiale. Cette spécification mélange volontairement quatre catégories différentes : dépendances du noyau, composants optionnels, composants futurs et exigences d’exploitation. Une mention dans `SMART_AO_V8_ARCHITECTURE_INFRASTRUCTURE_REFERENCE.md` ne constitue donc pas une preuve d’installation ou de raccordement.
 
-Le produit est aujourd’hui dans la situation suivante : le noyau métier, la sécurité tenant-scoped, PostgreSQL/Alembic, l’upload privé, le scan ClamAV, le parsing déterministe de base, la génération documentaire contrôlée, le pricing en prévisualisation, le cockpit initial, le paquet de dépôt et le webhook HMAC sont codés dans le dépôt. Un premier adaptateur **OR-Tools CP-SAT**, un socle **RAG local avec provider BGE optionnel**, le parsing avancé Docling/PyMuPDF et un stockage objet privé S3-compatible viennent d’être ajoutés. Un adaptateur INSEE Sirene read-only est maintenant câblé derrière un port enterprise et désactivé par défaut. En revanche, HiGHS/PuLP, l’activation opérationnelle du modèle BGE, pgvector/Qdrant, la recette Docling/MinerU/OCR, la recette MinIO/S3, BOAMP/URSSAF, l’e-mail SMTP, Playwright E2E et les services Redis/n8n ne sont pas intégrés au runtime par défaut.
+Le produit est aujourd’hui dans la situation suivante : le noyau métier, la sécurité tenant-scoped, PostgreSQL/Alembic, l’upload privé, le scan ClamAV, le parsing déterministe de base, la génération documentaire contrôlée, le pricing en prévisualisation, le cockpit initial, le paquet de dépôt et le webhook HMAC sont codés dans le dépôt. Un premier adaptateur **OR-Tools CP-SAT**, un socle **RAG local avec provider BGE optionnel**, le parsing avancé Docling/PyMuPDF et un stockage objet privé S3-compatible viennent d’être ajoutés. L’antenne RAG one-shot est maintenant sécurisée par un opt-in d’indexation séparé et un wrapper opérateur tenant/Case/version-scoped. Un adaptateur INSEE Sirene read-only est maintenant câblé derrière un port enterprise et désactivé par défaut. En revanche, HiGHS/PuLP, l’activation opérationnelle du modèle BGE, pgvector/Qdrant, la recette Docling/MinerU/OCR, la recette MinIO/S3, BOAMP/URSSAF, l’e-mail SMTP, Playwright E2E et les services Redis/n8n ne sont pas intégrés au runtime par défaut.
 
 > **Verdict :** on peut commencer à greffer ces briques par slices contrôlés, mais on ne peut pas dire que tout est codé ni que le produit est opérationnel de bout en bout. Le premier raccordement doit porter sur une dépendance ayant un contrat métier et un critère de recette précis ; il ne faut pas installer toute la pile cible en bloc.
 
@@ -53,7 +53,7 @@ La prévisualisation DPGF/BPU/Excel et la persistance de lots `PREVIEWED` ne con
 
 | Brique | Présence actuelle | Verdict |
 |---|---|---|
-| RAG applicatif | Pipeline local présent : fragments DCE admis → BGE provider → registre JSONB append-only → retrieval case-scoped → route HTTP avec citation bornée ; worker one-shot durci par `SMART_AO_RAG_ENABLED` + `SMART_AO_RAG_INDEXING_ENABLED` et wrapper opérateur UUID-scoped | **Partiel et désactivé par défaut** : migration `0050`, service, route, commande one-shot et antenne Ops existent ; l’indexation doit encore être déclenchée sur un corpus DCE réel et benchmarkée. Aucun déclenchement automatique après admission n’est activé. |
+| RAG applicatif | Pipeline local présent : fragments DCE admis → BGE provider → registre JSONB append-only → retrieval case-scoped → route HTTP avec citation bornée ; worker one-shot durci par `SMART_AO_RAG_ENABLED` + `SMART_AO_RAG_INDEXING_ENABLED` et wrapper opérateur UUID-scoped | **Partiel et désactivé par défaut** : migration `0050`, service, route, commande one-shot et antenne Ops existent ; l’indexation doit encore être exécutée sur un corpus DCE réel et benchmarkée. Aucun déclenchement automatique après admission n’est activé. |
 | Modèle **BGE** éventuel | Extra Python `rag`, provider `BAAI/bge-m3`, chargement paresseux ; image Docker installable avec `SMART_AO_INSTALL_RAG=1` | **Préparé et testable avec modèle simulé** ; les poids doivent être préchargés et validés sur l’environnement cible avant activation. |
 | `pgvector` | Toujours absent ; le premier bridge persistant stocke les vecteurs en JSONB et calcule la similarité côté Python | Non intégré ; JSONB est un socle de démarrage, pas la solution de performance finale pour un corpus volumineux. |
 | Qdrant | Mentionné comme option conditionnelle, absent du Compose et du code | Non intégré, correctement différé. |
