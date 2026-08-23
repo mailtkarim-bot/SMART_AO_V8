@@ -42,7 +42,7 @@ La preuve de ces éléments vient des manifests `pyproject.toml`, `uv.lock`, `we
 
 | Brique | Présence actuelle | Ce qui manque avant raccordement |
 |---|---|---|
-| **Google OR-Tools** (`ortools`) | Présent dans `pyproject.toml` et `uv.lock` ; adaptateur CP-SAT isolé sous `modules/optimization` | Le contrat d’affectation entière, les bornes, le statut d’infaisabilité, le déterminisme et les tests sont codés. Il reste à relier le résultat à un vrai cas pricing/capacité, avec validation métier patronale, persistance d’un run et budget CPU/mémoire. |
+| **Google OR-Tools** (`ortools`) | Présent dans `pyproject.toml` et `uv.lock` ; adaptateur CP-SAT et service `CaseCapacityPlanningService` isolés sous `modules/optimization` | Le contrat d’affectation entière, les bornes, le statut d’infaisabilité, le déterminisme, la vérification tenant/Case et les tests sont codés. Le raccordement reste non persistant et non HTTP : il faut encore relier un input métier réel, une validation patronale, une persistance de run et un budget CPU/mémoire. |
 | **HiGHS** (`highspy`) | Absent des manifests et du code | Un cas d’optimisation linéaire/mixte réel, une comparaison avec OR-Tools, des budgets CPU/mémoire et un résultat reproductible. |
 | **PuLP** (`pulp`) | Absent des manifests et du code | Une nécessité de compatibilité démontrée ; ce n’est pas une source de vérité et ne doit pas être ajouté par simple anticipation. |
 | `Decimal` | Présent via la bibliothèque standard et utilisé pour les montants | Le calcul financier de base est codé ; l’optimisation combinatoire n’est pas encore un service métier. |
@@ -114,7 +114,7 @@ Il est techniquement possible de commencer un raccordement maintenant, à condit
 
 | Priorité | Raccordement | Pourquoi maintenant / condition de sortie |
 |---:|---|---|
-| 1 | **OR-Tools ou HiGHS pour un cas d’optimisation concret** | Possible après figer le contrat pricing/capacité, les données autorisées, le solveur choisi, les budgets et les tests de reproductibilité. Ne pas installer les trois solveurs en même temps. |
+| 1 | **OR-Tools ou HiGHS pour un cas d’optimisation concret** | Le premier raccordement OR-Tools case-scoped est codé sans données financières ni persistence. La sortie est un plan de capacité non décisionnel ; il faut encore valider un input métier réel, la persistence/audit et la valeur sur un cas pricing avant toute exposition HTTP. Ne pas installer les trois solveurs en même temps. |
 | 2 | **Docling ou OCR local** | Le worker documentaire one-shot et la factory optionnelle sont maintenant câblés ; il faut encore constituer un corpus DCE anonymisé, mesurer CPU/RAM, tester les scans/OCR et définir le statut “candidat à revue humaine”. |
 | 3 | **RAG local avec pgvector** | Le contrat BGE/JSONB et l’antenne one-shot sont codés. Une migration pgvector ne sera envisagée qu’après corpus Golden, mesure de précision/latence/taille et comparaison avec le bridge JSONB actuel. |
 | 4 | **MinIO/S3** | Adaptateur S3-compatible et composition AppRuntime désormais codés ; reste la recette Docker réelle, l’exécution contrôlée de `scripts/verify_object_storage.py`, la stratégie de migration/backup et la restauration isolée. |
@@ -134,7 +134,7 @@ La séquence raisonnable est la suivante :
 1. Obtenir une CI GitHub qui exécute réellement ses étapes et valider la PR #49 ; le dernier run connu a échoué avant toute étape faute de runner.
 2. Valider localement la migration 0050, le retrieval persistant et le contrat HTTP avec un corpus Golden DCE non sensible ; cette validation de contrat est désormais faite, mais pas encore le benchmark métier Golden DCE.
 3. Précharger et vérifier BGE-M3 sur une machine dédiée, puis exécuter le job one-shot d’indexation sur une version DCE admise.
-4. Raccorder l’affectation OR-Tools à un cas pricing/capacité réel, avec validation patronale et mesure du temps de résolution.
+4. Raccorder le service OR-Tools case-scoped à un cas pricing/capacité réel, avec validation patronale, persistence/audit et mesure du temps de résolution.
 5. Comparer le bridge JSONB à pgvector seulement après le benchmark ; ne pas introduire Qdrant sans besoin mesuré.
 6. Recetter sur Docker réel le parsing avancé et S3/MinIO ; exécuter ensuite une recette INSEE avec token opérateur et données non sensibles, puis ajouter BOAMP/URSSAF/SMTP un par un derrière des ports et adaptateurs, avec secrets, budgets, rate limits, audit et possibilité de désactivation.
 
