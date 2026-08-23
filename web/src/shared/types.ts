@@ -414,3 +414,44 @@ export type CurrentActor = {
   actor_kind: string;
   membership_state: string;
 };
+
+
+export type BoampObservation = {
+  observation_id: string;
+  source_notice_id: string;
+  title: string | null;
+  publication_date: string | null;
+  response_deadline: string | null;
+  department_codes: string[];
+  market_types: string[];
+  source_status: string | null;
+  score_version: string;
+  score: number;
+  score_explanation: Record<string, unknown>;
+  fingerprint_sha256: string;
+};
+
+export type BoampQualificationDecision = "QUALIFIED" | "REJECTED" | "SNOOZED";
+export type BoampQualificationReason =
+  | "RELEVANT_PUBLIC_SIGNAL"
+  | "NOT_RELEVANT"
+  | "INSUFFICIENT_PUBLIC_DATA"
+  | "EXPIRED";
+
+export type BoampQualificationInput = {
+  decision: BoampQualificationDecision;
+  reason_code: BoampQualificationReason;
+};
+
+export type BoampQualificationReceipt = {
+  qualification_id: string;
+  event_id: string;
+  replayed: boolean;
+};
+
+export type BoampQualificationForm = {
+  decision: BoampQualificationDecision;
+  reason_code: BoampQualificationReason;
+};
+
+export type BoampOpportunity = BoampObservation;

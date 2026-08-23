@@ -25,6 +25,57 @@ describe("api client response parsing", () => {
 });
 
 
+describe("BOAMP transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lists observations and posts a closed qualification command", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ observations: [] }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            qualification_id: "qualification-1",
+            event_id: "event-1",
+            replayed: false,
+          }),
+          { status: 200 },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiClient("https://app.example.test", "access-1");
+
+    await expect(client.listBoampObservations()).resolves.toEqual({ observations: [] });
+    await expect(
+      client.qualifyBoampObservation("obs/1", {
+        decision: "QUALIFIED",
+        reason_code: "RELEVANT_PUBLIC_SIGNAL",
+      }),
+    ).resolves.toMatchObject({ replayed: false });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://app.example.test/api/v1/patron/boamp-opportunities",
+      expect.objectContaining({ credentials: "include" }),
+    );
+    const request = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "https://app.example.test/api/v1/patron/boamp-opportunities/obs%2F1/qualification",
+    );
+    const body = JSON.parse(String(request.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      decision: "QUALIFIED",
+      reason_code: "RELEVANT_PUBLIC_SIGNAL",
+    });
+    expect(body.command_id).toEqual(expect.any(String));
+    expect(body.idempotency_key).toEqual(expect.any(String));
+  });
+});
+
 describe("browser authentication transport", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

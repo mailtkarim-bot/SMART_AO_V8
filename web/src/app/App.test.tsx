@@ -35,6 +35,7 @@ vi.mock("../features/auth/useAuthentication", () => ({
         listAssignedCases: () => Promise.resolve([]),
         listPatronAssignments: () => Promise.resolve({ items: [] }),
         listPatronActions: () => Promise.resolve({ items: [], open_count: 0 }),
+        listBoampObservations: () => Promise.resolve({ observations: [] }),
         listPricingScenarios: () => Promise.resolve([]),
         getDecisionDossier: () => Promise.reject(Object.assign(new Error("missing"), { status: 404 })),
         ...overridesRef.current,
@@ -76,6 +77,7 @@ function baseOverrides(): Record<string, unknown> {
     listAssignedCases: () => Promise.resolve([CASE]),
     listPatronAssignments: () => Promise.resolve({ items: [] }),
     listPatronActions: () => Promise.resolve({ items: [], open_count: 0 }),
+    listBoampObservations: () => Promise.resolve({ observations: [] }),
     listPricingScenarios: () => Promise.resolve([]),
     getDecisionDossier: () =>
       Promise.reject(Object.assign(new Error("ignored"), { status: 404 })),

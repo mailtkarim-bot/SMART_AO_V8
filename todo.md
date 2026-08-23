@@ -36,6 +36,7 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 - [x] **Harnais PostgreSQL local** — `scripts/start_local_postgres.sh`, image PostgreSQL 16 digest-pinnée, volume local isolé, port hôte `5433`, healthcheck, réutilisation sûre et tests CLI sans fuite du mot de passe. La validation online reste à exécuter sur la machine Docker de l’utilisateur.
 - [x] **Revue globale et activation contrôlée du bus** — `docs/GLOBAL_REVIEW_2026-08-23.md`, `docs/EXTERNAL_EVENT_BUS_CONTRACT.md`, worker bus désactivé par défaut, opt-in explicite, configuration HTTPS obligatoire, profil Compose préproduction `external-bus` et tests de configuration. Aucun fournisseur réel n’est simulé.
 - [x] **Gate PostgreSQL du worker outbox** — `backend/tests/process/test_opportunity_event_bus_persistence.py`, recette étendue aux tests observations `0053`, qualification `0054` et worker outbox, plus `docs/NEXT_LOT_POSTGRES_OUTBOX_GATE.md`. Les tests sont codés et collectables ; leur exécution online reste ouverte tant que Docker/PostgreSQL n’est pas accessible.
+- [x] **Cockpit frontend BOAMP** — feature `web/src/features/opportunities`, méthodes API de lecture/qualification, sélection patronale, décisions et motifs fermés, message de rejeu idempotent et navigation intégrée à `App.tsx`. Les 85 tests frontend et le build Vite passent ; l’appel réel attend une URL HTTPS backend vérifiée.
 
 ## Vérifications externes encore ouvertes
 

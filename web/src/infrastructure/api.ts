@@ -31,6 +31,9 @@ import type {
   EnterpriseCapability,
   EnterpriseCapabilityInput,
   EnterpriseCapabilityVersionInput,
+  BoampObservation,
+  BoampQualificationInput,
+  BoampQualificationReceipt,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -187,6 +190,25 @@ export function createApiClient(
       ),
     listPatronActions: () =>
       request<{ items: PatronAction[]; open_count: number }>("/api/v1/patron/actions"),
+    listBoampObservations: () =>
+      request<{ observations: BoampObservation[] }>(
+        "/api/v1/patron/boamp-opportunities",
+      ),
+    qualifyBoampObservation: (
+      observationId: string,
+      input: BoampQualificationInput,
+    ) =>
+      request<BoampQualificationReceipt>(
+        `/api/v1/patron/boamp-opportunities/${encodeURIComponent(observationId)}/qualification`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            ...input,
+          }),
+        },
+      ),
     getDecisionDossier: (caseId: string) =>
       request<PatronDecisionDossier>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decision-dossier`,

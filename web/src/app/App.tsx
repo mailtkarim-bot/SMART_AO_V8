@@ -10,6 +10,8 @@ import { useCollaboratorWizard } from "../features/wizard/useCollaboratorWizard"
 import { PatronCockpitPanel } from "../features/cockpit/PatronCockpitPanel";
 import { PatronDecisionPanel } from "../features/decision/PatronDecisionPanel";
 import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
+import { BoampOpportunityPanel } from "../features/opportunities/BoampOpportunityPanel";
+import { useBoampOpportunities } from "../features/opportunities/useBoampOpportunities";
 import { FinancialDraftPanel } from "../features/draft/FinancialDraftPanel";
 import { useFinancialDraft } from "../features/draft/useFinancialDraft";
 import { useAuthentication } from "../features/auth/useAuthentication";
@@ -144,6 +146,7 @@ function App() {
     setSelectedCaseId(caseId);
     await refreshScenarios(caseId);
   });
+  const boamp = useBoampOpportunities(api, setMessage);
   const {
     assignments,
     selectedAssignmentId,
@@ -186,6 +189,7 @@ function App() {
     void refreshAssignments();
     void refreshActions();
     void refreshEnterpriseCompany();
+    void boamp.refreshObservations();
   }, [accessToken]);
 
   useEffect(() => {
@@ -304,6 +308,7 @@ function App() {
           <button className={`nav-item ${activeNav === "overview" ? "active" : ""}`} onClick={() => navigateTo("overview-section", "overview")}><span className="nav-icon">▦</span>Vue d’ensemble</button>
           <button className={`nav-item ${activeNav === "preparation" ? "active" : ""}`} onClick={() => navigateTo("preparation-section", "preparation")}><span className="nav-icon">◇</span>Préparation</button>
           <button className={`nav-item ${activeNav === "review" ? "active" : ""}`} onClick={() => navigateTo("review-section", "review")}><span className="nav-icon">◌</span>Revue</button>
+          <button className={`nav-item ${activeNav === "opportunities" ? "active" : ""}`} onClick={() => navigateTo("boamp-section", "opportunities")}><span className="nav-icon">◎</span>Opportunités BOAMP</button>
           <button className={`nav-item ${activeNav === "wizard" ? "active" : ""}`} onClick={() => navigateTo("collaborator-wizard-section", "wizard")}><span className="nav-icon">⌁</span>Wizard collaborateur</button>
           <button className={`nav-item ${activeNav === "library" ? "active" : ""}`} onClick={() => navigateTo("library-section", "library")}><span className="nav-icon">▤</span>Bibliothèque</button>
           <button className={`nav-item ${activeNav === "decision" ? "active" : ""}`} onClick={() => navigateTo("decision-section", "decision")}><span className="nav-icon">◇</span>Décision</button>
@@ -387,6 +392,19 @@ function App() {
         </section>
 
         <section className="section-block" id="review-section"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Connectez-vous avec votre compte pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
+
+        <BoampOpportunityPanel
+          observations={boamp.observations}
+          selectedObservationId={boamp.selectedObservationId}
+          qualificationForm={boamp.qualificationForm}
+          loading={boamp.loading}
+          qualifying={boamp.qualifying}
+          onRefresh={() => void boamp.refreshObservations()}
+          onSelect={boamp.selectObservation}
+          onDecisionChange={boamp.setDecision}
+          onReasonChange={boamp.setReason}
+          onQualify={() => void boamp.qualifySelected()}
+        />
 
         <CollaboratorWizardPanel
           wizardCaseId={wizardCaseId}

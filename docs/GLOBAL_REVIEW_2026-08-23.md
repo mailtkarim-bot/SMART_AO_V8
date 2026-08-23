@@ -4,7 +4,7 @@
 
 Le dépôt possède un **noyau métier sécurisé et largement codé**, mais il ne constitue pas encore une plateforme opérationnelle intégralement raccordée. Les frontières hexagonales, la résolution serveur du tenant et de l’acteur, l’idempotence, l’append-only, la révision optimiste et la confidentialité financière sont présentes dans les slices livrés. En revanche, une dépendance déclarée dans l’architecture cible ne doit pas être confondue avec une intégration active : plusieurs composants sont optionnels, désactivés par défaut ou attendent une recette Docker, PostgreSQL, fournisseur ou VPS réelle.
 
-La branche auditée est `docs/pricing-http-next-lot-28`, propre au moment de la revue, avec le dernier commit poussé `23efe31`. La chaîne Alembic comporte les migrations `0051` OR-Tools, `0052` profils de veille, `0053` observations BOAMP et `0054` qualifications BOAMP. Le code SQL offline est disponible ; aucune preuve PostgreSQL online n’est revendiquée dans le sandbox, qui ne dispose ni de Docker ni de PostgreSQL local.
+La branche auditée est `docs/pricing-http-next-lot-28`, propre au moment de la revue, avec le dernier commit fonctionnel de référence `e66840e`; les modifications frontend BOAMP de ce lot sont en cours de validation. La chaîne Alembic comporte les migrations `0051` OR-Tools, `0052` profils de veille, `0053` observations BOAMP et `0054` qualifications BOAMP. Le code SQL offline est disponible ; aucune preuve PostgreSQL online n’est revendiquée dans le sandbox, qui ne dispose ni de Docker ni de PostgreSQL local.
 
 ## Niveau réel des dépendances
 
@@ -16,7 +16,7 @@ La branche auditée est `docs/pricing-http-next-lot-28`, propre au moment de la 
 | RAG/BGE | Préparé, désactivé | Migration `0050`, provider optionnel, registre JSONB, retrieval et worker one-shot | Précharger les poids, corpus Golden DCE, benchmark, puis décider JSONB/pgvector/Qdrant. |
 | Docling/PyMuPDF/OCR | Ports et extras optionnels | Factories et fallback déterministe | Corpus scans/tableaux, budgets CPU/RAM et revue humaine. |
 | S3/MinIO | Adaptateur optionnel | Stockage privé, hash, écriture non écrasante et script de vérification | Bucket réel, permissions, lifecycle, backup/restore et recette Docker. |
-| BOAMP | Greffé jusqu’à la frontière applicative | Staging borné, persistence `0053`, scoring, lecture/qualification `0054`, outbox | PostgreSQL online, recette réseau contrôlée et fournisseur bus réel. |
+| BOAMP | Greffé jusqu’à la frontière frontend | Staging borné, persistence `0053`, scoring, lecture/qualification `0054`, routes HTTP, panel patronal frontend et outbox | PostgreSQL online, recette réseau contrôlée et fournisseur bus réel. |
 | INSEE Sirene | Adaptateur read-only optionnel | Port, route et activation runtime | Token opérateur hors Git et recette réelle non sensible. |
 | SMTP/ICS | Adaptateurs optionnels | Workers, ports et activation explicite | Compte SMTP/agenda réel, délivrabilité et synchronisation distante. |
 | Bus externe | Contrat générique et worker codés | Allowlist, HMAC, lease, retry, `2xx` avant `PUBLISHED`, activation désormais explicite | Contrat fournisseur, endpoint, auth, déduplication et replay réels. |
@@ -39,7 +39,7 @@ Le worker bus externe vient d’être durci : `SMART_AO_EXTERNAL_EVENT_BUS_ENABL
 
 ## Ce qui reste codable immédiatement et ce qui ne l’est pas
 
-Le prochain travail codable est le durcissement des antennes d’intégration et de leurs recettes : configuration runtime explicite, contrats opérateur, tests de non-fuite, validation des transitions outbox et documentation. Ce travail peut être effectué sans fournisseur réel. En revanche, le raccordement à un endpoint bus, l’activation BGE sur des poids réels, un bucket S3 réel, l’URL HTTPS frontend et le gate VPS ne doivent pas être simulés dans le sandbox.
+Le panel patronal BOAMP, son hook de chargement/qualification et son client API sont maintenant ajoutés avec 85 tests frontend et un build de production réussis. Le prochain travail codable reste le durcissement des antennes d’intégration et de leurs recettes : configuration runtime explicite, contrats opérateur, tests de non-fuite, validation des transitions outbox et documentation. Ce travail peut être effectué sans fournisseur réel. En revanche, le raccordement à un endpoint bus, l’activation BGE sur des poids réels, un bucket S3 réel, l’URL HTTPS frontend et le gate VPS ne doivent pas être simulés dans le sandbox.
 
 Les tâches actuellement ouvertes dans `todo.md` sont donc principalement des preuves externes : recette PostgreSQL réelle, contrat fournisseur bus, runners GitHub Actions fonctionnels, gate VPS, URL HTTPS frontend et rapport opérateur de restauration. Elles restent ouvertes à juste titre.
 

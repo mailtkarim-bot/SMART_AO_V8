@@ -216,3 +216,26 @@ input:focus, select:focus, textarea:focus { border-color: #8096fc; box-shadow: 0
 .enterprise-version-grid textarea { min-height: 72px; resize: vertical; }
 @media (max-width: 900px) { .enterprise-capability-grid, .enterprise-version-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 480px) { .enterprise-capability-grid, .enterprise-version-grid { grid-template-columns: 1fr; } .enterprise-capability-row { align-items: flex-start; flex-direction: column; } }
+
+/* BOAMP opportunity cockpit */
+.section-actions { display: flex; align-items: center; gap: 0.75rem; }
+.compact-button { min-height: 2.2rem; padding: 0.45rem 0.8rem; font-size: 0.76rem; }
+.section-note { margin: -0.55rem 0 1.25rem; color: #7d8ba0; font-size: 0.86rem; }
+.boamp-layout { display: grid; grid-template-columns: minmax(15rem, 0.8fr) minmax(22rem, 1.4fr); gap: 1rem; }
+.boamp-list { display: grid; align-content: start; gap: 0.65rem; }
+.boamp-item { display: grid; gap: 0.45rem; width: 100%; padding: 0.95rem 1rem; border: 1px solid #e0e7f0; border-radius: 0.75rem; background: #fff; color: inherit; text-align: left; cursor: pointer; }
+.boamp-item:hover, .boamp-item.selected { border-color: #91a4ff; background: #f7f9ff; }
+.boamp-item strong { overflow: hidden; font-size: 0.92rem; line-height: 1.35; text-overflow: ellipsis; }
+.boamp-item > span:last-child, .boamp-deadline { color: #7d8ba0; font-size: 0.76rem; }
+.boamp-item-top, .boamp-detail-heading, .boamp-facts > div { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.boamp-detail { min-width: 0; padding: 1.25rem; border: 1px solid #e0e7f0; border-radius: 0.75rem; background: #fff; }
+.boamp-detail-heading h3, .boamp-qualification h3 { margin: 0.25rem 0 0; }
+.score-emphasis { color: #6278da; font-size: 2.25rem; font-weight: 750; line-height: 1; }
+.score-emphasis small { color: #7d8ba0; font-size: 0.8rem; font-weight: 500; }
+.boamp-facts { display: grid; gap: 0.7rem; margin: 1.35rem 0; padding: 1rem 0; border-top: 1px solid #edf1f6; border-bottom: 1px solid #edf1f6; }
+.boamp-facts dt { color: #7d8ba0; font-size: 0.76rem; }
+.boamp-facts dd { max-width: 65%; margin: 0; color: #273650; font-size: 0.82rem; text-align: right; }
+.boamp-qualification { display: grid; gap: 0.75rem; }
+.boamp-qualification label { display: grid; gap: 0.35rem; color: #7d8ba0; font-size: 0.76rem; }
+.boamp-qualification select { min-height: 2.5rem; }
+@media (max-width: 900px) { .boamp-layout { grid-template-columns: 1fr; } }
