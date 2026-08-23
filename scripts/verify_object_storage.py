@@ -11,7 +11,6 @@ from uuid import uuid4
 
 from app.platform.storage.object_storage import S3PrivateObjectStorage
 
-
 VERIFY_CONTENT = b"SMART_AO_OBJECT_STORAGE_VERIFY_V1\n"
 
 

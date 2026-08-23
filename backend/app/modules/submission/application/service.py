@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.modules.enterprise.infrastructure.models import EnterpriseDocumentRecord
 from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
 from app.modules.submission.application.commands import PrepareSubmissionPackageCommand
+from app.modules.submission.application.notifications import SUBMISSION_EXPORT_EMAIL_TOPIC
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -137,6 +138,10 @@ class SubmissionPackageService:
             "archive_sha256": archive_sha256,
             "delivery": "DOWNLOAD",
         }
+        email_payload = {
+            "submission_package_id": str(submission_package_id),
+            "delivery": "EXPORT_READY",
+        }
         with self._session_factory.begin() as session:
             self._audit_writer.record(
                 session=session,
@@ -195,6 +200,22 @@ class SubmissionPackageService:
                     published_at=None,
                     last_error_code=None,
                     dedupe_key=f"submission-export:{event_id}",
+                )
+            )
+            session.add(
+                OutboxMessageRecord(
+                    id=uuid4(),
+                    tenant_id=actor.tenant_id,
+                    event_id=event_id,
+                    topic=SUBMISSION_EXPORT_EMAIL_TOPIC,
+                    payload_version=1,
+                    payload_json=email_payload,
+                    status="PENDING",
+                    attempt_count=0,
+                    next_attempt_at=now,
+                    published_at=None,
+                    last_error_code=None,
+                    dedupe_key=f"submission-export-email:{event_id}",
                 )
             )
         return archive_bytes

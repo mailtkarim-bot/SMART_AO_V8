@@ -158,6 +158,8 @@ services:
     build:
       context: ..
       dockerfile: ops/docker/backend.Dockerfile
+      args:
+        SMART_AO_INSTALL_NOTIFICATIONS: ${SMART_AO_INSTALL_NOTIFICATIONS:-0}
     command: python -m app.workers.submission_export_webhook
     restart: unless-stopped
     logging: *default-logging
@@ -178,6 +180,42 @@ services:
     networks:
       # edge grants outbound HTTPS to the external deposit portal only;
       # internal keeps database access. No inbound exposure is declared.
+      - edge
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  submission-export-smtp-worker:
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+      args:
+        SMART_AO_INSTALL_NOTIFICATIONS: ${SMART_AO_INSTALL_NOTIFICATIONS:-0}
+    command: python -m app.workers.submission_export_smtp
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+      SMART_AO_SMTP_ENABLED: ${SMART_AO_SMTP_ENABLED:-0}
+      SMART_AO_SMTP_HOST: ${SMART_AO_SMTP_HOST:-}
+      SMART_AO_SMTP_PORT: ${SMART_AO_SMTP_PORT:-587}
+      SMART_AO_SMTP_FROM: ${SMART_AO_SMTP_FROM:-}
+      SMART_AO_SMTP_TO: ${SMART_AO_SMTP_TO:-}
+      SMART_AO_SMTP_USERNAME: ${SMART_AO_SMTP_USERNAME:-}
+      SMART_AO_SMTP_PASSWORD: ${SMART_AO_SMTP_PASSWORD:-}
+      SMART_AO_SMTP_USE_TLS: ${SMART_AO_SMTP_USE_TLS:-0}
+      SMART_AO_SMTP_START_TLS: ${SMART_AO_SMTP_START_TLS:-}
+      SMART_AO_SMTP_TIMEOUT_SECONDS: ${SMART_AO_SMTP_TIMEOUT_SECONDS:-10}
+      SMART_AO_SMTP_BATCH_SIZE: ${SMART_AO_SMTP_BATCH_SIZE:-50}
+      SMART_AO_SMTP_LEASE_SECONDS: ${SMART_AO_SMTP_LEASE_SECONDS:-120}
+      SMART_AO_SMTP_POLL_SECONDS: ${SMART_AO_SMTP_POLL_SECONDS:-30}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
       - edge
       - internal
     security_opt:

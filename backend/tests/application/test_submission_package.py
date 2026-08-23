@@ -230,6 +230,20 @@ def test_submission_package_is_hashed_idempotent_and_append_only(services, sessi
         assert audit.metadata_json == {"channel": "download"}
         assert notification is not None
         assert notification.payload_json["archive_sha256"]
+        smtp_notification = session.scalar(
+            sa.select(OutboxMessageRecord).where(
+                OutboxMessageRecord.tenant_id == actor.tenant_id,
+                OutboxMessageRecord.topic == "submission.package.exported.smtp",
+            )
+        )
+        assert smtp_notification is not None
+        assert smtp_notification.event_id == notification.event_id
+        assert smtp_notification.payload_json == {
+            "submission_package_id": str(record.id),
+            "delivery": "EXPORT_READY",
+        }
+        assert "archive_sha256" not in smtp_notification.payload_json
+        assert "financial_snapshot_id" not in smtp_notification.payload_json
 
 
     with pytest.raises(sa.exc.ProgrammingError), session_factory.begin() as session:

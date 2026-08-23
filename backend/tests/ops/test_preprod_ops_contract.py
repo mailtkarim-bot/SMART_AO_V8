@@ -43,11 +43,13 @@ def test_7b_units_and_rotation_contract_are_present() -> None:
         assert marker in runbook
 
 
-def test_deploy_starts_submission_webhook_worker_explicitly() -> None:
+def test_deploy_starts_submission_notification_workers_explicitly() -> None:
     deploy_script = (OPS / "deploy-preprod.sh").read_text(encoding="utf-8")
     assert "submission-export-webhook-worker" in deploy_script
+    assert "submission-export-smtp-worker" in deploy_script
     assert (
-        "compose up -d backend dce-retention-worker submission-export-webhook-worker"
+        "compose up -d backend dce-retention-worker submission-export-webhook-worker "
+        "submission-export-smtp-worker"
         in deploy_script
     )
 
@@ -82,16 +84,21 @@ def test_preprod_services_use_minimal_environment_allowlists() -> None:
         "  submission-export-webhook-worker:", maxsplit=1
     )[0]
     webhook = compose.split("  submission-export-webhook-worker:", maxsplit=1)[1].split(
+        "  submission-export-smtp-worker:", maxsplit=1
+    )[0]
+    smtp = compose.split("  submission-export-smtp-worker:", maxsplit=1)[1].split(
         "\n  postgres:", maxsplit=1
     )[0]
 
     assert "SMART_AO_JWT_SIGNING_KEY" in backend
     assert "SMART_AO_JWT_SIGNING_KEY" not in retention
     assert "SMART_AO_JWT_SIGNING_KEY" not in webhook
+    assert "SMART_AO_JWT_SIGNING_KEY" not in smtp
     assert "SMART_AO_EXPORT_WEBHOOK_SECRET" in webhook
     assert "POSTGRES_PASSWORD" not in backend
     assert "POSTGRES_PASSWORD" not in retention
     assert "POSTGRES_PASSWORD" not in webhook
+    assert "POSTGRES_PASSWORD" not in smtp
 
 
 def test_deploy_validates_libpq_password_alignment() -> None:
@@ -165,12 +172,16 @@ def test_insee_connector_is_disabled_by_default_and_secret_is_backend_only() -> 
         "  submission-export-webhook-worker:", maxsplit=1
     )[0]
     webhook = compose.split("  submission-export-webhook-worker:", maxsplit=1)[1].split(
+        "  submission-export-smtp-worker:", maxsplit=1
+    )[0]
+    smtp = compose.split("  submission-export-smtp-worker:", maxsplit=1)[1].split(
         "\n  postgres:", maxsplit=1
     )[0]
     assert "SMART_AO_INSEE_ENABLED: ${SMART_AO_INSEE_ENABLED:-0}" in backend
     assert "SMART_AO_INSEE_API_TOKEN: ${SMART_AO_INSEE_API_TOKEN:-}" in backend
     assert "SMART_AO_INSEE_API_TOKEN" not in retention
     assert "SMART_AO_INSEE_API_TOKEN" not in webhook
+    assert "SMART_AO_INSEE_API_TOKEN" not in smtp
 
 
 def test_optional_notifications_build_and_runtime_flags_are_explicit() -> None:
@@ -180,6 +191,8 @@ def test_optional_notifications_build_and_runtime_flags_are_explicit() -> None:
     assert 'pip install --no-cache-dir ".[notifications]"' in dockerfile
     assert "SMART_AO_INSTALL_NOTIFICATIONS" in compose
     assert "SMART_AO_SMTP_ENABLED: ${SMART_AO_SMTP_ENABLED:-0}" in compose
+    assert "SMART_AO_SMTP_TO: ${SMART_AO_SMTP_TO:-}" in compose
+    assert "python -m app.workers.submission_export_smtp" in compose
 
 
 def test_smtp_credentials_are_allowlisted_only_for_backend() -> None:
@@ -191,12 +204,17 @@ def test_smtp_credentials_are_allowlisted_only_for_backend() -> None:
         "  submission-export-webhook-worker:", maxsplit=1
     )[0]
     webhook = compose.split("  submission-export-webhook-worker:", maxsplit=1)[1].split(
+        "  submission-export-smtp-worker:", maxsplit=1
+    )[0]
+    smtp = compose.split("  submission-export-smtp-worker:", maxsplit=1)[1].split(
         "\n  postgres:", maxsplit=1
     )[0]
     assert "SMART_AO_SMTP_PASSWORD" in backend
     assert "SMART_AO_SMTP_USERNAME" in backend
     assert "SMART_AO_SMTP_PASSWORD" not in retention
     assert "SMART_AO_SMTP_PASSWORD" not in webhook
+    assert "SMART_AO_SMTP_PASSWORD" in smtp
+    assert "SMART_AO_SMTP_TO" in smtp
 
 
 def test_optional_calendar_build_flag_is_explicit() -> None:
