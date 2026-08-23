@@ -17,6 +17,20 @@ def test_recipe_refuses_missing_database_url(capsys) -> None:
     assert "postgresql://" not in captured.out + captured.err
 
 
+def test_recipe_runs_both_boamp_persistence_suites(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+
+    monkeypatch.setattr(recipe.subprocess, "run", fake_run)
+    recipe._run_db_tests(database_url="postgresql://recipe-user:recipe-password@localhost/smart_ao")
+
+    assert calls
+    assert "tests/infrastructure/test_boamp_observation_persistence.py" in calls[0]
+    assert "tests/infrastructure/test_boamp_qualification_persistence.py" in calls[0]
+
+
 def test_recipe_prints_sanitized_success_verdict_without_db(capsys, monkeypatch) -> None:
     monkeypatch.setattr(
         recipe,
