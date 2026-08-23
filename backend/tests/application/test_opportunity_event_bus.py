@@ -209,7 +209,10 @@ def test_build_default_worker_requires_explicit_bus_configuration(monkeypatch) -
         module.build_default_worker()
 
     monkeypatch.setenv("SMART_AO_EXTERNAL_EVENT_BUS_ENABLED", "1")
-    monkeypatch.setenv("SMART_AO_DATABASE_URL", "postgresql+psycopg://user:pass@localhost/db")
+    database_url = (
+        "postgresql+psycopg://user:pass@localhost/db"  # pragma: allowlist secret
+    )
+    monkeypatch.setenv("SMART_AO_DATABASE_URL", database_url)
     monkeypatch.delenv("SMART_AO_EXTERNAL_EVENT_BUS_URL", raising=False)
     monkeypatch.delenv("SMART_AO_EXTERNAL_EVENT_BUS_TOKEN", raising=False)
     with pytest.raises(RuntimeError, match="requires"):

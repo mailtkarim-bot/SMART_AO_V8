@@ -28,7 +28,7 @@ def test_notifier_sends_minimal_export_notice_without_sensitive_payload() -> Non
         port=587,
         sender="no-reply@example.test",
         username="smtp-user",
-        password="smtp-password",
+        password="smtp-password",  # pragma: allowlist secret
         use_tls=False,
         start_tls=True,
         timeout_seconds=7,
@@ -59,7 +59,7 @@ def test_notifier_sends_minimal_export_notice_without_sensitive_payload() -> Non
         "use_tls": False,
         "start_tls": True,
         "username": "smtp-user",
-        "password": "smtp-password",
+        "password": "smtp-password",  # pragma: allowlist secret
     }
 
 

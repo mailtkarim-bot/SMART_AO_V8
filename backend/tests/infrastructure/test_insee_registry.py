@@ -81,7 +81,9 @@ def test_insee_lookup_fails_closed_on_external_errors(status_code: int) -> None:
         registry.find_by_siren(siren="123456789")
 
 
-@pytest.mark.parametrize("siren", ["", "123", "12345678A"])
+@pytest.mark.parametrize(  # pragma: allowlist secret
+    "siren", ["", "123", "12345678A"]  # pragma: allowlist secret
+)
 def test_insee_lookup_rejects_invalid_siren(siren: str) -> None:
     registry = InseeSireneRegistry(token="token", client=FakeClient(FakeResponse(200)))
 

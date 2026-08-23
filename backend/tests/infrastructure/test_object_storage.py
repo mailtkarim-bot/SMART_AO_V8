@@ -39,8 +39,12 @@ def test_s3_write_is_private_conditional_and_hashes_content() -> None:
     storage = S3PrivateObjectStorage(bucket="private", client=client)
 
     digest = storage.write(storage_key="tenant/object.bin", content=b"stored")
+    expected_digest = (
+        "87b04e58961f9a99d853d4046a0b5b793e7c3e4bbd21f5aca8fb17c20c"  # pragma: allowlist secret
+        "db1d8b"
+    )
 
-    assert digest == "87b04e58961f9a99d853d4046a0b5b793e7c3e4bbd21f5aca8fb17c20cdb1d8b"
+    assert digest == expected_digest
     assert client.put_requests[0]["Bucket"] == "private"
     assert client.put_requests[0]["Key"] == "tenant/object.bin"
     assert client.put_requests[0]["IfNoneMatch"] == "*"

@@ -75,7 +75,7 @@ def test_fake_docker_start_does_not_print_password(tmp_path: Path) -> None:
     result = _run_script(
         tmp_path,
         SMART_AO_TEST_DB_PORT="55433",
-        SMART_AO_TEST_DB_PASSWORD="super-secret-local",
+        SMART_AO_TEST_DB_PASSWORD="super-secret-local",  # pragma: allowlist secret
         SMART_AO_POSTGRES_WAIT_SECONDS="2",
     )
 

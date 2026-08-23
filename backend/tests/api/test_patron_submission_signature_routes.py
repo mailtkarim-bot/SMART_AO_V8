@@ -24,7 +24,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 NOW = datetime(2026, 8, 23, 12, 0, tzinfo=UTC)
-SECRET = "test-signature-secret-0123456789abcdef"
+SECRET = "test-signature-secret-0123456789abcdef"  # pragma: allowlist secret
 PROVIDER = "TEST_PROVIDER"
 PACKAGE_ID = uuid4()
 SIGNATURE_ID = uuid4()

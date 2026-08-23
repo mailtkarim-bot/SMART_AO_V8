@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
+from ipaddress import IPv4Network, IPv6Network, ip_address, ip_network
 from typing import Protocol
 from uuid import UUID
 
@@ -62,6 +64,9 @@ class AuthenticationHttpRuntime:
     clock: Clock
     context_resolver: AuthenticationContextResolver
     rate_limiter: LoginRateLimiter = field(default_factory=LoginRateLimiter.from_environment)
+    trusted_proxy_networks: tuple[IPv4Network | IPv6Network, ...] = field(
+        default_factory=lambda: _trusted_proxy_networks_from_environment()
+    )
 
     @classmethod
     def create(
@@ -73,6 +78,7 @@ class AuthenticationHttpRuntime:
         csrf_token_generator: CsrfTokenGenerator,
         clock: Clock,
         rate_limiter: LoginRateLimiter | None = None,
+        trusted_proxy_networks: tuple[IPv4Network | IPv6Network, ...] | None = None,
     ) -> AuthenticationHttpRuntime:
         audited_service = (
             authentication_service
@@ -96,6 +102,11 @@ class AuthenticationHttpRuntime:
                 clock=clock,
             ),
             rate_limiter=rate_limiter or LoginRateLimiter.from_environment(),
+            trusted_proxy_networks=(
+                trusted_proxy_networks
+                if trusted_proxy_networks is not None
+                else _trusted_proxy_networks_from_environment()
+            ),
         )
 
 
@@ -132,7 +143,9 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
 
     @router.post("/login", response_model=AccessTokenResponse)
     def login(request: LoginRequest, http_request: Request) -> JSONResponse:
-        source_ip = _source_ip(http_request)
+        source_ip = _source_ip(
+            http_request, trusted_proxy_networks=runtime.trusted_proxy_networks
+        )
         decision = runtime.rate_limiter.check(
             namespace="login",
             identity=request.email,
@@ -190,7 +203,9 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
         request: Request,
         csrf_header: str | None = Header(default=None, alias=_CSRF_HEADER_NAME),
     ) -> JSONResponse:
-        source_ip = _source_ip(request)
+        source_ip = _source_ip(
+            request, trusted_proxy_networks=runtime.trusted_proxy_networks
+        )
         decision = runtime.rate_limiter.check(
             namespace="refresh",
             identity=None,
@@ -285,8 +300,53 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
     return router
 
 
-def _source_ip(request: Request) -> str:
-    return request.client.host if request.client is not None else "unknown"
+def _source_ip(
+    request: Request,
+    *,
+    trusted_proxy_networks: tuple[IPv4Network | IPv6Network, ...] = (),
+) -> str:
+    """Resolve the source IP without trusting client-supplied headers by default.
+
+    ``X-Forwarded-For`` is considered only when the direct peer belongs to an
+    explicitly configured proxy network. The first address is then the address
+    asserted by that trusted edge proxy; direct clients cannot forge it.
+    """
+    peer = request.client.host if request.client is not None else "unknown"
+    if not trusted_proxy_networks:
+        return peer
+    try:
+        peer_address = ip_address(peer)
+    except ValueError:
+        return peer
+    if not any(peer_address in network for network in trusted_proxy_networks):
+        return peer
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if not forwarded_for:
+        return peer
+    candidate = forwarded_for.split(",", 1)[0].strip()
+    try:
+        ip_address(candidate)
+    except ValueError:
+        return peer
+    return candidate
+
+
+def _trusted_proxy_networks_from_environment() -> tuple[IPv4Network | IPv6Network, ...]:
+    raw = os.getenv("SMART_AO_TRUSTED_PROXY_CIDRS", "").strip()
+    if not raw:
+        return ()
+    networks: list[IPv4Network | IPv6Network] = []
+    for value in raw.split(","):
+        normalized = value.strip()
+        if not normalized:
+            continue
+        try:
+            networks.append(ip_network(normalized, strict=False))
+        except ValueError as error:
+            raise RuntimeError(
+                "SMART_AO_TRUSTED_PROXY_CIDRS must contain valid CIDR networks"
+            ) from error
+    return tuple(networks)
 
 
 def _rate_limited(retry_after_seconds: int) -> HTTPException:

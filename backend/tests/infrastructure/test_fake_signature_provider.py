@@ -9,7 +9,7 @@ from app.modules.submission.infrastructure.fake_signature_provider import (
 )
 from fastapi import HTTPException
 
-SECRET = "test-signature-callback-secret-0123456789"
+SECRET = "test-signature-callback-secret-0123456789"  # pragma: allowlist secret
 SIGNATURE_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001")
 PACKAGE_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002")
 DELIVERY_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003")
@@ -79,4 +79,4 @@ def test_test_provider_callback_matches_raw_body_hmac_verification() -> None:
 
 def test_test_provider_rejects_a_weak_secret() -> None:
     with pytest.raises(ValueError, match="32"):
-        SignatureProviderTestAdapter(callback_secret="weak")
+        SignatureProviderTestAdapter(callback_secret="weak")  # pragma: allowlist secret

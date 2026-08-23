@@ -56,6 +56,7 @@ dev = [
   "bandit>=1.8,<2.0",
   "detect-secrets>=1.5,<2.0",
   "pip-audit>=2.9,<3.0",
+  "mypy>=1.15,<2.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -79,6 +80,13 @@ markers = [
   "process: Process Managers, outbox et déduplication",
   "e2e: parcours de bout en bout multi-module",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+follow_imports = "skip"
+check_untyped_defs = true
+warn_unused_ignores = true
 
 [tool.coverage.run]
 branch = true

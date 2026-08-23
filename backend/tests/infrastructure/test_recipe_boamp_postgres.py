@@ -24,7 +24,11 @@ def test_recipe_runs_both_boamp_persistence_suites(monkeypatch) -> None:
         calls.append(command)
 
     monkeypatch.setattr(recipe.subprocess, "run", fake_run)
-    recipe._run_db_tests(database_url="postgresql://recipe-user:recipe-password@localhost/smart_ao")
+    database_url = (
+        "postgresql://recipe-user:recipe-password@"  # pragma: allowlist secret
+        "localhost/smart_ao"
+    )
+    recipe._run_db_tests(database_url=database_url)
 
     assert calls
     assert "tests/infrastructure/test_boamp_observation_persistence.py" in calls[0]
@@ -43,7 +47,10 @@ def test_recipe_prints_sanitized_success_verdict_without_db(capsys, monkeypatch)
         recipe.main(
             [
                 "--database-url",
-                "postgresql://recipe-user:recipe-password@localhost/smart_ao",
+                (
+                    "postgresql://recipe-user:recipe-password@"  # pragma: allowlist secret
+                    "localhost/smart_ao"
+                ),
                 "--skip-tests",
             ]
         )

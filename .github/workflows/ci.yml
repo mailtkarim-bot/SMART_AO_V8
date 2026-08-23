@@ -32,6 +32,12 @@ jobs:
         run: uv sync --group dev
       - name: Lint
         run: uv run ruff check .
+      - name: Type check security core
+        run: >-
+          uv run mypy backend/app/platform/security/authorization.py
+          backend/app/platform/security/context.py
+          backend/app/platform/security/rate_limit.py
+          backend/app/platform/security/tokens.py
       - name: Secrets scan
         run: >-
           git ls-files -z | xargs -0
