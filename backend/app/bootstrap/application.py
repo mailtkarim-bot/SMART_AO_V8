@@ -64,6 +64,9 @@ from app.interfaces.http.routes.patron_enterprise_capabilities import (
 from app.interfaces.http.routes.patron_enterprise_library import (
     build_patron_enterprise_library_router,
 )
+from app.interfaces.http.routes.patron_enterprise_registry import (
+    build_patron_enterprise_registry_router,
+)
 from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
 )
@@ -131,6 +134,7 @@ from app.modules.enterprise.application.enterprise_upload import (
     EnterprisePrivateUploadService,
     enterprise_upload_handlers,
 )
+from app.modules.enterprise.application.registry_lookup import EnterpriseRegistryLookupService
 from app.modules.enterprise.infrastructure.insee_registry import (
     CompanyRegistryPort,
     InseeSireneRegistry,
@@ -583,6 +587,7 @@ def create_app(
     authentication_runtime: AuthenticationHttpRuntime | None = None,
     knowledge_service: KnowledgeRetrievalService | None = None,
     public_notice_search: PublicNoticeSearchPort | None = None,
+    company_registry: CompanyRegistryPort | None = None,
     expose_api_docs: bool = True,
 ) -> FastAPI:
     app = FastAPI(
@@ -808,6 +813,13 @@ def create_app(
             app.include_router(
                 build_market_watch_router(
                     service=PublicNoticeSearchService(search_port=public_notice_search),
+                    security_runtime=security_runtime,
+                )
+            )
+        if company_registry is not None:
+            app.include_router(
+                build_patron_enterprise_registry_router(
+                    service=EnterpriseRegistryLookupService(registry=company_registry),
                     security_runtime=security_runtime,
                 )
             )

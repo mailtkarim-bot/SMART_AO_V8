@@ -47,6 +47,7 @@ class Capability(StrEnum):
     FINANCIAL_REPORT_PUBLISH = "financial.report.publish"
     FINANCIAL_REPORT_LINE_WRITE = "financial.report.line.write"
     ENTERPRISE_LIBRARY_READ = "enterprise.library.read"
+    ENTERPRISE_REGISTRY_READ = "enterprise.registry.read"
     ENTERPRISE_LIBRARY_WRITE = "enterprise.library.write"
     ENTERPRISE_CAPABILITY_READ = "enterprise.capability.read"
     ENTERPRISE_CAPABILITY_WRITE = "enterprise.capability.write"
@@ -81,6 +82,7 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.FINANCIAL_REPORT_PUBLISH,
         Capability.FINANCIAL_REPORT_LINE_WRITE,
         Capability.ENTERPRISE_LIBRARY_READ,
+        Capability.ENTERPRISE_REGISTRY_READ,
         Capability.ENTERPRISE_LIBRARY_WRITE,
         Capability.ENTERPRISE_CAPABILITY_READ,
         Capability.ENTERPRISE_CAPABILITY_WRITE,
