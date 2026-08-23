@@ -2,7 +2,7 @@
 
 **Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**Dernier commit fonctionnel de référence :** `798bbec` (recette PostgreSQL BOAMP 0053/0054, après les routes HTTP `4a189ea` et le worker bus `e2526d2`)
+**Dernier commit fonctionnel de référence :** `793b334` (worker bus BOAMP ingestion/qualification, après les routes HTTP `4a189ea` et la recette PostgreSQL `798bbec`)
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
@@ -158,6 +158,6 @@ La séquence raisonnable est la suivante :
 
 Le slice BOAMP est désormais greffé jusqu’à la frontière HTTP et outbox, sans prétendre à une intégration fournisseur réelle. Le routeur patronal `GET /api/v1/patron/boamp-opportunities` expose une projection minimale tenant-scoped ; `POST /api/v1/patron/boamp-opportunities/{observation_id}/qualification` accepte seulement les décisions et motifs fermés du contrat humain. Les capacités `opportunity.observation.read` et `opportunity.observation.qualify` restent réservées au patron, et l’acteur comme le tenant sont résolus côté serveur.
 
-Le worker `app.workers.opportunity_event_bus` ne consomme que `opportunity.boamp.qualification.recorded`. Il réclame les messages avec `FOR UPDATE SKIP LOCKED`, pose une lease, applique un payload exact limité à quatre identifiants/décisions, puis marque `PUBLISHED` uniquement après un accusé `2xx` du port `ExternalEventBusPort`. L’adaptateur HTTPS générique est opt-in par `SMART_AO_EXTERNAL_EVENT_BUS_URL` et `SMART_AO_EXTERNAL_EVENT_BUS_TOKEN`; aucun SDK Kafka/RabbitMQ, endpoint inventé ou appel réseau réel n’est inclus. En l’absence de configuration, la notification reste en retry et n’est pas déclarée publiée.
+Le worker `app.workers.opportunity_event_bus` ne consomme que `opportunity.boamp.ingestion.recorded` et `opportunity.boamp.qualification.recorded`. Il réclame les messages avec `FOR UPDATE SKIP LOCKED`, pose une lease, applique un payload exact limité à quatre identifiants/décisions, puis marque `PUBLISHED` uniquement après un accusé `2xx` du port `ExternalEventBusPort`. L’adaptateur HTTPS générique est opt-in par `SMART_AO_EXTERNAL_EVENT_BUS_URL` et `SMART_AO_EXTERNAL_EVENT_BUS_TOKEN`; aucun SDK Kafka/RabbitMQ, endpoint inventé ou appel réseau réel n’est inclus. En l’absence de configuration, la notification reste en retry et n’est pas déclarée publiée.
 
 La recette `scripts/recipe_boamp_postgres.py` est une antenne opérateur : `--apply` lance Alembic `head`, puis la vérification exige la révision `20260823_0054`, les quatre tables BOAMP et les quatre triggers append-only avant les tests de persistence. La sortie est un verdict JSON sans URL ni secret. Dans le sandbox, `--help`, les tests CLI et les tests ciblés passent ; l’exécution online reste **BLOCKED** par l’absence de PostgreSQL local. La recette réseau BOAMP, le bus réel et la preuve de migration online doivent être exécutés sur un environnement contrôlé disposant des services et credentials hors Git.
