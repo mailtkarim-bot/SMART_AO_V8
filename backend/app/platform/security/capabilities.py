@@ -16,6 +16,8 @@ class Capability(StrEnum):
     DCE_PREPARE = "dce.prepare"
     CASE_DCE_READ = "case.dce.read"
     MARKET_WATCH_READ = "market.watch.read"
+    OPPORTUNITY_PROFILE_READ = "opportunity.profile.read"
+    OPPORTUNITY_PROFILE_WRITE = "opportunity.profile.write"
     DCE_REQUIREMENT_CONFIRM = "dce.requirement.confirm"
     ASSIGNMENT_ACKNOWLEDGE = "assignment.acknowledge"
     ASSIGNMENT_CLARIFY = "assignment.clarify"
@@ -63,6 +65,8 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
         Capability.MARKET_WATCH_READ,
+        Capability.OPPORTUNITY_PROFILE_READ,
+        Capability.OPPORTUNITY_PROFILE_WRITE,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.ASSIGNMENT_MANAGE,
         Capability.DOCUMENT_ADMIN_READ,

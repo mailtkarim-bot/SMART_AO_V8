@@ -1,0 +1,1 @@
+"""Pure opportunity domain rules."""
