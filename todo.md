@@ -32,6 +32,7 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 - [x] **HTTP lecture/qualification patronale** — commit `4a189ea` : routes FastAPI tenant-scoped, bearer et acteur résolus serveur, capabilities patronales, DTOs `extra=forbid`, projection minimale et qualification humaine append-only.
 - [x] **Notification outbox vers bus externe** — commits `e2526d2` et `793b334` : `ExternalEventBusPort`, adaptateur HTTPS générique opt-in, adapter mémoire de test et worker borné aux topics BOAMP d’ingestion et de qualification ; aucun `PUBLISHED` sans accusé externe `2xx`, aucun polling Manus et aucun fournisseur inventé.
 - [x] **Recette PostgreSQL 0053/0054** — commit `798bbec` : `scripts/recipe_boamp_postgres.py`, validation d’URL, application Alembic optionnelle, contrôle de la révision `20260823_0054`, des tables/triggers append-only et lancement des tests ciblés ; aucune URL/secret dans la sortie.
+- [x] **Durcissement qualification BOAMP** — commit `394c3c4` : exception applicative typée pour les conflits d’idempotence, suppression du catch-all `RuntimeError` dans la route et test PostgreSQL couvrant qualification, rejeu, unicité event/outbox et trigger append-only ; l’exécution online reste dépendante d’un PostgreSQL disponible.
 
 ## Vérifications externes encore ouvertes
 

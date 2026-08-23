@@ -26,8 +26,10 @@ from app.modules.opportunity.application.boamp_qualification import (  # noqa: E
     QualificationDecision,
     QualificationReason,
 )
+from app.modules.opportunity.application.boamp_qualification_errors import (  # noqa: E402
+    BoampQualificationIdempotencyConflict,
+)
 from app.modules.opportunity.infrastructure.boamp_qualification_repository import (  # noqa: E402
-    BoampQualificationPersistenceConflict,
     BoampQualificationRepository,
 )
 from app.platform.events.dispatcher import CommandContext  # noqa: E402
@@ -117,7 +119,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         TypeError,
         ValueError,
         PermissionError,
-        BoampQualificationPersistenceConflict,
+        BoampQualificationIdempotencyConflict,
         sa.exc.SQLAlchemyError,
     ) as error:
         print(f"BOAMP patron operation refused: {error}", file=sys.stderr)
