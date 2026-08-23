@@ -38,12 +38,13 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 - [x] **Gate PostgreSQL du worker outbox** — `backend/tests/process/test_opportunity_event_bus_persistence.py`, recette étendue aux tests observations `0053`, qualification `0054` et worker outbox, plus `docs/NEXT_LOT_POSTGRES_OUTBOX_GATE.md`. Les tests sont codés et collectables ; leur exécution online reste ouverte tant que Docker/PostgreSQL n’est pas accessible.
 - [x] **Cockpit frontend BOAMP** — feature `web/src/features/opportunities`, méthodes API de lecture/qualification, sélection patronale, décisions et motifs fermés, message de rejeu idempotent et navigation intégrée à `App.tsx`. Les tests frontend et le build Vite passent ; l’appel réel attend une URL HTTPS backend vérifiée.
 - [x] **Lecture DCE/RAG frontend** — feature `web/src/features/dce`, projections `/dce-reading`, recherche `/knowledge/search`, compteurs de complétude, exigences structurées et localisations sources. Les 93 tests frontend et le build Vite passent ; PostgreSQL online, poids BGE et corpus Golden DCE restent à valider.
+- [x] **KNOWLEDGE-BENCHMARK-01** — value objects purs et `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG anonymisé, tenant-scoped et sans contenu sensible, puis calculer `recall_at_k`, moyenne et p95 à partir d’un rapport d’identifiants externe. Aucun corpus, modèle BGE ou résultat réel n’est fabriqué.
 
 ## Vérifications externes encore ouvertes
 
 - [ ] Exécuter la recette avec PostgreSQL 16 réellement accessible, puis conserver le verdict, les hashes de migration et la preuve des triggers append-only. Le sandbox actuel répond `connection refused` sur `127.0.0.1:5432`.
 - [ ] Définir avec le fournisseur réel le contrat de bus, l’URL HTTPS, le mode d’authentification, les garanties de livraison et la stratégie de replay ; injecter ensuite ces paramètres hors Git et exécuter une recette contrôlée. Aucun bus réel n’est configuré dans le dépôt.
-- [ ] Rétablir des runners GitHub Actions exécutants avant de considérer une CI distante comme verte ou de fusionner la PR #49/main.
+- [ ] Rétablir des runners GitHub Actions exécutants avant de considérer une CI distante comme verte ou de fusionner la PR #49/main. Les runs `32653263423` et `32653234492` échouent avant toute étape (`steps: []`).
 
 ## Frontières explicitement non retenues par les audits
 

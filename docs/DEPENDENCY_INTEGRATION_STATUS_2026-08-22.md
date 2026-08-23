@@ -2,7 +2,7 @@
 
 **Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**Dernier commit fonctionnel de référence :** `238868f` (cockpit BOAMP et lecture DCE/RAG frontend, après le gate PostgreSQL/outbox `e66840e`).
+**Dernier commit fonctionnel de référence :** `fa48c02` (cockpit BOAMP, lecture DCE/RAG frontend et contrat de benchmark Golden identifier-only, après le gate PostgreSQL/outbox `e66840e`).
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive
@@ -53,7 +53,7 @@ La prévisualisation DPGF/BPU/Excel et la persistance de lots `PREVIEWED` ne con
 
 | Brique | Présence actuelle | Verdict |
 |---|---|---|
-| RAG applicatif | Pipeline local présent : fragments DCE admis → BGE provider → registre JSONB append-only → retrieval case-scoped → route HTTP avec citation bornée ; worker one-shot durci par `SMART_AO_RAG_ENABLED` + `SMART_AO_RAG_INDEXING_ENABLED` et wrapper opérateur UUID-scoped | **Partiel et désactivé par défaut** : migration `0050`, service, route, commande one-shot, antenne Ops, client frontend et panel de recherche sourcée existent ; l’indexation doit encore être exécutée sur un corpus DCE réel et benchmarkée. Aucun déclenchement automatique après admission n’est activé. |
+| RAG applicatif | Pipeline local présent : fragments DCE admis → BGE provider → registre JSONB append-only → retrieval case-scoped → route HTTP avec citation bornée ; worker one-shot durci par `SMART_AO_RAG_ENABLED` + `SMART_AO_RAG_INDEXING_ENABLED` et wrapper opérateur UUID-scoped | **Partiel et désactivé par défaut** : migration `0050`, service, route, commande one-shot, antenne Ops, client frontend, panel de recherche sourcée et validateur de manifeste benchmark existent ; l’indexation doit encore être exécutée sur un corpus DCE réel et benchmarkée. Aucun déclenchement automatique après admission n’est activé. |
 | Modèle **BGE** éventuel | Extra Python `rag`, provider `BAAI/bge-m3`, chargement paresseux ; image Docker installable avec `SMART_AO_INSTALL_RAG=1` | **Préparé et testable avec modèle simulé** ; les poids doivent être préchargés et validés sur l’environnement cible avant activation. |
 | `pgvector` | Toujours absent ; le premier bridge persistant stocke les vecteurs en JSONB et calcule la similarité côté Python | Non intégré ; JSONB est un socle de démarrage, pas la solution de performance finale pour un corpus volumineux. |
 | Qdrant | Mentionné comme option conditionnelle, absent du Compose et du code | Non intégré, correctement différé. |

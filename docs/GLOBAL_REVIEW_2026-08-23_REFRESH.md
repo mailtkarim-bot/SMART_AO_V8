@@ -2,7 +2,7 @@
 
 **Date : 23 août 2026**  
 **Branche : `docs/pricing-http-next-lot-28`**  
-**Dernier commit poussé : [`238868f`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/238868f)**
+**Dernier commit poussé : [`fa48c02`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/fa48c02)**
 **Auteur : Manus AI**
 
 ## 1. Verdict exécutif
@@ -13,7 +13,7 @@ Le produit n’est toutefois pas encore **opérationnel de bout en bout**. Les d
 
 ## 2. État du code livré dans ce lot
 
-Le lot en cours étend `web/src/features/dce/` avec `DceKnowledgePanel.tsx` et `useDceKnowledge.ts`. Le client API expose `getCaseDceReading(caseId)` et `searchCaseKnowledge(caseId, query, topK)`. `App.tsx` hydrate la lecture lorsque l’affaire sélectionnée change et ajoute la navigation **Lecture DCE / RAG**.
+Le lot précédent étend `web/src/features/dce/` avec `DceKnowledgePanel.tsx` et `useDceKnowledge.ts`. Le nouveau lot ajoute le value object pur `backend/app/modules/knowledge/application/benchmark.py`, le contrat `docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md` et la commande `scripts/validate_knowledge_benchmark.py` pour valider un manifeste Golden DCE/RAG et scorer un rapport d’identifiants externe.
 
 La lecture affiche uniquement les champs prévus par le contrat public : fraîcheur, cycle de vie, intégrité, compteurs, exigences structurées et localisation source. La recherche envoie une requête bornée à 500 caractères et un `top_k` fixé à 5 côté client. La vue affiche le score, le modèle d’embedding et un libellé de localisation ; elle n’affiche pas le contenu intégral du fragment ni de données financières.
 
@@ -23,7 +23,7 @@ La lecture affiche uniquement les champs prévus par le contrat public : fraîch
 | Lecture DCE | Codée dans le backend et raccordée au frontend | DTO `CaseDceReadingResponse`, route `/api/v1/cases/{case_id}/dce-reading`, panel frontend. |
 | Recherche knowledge/RAG | Codée derrière une route existante et raccordée au frontend | DTO fermé, route `/api/v1/cases/{case_id}/knowledge/search`, recherche `q`/`top_k`. |
 | DCE exigences | Projection et compteurs disponibles | Exigences limitées à la projection serveur, confirmation humaine non remplacée par une décision IA. |
-| RAG/BGE | Antenne activable, pas activation production | Provider optionnel, retrieval et worker existants ; poids et corpus réels non chargés. |
+| RAG/BGE | Antenne activable, pas activation production | Provider optionnel, retrieval, worker et benchmark de manifeste existants ; poids et corpus réels non chargés. |
 
 ## 3. Dépendances et intégrations
 
@@ -65,18 +65,18 @@ uv run python scripts/recipe_boamp_postgres.py --apply
 
 | Contrôle | Résultat |
 |---|---:|
-| Tests frontend après BOAMP + DCE/RAG | **92 passed** |
+| Tests frontend après BOAMP + DCE/RAG | **93 passed** |
 | Build TypeScript/Vite | **Passé** |
 | Tests du hook DCE/RAG | **4 passed** |
 | Tests du panel DCE/RAG | **3 passed** |
 | Tests du client API | **5 passed** |
 | Tests d’intégration App | **4 passed** |
-| Migration offline Alembic jusqu’à `0054` | Disponible/passée précédemment |
+| Migration offline Alembic jusqu’à `0054` | **Passée** |
 | Migration online et tests PostgreSQL | **Non prouvés dans le sandbox** |
 | Docker réel | **Indisponible dans le sandbox** |
 | Fournisseur bus réel | **Non configuré et non appelé** |
 
-Le lot DCE/RAG frontend a été relu, validé puis poussé dans le commit `238868f`. Le worktree est propre ; l’absence de preuve PostgreSQL online reste indépendante du succès des tests frontend.
+Le lot DCE/RAG frontend a été poussé dans `238868f`, la documentation a été réconciliée dans `e5c4d05`, puis KNOWLEDGE-BENCHMARK-01 a été poussé dans `fa48c02`. Le code est validé localement ; seul le corpus réel, le cache BGE et la recette d’exécution restent externes. L’absence de preuve PostgreSQL online est indépendante des tests locaux.
 
 ## 6. Tâches ouvertes et ordre recommandé
 
@@ -84,8 +84,8 @@ Les tâches restantes dans `todo.md` concernent principalement des preuves exter
 
 L’ordre recommandé est le suivant :
 
-1. faire passer le gate frontend et backend local après le lot DCE/RAG ;
-2. commit/push du lot frontend DCE/RAG et mise à jour des documents canoniques ;
+1. faire passer le gate frontend et backend local après les lots DCE/RAG et benchmark ;
+2. commit/push du lot KNOWLEDGE-BENCHMARK-01 et mise à jour des documents canoniques — **réalisé dans `fa48c02`** ;
 3. exécuter PostgreSQL 16 et Alembic `0051`–`0054` sur Docker réel ;
 4. lancer les tests de persistence BOAMP et du worker outbox ;
 5. charger un corpus DCE non financier contrôlé et mesurer retrieval/fraîcheur/localisation ;
@@ -105,3 +105,4 @@ L’ordre recommandé est le suivant :
 - [`docs/LOCAL_POSTGRES_TESTING.md`](LOCAL_POSTGRES_TESTING.md)
 - [`docs/reference/SMART_AO_V8_DCE_DOCUMENT_EXTRACTION_01_CONTRAT.md`](reference/SMART_AO_V8_DCE_DOCUMENT_EXTRACTION_01_CONTRAT.md)
 - [`docs/reference/SMART_AO_V8_KNOWLEDGE_INDEXING_OPS_01_CONTRAT.md`](reference/SMART_AO_V8_KNOWLEDGE_INDEXING_OPS_01_CONTRAT.md)
+- [`docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md`](reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md)
