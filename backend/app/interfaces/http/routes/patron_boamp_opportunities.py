@@ -14,6 +14,9 @@ from app.modules.opportunity.application.boamp_qualification import (
     QualificationDecision,
     QualificationReason,
 )
+from app.modules.opportunity.application.boamp_qualification_errors import (
+    BoampQualificationIdempotencyConflict,
+)
 from app.modules.opportunity.public.boamp_qualification_contracts import (
     BoampObservationListResponse,
     BoampObservationQualificationRequest,
@@ -128,7 +131,7 @@ def build_patron_boamp_opportunity_router(
             raise HTTPException(status_code=403, detail="FORBIDDEN") from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail="INVALID_QUALIFICATION") from error
-        except RuntimeError as error:
+        except BoampQualificationIdempotencyConflict as error:
             raise HTTPException(status_code=409, detail="IDEMPOTENCY_CONFLICT") from error
         response = BoampQualificationReceiptResponse(
             qualification_id=result.qualification_id,

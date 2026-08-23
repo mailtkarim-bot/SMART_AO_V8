@@ -15,15 +15,14 @@ if TYPE_CHECKING:
         BoampQualificationCommand,
     )
 
+from app.modules.opportunity.application.boamp_qualification_errors import (
+    BoampQualificationIdempotencyConflict,
+)
 from app.modules.opportunity.infrastructure.observation_models import (
     BoampOpportunityObservationRecord,
     BoampOpportunityQualificationRecord,
 )
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord
-
-
-class BoampQualificationPersistenceConflict(RuntimeError):
-    """The qualification identity is reused for an incompatible command."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +78,7 @@ class BoampQualificationRepository:
             )
         ).all()
         if len({record.id for record in candidates}) > 1:
-            raise BoampQualificationPersistenceConflict(
+            raise BoampQualificationIdempotencyConflict(
                 "ambiguous qualification identity collision"
             )
         if candidates:
@@ -90,7 +89,7 @@ class BoampQualificationRepository:
                 or record.decision != command.decision.value
                 or record.reason_code != command.reason_code.value
             ):
-                raise BoampQualificationPersistenceConflict("qualification idempotency conflict")
+                raise BoampQualificationIdempotencyConflict("qualification idempotency conflict")
             event = session.scalar(
                 sa.select(DomainEventRecord).where(
                     DomainEventRecord.tenant_id == tenant_id,
@@ -99,7 +98,7 @@ class BoampQualificationRepository:
                 )
             )
             if event is None:
-                raise BoampQualificationPersistenceConflict(
+                raise BoampQualificationIdempotencyConflict(
                     "qualification replay has no audit event"
                 )
             return QualificationPersistenceResult(

@@ -8,6 +8,9 @@ from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.patron_boamp_opportunities import (
     build_patron_boamp_opportunity_router,
 )
+from app.modules.opportunity.application.boamp_qualification_errors import (
+    BoampQualificationIdempotencyConflict,
+)
 from app.platform.security.context import ActorKind
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -85,22 +88,32 @@ def _observation() -> SimpleNamespace:
     )
 
 
-def _runtime(*values: object):
+def _runtime(*values: object, repository: FakeRepository | None = None):
     return SimpleNamespace(
         session_factory=SessionFactory(*values),
-        boamp_qualification_repository=FakeRepository(),
+        boamp_qualification_repository=repository or FakeRepository(),
     )
 
 
 class FakeRepository:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+
     def list_observations(self, *, session, tenant_id, limit, min_score):
         return (_observation(),)
 
     def persist_qualification(self, **_kwargs):
+        if self.error is not None:
+            raise self.error
         return SimpleNamespace(qualification_id=uuid4(), event_id=uuid4(), replayed=False)
 
 
-def _client(*, allowed: bool = True, session_values: tuple[object, ...] = (uuid4(),)):
+def _client(
+    *,
+    allowed: bool = True,
+    session_values: tuple[object, ...] = (uuid4(),),
+    repository: FakeRepository | None = None,
+):
     context = SimpleNamespace(
         tenant_id=TENANT_ID,
         actor_id=ACTOR_ID,
@@ -113,7 +126,7 @@ def _client(*, allowed: bool = True, session_values: tuple[object, ...] = (uuid4
     app = FastAPI()
     app.include_router(
         build_patron_boamp_opportunity_router(
-            runtime=_runtime(*session_values),
+            runtime=_runtime(*session_values, repository=repository),
             security_runtime=ConsultationSecurityRuntime(
                 context_resolver=FakeResolver(context),
                 policy=FakePolicy(allowed=allowed),
@@ -174,6 +187,26 @@ def test_qualification_route_denies_policy_before_write() -> None:
 
     assert response.status_code == 403
     assert response.json()["detail"] == "FORBIDDEN"
+
+
+def test_qualification_conflict_maps_only_typed_error_to_409() -> None:
+    client = _client(
+        session_values=(uuid4(), _observation()),
+        repository=FakeRepository(error=BoampQualificationIdempotencyConflict("reused")),
+    )
+    response = client.post(
+        f"/api/v1/patron/boamp-opportunities/{OBSERVATION_ID}/qualification",
+        headers={"Authorization": "Bearer token"},
+        json={
+            "decision": "QUALIFIED",
+            "reason_code": "RELEVANT_PUBLIC_SIGNAL",
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "IDEMPOTENCY_CONFLICT"}
 
 
 def test_route_payload_is_closed() -> None:
