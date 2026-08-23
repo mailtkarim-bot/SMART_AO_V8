@@ -15,6 +15,7 @@ from app.workers.opportunity_event_bus import (
     BOAMP_QUALIFICATION_TOPIC,
     OpportunityEventBusWorker,
     _safe_payload,
+    external_event_bus_enabled,
 )
 
 
@@ -192,6 +193,27 @@ def test_worker_retries_after_external_rejection() -> None:
     assert message.attempt_count == 1
     assert message.last_error_code == "EXTERNAL_EVENT_BUS_DELIVERY_FAILED"
     assert message.next_attempt_at > datetime(2026, 8, 23, 12, tzinfo=UTC)
+
+
+def test_external_event_bus_is_disabled_by_default() -> None:
+    assert external_event_bus_enabled({}) is False
+    assert external_event_bus_enabled({"SMART_AO_EXTERNAL_EVENT_BUS_ENABLED": "0"}) is False
+    assert external_event_bus_enabled({"SMART_AO_EXTERNAL_EVENT_BUS_ENABLED": "1"}) is True
+
+
+def test_build_default_worker_requires_explicit_bus_configuration(monkeypatch) -> None:
+    from app.workers import opportunity_event_bus as module
+
+    monkeypatch.delenv("SMART_AO_EXTERNAL_EVENT_BUS_ENABLED", raising=False)
+    with pytest.raises(RuntimeError, match="disabled"):
+        module.build_default_worker()
+
+    monkeypatch.setenv("SMART_AO_EXTERNAL_EVENT_BUS_ENABLED", "1")
+    monkeypatch.setenv("SMART_AO_DATABASE_URL", "postgresql+psycopg://user:pass@localhost/db")
+    monkeypatch.delenv("SMART_AO_EXTERNAL_EVENT_BUS_URL", raising=False)
+    monkeypatch.delenv("SMART_AO_EXTERNAL_EVENT_BUS_TOKEN", raising=False)
+    with pytest.raises(RuntimeError, match="requires"):
+        module.build_default_worker()
 
 
 def test_http_bus_requires_https_and_nontrivial_token() -> None:

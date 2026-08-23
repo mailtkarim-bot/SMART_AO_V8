@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -170,17 +171,25 @@ def _retry_delay(attempt_count: int) -> timedelta:
     return timedelta(seconds=min(30 * (2 ** max(attempt_count - 1, 0)), 3600))
 
 
+def external_event_bus_enabled(environ: Mapping[str, str] | None = None) -> bool:
+    values = environ if environ is not None else os.environ
+    return values.get("SMART_AO_EXTERNAL_EVENT_BUS_ENABLED", "0") == "1"
+
+
 def build_default_worker() -> OpportunityEventBusWorker:
+    if not external_event_bus_enabled():
+        raise RuntimeError("external event bus worker is disabled")
     database_url = os.environ["SMART_AO_DATABASE_URL"]
-    engine = sa.create_engine(database_url)
-    sessions = sessionmaker(bind=engine, expire_on_commit=False)
     bus_url = os.getenv("SMART_AO_EXTERNAL_EVENT_BUS_URL") or None
     bus_token = os.getenv("SMART_AO_EXTERNAL_EVENT_BUS_TOKEN") or None
-    bus = (
-        HttpExternalEventBus(url=bus_url, token=bus_token)
-        if bus_url and bus_token
-        else None
-    )
+    if not bus_url or not bus_token:
+        raise RuntimeError(
+            "external event bus requires SMART_AO_EXTERNAL_EVENT_BUS_URL and "
+            "SMART_AO_EXTERNAL_EVENT_BUS_TOKEN"
+        )
+    engine = sa.create_engine(database_url)
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    bus = HttpExternalEventBus(url=bus_url, token=bus_token)
     return OpportunityEventBusWorker(
         session_factory=sessions,
         bus=bus,
@@ -190,6 +199,9 @@ def build_default_worker() -> OpportunityEventBusWorker:
 
 
 def main() -> None:
+    if not external_event_bus_enabled():
+        print("external event bus worker disabled")
+        return
     worker = build_default_worker()
     poll_seconds = float(os.getenv("SMART_AO_EXTERNAL_EVENT_BUS_POLL_SECONDS", "30"))
     while True:

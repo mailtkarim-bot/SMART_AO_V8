@@ -224,6 +224,34 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  opportunity-event-bus-worker:
+    profiles: ["external-bus"]
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: python -m app.workers.opportunity_event_bus
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+      SMART_AO_EXTERNAL_EVENT_BUS_ENABLED: ${SMART_AO_EXTERNAL_EVENT_BUS_ENABLED:-0}
+      SMART_AO_EXTERNAL_EVENT_BUS_URL: ${SMART_AO_EXTERNAL_EVENT_BUS_URL:-}
+      SMART_AO_EXTERNAL_EVENT_BUS_TOKEN: ${SMART_AO_EXTERNAL_EVENT_BUS_TOKEN:-}
+      SMART_AO_EXTERNAL_EVENT_BUS_BATCH_SIZE: ${SMART_AO_EXTERNAL_EVENT_BUS_BATCH_SIZE:-50}
+      SMART_AO_EXTERNAL_EVENT_BUS_LEASE_SECONDS: ${SMART_AO_EXTERNAL_EVENT_BUS_LEASE_SECONDS:-120}
+      SMART_AO_EXTERNAL_EVENT_BUS_POLL_SECONDS: ${SMART_AO_EXTERNAL_EVENT_BUS_POLL_SECONDS:-30}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - edge
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
   postgres:
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped

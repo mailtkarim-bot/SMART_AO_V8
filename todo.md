@@ -34,6 +34,7 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 - [x] **Recette PostgreSQL 0053/0054** — commit `798bbec` : `scripts/recipe_boamp_postgres.py`, validation d’URL, application Alembic optionnelle, contrôle de la révision `20260823_0054`, des tables/triggers append-only et lancement des tests ciblés ; aucune URL/secret dans la sortie.
 - [x] **Durcissement qualification BOAMP** — commits `394c3c4` et `cc27f85` : exception applicative typée pour les conflits d’idempotence, suppression du catch-all `RuntimeError` dans la route, alignement du script CLI et test PostgreSQL couvrant qualification, rejeu, unicité event/outbox et trigger append-only ; l’exécution online reste dépendante d’un PostgreSQL disponible.
 - [x] **Harnais PostgreSQL local** — `scripts/start_local_postgres.sh`, image PostgreSQL 16 digest-pinnée, volume local isolé, port hôte `5433`, healthcheck, réutilisation sûre et tests CLI sans fuite du mot de passe. La validation online reste à exécuter sur la machine Docker de l’utilisateur.
+- [x] **Revue globale et activation contrôlée du bus** — `docs/GLOBAL_REVIEW_2026-08-23.md`, `docs/EXTERNAL_EVENT_BUS_CONTRACT.md`, worker bus désactivé par défaut, opt-in explicite, configuration HTTPS obligatoire, profil Compose préproduction `external-bus` et tests de configuration. Aucun fournisseur réel n’est simulé.
 
 ## Vérifications externes encore ouvertes
 
