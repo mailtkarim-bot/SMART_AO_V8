@@ -68,3 +68,8 @@ En parallèle, la couverture doit progresser par tests fonctionnels et non par e
 - `ops/docker-compose.preprod.yml` — réseau interne et variables runtime préproduction.
 - `backend/tests/security/test_rate_limit.py` — non-régression proxy/rate limiter.
 - `docs/PROJECT_STATE.md` et `docs/GLOBAL_REVIEW_2026-08-23_REFRESH.md` — état canonique du projet.
+
+
+## Vérification post-push
+
+Après publication des commits `cc61de4` et `5177ea2`, le run GitHub Actions `32668698934` a été créé pour le SHA `5177ea2` et s’est terminé en échec avant une exécution exploitable, comme les runs précédents. La PR #49 est toujours `OPEN` avec un état `UNSTABLE`; `main` reste au SHA `970c9ff`. Cette observation confirme l’interdiction de fusion, mais ne fournit toujours aucun diagnostic fonctionnel supplémentaire sur le code.
