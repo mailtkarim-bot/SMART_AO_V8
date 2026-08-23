@@ -137,3 +137,10 @@ Le MFA step-up reste un point réellement ouvert : la policy et les tests de dé
 La validation locale du lot donne : 867 tests backend non-DB passés, 458 DB désélectionnés, couverture 67,62 % sous le seuil 85,50 %, Ruff passé, mypy sécurité passé, detect-secrets passé, 93 tests frontend et build passés, Alembic offline jusqu’à `0055` passé. PostgreSQL online, Docker/VPS/ClamAV/HTTPS, corpus BGE/DCE, bus externe et runners GitHub Actions restent non prouvés. Le verdict opérationnel demeure **NO-GO** et la PR #49 ne doit pas être fusionnée vers `main`.
 
 Le détail ligne par ligne est dans [`AUDIT_RECONCILIATION_2026-08-23_2.md`](AUDIT_RECONCILIATION_2026-08-23_2.md).
+
+
+## Réconciliation du troisième audit — 23 août 2026
+
+Le troisième audit backend/frontend/DevOps/métier confirme le verdict opérationnel NO-GO, tout en distinguant les défauts déjà corrigés des gaps métier et des preuves externes. Les corrections codables ajoutées depuis la dernière revue sont : helper d’authentification HTTP partagé, port de stockage dans platform, graphe patron_action avec projection synchronisée, installation Docker backend depuis `uv.lock`, actions CI par SHA, Trivy frontend, Nginx non-root/healthcheck, Compose dev borné au loopback, câblage JWT `kid`, ErrorBoundary, RBAC UI et outillage frontend.
+
+Restent valides : couverture sous 85,50 %, absence de preuve CI exécutée faute de runner, dépendance aux environnements PostgreSQL/Docker/VPS, absence de cérémonie TOTP active, N+1 non benchmarkés, projection/rétention outbox à définir et incomplétude du moteur métier CCAP/coût/DC1-DC4. Les affirmations `icalendar` manquant, token frontend en localStorage, shared kernel encore dans DCE et frontend non-root sont obsolètes ou fausses après vérification. Le détail complet est conservé dans `docs/AUDIT_RECONCILIATION_2026-08-23_3.md`.

@@ -180,3 +180,15 @@ La recette `scripts/recipe_boamp_postgres.py` est une antenne opérateur : `--ap
 | BGE/RAG/OCR/CCAP-CCTP | Les antennes optionnelles et contrats existent ; aucun corpus, poids ou résultat métier réel n’est fabriqué. Les gaps OCR et analyse métier restent des lots distincts. |
 
 Le rapport détaillé est [`AUDIT_RECONCILIATION_2026-08-23_2.md`](AUDIT_RECONCILIATION_2026-08-23_2.md).
+
+
+## Réconciliation du troisième audit — 23 août 2026
+
+- **Shared kernel et frontières HTTP** : `ApplicationCommand` est fourni par `platform/events/command_contracts.py`; les routes utilisent désormais `interfaces/http/dependencies/auth.py` pour la résolution Bearer. Les aliases `_resolve_context` conservés dans quelques modules sont uniquement des compatibilités contrôlées.
+- **Stockage** : le port est situé dans `platform/storage/ports.py`; les adaptateurs local et objet ne dépendent plus du module preparation.
+- **Docker/CI** : backend installé depuis `uv.lock` avec `uv sync --frozen`; frontend non-root sur 8080 avec healthcheck; actions CI par SHA; Trivy couvre backend et frontend. Le code et les contrats sont testés statiquement, mais l’exécution distante reste bloquée par l’absence de runner/Docker disponible.
+- **Sécurité frontend** : session mémoire, retry 401 contrôlé avec timeout, logout résilient, ErrorBoundary et masquage UI des surfaces patronales pour `COLLABORATEUR`. Ces contrôles complètent, mais ne remplacent pas, les contrôles backend et tenant.
+- **JWT** : `SMART_AO_JWT_KEY_ID` et `SMART_AO_JWT_VERIFICATION_KEYS_JSON` sont câblés en préproduction; les clés réelles doivent venir d’un gestionnaire de secrets et ne sont pas commitées.
+- **Reste externe ou volontairement ouvert** : TOTP/MFA actif, rate limiter distribué, scan ClamAV/libmagic de l’import pricing, projection/rétention outbox, N+1, OCR/corpus BGE, fournisseur bus, PostgreSQL online, Docker/ClamAV-EICAR, HTTPS, sauvegarde/restauration et CI avec runner exécutant.
+
+Le rapport détaillé est `docs/AUDIT_RECONCILIATION_2026-08-23_3.md`.

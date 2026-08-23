@@ -198,3 +198,14 @@ La branche `docs/pricing-http-next-lot-28` et la PR #49 restent non fusionnées 
 
 
 Le push des commits `cc61de4` et `5177ea2` a déclenché le run CI `32668698934` sur le SHA `5177ea2`; il s’est terminé en échec avant une exécution exploitable, sans rendre la PR #49 stable. `main` reste au SHA `970c9ff` et la PR #49 demeure ouverte et non fusionnée.
+
+
+## Actualisation — troisième audit intégré
+
+Les deux rapports joints ont été confrontés au dépôt. Les corrections codables livrées dans ce lot comprennent : centralisation de la résolution Bearer dans `interfaces/http/dependencies/auth.py` et migration des importeurs de routes ; inversion du port de stockage vers `platform/storage/ports.py` ; graphe pur des transitions patron_action avec synchronisation de la projection courante ; installation backend Docker depuis `uv.lock` via `uv sync --frozen` ; pinning SHA des actions CI ; scan Trivy de l’image frontend ; frontend Nginx non-root sur 8080 avec healthcheck ; Compose de développement borné au loopback et figé en `development` ; RBAC UI patron/collaborateur ; `ErrorBoundary` ; union TypeScript stricte ; scripts ESLint/typecheck ; câblage runtime JWT `kid` et manifeste de clés historiques.
+
+Les validations locales du lot sont PASS pour la suite backend non-DB disponible, Ruff backend/scripts, mypy du noyau sécurité, detect-secrets strict, tests API/architecture/ops/domaine ciblés, 98 tests Vitest, build frontend, ESLint, typecheck et Alembic offline jusqu’à `20260823_0055`. ESLint conserve deux avertissements `react-hooks/exhaustive-deps` dans `App.tsx`; ils ne sont pas masqués comme erreurs.
+
+Les rapports ont raison de maintenir ouverts : couverture sous 85,50 %, PostgreSQL online, Docker/ClamAV-EICAR, HTTPS, restauration, bus externe, corpus BGE/DCE, TOTP/MFA actif, projection/rétention outbox, N+1, erreurs globales, E2E frontend-backend et moteur métier CCAP/coût/DC1-DC4. L’import pricing XLSX possède toujours des gardes ZIP/macro/taille mais n’est pas encore raccordé au scan ClamAV/libmagic. La production reste NO-GO et PR #49/main restent non fusionnées tant qu’un run CI avec runner et étapes exécutées n’est pas disponible.
+
+Le rapport détaillé est `docs/AUDIT_RECONCILIATION_2026-08-23_3.md`.

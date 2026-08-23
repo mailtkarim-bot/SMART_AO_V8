@@ -71,3 +71,21 @@ MinIO sans contrat de stockage établi, sharding/Redis/tracing distribué spécu
 - [ ] Rétablir des runners GitHub Actions exécutants ; ne pas fusionner PR #49 ou `main` avant une CI réellement exécutée et l’analyse de ses résultats.
 
 Le détail de qualification se trouve dans `docs/AUDIT_RECONCILIATION_2026-08-23_2.md`.
+
+
+## Réconciliation audit 3 — 23 août 2026
+
+- [x] Centraliser les routes sur `interfaces/http/dependencies/auth.py` et éliminer les imports de helper privé d’une route vers une autre.
+- [x] Inverser la dépendance de stockage : port dans `platform/storage`, adaptateurs hors dépendance vers preparation.
+- [x] Rendre la machine à états patron_action explicite dans le domaine et synchroniser sa projection persistée.
+- [x] Installer l’image backend depuis `uv.lock` avec `uv sync --frozen`; ajouter le scan frontend Trivy et pinner les actions CI par SHA.
+- [x] Durcir le frontend : Nginx non-root/healthcheck, ErrorBoundary, RBAC UI patron/collaborateur, session/retry/timeout, ESLint et typecheck.
+- [x] Câbler `SMART_AO_JWT_KEY_ID` et `SMART_AO_JWT_VERIFICATION_KEYS_JSON` dans le runtime preprod sans secret dans Git; verrouiller le Compose dev au loopback et à `development`.
+- [ ] Définir le contrat `cockpit_projection` et une politique de rétention outbox/domain events avant d’ajouter un worker ou de publier vers un bus externe.
+- [ ] Raccorder ClamAV/libmagic à l’import pricing XLSX avec stockage temporaire privé et fail-closed.
+- [ ] Implémenter la cérémonie TOTP d’enrôlement/vérification puis activer le step-up MFA sur les opérations réellement sensibles.
+- [ ] Traiter les N+1 après mesure PostgreSQL et benchmark de requêtes; ne pas optimiser à l’aveugle.
+- [ ] Développer les slices métier CCAP-RISK, COST-BASIS/prix plancher, croisement CCTP–DPGF–CCAP, génération DC1/DC2/DC4 et boucle de décision GO/NO-GO.
+- [ ] Ajouter les preuves externes : PostgreSQL online, Docker/ClamAV-EICAR, HTTPS, backup/restore, corpus DCE/BGE, bus et runners GitHub Actions.
+
+Réconciliation détaillée : `docs/AUDIT_RECONCILIATION_2026-08-23_3.md`.
