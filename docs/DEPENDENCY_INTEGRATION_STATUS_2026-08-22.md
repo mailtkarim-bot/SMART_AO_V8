@@ -2,7 +2,7 @@
 
 **Date de vérification :** 23 août 2026
 **Branche vérifiée :** `docs/pricing-http-next-lot-28`
-**Dernier commit fonctionnel de référence :** `3f61741` (cockpit BOAMP frontend, après le gate PostgreSQL/outbox `e66840e`). Le lot DCE/RAG frontend est validé localement et en cours de commit séparé.
+**Dernier commit fonctionnel de référence :** `238868f` (cockpit BOAMP et lecture DCE/RAG frontend, après le gate PostgreSQL/outbox `e66840e`).
 **Objet :** distinguer les dépendances réellement installées et utilisées, les adaptateurs préparés, les services Docker configurés et les intégrations encore seulement prévues par la documentation.
 
 ## 1. Conclusion exécutive

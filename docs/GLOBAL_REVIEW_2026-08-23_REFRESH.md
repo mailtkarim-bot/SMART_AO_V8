@@ -2,7 +2,7 @@
 
 **Date : 23 août 2026**  
 **Branche : `docs/pricing-http-next-lot-28`**  
-**Dernier commit poussé avant ce lot : [`3f61741`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/3f61741)**  
+**Dernier commit poussé : [`238868f`](https://github.com/mailtkarim-bot/SMART_AO_V8/commit/238868f)**
 **Auteur : Manus AI**
 
 ## 1. Verdict exécutif
@@ -76,7 +76,7 @@ uv run python scripts/recipe_boamp_postgres.py --apply
 | Docker réel | **Indisponible dans le sandbox** |
 | Fournisseur bus réel | **Non configuré et non appelé** |
 
-Les nouveaux fichiers frontend n’étaient pas encore commités au moment de la rédaction de cette revue. Le dernier commit poussé reste `3f61741`; le lot DCE/RAG doit être relu puis commité séparément après le gate de qualité.
+Le lot DCE/RAG frontend a été relu, validé puis poussé dans le commit `238868f`. Le worktree est propre ; l’absence de preuve PostgreSQL online reste indépendante du succès des tests frontend.
 
 ## 6. Tâches ouvertes et ordre recommandé
 
