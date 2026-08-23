@@ -124,3 +124,16 @@ L’ordre recommandé est le suivant :
 - [`docs/reference/SMART_AO_V8_KNOWLEDGE_INDEXING_OPS_01_CONTRAT.md`](reference/SMART_AO_V8_KNOWLEDGE_INDEXING_OPS_01_CONTRAT.md)
 - [`docs/reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md`](reference/SMART_AO_V8_KNOWLEDGE_BENCHMARK_01_CONTRAT.md)
 - [`backend/alembic/versions/20260823_0055_pricing_scenarios_immutability.py`](../backend/alembic/versions/20260823_0055_pricing_scenarios_immutability.py)
+
+
+## Réconciliation du nouvel audit — 23 août 2026
+
+Le nouvel audit est globalement pertinent sur les blocages opérationnels, mais deux remarques sont des faux positifs : l’extra `calendar` est bien déclaré (`icalendar 7.3.0`) et le renderer ICS local ne dépend pas d’un import absent. Les neuf détections detect-secrets étaient des fixtures synthétiques de tests, non des secrets de production ; elles sont maintenant annotées localement et le scan canonique passe.
+
+Les corrections de ce lot ajoutent un contrôle mypy borné et reproductible sur le noyau de sécurité, verrouillé dans `uv.lock`, ainsi qu’une résolution sûre de l’IP derrière proxy : `X-Forwarded-For` n’est accepté que lorsque le pair direct appartient à `SMART_AO_TRUSTED_PROXY_CIDRS`, vide par défaut et configuré sur `172.30.0.0/24` dans Compose préproduction. Les tests couvrent les pairs approuvés et non approuvés, les adresses invalides et les CIDR invalides. Le rate limiter demeure process-local et nécessite toujours un store partagé avant un déploiement horizontal.
+
+Le MFA step-up reste un point réellement ouvert : la policy et les tests de décision existent, mais aucune cérémonie TOTP d’enrôlement/vérification ni aucun appel `mfa_required=True` n’est encore publié. Il serait dangereux d’imposer la policy avant de fournir le parcours utilisateur complet. Les modèles `CaseAssignment*` et `CollaboratorTask*` restent également dans `platform/security/models.py`; une extraction supplémentaire nécessite une décision de bounded context et une régression Alembic complète.
+
+La validation locale du lot donne : 867 tests backend non-DB passés, 458 DB désélectionnés, couverture 67,62 % sous le seuil 85,50 %, Ruff passé, mypy sécurité passé, detect-secrets passé, 93 tests frontend et build passés, Alembic offline jusqu’à `0055` passé. PostgreSQL online, Docker/VPS/ClamAV/HTTPS, corpus BGE/DCE, bus externe et runners GitHub Actions restent non prouvés. Le verdict opérationnel demeure **NO-GO** et la PR #49 ne doit pas être fusionnée vers `main`.
+
+Le détail ligne par ligne est dans [`AUDIT_RECONCILIATION_2026-08-23_2.md`](AUDIT_RECONCILIATION_2026-08-23_2.md).

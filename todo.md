@@ -58,3 +58,16 @@ Cette checklist est la source de vérité opérationnelle après réconciliation
 ## Frontières explicitement non retenues par les audits
 
 MinIO sans contrat de stockage établi, sharding/Redis/tracing distribué spéculatifs, DAST/Semgrep déjà couvert par Bandit/Trivy, et tests de charge nécessitant un environnement dédié ne sont pas des tâches ouvertes de cette remédiation.
+
+## Réconciliation audit 2 — 23 août 2026
+
+- [x] Corriger les neuf faux positifs detect-secrets des fixtures de test avec des allowlists locales explicites ; le scan canonique passe.
+- [x] Ajouter le contrôle mypy borné du noyau de sécurité (`authorization`, `context`, `rate_limit`, `tokens`) et verrouiller la dépendance.
+- [x] Corriger la résolution de l’IP client derrière proxy : `X-Forwarded-For` accepté seulement depuis `SMART_AO_TRUSTED_PROXY_CIDRS`, avec réseau Caddy préproduction déclaré.
+- [ ] Remonter honnêtement la couverture de 67,62 % vers 85,50 % par tests utiles, sans exclusions artificielles.
+- [ ] Implémenter puis tester la cérémonie TOTP complète avant d’activer le step-up MFA sur publication financière, export/signature et autres actions sensibles.
+- [ ] Décider le bounded context propriétaire puis extraire prudemment les modèles `CaseAssignment*` et `CollaboratorTask*` restants de `platform/security/models.py`, avec registry Alembic et régression d’imports.
+- [ ] Exécuter PostgreSQL online, Docker/ClamAV/EICAR, HTTPS, sauvegarde/restauration, corpus BGE/DCE et bus externe sur les environnements correspondants.
+- [ ] Rétablir des runners GitHub Actions exécutants ; ne pas fusionner PR #49 ou `main` avant une CI réellement exécutée et l’analyse de ses résultats.
+
+Le détail de qualification se trouve dans `docs/AUDIT_RECONCILIATION_2026-08-23_2.md`.

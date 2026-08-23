@@ -165,3 +165,18 @@ Le slice BOAMP est désormais greffé jusqu’à la frontière HTTP et outbox, s
 Le worker `app.workers.opportunity_event_bus` ne consomme que `opportunity.boamp.ingestion.recorded` et `opportunity.boamp.qualification.recorded`. Il réclame les messages avec `FOR UPDATE SKIP LOCKED`, pose une lease, applique un payload exact limité à quatre identifiants/décisions, puis marque `PUBLISHED` uniquement après un accusé `2xx` du port `ExternalEventBusPort`. L’activation runtime exige désormais `SMART_AO_EXTERNAL_EVENT_BUS_ENABLED=1`, une URL HTTPS et un token ; en mode par défaut, le worker quitte proprement sans ouvrir de connexion. Le service Compose préproduction est derrière le profil `external-bus`. Aucun SDK Kafka/RabbitMQ, endpoint inventé ou appel réseau réel n’est inclus. En l’absence de configuration, la notification reste en retry et n’est pas déclarée publiée. Le contrat opérateur complet est dans `docs/EXTERNAL_EVENT_BUS_CONTRACT.md`.
 
 La recette `scripts/recipe_boamp_postgres.py` est une antenne opérateur : `--apply` lance Alembic `head`, puis la vérification exige la révision `20260823_0054`, les quatre tables BOAMP et les quatre triggers append-only avant les tests de persistence. Le nouveau test DB qualification couvre création, rejeu, unicité event/outbox et mutation interdite. Le lanceur local `scripts/start_local_postgres.sh` utilise l’image PostgreSQL 16 digest-pinnée, un volume isolé et le port hôte `5433`; ses tests CLI couvrent l’aide, les validations et l’absence de fuite du mot de passe. La sortie est un verdict JSON sans URL ni secret. Dans le sandbox, `--help`, les tests CLI, les tests applicatifs et la collecte du test DB passent ; l’exécution online reste **BLOCKED** par l’absence de daemon Docker/PostgreSQL local. La recette réseau BOAMP, le bus réel et la preuve de migration online doivent être exécutés sur un environnement contrôlé disposant des services et credentials hors Git.
+
+
+## Réconciliation du nouvel audit — 23 août 2026
+
+| Dépendance ou contrôle | État vérifié après ce lot |
+|---|---|
+| Extra `calendar` / ICS | Déclaré dans `pyproject.toml`; `icalendar 7.3.0` est installable avec l’extra. Le renderer ICS local ne dépend pas de ce paquet pour fonctionner. |
+| Detect-secrets | Le scan canonique CI passe après allowlist locale de neuf fixtures de tests synthétiques. Aucune exclusion globale des tests ou de `backend/app` n’a été ajoutée. |
+| Mypy | Ajouté au groupe dev et à `uv.lock`; CI contrôle les quatre modules du noyau de sécurité. Le reste de l’application n’est pas encore couvert par ce contrôle. |
+| Proxy/Caddy et rate limiter | `SMART_AO_TRUSTED_PROXY_CIDRS` est configurable ; Compose préproduction fournit le réseau interne Caddy `172.30.0.0/24`. Les en-têtes de transfert restent ignorés depuis un pair non approuvé. Le store partagé multi-réplique reste externe. |
+| MFA/TOTP | Les tables et la policy de step-up existent, mais aucune cérémonie TOTP ni configuration sensible n’est activée. Le flux complet reste à coder avant activation. |
+| PostgreSQL/Docker/VPS | Aucun résultat online réel ajouté. Alembic offline `0055` passe ; la recette PostgreSQL, le trigger online, Docker, ClamAV/EICAR, HTTPS et backup/restauration restent à exécuter sur l’environnement correspondant. |
+| BGE/RAG/OCR/CCAP-CCTP | Les antennes optionnelles et contrats existent ; aucun corpus, poids ou résultat métier réel n’est fabriqué. Les gaps OCR et analyse métier restent des lots distincts. |
+
+Le rapport détaillé est [`AUDIT_RECONCILIATION_2026-08-23_2.md`](AUDIT_RECONCILIATION_2026-08-23_2.md).
