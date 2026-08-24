@@ -235,3 +235,12 @@ Le rapprochement DPGF/BPU est volontairement limité à des candidats issus de l
 Le contrat GO conditionnel est consolidé : l’issue `CONDITIONAL_GO` exige au moins une et au plus 32 conditions structurées, avec responsable, échéance ou justification de son absence et conséquence d’échec. Les conditions sont validées par les invariants domaine, persistées à l’état `OPEN` dans la transaction Decision et comptées dans le receipt. `GO` et `NO_GO` refusent les conditions excédentaires.
 
 Les nouveaux tests ciblés portent le total intermédiaire à **32 tests passés**, avec Ruff et mypy passés sur 38 fichiers. Le run CI le plus récent `32756930349`, déclenché par `ea103d1`, est encore `queued` avant toute étape de runner (`runnerName: null`, zéro étape pour backend, frontend et image-security). La CI n’est donc pas une preuve distante ; PostgreSQL online, Docker, VPS, fournisseurs externes et corpus réel restent non exécutés.
+
+
+## Mise à jour du 24 août 2026 — recette PostgreSQL et contrôle de soumission
+
+La recette PostgreSQL réelle n’a pas été exécutée dans le sandbox : aucun exécutable `pg_isready`, aucun listener sur `:5432`, aucune variable `SMART_AO_DATABASE_URL` et aucun socket Docker n’étaient présents. Cette limitation empêche de revendiquer une migration online, une persistence effective du GO conditionnel, une vérification des triggers append-only, une isolation inter-tenant ou une transaction outbox validée.
+
+Un garde domaine de soumission est néanmoins préparé. Il accepte uniquement une Decision finalisée `GO` ou `CONDITIONAL_GO`, sur contexte `FROZEN`, avec exigences DCE confirmées, conditions satisfaites pour un GO conditionnel et actions de risques résolues. Il renvoie des raisons de blocage non financières, ne publie aucun dossier et ne calcule aucun montant.
+
+Le gate local compte **971 tests passés et 458 désélectionnés**, avec 39 tests ciblés sur la tranche récente. Ruff, mypy ciblé et detect-secrets sont passés. La recette PostgreSQL online, Docker, VPS, fournisseurs externes et la CI avec runner effectif demeurent non démontrés.

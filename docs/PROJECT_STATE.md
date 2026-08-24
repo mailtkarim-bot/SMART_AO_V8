@@ -332,3 +332,12 @@ Le rapprochement DPGF/BPU est préparé comme une recherche de candidats sur les
 Le GO conditionnel est maintenant couvert par le même contrat de finalisation : `CONDITIONAL_GO` exige entre une et 32 conditions fermées, avec libellé, responsable, échéance ou justification d’absence d’échéance, et conséquence d’échec. Les invariants domaine sont réutilisés, les identifiants sont uniques, les conditions sont persistées dans la transaction Decision et leur état initial est `OPEN`. `GO` et `NO_GO` refusent toute condition fournie. L’événement reste sparse et ne divulgue ni justification, ni extrait, ni donnée financière.
 
 La validation intermédiaire de cette extension est de **32 tests ciblés passés**, Ruff et mypy passés sur 38 fichiers. Le run CI GitHub le plus récent `32756930349`, déclenché par `ea103d1`, est encore `queued` pour les trois jobs ; chacun affiche `runnerName: null` et zéro étape. Aucune exécution distante de test n’est donc démontrée. La recette PostgreSQL online, Docker, VPS et fournisseurs externes restent ouvertes.
+
+
+## Recette PostgreSQL et garde de soumission — 24 août 2026
+
+La tentative de recette PostgreSQL réelle n’a pas pu démarrer dans le sandbox : aucun `pg_isready`, aucun listener `:5432`, aucune variable `SMART_AO_DATABASE_URL` et aucun socket Docker n’étaient disponibles. Aucune migration online, insertion, vérification de trigger, test de concurrence ou preuve outbox n’est donc revendiquée.
+
+Le domaine `decision/submission_gate.py` prépare le futur contrôle de soumission sans montant financier. Il bloque une Decision non finalisée, une issue `NO_GO` ou inconnue, un contexte non gelé, une exigence DCE non confirmée, un `CONDITIONAL_GO` dont les conditions ne sont pas satisfaites et une action de risque non résolue. Le garde ne publie rien et ne remplace pas la décision humaine.
+
+Le gate local après cette extension est de **971 tests passés et 458 désélectionnés**, dont **39 tests ciblés passés** avec un avertissement Starlette existant. Ruff, mypy ciblé et detect-secrets sont passés. La recette PostgreSQL online, Docker, VPS, ClamAV, HTTPS et la CI réellement exécutée restent ouvertes.

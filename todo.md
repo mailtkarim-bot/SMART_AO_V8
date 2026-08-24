@@ -253,3 +253,12 @@ Le rapport `docs/operator-reports/AUDIT_LEGENDAIRE_SMART_AO_V8_2026-08-24.md` es
 - [ ] Tester en base l’isolation tenant, les lots non `COMMITTED`, la concurrence et la transaction outbox.
 - [ ] Persister une décision de rapprochement patronale si la conservation de la correspondance devient nécessaire.
 - [ ] Rétablir des runners GitHub Actions exécutants ; le run le plus récent `32756930349` est encore en attente avant toute étape avec `runnerName: null` et zéro étape.
+
+
+## Recette GO conditionnel et garde de soumission — 24 août 2026
+
+La tentative de recette PostgreSQL réelle n’a pas pu être lancée dans le sandbox : aucun serveur local ni cible `SMART_AO_DATABASE_URL` n’est disponible, et Docker de l’ordinateur utilisateur n’est pas accessible depuis cet environnement. Cette étape reste donc explicitement ouverte et ne doit pas être comptée comme validée.
+
+Le garde domaine de soumission est préparé. Il bloque les Decisions non finalisées, `NO_GO`, les contextes non gelés, les exigences DCE non confirmées, les conditions ouvertes d’un `CONDITIONAL_GO` et les actions de risques non résolues. Il ne lit ni ne renvoie de montants financiers.
+
+Le gate local courant est de **971 tests passés et 458 désélectionnés** ; 39 tests ciblés de la tranche récente passent. Ruff, mypy ciblé et detect-secrets passent. La prochaine recette nécessite PostgreSQL réellement accessible et doit couvrir la migration 0059, la persistence des conditions `OPEN`, l’outbox, l’idempotence, l’isolation tenant, l’append-only et les scénarios inter-tenant.
