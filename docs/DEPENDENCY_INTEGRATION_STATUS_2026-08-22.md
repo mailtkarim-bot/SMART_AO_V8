@@ -192,3 +192,12 @@ Le rapport détaillé est [`AUDIT_RECONCILIATION_2026-08-23_2.md`](AUDIT_RECONCI
 - **Reste externe ou volontairement ouvert** : TOTP/MFA actif, rate limiter distribué, scan ClamAV/libmagic de l’import pricing, projection/rétention outbox, N+1, OCR/corpus BGE, fournisseur bus, PostgreSQL online, Docker/ClamAV-EICAR, HTTPS, sauvegarde/restauration et CI avec runner exécutant.
 
 Le rapport détaillé est `docs/AUDIT_RECONCILIATION_2026-08-23_3.md`.
+
+
+## Actualisation audit n°4 — 24 août 2026
+
+Le quatrième audit a confirmé une incompatibilité entre la projection mutable `patron_actions` et son ancien trigger append-only. La migration `20260824_0056` sépare désormais les colonnes de projection autorisées des colonnes historiques immuables. Le readiness vérifie la tête Alembic `20260824_0056` au lieu de se limiter à `SELECT 1`, et les Compose local/préproduction utilisent un service `migrate` one-shot avant le backend et les workers.
+
+L’extra `object-storage` est désormais raccordé au Dockerfile backend et au build préproduction. Le pipeline CI exporte toutes les extras pour pip-audit et construit l’image backend de scan avec les flags optionnels. Cela prouve le câblage de la supply chain, pas l’absence de CVE ni une exécution CI verte. Docker, PostgreSQL online, ClamAV réel, bucket S3/MinIO, fournisseurs externes et runners GitHub restent des preuves environnementales à exécuter sur leurs cibles.
+
+La réconciliation détaillée est [`AUDIT_RECONCILIATION_2026-08-24_4.md`](AUDIT_RECONCILIATION_2026-08-24_4.md).

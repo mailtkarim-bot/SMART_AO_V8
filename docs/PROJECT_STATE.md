@@ -214,3 +214,14 @@ Le rapport détaillé est `docs/AUDIT_RECONCILIATION_2026-08-23_3.md`.
 Le push du lot a déclenché le run CI `32673495930` sur `234e367`. Il s’est terminé en échec après environ cinq secondes ; les jobs `backend`, `frontend` et `image-security` ont chacun `steps: []`. Aucune étape de code n’a été exécutée. Ce run confirme le blocage de provisioning des runners et ne constitue pas un échec fonctionnel démontré. La branche reste publiée et `main`/PR #49 restent non fusionnés.
 
 Le gate backend final, après installation des extras verrouillés avec `uv sync --all-extras`, a produit **885 passed, 458 deselected, 4 warnings** en 10,08 secondes. Les deux échecs précédents provenaient uniquement de l’extra optionnel `calendar` absent de l’environnement local ; ils ont disparu sans modification applicative.
+
+
+## Actualisation — quatrième audit intégré, 24 août 2026
+
+Le rapport `docs/operator-reports/RAPPORT_AUDIT_04_VERIFICATION.md` a été confronté au code et sa réconciliation est conservée dans [`AUDIT_RECONCILIATION_2026-08-24_4.md`](AUDIT_RECONCILIATION_2026-08-24_4.md). Le finding critique patron_action est confirmé : le service synchronisait une projection par `UPDATE` alors que le trigger 0038 refusait tout UPDATE. La migration additive `20260824_0056` autorise uniquement `state`, `aggregate_revision` et `updated_at`, tout en gardant les colonnes historiques et les suppressions append-only. Le test DB de transition couvre maintenant la projection autorisée et la mutation historique refusée.
+
+La readiness vérifie désormais la connexion PostgreSQL, la tête Alembic `20260824_0056` et ClamAV. Les Compose local et préproduction possèdent un service `migrate` one-shot ; backend et workers attendent sa réussite. Le worker de rétention local est redémarrable et l’override PostgreSQL utilise `127.0.0.1:5433`. L’extra object-storage est raccordé au Dockerfile et au build préproduction. La CI exporte toutes les extras pour pip-audit et construit l’image backend avec les flags optionnels activés pour le scan Trivy.
+
+Les seeds/assertions DB BOAMP, event-bus, veille et OR-Tools ont été corrigés. Les services application preparation/submission importent le port de stockage depuis `platform.storage`. ErrorBoundary remonte son sous-arbre après Réessayer. Validation locale : backend non-DB `885 passed, 458 deselected, 4 warnings`; frontend `98 passed` sur 23 fichiers, typecheck/build passés, ESLint 0 erreur avec 2 warnings connus ; Ruff, mypy sécurité, lockfile, shell syntax et scan detect-secrets passés ; Alembic offline jusqu’à `0056` passé. Docker et PostgreSQL online restent non disponibles dans ce sandbox, et la CI GitHub n’est pas un gate vert.
+
+La branche reste NO-GO production et `main`/PR #49 ne doivent pas être fusionnés sans run CI exécuté, migration PostgreSQL online, recette Docker/ClamAV/HTTPS et validation opérateur.
