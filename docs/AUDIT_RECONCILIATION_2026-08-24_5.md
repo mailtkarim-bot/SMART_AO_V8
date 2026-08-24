@@ -89,3 +89,8 @@ Les corrections seront publiées dans un commit de code dédié et la présente 
 ## 6. Preuve CI après publication
 
 Après publication de `0071301`, le run GitHub Actions `32712883828` s’est terminé en échec. Les trois jobs `backend`, `frontend` et `image-security` ont `steps: []` et aucune étape de test, build, pip-audit ou Trivy n’a exécuté le code. Ce résultat confirme la persistance du blocage de provisioning des runners ; il ne constitue pas un verdict fonctionnel sur les corrections locales.
+
+
+## 7. Preuve CI après le commit documentaire final
+
+Le dernier push `537c835` a déclenché le run `32712943053`. Il s’est terminé en échec avec les jobs `backend`, `frontend` et `image-security` à `steps: []`. Aucune étape n’a exécuté le code, les tests ou les scans. La branche distante est toutefois propre et synchronisée sur `537c835`.

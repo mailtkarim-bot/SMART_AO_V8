@@ -240,3 +240,6 @@ Le projet reste NO-GO production tant que le démarrage Docker, les migrations P
 
 
 Le run CI déclenché après publication du cinquième audit est `32712883828` sur `0071301`. Il s’est terminé en échec avec les jobs `backend`, `frontend` et `image-security` à `steps: []`; aucune étape de code, test ou scan n’a été exécutée. Le blocage de provisioning des runners persiste. La PR #49 reste ouverte et `main` reste à `970c9ff`.
+
+
+Le dernier push documentaire `537c835` a déclenché le run CI `32712943053`, terminé en échec avec `steps: []` sur `backend`, `frontend` et `image-security`. Aucune étape n’a exécuté les tests ou scans ; le blocage de provisioning des runners persiste. La branche distante reste propre et synchronisée sur `537c835`; la PR #49 reste ouverte et `main` reste à `970c9ff`.
