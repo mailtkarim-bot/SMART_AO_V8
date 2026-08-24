@@ -243,3 +243,6 @@ Le run CI déclenché après publication du cinquième audit est `32712883828` s
 
 
 Le dernier push documentaire `537c835` a déclenché le run CI `32712943053`, terminé en échec avec `steps: []` sur `backend`, `frontend` et `image-security`. Aucune étape n’a exécuté les tests ou scans ; le blocage de provisioning des runners persiste. La branche distante reste propre et synchronisée sur `537c835`; la PR #49 reste ouverte et `main` reste à `970c9ff`.
+
+
+Clôture de la vérification distante : le commit `b00aad0` a produit le run CI `32712989698`, terminé en échec avec `backend`, `frontend` et `image-security` à `steps: []`. Le code n’a pas été exécuté par GitHub Actions ; le blocage de provisioning des runners persiste. La branche locale/distante est propre et la PR #49 reste ouverte, sans modification de `main` (`970c9ff`).

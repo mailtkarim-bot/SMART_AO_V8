@@ -94,3 +94,8 @@ Après publication de `0071301`, le run GitHub Actions `32712883828` s’est ter
 ## 7. Preuve CI après le commit documentaire final
 
 Le dernier push `537c835` a déclenché le run `32712943053`. Il s’est terminé en échec avec les jobs `backend`, `frontend` et `image-security` à `steps: []`. Aucune étape n’a exécuté le code, les tests ou les scans. La branche distante est toutefois propre et synchronisée sur `537c835`.
+
+
+## 8. Clôture de la preuve distante
+
+Le commit documentaire final observé est `b00aad0`. Son run CI associé est `32712989698`, terminé en échec avec `backend`, `frontend` et `image-security` à `steps: []`. Cette répétition confirme que le défaut est antérieur à l’exécution des étapes GitHub Actions et relève du provisioning des runners, non d’un échec de test identifié par le pipeline.
