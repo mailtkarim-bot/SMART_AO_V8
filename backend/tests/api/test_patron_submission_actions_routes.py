@@ -271,6 +271,7 @@ def test_prepare_submission_returns_201_then_200_on_replay():
         (CommandExecutionError("DCE_NOT_FOUND_OR_FORBIDDEN"), 404, "NOT_FOUND_OR_FORBIDDEN"),
         (CommandExecutionError("VERSION_CONFLICT"), 409, "VERSION_CONFLICT"),
         (CommandExecutionError("PREPARATION_BLOCKED"), 422, "COMMAND_REJECTED"),
+        (CommandExecutionError("DECISION_SUBMISSION_BLOCKED"), 422, "COMMAND_REJECTED"),
     ],
 )
 def test_prepare_submission_maps_service_errors(error, status_code, detail):

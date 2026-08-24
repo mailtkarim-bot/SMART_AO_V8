@@ -289,3 +289,21 @@ La simulation Docker éphémère n’a pas été exécutée : `docker` est absen
 - [ ] Définir explicitement l’autorité `PATRON_DELEGATE`, qui peut aujourd’hui posséder `SUBMISSION_AUTHORIZE` mais pas `DECISION_RISK_READ`.
 - [ ] Ajouter les tests de composition et de persistence : Decision absente/obsolète, tenant étranger, contexte non gelé, exigence non confirmée, action/condition ouverte, révision concurrente et rollback transactionnel.
 - [ ] Recetter reader, concaténation UUID, migration `0059`, FKs, triggers, outbox et conditions sur PostgreSQL réel ; aucune validation online n’est disponible dans le sandbox.
+
+
+## Intégration effective du garde Decision dans Submission — 24 août 2026
+
+### Livré
+
+- [x] Ajouter le port applicatif `SubmissionDecisionGateReader` sans exposer de montants.
+- [x] Implémenter `SqlAlchemySubmissionDecisionGateReader` avec filtrage tenant/Case, Decision `GO_NO_GO` courante, confirmations DCE, conditions ouvertes et actions de risque non résolues.
+- [x] Appeler le garde avant la matérialisation du manifeste Submission et avant l’export ZIP.
+- [x] Bloquer en échec fermé l’absence de reader ou de Decision.
+- [x] Préserver le contrat HTTP neutre `422 COMMAND_REJECTED` pour `DECISION_SUBMISSION_BLOCKED`.
+- [x] Ajouter les tests du blocage avant manifeste, avant lecture storage, du contrat HTTP et de la compilation PostgreSQL offline sans champs financiers.
+
+### Validation externe encore requise
+
+- [ ] Exécuter le reader et les requêtes de comptage contre PostgreSQL réel, notamment la jointure `concat(UUID)` et les transitions PatronAction.
+- [ ] Tester online les cas inter-tenant, Decision obsolète, condition satisfaite/échouée, action abandonnée/terminée, rollback transactionnel et concurrence préparation/export.
+- [ ] Décider explicitement si `PATRON_DELEGATE` peut préparer/exporter avec un accès séparé au snapshot Decision; le code actuel continue de réserver Submission au `PATRON_ADMIN`.

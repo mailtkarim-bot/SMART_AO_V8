@@ -295,6 +295,9 @@ from app.modules.submission.application.signature_service import (
     SubmissionSignatureService,
     submission_signature_handlers,
 )
+from app.modules.submission.infrastructure.decision_gate_reader import (
+    SqlAlchemySubmissionDecisionGateReader,
+)
 from app.modules.submission.infrastructure.ics_calendar import IcsSubmissionDeadlineCalendar
 from app.modules.submission.infrastructure.signature_reader import (
     SqlAlchemySubmissionSignatureReader,
@@ -411,7 +414,9 @@ class AppRuntime:
                 **pricing_import_handlers(),
                 **opportunity_watch_profile_handlers(),
                 **preparation_review_handlers(storage=preparation_storage),
-                **submission_handlers(),
+                **submission_handlers(
+                    decision_gate_reader=SqlAlchemySubmissionDecisionGateReader(),
+                ),
                 **submission_evidence_handlers(),
                 **submission_signature_handlers(),
             },
@@ -948,6 +953,7 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
             storage=runtime.preparation_storage,
+            decision_gate_reader=SqlAlchemySubmissionDecisionGateReader(),
         )
         app.include_router(
             build_case_dce_reading_router(
