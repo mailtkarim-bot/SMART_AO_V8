@@ -24,7 +24,7 @@ La persistence `decision_risks` est append-only dans cette tranche. Elle porte l
 
 | Contrôle | Résultat |
 |---|---:|
-| Suite backend hors marqueur `db` | **923 passed, 458 deselected** |
+| Suite backend hors marqueur `db` | **929 passed, 458 deselected** |
 | Tests risques domaine/application/API | Passés |
 | Tests frontières architecture | Passés |
 | Ruff backend/scripts ciblés | Passé |
