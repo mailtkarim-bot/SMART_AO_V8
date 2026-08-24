@@ -1,7 +1,7 @@
 .PHONY: install lint format test test-domain test-architecture db-up db-down migrate up down
 
 install:
-	uv sync --group dev
+	uv sync --group dev --extra calendar
 
 lint:
 	uv run ruff check .
@@ -10,13 +10,13 @@ format:
 	uv run ruff format .
 
 test:
-	uv run pytest
+	uv run --extra calendar pytest
 
 test-domain:
-	uv run pytest -m 'schema or domain'
+	uv run --extra calendar pytest -m 'schema or domain'
 
 test-architecture:
-	uv run pytest -m architecture
+	uv run --extra calendar pytest -m architecture
 
 db-up:
 	docker compose up -d postgres

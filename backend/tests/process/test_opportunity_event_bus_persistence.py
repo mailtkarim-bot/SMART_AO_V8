@@ -99,7 +99,7 @@ def test_worker_publishes_postgres_outbox_only_after_ack(
 def test_worker_retries_postgres_outbox_after_external_rejection(
     session_factory: sessionmaker[Session],
 ) -> None:
-    _tenant_id, message_id = _seed_outbox(session_factory)
+    tenant_id, message_id = _seed_outbox(session_factory)
 
     class FailingBus:
         def publish(self, **_kwargs: object) -> None:
@@ -124,6 +124,7 @@ def test_worker_retries_postgres_outbox_after_external_rejection(
         assert message.next_attempt_at == NOW + timedelta(seconds=30)
         assert session.scalar(
             sa.select(sa.func.count(OutboxMessageRecord.id)).where(
-                OutboxMessageRecord.status == "PUBLISHED"
+                OutboxMessageRecord.tenant_id == tenant_id,
+                OutboxMessageRecord.status == "PUBLISHED",
             )
         ) == 0

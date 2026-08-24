@@ -112,6 +112,14 @@ def test_deploy_validates_libpq_password_alignment() -> None:
     assert 'PGPASSWORD}" == "${POSTGRES_PASSWORD}' in deploy_script
 
 
+def test_readiness_contract_uses_shared_schema_head() -> None:
+    application = (ROOT / "backend/app/bootstrap/application.py").read_text(encoding="utf-8")
+    schema = (ROOT / "backend/app/platform/persistence/schema.py").read_text(encoding="utf-8")
+    assert "from app.platform.persistence.schema import EXPECTED_ALEMBIC_HEAD" in application
+    assert "EXPECTED_ALEMBIC_HEAD" in application
+    assert 'EXPECTED_ALEMBIC_HEAD = "20260824_0056"' in schema
+
+
 def test_healthcheck_validates_application_json_payloads() -> None:
     healthcheck = (OPS / "healthcheck-preprod.sh").read_text(encoding="utf-8")
     assert 'live_body="$(curl' in healthcheck
@@ -145,6 +153,7 @@ def test_dev_compose_is_loopback_bound_and_not_repurposable_as_preprod() -> None
     assert 'SMART_AO_ENV: development' in compose
     assert '"127.0.0.1:5432:5432"' in compose
     assert '"127.0.0.1:8000:8000"' in compose
+    assert 'command: ["alembic", "-c", "/app/backend/alembic.ini", "upgrade", "head"]' in compose
     assert compose.count("no-new-privileges:true") >= 5
     assert "service_completed_successfully" in compose
     local_override = (ROOT / "compose.local-dev.yml").read_text(encoding="utf-8")
@@ -250,6 +259,12 @@ def test_smtp_credentials_are_allowlisted_only_for_backend() -> None:
     assert "SMART_AO_SMTP_PASSWORD" not in webhook
     assert "SMART_AO_SMTP_PASSWORD" in smtp
     assert "SMART_AO_SMTP_TO" in smtp
+
+
+def test_validation_commands_install_calendar_extra() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert "uv sync --group dev --extra calendar" in makefile
+    assert "uv run --extra calendar pytest" in makefile
 
 
 def test_optional_calendar_build_flag_is_explicit() -> None:

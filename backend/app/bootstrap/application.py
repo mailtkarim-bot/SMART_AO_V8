@@ -260,6 +260,7 @@ from app.modules.submission.infrastructure.smtp_notifications import (
 )
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.observability.http import RequestObservabilityMiddleware
+from app.platform.persistence.schema import EXPECTED_ALEMBIC_HEAD
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.storage.object_storage import S3PrivateObjectStorage
@@ -637,7 +638,6 @@ def create_app(
 
     @app.get("/healthz/ready", tags=["system"])
     def readiness() -> JSONResponse:
-        expected_schema_head = "20260824_0056"
         checks: dict[str, str] = {
             "database": "unknown",
             "schema": "unknown",
@@ -651,12 +651,19 @@ def create_app(
         try:
             with runtime.session_factory() as session:
                 session.execute(sa.text("SELECT 1"))
-                schema_head = session.scalar(sa.text("SELECT version_num FROM alembic_version"))
             checks["database"] = "ok"
-            checks["schema"] = "ok" if schema_head == expected_schema_head else "failed"
         except sa.exc.SQLAlchemyError:
             checks["database"] = "failed"
-            checks["schema"] = "failed"
+
+        if checks["database"] == "ok":
+            try:
+                with runtime.session_factory() as session:
+                    schema_head = session.scalar(
+                        sa.text("SELECT version_num FROM alembic_version")
+                    )
+                checks["schema"] = "ok" if schema_head == EXPECTED_ALEMBIC_HEAD else "failed"
+            except sa.exc.SQLAlchemyError:
+                checks["schema"] = "failed"
         try:
             with socket.create_connection(
                 (

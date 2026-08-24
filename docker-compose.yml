@@ -23,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: ops/docker/backend.Dockerfile
-    command: ["alembic", "-c", "/app/alembic.ini", "upgrade", "head"]
+    command: ["alembic", "-c", "/app/backend/alembic.ini", "upgrade", "head"]
     restart: "no"
     environment:
       SMART_AO_ENV: development

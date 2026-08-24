@@ -6,9 +6,10 @@ Le script ne supprime jamais de conteneur ni de volume. Il vérifie les paramèt
 
 ## Démarrage
 
-Depuis la racine du dépôt :
+Depuis la racine du dépôt, installer l’environnement de test avec l’extra calendrier afin que les tests ICS soient inclus dans la validation canonique :
 
 ```bash
+make install
 scripts/start_local_postgres.sh
 ```
 
@@ -31,7 +32,7 @@ Avec les valeurs locales par défaut :
 
 ```bash
 SMART_AO_TEST_DATABASE_URL='postgresql+psycopg://smart_ao:smart_ao@127.0.0.1:5433/smart_ao' \
-  uv run pytest -m db
+  uv run --extra calendar pytest -m db
 ```
 
 Avec un mot de passe personnalisé, la valeur doit rester dans l’environnement du shell ou dans un fichier local ignoré par Git :
@@ -40,7 +41,7 @@ Avec un mot de passe personnalisé, la valeur doit rester dans l’environnement
 export SMART_AO_TEST_DB_PASSWORD='valeur-locale-non-versionnee'
 scripts/start_local_postgres.sh
 export SMART_AO_TEST_DATABASE_URL="postgresql+psycopg://smart_ao:${SMART_AO_TEST_DB_PASSWORD}@127.0.0.1:5433/smart_ao"
-uv run pytest -m db
+uv run --extra calendar pytest -m db
 ```
 
 La recette spécifique BOAMP peut ensuite être exécutée avec une URL fournie hors dépôt :

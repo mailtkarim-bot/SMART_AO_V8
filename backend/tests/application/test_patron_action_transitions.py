@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -120,6 +120,38 @@ def test_action_transitions_are_versioned_idempotent_and_append_only(services, s
                 sa.update(PatronActionRecord)
                 .where(PatronActionRecord.id == action_id)
                 .values(title="tampered")
+            )
+
+        locked_mutations = {
+            "id": uuid4(),
+            "tenant_id": uuid4(),
+            "created_at": NOW + timedelta(seconds=1),
+            "case_id": uuid4(),
+            "functional_key": "tampered-functional-key",
+            "action_type": "CONTROL_SUBMISSION",
+            "severity": "URGENT",
+            "title": "tampered-title",
+            "why_now": "tampered-why-now",
+            "impact": "tampered-impact",
+            "recommended_action": "tampered-recommendation",
+            "due_at": NOW,
+            "source_refs_json": ["tampered-source"],
+            "actor_id": uuid4(),
+            "membership_id": uuid4(),
+            "command_id": uuid4(),
+            "idempotency_key": uuid4(),
+            "correlation_id": uuid4(),
+        }
+        for column, value in locked_mutations.items():
+            with pytest.raises(sa.exc.DatabaseError, match="append-only"), session.begin_nested():
+                session.execute(
+                    sa.update(PatronActionRecord)
+                    .where(PatronActionRecord.id == action_id)
+                    .values(**{column: value})
+                )
+        with pytest.raises(sa.exc.DatabaseError, match="append-only"), session.begin_nested():
+            session.execute(
+                sa.delete(PatronActionRecord).where(PatronActionRecord.id == action_id)
             )
 
 
