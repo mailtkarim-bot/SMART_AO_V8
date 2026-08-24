@@ -42,7 +42,8 @@ services:
       SMART_AO_ENV: development
       SMART_AO_LOG_LEVEL: ${SMART_AO_LOG_LEVEL:-INFO}
       SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
-      SMART_AO_JWT_SIGNING_KEY: ${SMART_AO_JWT_SIGNING_KEY:-dev-only-signing-key-change-me-0123456789}
+      # Development-only fallback; production compose requires an injected secret.
+      SMART_AO_JWT_SIGNING_KEY: ${SMART_AO_JWT_SIGNING_KEY:-local-development-signing-key-change-me-0123456789}
       SMART_AO_JWT_ISSUER: ${SMART_AO_JWT_ISSUER:-smart-ao-dev}
       SMART_AO_JWT_AUDIENCE: ${SMART_AO_JWT_AUDIENCE:-smart-ao-dev}
       SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine

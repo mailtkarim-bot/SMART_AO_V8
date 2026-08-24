@@ -151,8 +151,14 @@ def test_backend_docker_context_excludes_demonstrations_and_tests() -> None:
 def test_dev_compose_is_loopback_bound_and_not_repurposable_as_preprod() -> None:
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     assert 'SMART_AO_ENV: development' in compose
-    assert '"127.0.0.1:5432:5432"' in compose
+    assert '"127.0.0.1:${SMART_AO_POSTGRES_HOST_PORT:-5432}:5432"' in compose
     assert '"127.0.0.1:8000:8000"' in compose
+    assert "local-development-signing-key-change-me" in compose
+    assert "dev-only-signing-key" not in compose
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    assert "SMART_AO_ENV=development" in env_example
+    assert "SMART_AO_JWT_SIGNING_KEY=" in env_example
+    assert "local-development-signing-key-change-me-" in env_example
     assert 'command: ["alembic", "-c", "/app/backend/alembic.ini", "upgrade", "head"]' in compose
     assert compose.count("no-new-privileges:true") >= 5
     assert "service_completed_successfully" in compose
