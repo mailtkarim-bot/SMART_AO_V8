@@ -61,9 +61,9 @@ Le système ne déduit pas l’issue. La finalisation reste une décision humain
 | mypy ciblé Decision/PatronAction/bootstrap | Passé sur 38 fichiers |
 | PostgreSQL online | Non exécuté |
 | Docker/VPS/ClamAV/HTTPS/fournisseur externe | Non exécutés |
-| CI GitHub Actions | Échec avant étapes, runners non alloués |
+| CI GitHub Actions | `32756930349` queued, runners non alloués |
 
-La validation hors PostgreSQL ne constitue pas une preuve d’application des migrations ni de fonctionnement des triggers en base réelle. La CI GitHub `32748619776` a terminé avec les trois jobs en échec, `runnerName: null` et zéro étape ; aucun test distant n’a donc été exécuté.
+La validation hors PostgreSQL ne constitue pas une preuve d’application des migrations ni de fonctionnement des triggers en base réelle. Le run CI GitHub le plus récent `32756930349`, déclenché par `ea103d1`, est encore `queued` avec les trois jobs sans runner (`runnerName: null`) et zéro étape ; aucun test distant n’a donc été exécuté.
 
 ## Travaux restants
 

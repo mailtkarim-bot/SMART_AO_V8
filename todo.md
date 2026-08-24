@@ -252,4 +252,4 @@ Le rapport `docs/operator-reports/AUDIT_LEGENDAIRE_SMART_AO_V8_2026-08-24.md` es
 - [ ] Exécuter la migration et les requêtes de pagination/rapprochement sur PostgreSQL réel.
 - [ ] Tester en base l’isolation tenant, les lots non `COMMITTED`, la concurrence et la transaction outbox.
 - [ ] Persister une décision de rapprochement patronale si la conservation de la correspondance devient nécessaire.
-- [ ] Rétablir des runners GitHub Actions exécutants ; le run `32748619776` est en échec avant toute étape avec `runnerName: null` et zéro étape.
+- [ ] Rétablir des runners GitHub Actions exécutants ; le run le plus récent `32756930349` est encore en attente avant toute étape avec `runnerName: null` et zéro étape.
