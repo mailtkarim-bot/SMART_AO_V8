@@ -66,6 +66,31 @@ def test_post_slice_modules_expose_application_and_public_boundaries() -> None:
 
 
 @pytest.mark.architecture
+def test_membership_read_services_use_only_application_ports() -> None:
+    source_paths = (
+        REPOSITORY_ROOT
+        / "backend/app/modules/membership/application/patron_assignment_cockpit.py",
+        REPOSITORY_ROOT / "backend/app/modules/membership/application/assignment_history.py",
+    )
+    for source_path in source_paths:
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        imported_modules = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        imported_names = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        assert "sqlalchemy" not in imported_names, source_path
+        assert "sqlalchemy" not in imported_modules, source_path
+        assert not any(".infrastructure" in module for module in imported_modules), source_path
+
+
+@pytest.mark.architecture
 def test_post_slice_application_does_not_import_http_routes() -> None:
     modules_root = REPOSITORY_ROOT / "backend/app/modules"
     for module_name in POST_SLICE_MODULES:

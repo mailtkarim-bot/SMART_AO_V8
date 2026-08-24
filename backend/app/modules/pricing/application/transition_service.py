@@ -222,5 +222,13 @@ def _projection(record: PricingScenarioRecord) -> PricingScenarioProjection:
         total_cost_minor=record.total_cost_minor,
         gross_margin_minor=record.gross_margin_minor,
         gross_margin_rate_bps=record.gross_margin_rate_bps,
+        penalty_reserve_minor=record.penalty_reserve_minor,
+        retention_reserve_minor=record.retention_reserve_minor,
+        guarantee_reserve_minor=record.guarantee_reserve_minor,
+        floor_margin_rate_bps=record.floor_margin_rate_bps,
+        target_margin_rate_bps=record.target_margin_rate_bps,
+        break_even_sales_minor=record.break_even_sales_minor,
+        floor_sales_minor=record.floor_sales_minor,
+        target_sales_minor=record.target_sales_minor,
         source_snapshot_revision=record.source_snapshot_revision,
     )

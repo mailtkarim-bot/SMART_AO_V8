@@ -193,3 +193,14 @@ Ces deux points sont corrigés. Le test accepte désormais le mapping paramétra
 La suite backend locale hors `db` est maintenant verte : **906 passed, 458 deselected**. Le frontend reste vert avec **98 tests dans 23 fichiers**, typecheck et build passés, lint sans erreur mais avec deux warnings hooks connus. Le rapport auditeur indiquait 905+1 failed au commit `33986fb`; cette observation est confirmée et corrigée. La baseline locale contient 14 entrées qualifiées ; le nombre 10 donné par l’auditeur est une mesure de son clone et n’est pas substitué sans analyse supplémentaire.
 
 La CI reste non exploitable : le run post-push `32728988801` a échoué avant toute étape, avec `runnerName` nul pour `backend`, `frontend` et `image-security`. Les résultats Docker/PostgreSQL/ClamAV live de l’auditeur sont conservés comme preuves externes. Le verdict ne change pas : socle renforcé, mais **NO-GO opérationnel** jusqu’à rétablissement de la CI, recette Docker/PostgreSQL/HTTPS/backup-restore et livraison des fonctions métier centrales.
+
+
+## 13. Priorité ARCH-001 et cœur métier BTP — 24 août 2026
+
+Une première tranche de réduction ARCH-001 est livrée : les services de lecture `PatronAssignmentCockpitService` et `AssignmentHistoryService` consomment leurs Protocols applicatifs et reçoivent les readers SQLAlchemy depuis la composition root. Les règles de frontière sont verrouillées par test. Cette approche préserve l’isolation tenant, les projections fermées et les audits de refus ; elle n’est pas une prétention de suppression immédiate des 64 arêtes historiques.
+
+Le premier vertical slice métier ciblé est `COST-BASIS-01`. Le domaine pricing calcule désormais en centimes et points de base les coûts complets, réserves BTP, marge, seuil de rentabilité, prix plancher et prix cible. Les résultats sont persistés de façon additive sur `pricing_scenarios` par le head Alembic `20260824_0057`, avec contraintes de cohérence. La route de création de scénario reste patronale et financière privée.
+
+Après ce lot, la suite backend hors DB est à **914 passed, 458 deselected** ; Ruff, mypy ciblé et les scripts shell passent. Le SQL offline de la migration 0057 est généré. La persistence PostgreSQL online et le parcours Docker restent à exécuter dans un environnement disponible.
+
+Le cœur BTP est donc renforcé mais non finalisé : le croisement documentaire CCAP–CCTP–DPGF–BPU, les risques structurés, l’OCR/corpus Golden, la génération DC1/DC2/DC4, la décision finalisable et le dépôt restent des slices de production à coder et recetter. Le verdict opérationnel demeure NO-GO.

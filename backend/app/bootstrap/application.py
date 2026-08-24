@@ -193,6 +193,12 @@ from app.modules.membership.application.patron_assignment import (
 from app.modules.membership.application.patron_assignment_cockpit import (
     PatronAssignmentCockpitService,
 )
+from app.modules.membership.infrastructure.assignment_history_reader import (
+    SqlAlchemyAssignmentHistoryReader,
+)
+from app.modules.membership.infrastructure.patron_assignment_cockpit_reader import (
+    SqlAlchemyPatronAssignmentCockpitReader,
+)
 from app.modules.opportunity.application.patron_watch_profile import (
     PatronWatchProfileService,
     opportunity_watch_profile_handlers,
@@ -797,6 +803,7 @@ def create_app(
         )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
+            reader_factory=SqlAlchemyAssignmentHistoryReader,
             policy=security_policy,
         )
         patron_assignment_management_service = PatronAssignmentManagementService(
@@ -806,6 +813,7 @@ def create_app(
         )
         patron_assignment_cockpit_service = PatronAssignmentCockpitService(
             session_factory=runtime.session_factory,
+            reader_factory=SqlAlchemyPatronAssignmentCockpitReader,
             policy=security_policy,
         )
         patron_financial_report_service = PatronFinancialReportService(

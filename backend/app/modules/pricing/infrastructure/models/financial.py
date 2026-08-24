@@ -114,6 +114,21 @@ class PricingScenarioRecord(TenantScopedRecord, Base):
         sa.CheckConstraint("version > 0", name="version_positive"),
         sa.CheckConstraint("state IN ('DRAFT', 'SELECTED', 'ARCHIVED')", name="state"),
         sa.CheckConstraint("scenario_type IN ('BASE', 'PRUDENT', 'CUSTOM')", name="scenario_type"),
+        sa.CheckConstraint(
+            "penalty_reserve_minor >= 0 AND retention_reserve_minor >= 0 "
+            "AND guarantee_reserve_minor >= 0",
+            name="cost_basis_reserves_non_negative",
+        ),
+        sa.CheckConstraint(
+            "floor_margin_rate_bps >= 0 AND floor_margin_rate_bps < 10000 "
+            "AND target_margin_rate_bps >= 0 AND target_margin_rate_bps < 10000 "
+            "AND floor_margin_rate_bps <= target_margin_rate_bps",
+            name="cost_basis_rates_valid",
+        ),
+        sa.CheckConstraint(
+            "break_even_sales_minor >= 0 AND floor_sales_minor >= 0 AND target_sales_minor >= 0",
+            name="cost_basis_thresholds_non_negative",
+        ),
         sa.Index("ix_pricing_scenarios__tenant_case", "tenant_id", "case_id", "created_at"),
     )
 
@@ -129,6 +144,14 @@ class PricingScenarioRecord(TenantScopedRecord, Base):
     total_cost_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     gross_margin_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     gross_margin_rate_bps: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    penalty_reserve_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    retention_reserve_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    guarantee_reserve_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    floor_margin_rate_bps: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    target_margin_rate_bps: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    break_even_sales_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    floor_sales_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    target_sales_minor: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
     source_snapshot_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)

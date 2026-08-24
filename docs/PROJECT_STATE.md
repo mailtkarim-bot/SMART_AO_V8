@@ -286,3 +286,14 @@ Validation locale après cette correction : **906 tests backend hors `db` passé
 Le test Docker cold-start et la migration PostgreSQL online rapportés par l’auditeur restent des preuves de son environnement. Docker est indisponible dans le sandbox courant ; le démarrage `make up`, ClamAV/EICAR, les triggers online, le backup/restore, HTTPS public et les fournisseurs externes doivent être rejoués sur les environnements correspondants. La CI GitHub reste bloquée : le run post-push `32728988801` a échoué avec `runnerName` nul et `steps: []`.
 
 Le verdict opérationnel reste **NO-GO**. Le quickstart dev est corrigé dans la configuration et couvert statiquement, mais la plateforme AO complète reste inachevée : MFA/TOTP, rate limiting distribué, `cockpit_projection`, coût de revient/prix plancher, analyse CCAP et croisement documentaire, OCR, DC1/DC2/DC4, décision finalisable, signature qualifiée, dépôt externe et recettes d’intégrations restent ouverts.
+
+
+## Lot ARCH-001 et cœur métier BTP — 24 août 2026
+
+La priorité architecture/métier a produit une première tranche vérifiée. `PatronAssignmentCockpitService` et `AssignmentHistoryService` consomment désormais leurs ports de lecture applicatifs (`PatronAssignmentCockpitReader` et `AssignmentHistoryReader`) ; les adaptateurs SQLAlchemy sont assemblés uniquement depuis la composition root. Un test d’architecture interdit la réintroduction de SQLAlchemy ou de modules `.infrastructure` dans ces deux services. Cette tranche réduit ARCH-001 sans prétendre supprimer les arêtes historiques restantes.
+
+Le slice `COST-BASIS-01` est livré dans `pricing/domain/cost_basis.py` et raccordé à la création des scénarios pricing. Il calcule exactement en unités mineures les coûts directs, frais généraux, sous-traitance, contingence, réserves de pénalités/retenues/garanties, marge, seuil de rentabilité, prix plancher et prix cible. La migration additive `20260824_0057` persiste ces valeurs avec contraintes PostgreSQL ; les DTOs et la route patronale sont fermés et les champs restent `FINANCIAL_PRIVATE`.
+
+La validation locale de ce lot est : **914 tests backend hors `db` passés, 458 désélectionnés**, Ruff passé, mypy ciblé passé sur 32 fichiers, scripts shell passés et SQL Alembic offline rendu jusqu’au head `20260824_0057`. Les tests frontend précédents restent à 98 tests passés dans 23 fichiers. PostgreSQL online, Docker, CI avec runner, VPS et fournisseurs externes ne sont pas revendiqués.
+
+La suite métier reste à coder : croisement CCAP–CCTP–DPGF–BPU, risques et exigences structurés, OCR/corpus Golden, génération DC1/DC2/DC4, décision GO/NO-GO complète et dépôt. ARCH-001 reste une dette de refactoring progressive sur les autres services application qui accèdent encore directement à l’ORM.

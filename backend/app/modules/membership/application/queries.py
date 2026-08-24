@@ -120,3 +120,12 @@ class PatronAssignmentCockpitReader(Protocol):
         assignment_id: UUID,
         limit: int,
     ) -> PatronAssignmentJournalLookup | None: ...
+
+    def get_interactions(
+        self,
+        *,
+        tenant_id: UUID,
+        assignment_id: UUID,
+        kind: str | None,
+        limit: int,
+    ) -> PatronAssignmentInteractionsLookup | None: ...

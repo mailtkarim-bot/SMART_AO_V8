@@ -149,3 +149,31 @@ Le rapport `docs/operator-reports/AUDIT_LEGENDAIRE_SMART_AO_V8_2026-08-24.md` es
 - [ ] Coder les fonctions métier centrales COST-BASIS, CCAP-RISK, croisement documentaire, OCR, DC1/DC2/DC4 et décision finalisable.
 
 **Mesure locale de sortie du correctif :** 906 tests backend hors `db` passent ; 458 sont désélectionnés ; 98 tests frontend passent ; typecheck, lint et build passent ; Ruff, lock UV et scripts shell passent. Les preuves Docker/PostgreSQL online, EICAR, HTTPS public, backup/restore, fournisseur réel et CI avec steps exécutés restent externes ou non obtenues.
+
+
+## Priorité ARCH-001 et cœur métier BTP — 24 août 2026
+
+### Livré dans la tranche courante
+
+- [x] Extraire `PatronAssignmentCockpitService` vers `PatronAssignmentCockpitReader`, assemblé depuis la composition root.
+- [x] Extraire `AssignmentHistoryService` vers `AssignmentHistoryReader`, assemblé depuis la composition root.
+- [x] Ajouter un test d’architecture empêchant SQLAlchemy et `.infrastructure` dans ces deux services application.
+- [x] Corriger le narrowing mypy de l’ID d’affectation collaborateur.
+- [x] Livrer `COST-BASIS-01` : calcul pur exact des coûts complets, réserves BTP, marge, seuil de rentabilité, prix plancher et prix cible.
+- [x] Persister les sorties COST-BASIS avec migration `20260824_0057`, contraintes PostgreSQL et DTOs patronaux fermés.
+
+### Tranches de code suivantes
+
+- [ ] Extraire progressivement les autres services membership mutationnels vers des ports/snapshots applicatifs, sans déplacer le dispatcher transactionnel.
+- [ ] Introduire les repositories/snapshots pricing nécessaires pour retirer les accès ORM directs de `pricing/application`.
+- [ ] Implémenter le registre structuré des risques et exigences CCAP/CCTP, avec sources, criticité, propriétaire et état de traitement.
+- [ ] Implémenter le croisement DPGF/BPU avec détection des incohérences et provenance de chaque résultat.
+- [ ] Ajouter l’OCR/corpus Golden et la qualification humaine avant toute décision automatique.
+- [ ] Finaliser la génération contrôlée DC1/DC2/DC4 et la décision GO/NO-GO patronale.
+- [ ] Ajouter l’E2E navigateur du parcours pricing/COST-BASIS et les contrôles de non-fuite financière.
+
+### Preuves requises
+
+- [ ] Rejouer migration `0057`, contraintes, idempotence et concurrence avec PostgreSQL online.
+- [ ] Rejouer le quickstart Docker et le parcours complet sur un hôte Docker réel.
+- [ ] Obtenir un run GitHub Actions attribué avec steps et artifacts ; ne pas fusionner PR #49 avant ce résultat.
