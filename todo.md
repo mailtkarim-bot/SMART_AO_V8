@@ -177,3 +177,32 @@ Le rapport `docs/operator-reports/AUDIT_LEGENDAIRE_SMART_AO_V8_2026-08-24.md` es
 - [ ] Rejouer migration `0057`, contraintes, idempotence et concurrence avec PostgreSQL online.
 - [ ] Rejouer le quickstart Docker et le parcours complet sur un hôte Docker réel.
 - [ ] Obtenir un run GitHub Actions attribué avec steps et artifacts ; ne pas fusionner PR #49 avant ce résultat.
+
+## Tranche readers mutationnels et registre CCAP/CCTP — 24 août 2026
+
+### Livré
+
+- [x] Introduire `AssignmentManagementReader` et faire passer les lectures préparatoires membership par un port applicatif.
+- [x] Introduire `PricingScenarioReader` et faire passer les lectures patronales pricing/scénarios-transition par un port applicatif, en conservant l’état et la version de la dernière transition.
+- [x] Ajouter la capability dédiée `decision.risk.write`, réservée au patron administrateur.
+- [x] Ajouter la commande et les DTOs fermés `RegisterStructuredRisk`.
+- [x] Ajouter le domaine pur CCAP/CCTP avec sévérité, vraisemblance, traitement, bornes et provenance.
+- [x] Ajouter la route patronale `POST /api/v1/patron/cases/{case_id}/risks`.
+- [x] Vérifier tenant, case, version DCE applicable, analyse `COMPLETED`, fragment, extrait et offsets avant persistence.
+- [x] Ajouter la migration PostgreSQL `20260824_0058` avec FKs composites, contraintes et identités tenant-scoped.
+- [x] Émettre un événement sparse sans énoncé ni extrait source.
+
+### À recetter sur PostgreSQL réel
+
+- [ ] Exécuter `20260824_0058` sur une base jetable et vérifier les FKs composites.
+- [ ] Tester l’isolation tenant et le refus d’un fragment appartenant à une autre version ou un autre tenant.
+- [ ] Tester la concurrence sur `functional_key`, la clé de commande et la clé d’idempotence.
+- [ ] Vérifier la transaction unique persistence + event + outbox + receipt.
+- [ ] Ajouter ensuite la lecture patronale des risques avec pagination bornée et DTO sans fuite financière.
+
+### Prochaine valeur métier BTP
+
+- [ ] Relier le risque à une exigence DCE et à une action de traitement patronale.
+- [ ] Croiser CCAP/CCTP avec DPGF/BPU et conserver la provenance de chaque résultat.
+- [ ] Ajouter le corpus Golden et la qualification humaine avant toute automatisation OCR/RAG.
+- [ ] Finaliser DC1/DC2/DC4 et GO/NO-GO.

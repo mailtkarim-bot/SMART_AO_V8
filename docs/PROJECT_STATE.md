@@ -297,3 +297,14 @@ Le slice `COST-BASIS-01` est livré dans `pricing/domain/cost_basis.py` et racco
 La validation locale de ce lot est : **914 tests backend hors `db` passés, 458 désélectionnés**, Ruff passé, mypy ciblé passé sur 32 fichiers, scripts shell passés et SQL Alembic offline rendu jusqu’au head `20260824_0057`. Les tests frontend précédents restent à 98 tests passés dans 23 fichiers. PostgreSQL online, Docker, CI avec runner, VPS et fournisseurs externes ne sont pas revendiqués.
 
 La suite métier reste à coder : croisement CCAP–CCTP–DPGF–BPU, risques et exigences structurés, OCR/corpus Golden, génération DC1/DC2/DC4, décision GO/NO-GO complète et dépôt. ARCH-001 reste une dette de refactoring progressive sur les autres services application qui accèdent encore directement à l’ORM.
+
+
+## Tranche mutationnelle membership/pricing et registre CCAP/CCTP — 24 août 2026
+
+`PatronAssignmentManagementService` reçoit désormais un `AssignmentManagementReader` pour ses lectures préparatoires de case et d’affectation. `PricingScenarioService` et `PricingScenarioTransitionService` reçoivent un `PricingScenarioReader` pour leurs projections patronales. Les adaptateurs SQLAlchemy sont assemblés depuis la composition root ; les handlers d’écriture restent dans le dispatcher transactionnel afin de préserver event/outbox/receipt, idempotence et révision.
+
+Le registre structuré des risques est livré sous `decision.domain.risk`, `decision.application.risk` et `decision_risks`. La route patronale `POST /api/v1/patron/cases/{case_id}/risks` vérifie le tenant, la case, la version DCE applicable, l’analyse d’extraction terminée, le fragment source, l’extrait et les offsets. La migration `20260824_0058` ajoute les FKs composites, identités tenant-scoped et contraintes de catégorie, sévérité, vraisemblance, traitement et provenance. L’événement est sparse et n’expose ni énoncé ni extrait.
+
+Validation locale de la tranche : **923 tests backend hors `db` passés, 458 désélectionnés**, Ruff passé, mypy passé sur 57 fichiers, tests HTTP/application/architecture risques passés, scripts shell passés et SQL Alembic offline rendu jusqu’au head `20260824_0058`. PostgreSQL online, Docker, CI avec runner, VPS et fournisseurs réels ne sont pas revendiqués.
+
+Le rapport détaillé est `docs/ARCH001_RISK_REGISTER_REMEDIATION_2026-08-24.md`. ARCH-001 reste une dette progressive sur les autres services ; les prochaines capacités métier sont le croisement risques/exigences et DPGF/BPU, l’OCR/corpus Golden, DC1/DC2/DC4 et GO/NO-GO.

@@ -13,6 +13,8 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from app.modules.decision.domain.risk import StructuredRisk
+
 
 @dataclass(frozen=True, slots=True)
 class DecisionRootSnapshot:
@@ -86,6 +88,60 @@ class DecisionSnapshot:
     contexts: tuple[DecisionContextSnapshot, ...]
     context_references: tuple[DecisionContextReferenceSnapshot, ...]
     conditions: tuple[DecisionConditionSnapshot, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionRiskDraft:
+    id: UUID
+    tenant_id: UUID
+    case_id: UUID
+    dce_version_id: UUID
+    source_fragment_id: UUID
+    functional_key: str
+    risk: StructuredRisk
+    actor_id: UUID
+    membership_id: UUID
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None
+    due_at: datetime | None
+
+
+class DecisionRiskRepository(Protocol):
+    """Persists one immutable, tenant-scoped structured risk."""
+
+    def case_exists(self, *, session: object, tenant_id: UUID, case_id: UUID) -> bool: ...
+
+    def case_uses_dce_version(
+        self, *, session: object, tenant_id: UUID, case_id: UUID, dce_version_id: UUID
+    ) -> bool: ...
+
+    def source_exists(
+        self,
+        *,
+        session: object,
+        tenant_id: UUID,
+        dce_version_id: UUID,
+        source_fragment_id: UUID,
+    ) -> bool: ...
+
+    def source_supports(
+        self,
+        *,
+        session: object,
+        tenant_id: UUID,
+        dce_version_id: UUID,
+        source_fragment_id: UUID,
+        source_excerpt: str,
+        start_byte_offset: int,
+        end_byte_offset: int,
+    ) -> bool: ...
+
+    def functional_exists(
+        self, *, session: object, tenant_id: UUID, functional_key: str
+    ) -> bool: ...
+
+    def create(self, *, session: object, draft: DecisionRiskDraft) -> None: ...
 
 
 class DecisionRepository(Protocol):

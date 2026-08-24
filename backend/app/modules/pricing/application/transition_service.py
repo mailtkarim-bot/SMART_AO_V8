@@ -1,10 +1,9 @@
-from dataclasses import replace
 from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from app.modules.pricing.application.service import PricingScenarioProjection
+from app.modules.pricing.application.queries import PricingScenarioProjection, PricingScenarioReader
 from app.modules.pricing.application.transition_commands import (
     ArchivePricingScenarioCommand,
     SelectPricingScenarioCommand,
@@ -33,9 +32,15 @@ from app.platform.security.context import ActorContext, ActorKind, DataClassific
 
 class PricingScenarioTransitionService:
     def __init__(
-        self, *, session_factory, dispatcher: CommandDispatcher, policy: AuthorizationPolicyPort
+        self,
+        *,
+        session_factory,
+        reader: PricingScenarioReader,
+        dispatcher: CommandDispatcher,
+        policy: AuthorizationPolicyPort,
     ) -> None:
         self._session_factory = session_factory
+        self._reader = reader
         self._dispatcher = dispatcher
         self._policy = policy
 
@@ -76,37 +81,7 @@ class PricingScenarioTransitionService:
     def list_for_case(self, *, actor: ActorContext, case_id, now: datetime):
         if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
             raise PermissionError("PATRON_REQUIRED")
-        with self._session_factory() as session:
-            records = session.scalars(
-                sa.select(PricingScenarioRecord)
-                .where(
-                    PricingScenarioRecord.tenant_id == actor.tenant_id,
-                    PricingScenarioRecord.case_id == case_id,
-                )
-                .order_by(PricingScenarioRecord.created_at.desc())
-            ).all()
-            projections = []
-            for record in records:
-                latest = session.scalar(
-                    sa.select(PricingScenarioTransitionRecord)
-                    .where(
-                        PricingScenarioTransitionRecord.tenant_id == actor.tenant_id,
-                        PricingScenarioTransitionRecord.scenario_id == record.id,
-                    )
-                    .order_by(PricingScenarioTransitionRecord.version.desc())
-                    .limit(1)
-                )
-                if latest is None:
-                    projections.append(_projection(record))
-                else:
-                    projections.append(
-                        replace(
-                            _projection(record),
-                            state=latest.to_state,
-                            version=latest.version,
-                        )
-                    )
-            return tuple(projections)
+        return self._reader.list_for_case(tenant_id=actor.tenant_id, case_id=case_id)
 
 
 class TransitionPricingScenarioHandler:

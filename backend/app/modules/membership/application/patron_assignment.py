@@ -5,10 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.commands import (
@@ -18,6 +19,11 @@ from app.modules.dce.application.commands import (
     ReactivateCaseAssignmentCommand,
     SuspendCaseAssignmentCommand,
     ValidateAssignmentInteractionCommand,
+)
+from app.modules.membership.application.queries import (
+    AssignmentManagementCase,
+    AssignmentManagementReader,
+    AssignmentManagementTarget,
 )
 from app.platform.events.dispatcher import (
     CommandContext,
@@ -58,12 +64,14 @@ class PatronAssignmentManagementService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
+        session_factory: Any,
+        reader: AssignmentManagementReader,
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
         audit_writer: SecurityAuditWriter | None = None,
     ) -> None:
         self._session_factory = session_factory
+        self._reader = reader
         self._dispatcher = dispatcher
         self._policy = policy
         self._audit_writer = audit_writer or SecurityAuditWriter()
@@ -338,7 +346,7 @@ class PatronAssignmentManagementService:
         self,
         *,
         actor: ActorContext,
-        case: CaseRecord,
+        case: AssignmentManagementCase,
         now: datetime,
     ) -> None:
         decision = self._policy.authorize(
@@ -362,7 +370,7 @@ class PatronAssignmentManagementService:
         self,
         *,
         actor: ActorContext,
-        assignment: CaseAssignmentRecord,
+        assignment: AssignmentManagementTarget,
         now: datetime,
     ) -> None:
         decision = self._policy.authorize(
@@ -421,28 +429,15 @@ class PatronAssignmentManagementService:
                 ),
             )
 
-    def _resolve_case(self, *, tenant_id: UUID, case_id: UUID) -> CaseRecord | None:
-        with self._session_factory() as session:
-            return session.scalar(
-                sa.select(CaseRecord).where(
-                    CaseRecord.tenant_id == tenant_id,
-                    CaseRecord.id == case_id,
-                )
-            )
+    def _resolve_case(
+        self, *, tenant_id: UUID, case_id: UUID
+    ) -> AssignmentManagementCase | None:
+        return self._reader.get_case(tenant_id=tenant_id, case_id=case_id)
 
     def _resolve_assignment(
-        self,
-        *,
-        tenant_id: UUID,
-        assignment_id: UUID,
-    ) -> CaseAssignmentRecord | None:
-        with self._session_factory() as session:
-            return session.scalar(
-                sa.select(CaseAssignmentRecord).where(
-                    CaseAssignmentRecord.tenant_id == tenant_id,
-                    CaseAssignmentRecord.id == assignment_id,
-                )
-            )
+        self, *, tenant_id: UUID, assignment_id: UUID
+    ) -> AssignmentManagementTarget | None:
+        return self._reader.get_assignment(tenant_id=tenant_id, assignment_id=assignment_id)
 
 
 class PatronAssignmentManagementHandler:

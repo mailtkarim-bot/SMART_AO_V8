@@ -48,11 +48,12 @@ def _runtime(*, resolver_error=None):
     )
 
 
-def _client(*, service=None, resolver_error=None):
+def _client(*, service=None, risk_service=None, resolver_error=None):
     app = FastAPI()
     app.include_router(
         build_patron_decision_router(
             service=service or _DecisionService(),
+            risk_service=risk_service,
             security_runtime=_runtime(resolver_error=resolver_error),
         )
     )
@@ -109,6 +110,52 @@ def _dossier(case_id):
     )
 
 
+def _risk_payload():
+    return {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "risk_id": str(uuid4()),
+        "dce_version_id": str(uuid4()),
+        "source_fragment_id": str(uuid4()),
+        "category": "CCAP",
+        "risk_code": "CCAP-DELAI-001",
+        "title": "Délai contractuel critique",
+        "statement": "Le délai impose une mobilisation anticipée.",
+        "severity": "HIGH",
+        "likelihood": "LIKELY",
+        "source_excerpt": "Le titulaire respecte le délai contractuel.",
+        "source_locator": {"page": 12, "section": "CCAP 4.2"},
+        "start_byte_offset": 100,
+        "end_byte_offset": 150,
+    }
+
+
+class _RiskService:
+    def __init__(self, *, error=None):
+        self.error = error
+        self.calls = []
+
+    def execute(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        result = SimpleNamespace(
+            command_id=str(kwargs["command"].command_id),
+            idempotency_key=str(kwargs["command"].idempotency_key),
+            result_code="DECISION_RISK_REGISTERED",
+            aggregate_refs=[
+                {
+                    "aggregate_id": str(kwargs["command"].risk_id),
+                    "aggregate_revision": 1,
+                }
+            ],
+            event_ids=[str(uuid4())],
+            replayed=False,
+        )
+        return result
+
+
 class _DecisionService:
     def __init__(self, *, error=None):
         self.error = error
@@ -142,6 +189,47 @@ def test_decision_route_maps_invalid_context_to_401():
 
     assert response.status_code == 401
     assert response.json() == {"detail": "UNAUTHENTICATED"}
+
+
+def test_register_risk_returns_closed_patron_receipt_and_forwards_case_from_path():
+    risk_service = _RiskService()
+    case_id = uuid4()
+    payload = _risk_payload()
+
+    response = _client(risk_service=risk_service).post(
+        f"/api/v1/patron/cases/{case_id}/risks",
+        json=payload,
+        headers=_headers(),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["result_code"] == "DECISION_RISK_REGISTERED"
+    assert risk_service.calls[0]["command"].case_id == case_id
+    assert "source_excerpt" not in response.json()
+    assert "statement" not in response.json()
+
+
+def test_register_risk_maps_permission_error_to_403():
+    response = _client(
+        risk_service=_RiskService(error=PermissionError("PATRON_REQUIRED"))
+    ).post(
+        f"/api/v1/patron/cases/{uuid4()}/risks",
+        json=_risk_payload(),
+        headers=_headers(),
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "FORBIDDEN"}
+
+
+def test_register_risk_rejects_forbidden_extra_fields():
+    response = _client(risk_service=_RiskService()).post(
+        f"/api/v1/patron/cases/{uuid4()}/risks",
+        json={**_risk_payload(), "tenant_id": str(uuid4())},
+        headers=_headers(),
+    )
+
+    assert response.status_code == 422
 
 
 def test_read_decision_dossier_returns_frozen_projection():

@@ -1,11 +1,15 @@
-from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.modules.pricing.application.commands import CreatePricingScenarioCommand
+from app.modules.pricing.application.queries import (
+    PricingScenarioProjection,
+    PricingScenarioReader,
+)
 from app.modules.pricing.domain.cost_basis import (
     CostBasisInput,
     CostBasisValidationError,
@@ -33,39 +37,17 @@ from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
 
 
-@dataclass(frozen=True, slots=True)
-class PricingScenarioProjection:
-    scenario_id: UUID
-    case_id: UUID
-    scenario_key: str
-    scenario_type: str
-    version: int
-    state: str
-    assumptions: dict[str, object]
-    sales_total_minor: int
-    total_cost_minor: int
-    gross_margin_minor: int
-    gross_margin_rate_bps: int
-    penalty_reserve_minor: int
-    retention_reserve_minor: int
-    guarantee_reserve_minor: int
-    floor_margin_rate_bps: int
-    target_margin_rate_bps: int
-    break_even_sales_minor: int
-    floor_sales_minor: int
-    target_sales_minor: int
-    source_snapshot_revision: int
-
-
 class PricingScenarioService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
+        session_factory: Any,
+        reader: PricingScenarioReader,
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
     ) -> None:
         self._session_factory = session_factory
+        self._reader = reader
         self._dispatcher = dispatcher
         self._policy = policy
 
@@ -106,18 +88,7 @@ class PricingScenarioService:
     def list_for_case(self, *, actor: ActorContext, case_id: UUID, now: datetime):
         if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
             raise PermissionError("PATRON_REQUIRED")
-        with self._session_factory() as session:
-            return tuple(
-                _projection(row)
-                for row in session.scalars(
-                    sa.select(PricingScenarioRecord)
-                    .where(
-                        PricingScenarioRecord.tenant_id == actor.tenant_id,
-                        PricingScenarioRecord.case_id == case_id,
-                    )
-                    .order_by(PricingScenarioRecord.created_at.desc())
-                ).all()
-            )
+        return self._reader.list_for_case(tenant_id=actor.tenant_id, case_id=case_id)
 
 
 class PricingScenarioHandler:

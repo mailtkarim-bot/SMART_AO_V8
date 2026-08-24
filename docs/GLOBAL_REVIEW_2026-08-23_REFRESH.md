@@ -204,3 +204,12 @@ Le premier vertical slice métier ciblé est `COST-BASIS-01`. Le domaine pricing
 Après ce lot, la suite backend hors DB est à **914 passed, 458 deselected** ; Ruff, mypy ciblé et les scripts shell passent. Le SQL offline de la migration 0057 est généré. La persistence PostgreSQL online et le parcours Docker restent à exécuter dans un environnement disponible.
 
 Le cœur BTP est donc renforcé mais non finalisé : le croisement documentaire CCAP–CCTP–DPGF–BPU, les risques structurés, l’OCR/corpus Golden, la génération DC1/DC2/DC4, la décision finalisable et le dépôt restent des slices de production à coder et recetter. Le verdict opérationnel demeure NO-GO.
+
+
+## Tranche mutationnelle et registre CCAP/CCTP — 24 août 2026
+
+Les lectures préparatoires des services mutationnels membership et pricing passent maintenant par des ports applicatifs : `AssignmentManagementReader` pour les contrôles de case/affectation et `PricingScenarioReader` pour les projections de scénarios. Les adaptateurs SQLAlchemy sont assemblés dans la composition root. Les handlers d’écriture restent raccordés au dispatcher transactionnel afin de préserver event/outbox/receipt, idempotence et révision ; ARCH-001 est donc réduit par tranches, non supprimé en une seule opération.
+
+Le registre structuré des risques CCAP/CCTP est codé derrière la capability patronale dédiée `decision.risk.write`. Chaque risque doit référencer une affaire tenant-scoped, sa version DCE applicable, une analyse d’extraction terminée et un fragment dont l’extrait et les offsets concordent avec le texte source. La migration `20260824_0058` ajoute la persistence, les FKs composites et les contraintes de catégorie, sévérité, vraisemblance, traitement et provenance. L’événement est sparse et ne contient pas le texte financier ou documentaire sensible.
+
+La validation locale de cette tranche est de **923 tests backend hors `db` passés**, avec **458 désélectionnés**, Ruff et mypy ciblé passés, scripts shell validés et Alembic offline généré jusqu’à `20260824_0058`. PostgreSQL online, Docker, CI avec runner, VPS et fournisseurs externes ne sont pas revendiqués. Le registre n’est pas encore un moteur complet d’analyse AO : DPGF/BPU, OCR/corpus Golden, DC1/DC2/DC4 et GO/NO-GO restent à implémenter et recetter.

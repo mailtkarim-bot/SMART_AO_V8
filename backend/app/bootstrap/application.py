@@ -135,6 +135,11 @@ from app.modules.dce.infrastructure.quarantine import (
 )
 from app.modules.dce.infrastructure.repositories import SqlAlchemyConsultationRepository
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
+from app.modules.decision.application.risk import (
+    PatronDecisionRiskService,
+    decision_risk_handlers,
+)
+from app.modules.decision.infrastructure.risk_repository import SqlAlchemyDecisionRiskRepository
 from app.modules.enterprise.application.enterprise_capability import (
     EnterpriseCapabilityService,
     enterprise_capability_handlers,
@@ -196,6 +201,9 @@ from app.modules.membership.application.patron_assignment_cockpit import (
 from app.modules.membership.infrastructure.assignment_history_reader import (
     SqlAlchemyAssignmentHistoryReader,
 )
+from app.modules.membership.infrastructure.assignment_management_reader import (
+    SqlAlchemyAssignmentManagementReader,
+)
 from app.modules.membership.infrastructure.patron_assignment_cockpit_reader import (
     SqlAlchemyPatronAssignmentCockpitReader,
 )
@@ -249,6 +257,7 @@ from app.modules.pricing.application.transition_service import (
     PricingScenarioTransitionService,
     pricing_scenario_transition_handlers,
 )
+from app.modules.pricing.infrastructure.scenario_reader import SqlAlchemyPricingScenarioReader
 from app.modules.submission.application.calendar import SubmissionDeadlineCalendarPort
 from app.modules.submission.application.evidence_service import (
     SubmissionEvidenceService,
@@ -355,6 +364,9 @@ class AppRuntime:
                 **preparation_transmission_handlers(action_writer=PatronActionWriter()),
                 **patron_action_handlers(),
                 **patron_action_transition_handlers(),
+                **decision_risk_handlers(
+                    repository_factory=lambda _session: SqlAlchemyDecisionRiskRepository()
+                ),
                 **pricing_scenario_handlers(),
                 **pricing_scenario_transition_handlers(),
                 **pricing_import_creation_handlers(),
@@ -771,13 +783,19 @@ def create_app(
             session_factory=runtime.session_factory,
             policy=security_policy,
         )
+        patron_decision_risk_service = PatronDecisionRiskService(
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
         pricing_scenario_service = PricingScenarioService(
             session_factory=runtime.session_factory,
+            reader=SqlAlchemyPricingScenarioReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
         pricing_scenario_transition_service = PricingScenarioTransitionService(
             session_factory=runtime.session_factory,
+            reader=SqlAlchemyPricingScenarioReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
@@ -808,6 +826,7 @@ def create_app(
         )
         patron_assignment_management_service = PatronAssignmentManagementService(
             session_factory=runtime.session_factory,
+            reader=SqlAlchemyAssignmentManagementReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
@@ -1005,6 +1024,7 @@ def create_app(
         app.include_router(
             build_patron_decision_router(
                 service=patron_decision_dossier_service,
+                risk_service=patron_decision_risk_service,
                 security_runtime=security_runtime,
             )
         )
