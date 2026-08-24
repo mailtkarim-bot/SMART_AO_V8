@@ -228,3 +228,12 @@ La branche reste NO-GO production et `main`/PR #49 ne doivent pas être fusionn�
 
 
 Le push du quatrième lot a déclenché le run CI `32680863228` sur `7be6263`. Il s’est terminé en échec avec les trois jobs `backend`, `frontend` et `image-security` à `steps: []`; aucune étape n’a exécuté le code. Ce résultat confirme le blocage de provisioning des runners. La branche reste publiée, la PR #49 reste ouverte et `main` reste non fusionné.
+
+
+## Actualisation — cinquième audit intégré, 24 août 2026
+
+Le rapport source est archivé dans [`operator-reports/RAPPORT_AUDIT_05_VERIFICATION.md`](operator-reports/RAPPORT_AUDIT_05_VERIFICATION.md) et sa réponse détaillée est [`AUDIT_RECONCILIATION_2026-08-24_5.md`](AUDIT_RECONCILIATION_2026-08-24_5.md). Le finding critique N5-01 était exact : le service `migrate` du Compose de développement appelait `/app/alembic.ini`, alors que l’image backend place le fichier sous `/app/backend/alembic.ini`. Le chemin a été corrigé et protégé par un contrat de test. N5-02 est traité par la constante partagée `EXPECTED_ALEMBIC_HEAD`, le contrôle readiness séparé database/schema et un test comparant la constante à la tête réelle du graphe Alembic. N5-03 est traité par une assertion event-bus scoped au tenant du test. N5-04 ajoute la couverture DB des 18 colonnes historiques et de DELETE pour la garde 0056. N5-05 documente `--extra calendar` dans Makefile et le runbook PostgreSQL. N5-06 augmente les timeouts Vitest à 15 secondes pour les runners CPU-contraints.
+
+Validation locale du lot : backend non-DB `888 passed, 458 deselected, 4 warnings`; frontend `23 fichiers, 98 tests passés`; typecheck/build frontend passés; ESLint 0 erreur et 2 warnings `exhaustive-deps`; Ruff, mypy sécurité, `uv lock --check`, installation pnpm frozen, syntaxe shell et `git diff --check` passés. Le test ciblé architecture/ops/readiness a donné `31 passed, 1 warning`. Docker et PostgreSQL online ne sont pas disponibles dans ce sandbox ; les résultats PostgreSQL/coverage annoncés par le rapport source restent des preuves externes non reproduites ici.
+
+Le projet reste NO-GO production tant que le démarrage Docker, les migrations PostgreSQL online, ClamAV/EICAR, HTTPS, sauvegarde-restauration, CI avec runners actifs et les lots métier BTP ne sont pas exécutés sur leurs cibles. La PR #49 et `main` ne doivent pas être fusionnées sur un run CI sans étapes.

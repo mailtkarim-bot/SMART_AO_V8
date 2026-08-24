@@ -201,3 +201,12 @@ Le quatrième audit a confirmé une incompatibilité entre la projection mutable
 L’extra `object-storage` est désormais raccordé au Dockerfile backend et au build préproduction. Le pipeline CI exporte toutes les extras pour pip-audit et construit l’image backend de scan avec les flags optionnels. Cela prouve le câblage de la supply chain, pas l’absence de CVE ni une exécution CI verte. Docker, PostgreSQL online, ClamAV réel, bucket S3/MinIO, fournisseurs externes et runners GitHub restent des preuves environnementales à exécuter sur leurs cibles.
 
 La réconciliation détaillée est [`AUDIT_RECONCILIATION_2026-08-24_4.md`](AUDIT_RECONCILIATION_2026-08-24_4.md).
+
+
+## Actualisation audit n°5 — 24 août 2026
+
+L’audit n°5 a confirmé un défaut de chemin dans le service `migrate` du Compose de développement ; il est corrigé vers `/app/backend/alembic.ini`, conformément à la structure de l’image backend. La tête Alembic est maintenant partagée via `EXPECTED_ALEMBIC_HEAD` et comparée au graphe réel par un test d’architecture. Le readiness distingue la connectivité database de l’état schema.
+
+Le test event-bus est isolé par tenant, la garde 0056 est testée sur toutes ses colonnes historiques et DELETE, et les commandes canoniques de validation installent explicitement l’extra `calendar`. Les timeouts Vitest sont adaptés aux runners CPU-contraints. Ces corrections améliorent le câblage et la preuve locale ; elles ne constituent pas une exécution Docker/PostgreSQL online, un run CI vert ou une recette fournisseur.
+
+La réponse détaillée est [`AUDIT_RECONCILIATION_2026-08-24_5.md`](AUDIT_RECONCILIATION_2026-08-24_5.md).

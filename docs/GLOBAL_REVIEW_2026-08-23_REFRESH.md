@@ -153,3 +153,12 @@ Le quatrième rapport confirme une régression réelle de `patron_action` : le t
 Les consommateurs application preparation/submission utilisent le port storage platform, et ErrorBoundary force un re-montage après retry. La validation finale locale donne 885 tests backend non-DB passés, 458 DB désélectionnés, 98 tests frontend passés sur 23 fichiers, typecheck/build passés, Ruff/mypy/lockfile/shell/detect-secrets passés et Alembic offline jusqu’à 0056 passé. Le sandbox courant ne possède ni Docker ni PostgreSQL accessible ; les preuves online annoncées dans le rapport source sont conservées comme preuves fournies mais non reproduites ici. Le verdict reste **NO-GO production** jusqu’à une recette online, une CI avec runners actifs et une validation métier/infra complète.
 
 Le détail ligne par ligne est dans [`AUDIT_RECONCILIATION_2026-08-24_4.md`](AUDIT_RECONCILIATION_2026-08-24_4.md).
+
+
+## Retour sur l’audit n°5 — 24 août 2026
+
+Le cinquième audit a été vérifié et est pertinent. Il a détecté un défaut réel dans le service `migrate` du Compose de développement : `/app/alembic.ini` ne correspondait pas au chemin réel `/app/backend/alembic.ini` de l’image backend. Le chemin est corrigé. Les autres findings confirmés sont traités par une constante de tête Alembic partagée et un test anti-dérive, un diagnostic readiness séparant `database` et `schema`, une assertion event-bus isolée par tenant, une couverture élargie de la garde 0056, l’installation explicite de l’extra `calendar` dans les commandes canoniques et des timeouts Vitest adaptés aux runners CPU-contraints.
+
+Validation locale après le lot : 888 tests backend non-DB passés, 458 tests DB désélectionnés, 98 tests frontend passés, typecheck/build passés, Ruff/mypy/lockfile/syntaxe shell passés et 31 tests ciblés architecture/ops/readiness passés. La preuve PostgreSQL réelle annoncée dans le rapport source n’est pas reproduite dans le sandbox courant ; Docker et PostgreSQL restent indisponibles ici. Le verdict de production reste NO-GO jusqu’aux preuves online, à une CI réellement exécutée et aux lots métier BTP.
+
+Le détail complet est conservé dans [`AUDIT_RECONCILIATION_2026-08-24_5.md`](AUDIT_RECONCILIATION_2026-08-24_5.md).
