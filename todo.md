@@ -89,3 +89,40 @@ Le détail de qualification se trouve dans `docs/AUDIT_RECONCILIATION_2026-08-23
 - [ ] Ajouter les preuves externes : PostgreSQL online, Docker/ClamAV-EICAR, HTTPS, backup/restore, corpus DCE/BGE, bus et runners GitHub Actions.
 
 Réconciliation détaillée : `docs/AUDIT_RECONCILIATION_2026-08-23_3.md`.
+
+
+## Source de vérité canonique après l’audit exhaustif — 24 août 2026
+
+Les sections antérieures restent conservées comme journal historique. La checklist ci-dessous est la référence de pilotage la plus récente ; elle ne transforme aucune recette externe en preuve locale.
+
+### Remédiations appliquées dans le lot courant
+
+- [x] Archiver le rapport exhaustif dans `docs/operator-reports/AUDIT_EXHAUSTIF_SMART_AO_V8_2026-08-24.md` et publier `docs/AUDIT_RECONCILIATION_2026-08-24_6.md`.
+- [x] Bloquer les redirections et destinations HTTP privées pour le webhook et le bus externe via un helper partagé HTTPS/DNS.
+- [x] Ajouter les headers de sécurité FastAPI de défense en profondeur.
+- [x] Borner les retries des workers retention, webhook, SMTP et bus avec terminal `FAILED`; conserver `cockpit_projection` ouvert jusqu’à décision de contrat/rétention.
+- [x] Aligner la limite d’admission DCE runtime sur 150 MB et paramétrer le port PostgreSQL hôte du Compose dev.
+- [x] Renforcer le workflow CI par permissions minimales, concurrency, timeouts, digest PostgreSQL, installation de toutes les extras et rapports SARIF Trivy backend/frontend.
+- [x] Nettoyer la baseline detect-secrets des environnements/caches et faire passer le hook canonique.
+- [x] Livrer le backend BTP-1a `POST /api/v1/cases` avec DTOs fermés, capability patronale, idempotence, scopes/origines validés, référence Consultation tenant/révision vérifiée, ports applicatifs et événement sparse.
+
+### Travaux de code prioritaires restant
+
+- [ ] Ajouter l’écran frontend de création d’affaire et son parcours de navigation `CASE_OVERVIEW`.
+- [ ] Définir et coder la cérémonie MFA/TOTP complète : enrôlement, confirmation, recovery, step-up et tests d’intégration.
+- [ ] Concevoir un rate limiter distribué ou une admission edge avant tout scale-out multi-réplique.
+- [ ] Définir le contrat, le consumer, l’alerte et la rétention de `cockpit_projection`; conserver les messages `FAILED` consultables.
+- [ ] Refactoriser progressivement les arêtes application→infrastructure par bounded context, en commençant par les lectures membership, avec tests d’architecture, DB et concurrence.
+- [ ] Implémenter l’analyse métier CCAP–CCTP–DPGF–BPU, l’OCR/corpus Golden, le coût de revient, le prix plancher, pénalités/RG/cautionnement, DC1/DC2/DC4 et la commande de décision GO/NO-GO.
+- [ ] Implémenter la conversion contrôlée observation BOAMP qualifiée → Case, sans créer de scheduler ou d’appel fournisseur par défaut.
+
+### Preuves externes obligatoires avant production
+
+- [ ] Obtenir un runner GitHub réellement attribué et exécuter la CI complète de la branche ; ne pas fusionner PR #49 ou `main` avant un verdict avec steps et artifacts.
+- [ ] Exécuter PostgreSQL 16 online sur base jetable : migrations head `0056`, tests DB, isolation tenant, append-only et parcours CreateCase.
+- [ ] Exécuter Docker/Compose/Caddy/ClamAV réel, test EICAR, health/readiness et vérification des logs persistants.
+- [ ] Vérifier une URL HTTPS backend réelle, le login/refresh/CSRF et un E2E navigateur Playwright.
+- [ ] Recetter backup hors hôte et restauration isolée avec hashes, contrôle tenant et état outbox.
+- [ ] Recetter séparément BGE/RAG, Docling/OCR, S3/MinIO, BOAMP/INSEE, SMTP/ICS, signature et bus avec credentials runtime hors Git.
+
+**État de preuve local au 24 août :** 906 tests backend hors `db` passent ; 458 tests DB sont désélectionnés ; 98 tests frontend passent ; typecheck, lint, build, Ruff, mypy ciblé, lock UV, detect-secrets, scripts shell et Alembic offline `0056` passent. Docker, PostgreSQL online, VPS, HTTPS public, EICAR, backup/restore, fournisseur réel et CI avec steps exécutés ne sont pas prouvés dans le sandbox.

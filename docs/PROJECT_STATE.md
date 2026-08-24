@@ -246,3 +246,28 @@ Le dernier push documentaire `537c835` a déclenché le run CI `32712943053`, te
 
 
 Clôture de la vérification distante : le commit `b00aad0` a produit le run CI `32712989698`, terminé en échec avec `backend`, `frontend` et `image-security` à `steps: []`. Le code n’a pas été exécuté par GitHub Actions ; le blocage de provisioning des runners persiste. La branche locale/distante est propre et la PR #49 reste ouverte, sans modification de `main` (`970c9ff`).
+
+
+## Actualisation canonique après l’audit exhaustif — 24 août 2026
+
+Cette section est la référence la plus récente et supersède les anciens comptes de tests, de couverture, de tête Alembic et de commit lorsqu’ils diffèrent. Le rapport externe exhaustif est archivé dans `docs/operator-reports/AUDIT_EXHAUSTIF_SMART_AO_V8_2026-08-24.md`, et sa réponse de qualification est `docs/AUDIT_RECONCILIATION_2026-08-24_6.md`.
+
+Le lot courant a appliqué les remédiations sûres confirmées par confrontation au code : helper HTTPS public anti-SSRF avec résolution DNS publique et refus des redirections pour le webhook et le bus externe ; headers de défense en profondeur dans FastAPI ; politique retry/dead-letter bornée pour retention, webhook, SMTP et bus ; limite DCE runtime alignée sur Caddy ; port PostgreSQL hôte de développement paramétrable ; workflow CI durci par permissions minimales, concurrency, timeouts, digest PostgreSQL et SARIF Trivy backend/frontend ; baseline detect-secrets nettoyée des environnements et caches. Le topic `cockpit_projection` n’a pas été supprimé, car son contrat et sa rétention doivent être décidés explicitement.
+
+Le slice BTP-1a `CreateCase` est maintenant présent au niveau backend : DTOs et commande Pydantic fermés, capability `CASE_CREATE` réservée au patron admin, acteur et tenant résolus serveur, identifiant déterministe dérivé de l’idempotency key, contrôles de portée et d’origine, vérification tenant/révision de la Consultation, persistence Case et lien Consultation via ports injectés, événement `CASE_CREATED` sparse et référence `AFF`. Le handler ne dépend pas de SQLAlchemy ; les adaptateurs sont assemblés dans la composition root. Les tests unitaires/API couvrent succès, rejeu, refus, conflit, scope invalide et référence Consultation absente ou obsolète. Il n’existe pas encore d’écran frontend de création ni de preuve PostgreSQL online de ce parcours.
+
+Validation locale de ce lot : **906 tests backend hors `db` passés**, 458 tests DB désélectionnés ; **98 tests frontend dans 23 fichiers passés**, typecheck, lint et build Vite passés. Ruff, mypy ciblé, `uv lock --check`, `git diff --check`, `bash -n` et le hook detect-secrets passent. Alembic génère le SQL offline jusqu’à la tête `20260824_0056`. Deux avertissements ESLint `react-hooks/exhaustive-deps` dans `web/src/app/App.tsx` restent connus et ne sont pas des erreurs de lint.
+
+Ces validations sont uniquement locales. Le sandbox courant ne fournit pas Docker ; aucune recette PostgreSQL online, migration appliquée, trigger vérifié en base, ClamAV/EICAR, HTTPS public, backup/restore, fournisseur externe, VPS ou CI GitHub avec steps exécutés n’est revendiqué. La mesure externe de l’auditeur de 1 346 tests et 90,96 % reste une preuve de son environnement, pas une mesure locale. Les runs GitHub avec `runnerName` absent et `steps: []` restent un blocage ; PR #49 et `main` ne doivent pas être fusionnées sur cette base.
+
+### État de sortie actuel
+
+| Axe | État canonique au 24 août |
+|---|---|
+| Socle backend et sécurité | Renforcé localement ; invariants tenant, append-only, idempotence, révision optimiste, DTO fermés et confidentialité financière conservés. |
+| CreateCase | Backend livré et testé hors DB ; écran frontend et test PostgreSQL online restant. |
+| Workers/outbox | Dead-letter ciblée livrée ; contrat/rétention `cockpit_projection` encore ouverts. |
+| CI | Workflow durci statiquement ; runner GitHub et exécution réelle non rétablis. |
+| Dépendances externes | Antennes/adaptateurs optionnels existants ; aucune recette fournisseur, corpus BGE, bucket, SMTP, signature qualifiée ou bus réel. |
+| Métier BTP | Plusieurs slices documentaires et pricing existent ; croisement CCTP–DPGF–BPU–CCAP, coût de revient/prix plancher, OCR métier, DC1/DC2/DC4 et décision complète restent à coder. |
+| Production | **NO-GO** tant que les preuves Docker/PostgreSQL/HTTPS/backup-restore/VPS/CI et les slices métier critiques ne sont pas obtenus. |

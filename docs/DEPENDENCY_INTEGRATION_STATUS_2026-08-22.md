@@ -210,3 +210,23 @@ L’audit n°5 a confirmé un défaut de chemin dans le service `migrate` du Com
 Le test event-bus est isolé par tenant, la garde 0056 est testée sur toutes ses colonnes historiques et DELETE, et les commandes canoniques de validation installent explicitement l’extra `calendar`. Les timeouts Vitest sont adaptés aux runners CPU-contraints. Ces corrections améliorent le câblage et la preuve locale ; elles ne constituent pas une exécution Docker/PostgreSQL online, un run CI vert ou une recette fournisseur.
 
 La réponse détaillée est [`AUDIT_RECONCILIATION_2026-08-24_5.md`](AUDIT_RECONCILIATION_2026-08-24_5.md).
+
+
+## 11. Réconciliation canonique de l’audit exhaustif — 24 août 2026
+
+Cette section supersède les formulations historiques contradictoires sur les comptes de tests et le statut ICS. Le rapport exhaustif archivé dans `docs/operator-reports/` demeure la source de la mesure externe : son résultat Docker/PostgreSQL de 1 346 tests et 90,96 % n’a pas été reproduit dans le sandbox courant. La validation locale actuelle est de 906 tests backend hors `db`, 458 tests DB désélectionnés, 98 tests frontend dans 23 fichiers, typecheck/lint/build passés, et Alembic offline jusqu’à `20260824_0056`.
+
+**Correction ICS explicite :** le renderer `backend/app/modules/submission/infrastructure/ics_calendar.py` importe bien `icalendar` et lève une erreur contrôlée si l’extra `calendar` n’est pas disponible. L’extra est donc requis pour ce renderer. Cette dépendance est câblée pour un export ICS local, désactivée par défaut et non reliée à un agenda distant ; aucune synchronisation CalDAV/OAuth n’est revendiquée. Les phrases historiques indiquant que le renderer n’importe pas `icalendar` sont obsolètes et sont conservées uniquement pour expliquer la correction.
+
+| Brique | État vérifié au 24 août | Ce qui n’est toujours pas prouvé |
+|---|---|---|
+| OR-Tools | Port/adaptateur CP-SAT, persistence de run, hash, idempotence et audit codés sous `optimization`. | Migration/tests PostgreSQL online et valeur sur cas métier réel. |
+| RAG/BGE | Provider local optionnel, index JSONB tenant/Case/version-scoped, retrieval et worker one-shot protégés par opt-in séparé. | Poids BGE, corpus Golden DCE, précision/latence, activation automatique et choix pgvector/Qdrant. |
+| Docling/PyMuPDF/OCR | Adaptateurs optionnels et fallback déterministe existants. | Scans, OCR, tableaux complexes, budgets CPU/RAM et validation humaine sur corpus réel. |
+| S3/MinIO | Port et adaptateur privé optionnels, non-écrasant et borné. | Bucket réel, permissions, lifecycle, backup/restore et recette Docker. |
+| BOAMP/INSEE/SMTP/ICS | Ports, projections allowlistées et activations runtime explicites ; ICS local dépend de `icalendar`. | Credentials, réseau, fournisseurs, délivrabilité/synchronisation et preuves d’exécution. |
+| Bus HTTP | HTTPS public, DNS privé/réservé et redirections refusés ; retry borné côté workers. | Endpoint fournisseur, contrat d’accusé, replay/dédoublonnage réels et recette réseau. |
+| Signature | Provider de test HMAC local et routes de suivi présents. | Signature électronique qualifiée, certificat, SDK et fournisseur réel. |
+| CI/Docker/VPS | Workflow, Compose, digests et runbooks améliorés statiquement. | Runner GitHub, Docker/ClamAV/EICAR, HTTPS, backup/restore et production. |
+
+Le statut global reste **greffable par slices mais non opérationnel de bout en bout**. Ajouter une dépendance au manifest ou un adaptateur ne vaut ni installation sur cible, ni recette fournisseur, ni preuve métier. Les secrets, tokens, poids de modèle et URLs réelles doivent rester des paramètres runtime hors Git.

@@ -162,3 +162,23 @@ Le cinquième audit a été vérifié et est pertinent. Il a détecté un défau
 Validation locale après le lot : 888 tests backend non-DB passés, 458 tests DB désélectionnés, 98 tests frontend passés, typecheck/build passés, Ruff/mypy/lockfile/syntaxe shell passés et 31 tests ciblés architecture/ops/readiness passés. La preuve PostgreSQL réelle annoncée dans le rapport source n’est pas reproduite dans le sandbox courant ; Docker et PostgreSQL restent indisponibles ici. Le verdict de production reste NO-GO jusqu’aux preuves online, à une CI réellement exécutée et aux lots métier BTP.
 
 Le détail complet est conservé dans [`AUDIT_RECONCILIATION_2026-08-24_5.md`](AUDIT_RECONCILIATION_2026-08-24_5.md).
+
+
+## 11. Réconciliation de l’audit exhaustif — 24 août 2026
+
+Le rapport exhaustif a été archivé et confronté au code. Cette section est la mise à jour la plus récente ; les mesures historiques précédentes sont conservées pour traçabilité mais ne doivent pas être interprétées comme l’état courant. L’auditeur a exécuté Docker/PostgreSQL et rapporté 1 346 tests avec 90,96 % ; cette preuve reste externe. Dans le sandbox courant, Docker est indisponible et les tests PostgreSQL n’ont pas été exécutés online.
+
+Les corrections sûres confirmées sont maintenant appliquées. Le webhook et le bus HTTP passent par `platform/security/public_http.py`, qui impose HTTPS, rejette les credentials/fragments, filtre les DNS privés/réservés et refuse les redirections. Les réponses API bénéficient de headers de défense en profondeur. Les quatre workers outbox concernés ont une politique de tentatives bornées et un état terminal `FAILED`. La limite runtime d’upload DCE est alignée sur 150 MB, le port PostgreSQL du Compose dev est configurable, le workflow CI est renforcé et la baseline de secrets est assainie.
+
+Le finding métier BTP-1a est traité au niveau backend par `POST /api/v1/cases`. La route résout l’acteur et le tenant côté serveur, limite la capability au patron admin, construit une commande fermée et idempotente, et retourne seulement une référence `AFF`. Le handler vérifie la portée, la cohérence de l’origine et, lorsqu’elle est fournie, l’existence de la Consultation dans le tenant avec sa révision exacte. La persistence est derrière des ports applicatifs et crée le lien Case–Consultation sans importer l’ORM dans l’application. L’écran frontend de création et la validation PostgreSQL online restent à faire.
+
+La dette ARCH-001, le MFA/TOTP complet, le rate limiter distribué, le contrat et la rétention `cockpit_projection`, les recettes Docker/ClamAV/EICAR/HTTPS/backup-restore, le fournisseur bus réel, les poids BGE/corpus Golden, l’OCR métier et les fonctions BTP centrales restent ouverts. Aucun rôle délégué ne reçoit de capabilities globales par raccourci. Aucun provider réel, prix, décision, signature qualifiée ou dépôt externe n’est simulé.
+
+| Validation locale après ce lot | Résultat |
+|---|---|
+| Backend hors `db` | 906 tests passés ; 458 tests DB désélectionnés. |
+| Frontend | 98 tests dans 23 fichiers, typecheck, lint et build passés ; deux warnings hooks connus. |
+| Qualité et migrations | Ruff, mypy ciblé, lock UV, detect-secrets, scripts shell, diff et Alembic offline jusqu’à `20260824_0056` passés. |
+| Docker/PostgreSQL/VPS/CI externe | Non exécutés ici ; aucune preuve locale ou distante verte ne doit être déduite du code statique. |
+
+Le verdict demeure **NO-GO opérationnel** pour une vente ou une mise en production revendiquée tant que la CI n’exécute pas réellement ses étapes, que la recette PostgreSQL/Docker/VPS n’est pas produite et que les capacités métier centrales ne sont pas livrées.
