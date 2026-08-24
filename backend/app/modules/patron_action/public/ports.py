@@ -1,12 +1,24 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.platform.events.dispatcher import CommandContext
-from app.platform.security.models import PatronActionRecord
+
+
+@dataclass(frozen=True, slots=True)
+class PatronActionReference:
+    """Minimal cross-context reference returned by the patron-action port."""
+
+    id: UUID
+    case_id: UUID | None
+    action_type: str
+    severity: str
+    state: str
+    aggregate_revision: int
 
 
 class PatronActionWriter(Protocol):
@@ -22,4 +34,7 @@ class PatronActionWriter(Protocol):
         transmission_id: UUID,
         command_id: UUID,
         idempotency_key: UUID,
-    ) -> PatronActionRecord | None: ...
+    ) -> PatronActionReference | None: ...
+
+
+__all__ = ["PatronActionReference", "PatronActionWriter"]

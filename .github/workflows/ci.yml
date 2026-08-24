@@ -5,12 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
         env:
           POSTGRES_DB: smart_ao
           POSTGRES_USER: smart_ao
@@ -23,15 +31,21 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           python-version: "3.12"
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --group dev
+        run: uv sync --group dev --all-extras
       - name: Lint
         run: uv run ruff check .
+      - name: Type check security core
+        run: >-
+          uv run mypy backend/app/platform/security/authorization.py
+          backend/app/platform/security/context.py
+          backend/app/platform/security/rate_limit.py
+          backend/app/platform/security/tokens.py
       - name: Secrets scan
         run: >-
           git ls-files -z | xargs -0
@@ -39,7 +53,7 @@ jobs:
           --exclude-files '^docs/|^web/pnpm-lock.yaml$'
       - name: Dependency vulnerability audit
         run: >-
-          uv export --no-emit-project --no-dev --format requirements-txt
+          uv export --all-extras --no-emit-project --no-dev --format requirements-txt
           -o /tmp/smart_ao_requirements.txt
           && uv run pip-audit --strict -r /tmp/smart_ao_requirements.txt
       - name: Python SAST
@@ -55,20 +69,21 @@ jobs:
           --output-dir ci-coverage --environment-only
       - name: Upload coverage diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-${{ github.sha }}
           path: ci-coverage/
           if-no-files-found: error
 
   frontend:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 11
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: pnpm
@@ -76,26 +91,68 @@ jobs:
       - name: Install frontend dependencies
         working-directory: web
         run: pnpm install --frozen-lockfile
+      - name: Typecheck cockpit
+        working-directory: web
+        run: pnpm typecheck
+      - name: Lint cockpit
+        working-directory: web
+        run: pnpm lint
       - name: Test cockpit
         working-directory: web
         run: pnpm test
       - name: Build cockpit
         working-directory: web
         run: pnpm build
+      - name: Frontend dependency audit
+        working-directory: web
+        run: pnpm audit --prod --audit-level high
 
   image-security:
+    permissions:
+      contents: read
+      security-events: write
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify deployment Dockerfile
         run: test -f ops/docker/backend.Dockerfile
       - name: Build deployment image
-        run: docker build --file ops/docker/backend.Dockerfile --tag smart-ao-v8:ci .
-      - name: Scan deployment image
-        uses: aquasecurity/trivy-action@v0.36.0
+        run: >-
+          docker build --file ops/docker/backend.Dockerfile --tag smart-ao-v8:ci
+          --build-arg SMART_AO_INSTALL_RAG=1
+          --build-arg SMART_AO_INSTALL_DOCUMENT_ADVANCED=1
+          --build-arg SMART_AO_INSTALL_OBJECT_STORAGE=1
+          --build-arg SMART_AO_INSTALL_CONNECTORS=1
+          --build-arg SMART_AO_INSTALL_NOTIFICATIONS=1
+          --build-arg SMART_AO_INSTALL_CALENDAR=1 .
+      - name: Scan backend deployment image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: smart-ao-v8:ci
-          format: table
+          format: sarif
+          output: trivy-backend.sarif
           exit-code: '1'
           ignore-unfixed: true
           severity: CRITICAL,HIGH
+      - name: Upload backend image scan
+        if: always()
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+        with:
+          sarif_file: trivy-backend.sarif
+      - name: Build frontend deployment image
+        run: docker build --file ops/docker/frontend.Dockerfile --tag smart-ao-v8-frontend:ci .
+      - name: Scan frontend deployment image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: smart-ao-v8-frontend:ci
+          format: sarif
+          output: trivy-frontend.sarif
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Upload frontend image scan
+        if: always()
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
+        with:
+          sarif_file: trivy-frontend.sarif

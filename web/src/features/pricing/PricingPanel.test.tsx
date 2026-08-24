@@ -2,10 +2,34 @@ import type { ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PricingScenario } from "../../shared/types";
+import type { PricingImportBatchRead, PricingScenario } from "../../shared/types";
 import { PricingPanel } from "./PricingPanel";
 
 type PanelProps = ComponentProps<typeof PricingPanel>;
+
+const preview: PricingImportBatchRead = {
+  batch_id: "batch-1",
+  case_id: "case-1",
+  document_kind: "BPU",
+  state: "PREVIEWED",
+  aggregate_revision: 1,
+  row_count: 1,
+  valid_row_count: 1,
+  error_count: 0,
+  total_minor: 1500,
+  rows: [
+    {
+      row_number: 2,
+      code: "A-01",
+      designation: "Terrassement",
+      unit: "m2",
+      quantity_decimal: "1",
+      unit_price_minor: 1500,
+      total_minor: 1500,
+      errors: [],
+    },
+  ],
+};
 
 const scenario: PricingScenario = {
   scenario_id: "scenario-1",
@@ -32,11 +56,16 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
     pricingImportBatchRevision: "1",
     pricingImportReportRevision: "0",
     pricingImportState: "IDLE",
+    pricingImportPreview: null,
     pricingImportReloadState: "NOT_ATTEMPTED",
+    pricingImportUploading: false,
+    pricingImportLoading: false,
     pricingImportSubmitting: false,
     setPricingImportBatchId: vi.fn(),
     setPricingImportBatchRevision: vi.fn(),
     setPricingImportReportRevision: vi.fn(),
+    onPreview: vi.fn(),
+    onReload: vi.fn(),
     onCommit: vi.fn(),
     ...overrides,
   };
@@ -66,6 +95,21 @@ describe("PricingPanel integration", () => {
 
     const button = screen.getByRole("button", { name: /commiter les lignes validées|commit en cours/i });
     expect(button).toBeDisabled();
+  });
+
+  it("renders the persisted preview and exposes patron reload/upload actions", () => {
+    const onPreview = vi.fn();
+    const onReload = vi.fn();
+    renderPanel({ pricingImportPreview: preview, onPreview, onReload });
+
+    expect(screen.getByText(/BPU · PREVIEWED/)).toBeInTheDocument();
+    expect(screen.getByText(/#2 · Terrassement/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /relire le batch/i }));
+    expect(onReload).toHaveBeenCalledOnce();
+    fireEvent.change(screen.getByLabelText(/fichier dpgf/i), {
+      target: { files: [new File(["xlsx"], "pricing.xlsx")] },
+    });
+    expect(onPreview).toHaveBeenCalledOnce();
   });
 
   it("shows a processing label while the hook is submitting", () => {

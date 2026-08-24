@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
@@ -49,12 +50,24 @@ class JwtAccessTokenCodec:
         audience: str,
         clock: Clock,
         token_ttl: timedelta = _ACCESS_TOKEN_TTL,
+        signing_key_id: str = "active",
+        verification_keys: Mapping[str, str] | None = None,
     ) -> None:
         if len(signing_key) < 32:
             raise ValueError("JWT signing key must contain at least 32 characters")
         if token_ttl <= timedelta():
             raise ValueError("JWT access token TTL must be positive")
+        if not signing_key_id or len(signing_key_id) > 64:
+            raise ValueError("JWT signing key id must be 1-64 characters")
+        if not all(character.isalnum() or character in "._-" for character in signing_key_id):
+            raise ValueError("JWT signing key id contains invalid characters")
+        keys = dict(verification_keys or {})
+        keys.setdefault(signing_key_id, signing_key)
+        if any(len(candidate) < 32 for candidate in keys.values()):
+            raise ValueError("JWT verification keys must contain at least 32 characters")
         self._signing_key = signing_key
+        self._signing_key_id = signing_key_id
+        self._verification_keys = keys
         self._issuer = issuer
         self._audience = audience
         self._clock = clock
@@ -77,14 +90,22 @@ class JwtAccessTokenCodec:
             },
             self._signing_key,
             algorithm="HS256",
+            headers={"kid": self._signing_key_id},
         )
 
     def decode(self, token: str) -> AccessTokenClaims:
         """Verify signature, issuer, audience and shape before returning typed claims."""
         try:
+            header = jwt.get_unverified_header(token)
+            key_id = header.get("kid", self._signing_key_id)
+            if not isinstance(key_id, str):
+                raise AccessTokenRejectedError()
+            verification_key = self._verification_keys.get(key_id)
+            if verification_key is None:
+                raise AccessTokenRejectedError()
             payload = jwt.decode(
                 token,
-                self._signing_key,
+                verification_key,
                 algorithms=["HS256"],
                 audience=self._audience,
                 issuer=self._issuer,

@@ -180,3 +180,23 @@ def test_dispatcher_rolls_back_receipt_and_side_effects_before_commit(
             sa.text("SELECT count(*) FROM consultations WHERE tenant_id = :tenant_id"),
             {"tenant_id": tenant_id},
         ).scalar_one() == 0
+
+
+@pytest.mark.db
+def test_dispatcher_records_completion_time_after_receipt_time(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id = _insert_tenant(database_engine)
+    context = _context(tenant_id)
+    dispatcher = CommandDispatcher(
+        session_factory=session_factory,
+        handlers={"CreateConsultation": CreateConsultationHandler()},
+    )
+
+    dispatcher.dispatch(command=_command(), context=context)
+
+    with Session(database_engine) as session:
+        receipt = session.query(CommandReceiptRecord).filter_by(tenant_id=tenant_id).one()
+        assert receipt.completed_at is not None
+        assert receipt.completed_at >= context.received_at

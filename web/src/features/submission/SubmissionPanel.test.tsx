@@ -19,12 +19,21 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
     preparationRevision: "1",
     submissionPackageId: "",
     submissionExported: false,
+    signatureId: "",
+    signaturePackageVersion: "1",
+    signatureStatus: null,
+    signatureProvider: "",
+    signatureRevision: null,
     evidenceForm,
     setPreparationPackageId: vi.fn(),
     setPreparationRevision: vi.fn(),
     setSubmissionPackageId: vi.fn(),
+    setSignatureId: vi.fn(),
+    setSignaturePackageVersion: vi.fn(),
     setEvidenceForm: vi.fn(),
     onPrepare: vi.fn(),
+    onRequestSignature: vi.fn(),
+    onLoadSignature: vi.fn(),
     onExport: vi.fn(),
     onRecordEvidence: vi.fn(),
     ...overrides,
@@ -38,7 +47,7 @@ describe("SubmissionPanel integration", () => {
     renderPanel({ onPrepare });
 
     expect(screen.getByText("Dépôt externe non effectué")).toBeInTheDocument();
-    expect(screen.getByText("external_submission: NOT_PERFORMED")).toBeInTheDocument();
+    expect(screen.getAllByText("external_submission: NOT_PERFORMED")).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: /préparer le paquet/i }));
     expect(onPrepare).toHaveBeenCalledOnce();
@@ -58,6 +67,30 @@ describe("SubmissionPanel integration", () => {
 
     expect(onExport).toHaveBeenCalledOnce();
     expect(screen.getByText("Export audité")).toBeInTheDocument();
+  });
+
+  it("shows a bounded signature status and delegates patron actions", () => {
+    const onRequestSignature = vi.fn();
+    const onLoadSignature = vi.fn();
+    renderPanel({
+      signatureId: "signature-1",
+      signatureStatus: "SIGNED",
+      signatureProvider: "TEST_PROVIDER",
+      signatureRevision: 2,
+      onRequestSignature,
+      onLoadSignature,
+    });
+
+    expect(screen.getByText("Signature électronique")).toBeInTheDocument();
+    expect(screen.getByText("SIGNED")).toBeInTheDocument();
+    expect(screen.getByText("Provider : TEST_PROVIDER")).toBeInTheDocument();
+    expect(screen.getByText("Révision signature : 2")).toBeInTheDocument();
+    expect(screen.getAllByText("external_submission: NOT_PERFORMED")).toHaveLength(2);
+    expect(screen.queryByText(/provider_reference_hash|signature_sha256/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /demander la signature/i }));
+    fireEvent.click(screen.getByRole("button", { name: /recharger l’état/i }));
+    expect(onRequestSignature).toHaveBeenCalledOnce();
+    expect(onLoadSignature).toHaveBeenCalledOnce();
   });
 
   it("records only the redacted manual evidence action", () => {

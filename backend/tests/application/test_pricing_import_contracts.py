@@ -4,6 +4,7 @@ import pytest
 from app.modules.pricing.public.import_contracts import (
     CommitPricingImportRequest,
     PricingImportCommitResponse,
+    PricingImportCreationRequest,
     PricingImportPreviewResponse,
 )
 from pydantic import ValidationError
@@ -92,3 +93,40 @@ def test_preview_response_closes_document_kind_and_row_shape():
         PricingImportPreviewResponse.model_validate(
             {**payload, "rows": [{**payload["rows"][0], "row_number": 0}]}
         )
+
+
+def test_creation_request_is_closed_and_carries_only_command_metadata():
+    payload = {
+        "command_id": uuid4(),
+        "idempotency_key": uuid4(),
+        "correlation_id": uuid4(),
+    }
+    request = PricingImportCreationRequest.model_validate(payload)
+    assert request.command_id == payload["command_id"]
+
+    for forbidden in ("payload", "filename", "storage_key", "source_sha256", "total_minor"):
+        with pytest.raises(ValidationError):
+            PricingImportCreationRequest.model_validate({**payload, forbidden: "forbidden"})
+
+    with pytest.raises(ValidationError):
+        PricingImportCreationRequest.model_validate({**payload, "command_id": "not-a-uuid"})
+
+
+def test_creation_request_requires_idempotency_key():
+    with pytest.raises(ValidationError):
+        PricingImportCreationRequest.model_validate({"command_id": uuid4()})
+
+
+def test_creation_request_rejects_unknown_document_metadata():
+    payload = {"command_id": uuid4(), "idempotency_key": uuid4()}
+    with pytest.raises(ValidationError):
+        PricingImportCreationRequest.model_validate({**payload, "document_kind": "DPGF"})
+
+
+def test_creation_request_serializes_only_public_command_metadata():
+    payload = {"command_id": uuid4(), "idempotency_key": uuid4(), "correlation_id": uuid4()}
+    dumped = PricingImportCreationRequest.model_validate(payload).model_dump()
+    assert set(dumped) == {"command_id", "idempotency_key", "correlation_id"}
+    assert {"payload", "filename", "storage_key", "source_sha256", "total_minor"}.isdisjoint(
+        dumped
+    )

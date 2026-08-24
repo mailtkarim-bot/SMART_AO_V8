@@ -10,8 +10,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
+
+from app.modules.decision.domain.risk import StructuredRisk
+from app.modules.decision.domain.risk_requirement import RiskRequirementLink
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,11 +84,165 @@ class DecisionConditionSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class DecisionConditionDraft:
+    id: UUID
+    tenant_id: UUID
+    decision_id: UUID
+    label: str
+    owner_actor_id: UUID | None
+    due_at: datetime | None
+    due_date_absence_reason: str | None
+    failure_consequence: str
+
+
+@dataclass(frozen=True, slots=True)
 class DecisionSnapshot:
     root: DecisionRootSnapshot
     contexts: tuple[DecisionContextSnapshot, ...]
     context_references: tuple[DecisionContextReferenceSnapshot, ...]
     conditions: tuple[DecisionConditionSnapshot, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionRiskDraft:
+    id: UUID
+    tenant_id: UUID
+    case_id: UUID
+    dce_version_id: UUID
+    source_fragment_id: UUID
+    functional_key: str
+    risk: StructuredRisk
+    actor_id: UUID
+    membership_id: UUID
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None
+    due_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionRiskRequirementLinkDraft:
+    id: UUID
+    tenant_id: UUID
+    case_id: UUID
+    risk_id: UUID
+    requirement_id: UUID
+    dce_version_id: UUID
+    functional_key: str
+    link: RiskRequirementLink
+    actor_id: UUID
+    membership_id: UUID
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None
+
+
+class DecisionPatronActionReference(Protocol):
+    @property
+    def id(self) -> UUID: ...
+
+    @property
+    def aggregate_revision(self) -> int: ...
+
+
+class DecisionPatronActionWriter(Protocol):
+    """Creates one explainable patron action inside the caller transaction."""
+
+    def create_from_risk_requirement_link(
+        self,
+        *,
+        session: Any,
+        context: Any,
+        case_id: UUID,
+        risk_id: UUID,
+        requirement_id: UUID,
+        link_id: UUID,
+        command_id: UUID,
+        idempotency_key: UUID,
+    ) -> DecisionPatronActionReference | None: ...
+
+
+class DecisionRiskRequirementLinkRepository(Protocol):
+    """Persists one immutable link to a human-confirmed DCE requirement."""
+
+    def case_exists(self, *, session: object, tenant_id: UUID, case_id: UUID) -> bool: ...
+
+    def case_uses_dce_version(
+        self, *, session: object, tenant_id: UUID, case_id: UUID, dce_version_id: UUID
+    ) -> bool: ...
+
+    def risk_matches_case_and_version(
+        self,
+        *,
+        session: object,
+        tenant_id: UUID,
+        risk_id: UUID,
+        case_id: UUID,
+        dce_version_id: UUID,
+    ) -> bool: ...
+
+    def requirement_is_confirmed(
+        self, *, session: object, tenant_id: UUID, requirement_id: UUID, dce_version_id: UUID
+    ) -> bool: ...
+
+    def functional_exists(
+        self, *, session: object, tenant_id: UUID, functional_key: str
+    ) -> bool: ...
+
+    def create(self, *, session: object, draft: DecisionRiskRequirementLinkDraft) -> None: ...
+
+
+class DecisionRiskRepository(Protocol):
+    """Persists one immutable, tenant-scoped structured risk."""
+
+    def case_exists(self, *, session: object, tenant_id: UUID, case_id: UUID) -> bool: ...
+
+    def case_uses_dce_version(
+        self, *, session: object, tenant_id: UUID, case_id: UUID, dce_version_id: UUID
+    ) -> bool: ...
+
+    def source_exists(
+        self,
+        *,
+        session: object,
+        tenant_id: UUID,
+        dce_version_id: UUID,
+        source_fragment_id: UUID,
+    ) -> bool: ...
+
+    def source_supports(
+        self,
+        *,
+        session: object,
+        tenant_id: UUID,
+        dce_version_id: UUID,
+        source_fragment_id: UUID,
+        source_excerpt: str,
+        start_byte_offset: int,
+        end_byte_offset: int,
+    ) -> bool: ...
+
+    def functional_exists(
+        self, *, session: object, tenant_id: UUID, functional_key: str
+    ) -> bool: ...
+
+    def create(self, *, session: object, draft: DecisionRiskDraft) -> None: ...
+
+
+class DecisionVerifiedContextReader(Protocol):
+    """Checks that every DCE requirement referenced by a context is confirmed."""
+
+    def has_confirmed_dce_requirements(
+        self, *, session: object, tenant_id: UUID, context_id: UUID, case_id: UUID
+    ) -> bool: ...
+
+
+class DecisionConditionRepository(Protocol):
+    """Persists immutable initial conditions owned by a Decision."""
+
+    def create_many(
+        self, *, session: object, drafts: tuple[DecisionConditionDraft, ...]
+    ) -> None: ...
 
 
 class DecisionRepository(Protocol):

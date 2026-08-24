@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -121,6 +121,85 @@ class SqlAlchemyCaseRepository(CaseRepository):
             consultation_links=consultation_links,
             dce_applicability_history=dce_history,
         )
+
+    def has_active_functional_identity(
+        self, *, tenant_id: UUID | str, functional_identity_hash: str
+    ) -> bool:
+        return (
+            self._session.scalar(
+                sa.select(CaseRecord.id).where(
+                    CaseRecord.tenant_id == tenant_id,
+                    CaseRecord.functional_identity_hash == functional_identity_hash,
+                    CaseRecord.lifecycle != "ARCHIVED",
+                )
+            )
+            is not None
+        )
+
+    def create(
+        self,
+        *,
+        aggregate_id: UUID,
+        tenant_id: UUID,
+        aggregate_revision: int,
+        functional_identity_hash: str,
+        title: str,
+        object_description: str,
+        business_origin: str,
+        origin_reference_id: UUID | None,
+        origin_rationale: str | None,
+        consultation_id: UUID | None,
+        consultation_scope_snapshot_json: Mapping[str, object] | None,
+        consultation_rationale: str | None,
+        scope_kind: str,
+        scope_json: Mapping[str, object],
+        scope_fingerprint: str,
+        actor_id: UUID | str,
+    ) -> None:
+        self._session.add(
+            CaseRecord(
+                id=aggregate_id,
+                tenant_id=tenant_id,
+                aggregate_revision=aggregate_revision,
+                functional_identity_hash=functional_identity_hash,
+                title=title,
+                object_description=object_description,
+                business_origin=business_origin,
+                origin_reference_id=origin_reference_id,
+                origin_rationale=origin_rationale,
+                consultation_id=consultation_id,
+                scope_kind=scope_kind,
+                scope_json=dict(scope_json),
+                scope_fingerprint=scope_fingerprint,
+                applicable_dce_version_id=None,
+                lifecycle="ACTIVE",
+                commercial_stage="INTAKE",
+                decision_readiness="NOT_ASSESSED",
+                dce_freshness="NO_DCE",
+                responsibility_status="UNASSIGNED",
+                stopped_reason=None,
+                stopped_at=None,
+                archived_reason=None,
+                archived_at=None,
+                created_by_actor_id=actor_id,
+                updated_by_actor_id=actor_id,
+            )
+        )
+        if consultation_id is not None:
+            if consultation_scope_snapshot_json is None:
+                raise ValueError("CONSULTATION_SCOPE_SNAPSHOT_REQUIRED")
+            self._session.add(
+                CaseConsultationLinkRecord(
+                    id=uuid4(),
+                    tenant_id=tenant_id,
+                    case_id=aggregate_id,
+                    consultation_id=consultation_id,
+                    scope_snapshot_json=dict(consultation_scope_snapshot_json),
+                    rationale=consultation_rationale,
+                    is_current=True,
+                    created_by_actor_id=actor_id,
+                )
+            )
 
     def update_root(
         self,

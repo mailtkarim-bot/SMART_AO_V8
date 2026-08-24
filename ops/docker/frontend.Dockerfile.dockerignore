@@ -1,0 +1,5 @@
+# Frontend image context: only web/ sources are needed.
+backend/
+docs/
+web/node_modules/
+web/dist/

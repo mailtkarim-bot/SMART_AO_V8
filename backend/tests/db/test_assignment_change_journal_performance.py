@@ -2,9 +2,7 @@ from importlib.util import module_from_spec, spec_from_file_location
 
 import pytest
 import sqlalchemy as sa
-from alembic import command
-from alembic.config import Config
-from tests.support.database import ALEMBIC_INI, DATABASE_URL, REPOSITORY_ROOT
+from tests.support.database import REPOSITORY_ROOT
 
 MAX_INSERT_MILLISECONDS = 5_000
 MAX_RECENT_READ_MILLISECONDS = 500
@@ -30,20 +28,15 @@ def _measure(engine: sa.Engine, *, event_type: str) -> dict[str, float | int | s
         "ASSIGNMENT_ENDED",
     ],
 )
-def test_assignment_change_journal_performance_budget(event_type: str) -> None:
+def test_assignment_change_journal_performance_budget(
+    event_type: str,
+    database_engine: sa.Engine,
+) -> None:
     """Exercise real PostgreSQL inserts and indexed recent reads over 1,000 rows."""
 
-    config = Config(str(ALEMBIC_INI))
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
-    command.upgrade(config, "head")
-    engine = sa.create_engine(DATABASE_URL)
-    try:
-        result = _measure(engine, event_type=event_type)
-    finally:
-        with engine.begin() as connection:
-            connection.execute(sa.text("TRUNCATE TABLE tenants, identities CASCADE"))
-        engine.dispose()
-        command.downgrade(config, "base")
+    result = _measure(database_engine, event_type=event_type)
+    with database_engine.begin() as connection:
+        connection.execute(sa.text("TRUNCATE TABLE tenants, identities CASCADE"))
 
     assert result["event_type"] == event_type
     assert result["event_count"] == 1_000

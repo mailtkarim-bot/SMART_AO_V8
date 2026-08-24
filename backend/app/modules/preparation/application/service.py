@@ -8,7 +8,14 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.modules.enterprise.infrastructure.models import EnterpriseDocumentRecord
+from app.modules.enterprise.infrastructure.models import (
+    CaseCapabilityGapRecord,
+    CaseCapabilityProposalRecord,
+    EnterpriseCapabilityProofLinkRecord,
+    EnterpriseCapabilityRecord,
+    EnterpriseCapabilityVersionRecord,
+    EnterpriseDocumentRecord,
+)
 from app.modules.membership.public.text_safety import contains_forbidden_text
 from app.modules.preparation.application.commands import (
     EvaluatePreparationReadinessCommand,
@@ -19,7 +26,11 @@ from app.modules.preparation.application.document_content import (
     build_technical_document,
 )
 from app.modules.preparation.application.ports import PreparationDceReader
-from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
+from app.modules.preparation.infrastructure.models import (
+    GeneratedTechnicalDocumentRecord,
+    PreparationPackageRecord,
+    PreparationReadinessRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -37,17 +48,10 @@ from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
 from app.platform.security.models import (
     CaseAssignmentRecord,
-    CaseCapabilityGapRecord,
-    CaseCapabilityProposalRecord,
     CollaboratorTaskRecord,
     CollaboratorTaskResultRecord,
-    EnterpriseCapabilityProofLinkRecord,
-    EnterpriseCapabilityRecord,
-    EnterpriseCapabilityVersionRecord,
-    GeneratedTechnicalDocumentRecord,
-    PreparationPackageRecord,
-    PreparationReadinessRecord,
 )
+from app.platform.storage.ports import GeneratedDocumentStorage
 
 _PREPARATION_COMMANDS = frozenset({"EvaluatePreparationReadiness", "GenerateTechnicalDocument"})
 

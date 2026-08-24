@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Any, Protocol
 from uuid import UUID, uuid4
@@ -167,8 +167,26 @@ class CommandDispatcher:
                     lease_expires_at=None,
                     event_ids_json=[],
                 )
-                session.add(receipt)
-                session.flush()
+                try:
+                    with session.begin_nested():
+                        session.add(receipt)
+                        session.flush()
+                except IntegrityError as error:
+                    concurrent_receipt = self._find_receipt(
+                        session=session,
+                        tenant_id=context.tenant_id,
+                        actor_id=context.actor_id,
+                        command_type=command_type,
+                        idempotency_key=command.idempotency_key,
+                    )
+                    if concurrent_receipt is None:
+                        raise CommandExecutionError(
+                            "command receipt collision could not be resolved"
+                        ) from error
+                    return self._resolve_existing_receipt(
+                        concurrent_receipt,
+                        request_hash=request_hash,
+                    )
 
                 outcome = handler.execute(session=session, command=command, context=context)
                 event_ids = self._persist_events_and_outbox(
@@ -191,7 +209,7 @@ class CommandDispatcher:
                 receipt.result_code = outcome.result_code
                 receipt.response_body_json = result.as_receipt_body()
                 receipt.event_ids_json = list(event_ids)
-                receipt.completed_at = context.received_at
+                receipt.completed_at = datetime.now(tz=UTC)
                 return result
         except (IdempotencyKeyReusedError, CommandInProgressError):
             raise

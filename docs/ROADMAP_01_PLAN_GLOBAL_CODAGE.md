@@ -423,7 +423,9 @@ Commit, CI verte, PROJECT_STATE mis à jour
 
 ## 22. Prochaine action exacte
 
-Les slices métier prioritaires de préparation documentaire, cockpit patron initial et paquet de dépôt contrôlé sont publiés sur `ops/vps-deploy-health-digests-01`, avec CI verte. La prochaine action de développement est la réconciliation finale : conserver la suite backend complète verte, vérifier les tests d’architecture et d’import, le build frontend strict, les contrats OpenAPI, les secrets et la documentation. Les documents de reprise à maintenir sont `docs/PROJECT_STATE.md`, `docs/PROJECT_PROGRESS_REPORT.md` et `todo.md`.
+Après le lot 28 et les antennes OR-Tools/signature, le prochain axe métier est S10 — veille et qualification d’opportunités. L’incrément `OPPORTUNITY-WATCH-PROFILE-01 / domaine-application` commence par le contrat pur du profil patronal, ses critères allowlistés, son snapshot canonique et ses capabilities dédiées. La suite immédiate est la persistence versionnée et la lecture patronale tenant-scoped ; l’ingestion BOAMP, la déduplication, le scoring explicable et la conversion en Case ne doivent être ajoutés qu’après ces fondations.
+
+En parallèle, la CI GitHub doit redevenir réellement exécutable et la migration OR-Tools `0051` doit être appliquée sur PostgreSQL réel. Les documents de reprise à maintenir sont `docs/PROJECT_STATE.md`, `docs/PROJECT_PROGRESS_REPORT.md`, `docs/DEPENDENCY_INTEGRATION_STATUS_2026-08-22.md` et `todo.md`.
 
 > **Prochaine frontière opérationnelle :** lorsque l’utilisateur disposera d’un VPS, exécuter le runbook de préproduction avec images digest-pinnées, PostgreSQL, ClamAV/EICAR, Caddy/HTTPS, sauvegarde hors hôte, restauration isolée, timers systemd, supervision externe et rapport opérateur.
 

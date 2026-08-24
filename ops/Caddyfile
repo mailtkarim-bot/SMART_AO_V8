@@ -10,11 +10,16 @@
         format json
     }
 
+    request_body {
+        max_size 150MB
+    }
+
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         Referrer-Policy "strict-origin-when-cross-origin"
+        Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; base-uri 'self'; frame-ancestors 'none'"
         -Server
     }
 
@@ -23,11 +28,12 @@
         reverse_proxy backend:8000
     }
 
-    handle /healthz {
-        respond "ok" 200
+    @health path /healthz /healthz/*
+    handle @health {
+        reverse_proxy backend:8000
     }
 
     handle {
-        reverse_proxy frontend:80
+        reverse_proxy frontend:8080
     }
 }

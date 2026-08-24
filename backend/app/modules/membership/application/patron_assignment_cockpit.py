@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 from uuid import UUID
-
-from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.membership.application.queries import (
     PatronAssignmentCockpitItemProjection,
+    PatronAssignmentCockpitReader,
     PatronAssignmentInteractionsLookup,
     PatronAssignmentJournalLookup,
-)
-from app.modules.membership.infrastructure.patron_assignment_cockpit_reader import (
-    SqlAlchemyPatronAssignmentCockpitReader,
 )
 from app.platform.security.audit import (
     AuditEventType,
@@ -37,11 +35,13 @@ class PatronAssignmentCockpitService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
+        session_factory: Any,
+        reader_factory: Callable[[Any], PatronAssignmentCockpitReader],
         policy: AuthorizationPolicyPort,
         audit_writer: SecurityAuditWriter | None = None,
     ) -> None:
         self._session_factory = session_factory
+        self._reader_factory = reader_factory
         self._policy = policy
         self._audit_writer = audit_writer or SecurityAuditWriter()
 
@@ -69,7 +69,7 @@ class PatronAssignmentCockpitService:
             now=now,
         )
         with self._session_factory() as session:
-            return SqlAlchemyPatronAssignmentCockpitReader(session).list(
+            return self._reader_factory(session).list(
                 tenant_id=actor.tenant_id,
                 case_id=case_id,
                 state=state,
@@ -92,7 +92,7 @@ class PatronAssignmentCockpitService:
             now=now,
         )
         with self._session_factory() as session:
-            lookup = SqlAlchemyPatronAssignmentCockpitReader(session).get_journal(
+            lookup = self._reader_factory(session).get_journal(
                 tenant_id=actor.tenant_id,
                 assignment_id=assignment_id,
                 limit=limit,
@@ -133,7 +133,7 @@ class PatronAssignmentCockpitService:
             now=now,
         )
         with self._session_factory() as session:
-            lookup = SqlAlchemyPatronAssignmentCockpitReader(session).get_interactions(
+            lookup = self._reader_factory(session).get_interactions(
                 tenant_id=actor.tenant_id,
                 assignment_id=assignment_id,
                 kind=kind,

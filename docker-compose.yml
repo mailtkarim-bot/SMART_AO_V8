@@ -1,3 +1,5 @@
+# Local development compose only. Preproduction requires explicit JWT secrets
+# through ops/docker-compose.preprod.yml and must not inherit these defaults.
 services:
   postgres:
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
@@ -13,29 +15,55 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${SMART_AO_POSTGRES_HOST_PORT:-5432}:5432"
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    build:
+      context: .
+      dockerfile: ops/docker/backend.Dockerfile
+    command: ["alembic", "-c", "/app/backend/alembic.ini", "upgrade", "head"]
+    restart: "no"
+    environment:
+      SMART_AO_ENV: development
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
 
   backend:
     build:
       context: .
       dockerfile: ops/docker/backend.Dockerfile
     environment:
-      SMART_AO_ENV: ${SMART_AO_ENV:-development}
+      SMART_AO_ENV: development
       SMART_AO_LOG_LEVEL: ${SMART_AO_LOG_LEVEL:-INFO}
       SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
+      # Development-only fallback; production compose requires an injected secret.
+      SMART_AO_JWT_SIGNING_KEY: ${SMART_AO_JWT_SIGNING_KEY:-local-development-signing-key-change-me-0123456789}
+      SMART_AO_JWT_ISSUER: ${SMART_AO_JWT_ISSUER:-smart-ao-dev}
+      SMART_AO_JWT_AUDIENCE: ${SMART_AO_JWT_AUDIENCE:-smart-ao-dev}
       SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
+      SMART_AO_DCE_MAX_BYTES: "150000000"
       SMART_AO_CLAMD_HOST: clamav
       SMART_AO_CLAMD_PORT: "3310"
       SMART_AO_CLAMD_TIMEOUT_SECONDS: "30"
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       clamav:
         condition: service_healthy
     volumes:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test:
         - CMD-SHELL
@@ -51,17 +79,23 @@ services:
       context: .
       dockerfile: ops/docker/backend.Dockerfile
     command: python -m app.workers.dce_retention
+    restart: unless-stopped
     environment:
       SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
       SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
       SMART_AO_RETENTION_BATCH_SIZE: "50"
       SMART_AO_RETENTION_LEASE_SECONDS: "120"
       SMART_AO_RETENTION_POLL_SECONDS: "30"
+      SMART_AO_OUTBOX_MAX_ATTEMPTS: "10"
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
+    security_opt:
+      - no-new-privileges:true
 
   clamav:
     image: clamav/clamav:1.4_base@sha256:1b6920e8c32cca47ea33b1e2611d9a4740ccc622cf13b30b29f8283d60175e39
@@ -75,6 +109,8 @@ services:
       timeout: 10s
       retries: 40
       start_period: 90s
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   postgres_data:

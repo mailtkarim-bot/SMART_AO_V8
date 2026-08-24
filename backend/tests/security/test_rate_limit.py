@@ -1,9 +1,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from ipaddress import ip_network
 
 import pytest
+from app.interfaces.http.routes.authentication import (
+    _source_ip,
+    _trusted_proxy_networks_from_environment,
+)
 from app.platform.security.rate_limit import LoginRateLimiter
+from starlette.requests import Request
+
+
+def _request(*, peer: str, forwarded_for: str | None = None) -> Request:
+    headers = [] if forwarded_for is None else [(b"x-forwarded-for", forwarded_for.encode())]
+    return Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/",
+            "headers": headers,
+            "client": (peer, 8000),
+            "server": (peer, 8000),
+        }
+    )
 
 
 @dataclass
@@ -15,6 +35,48 @@ class FakeMonotonicClock:
 
     def advance(self, seconds: float) -> None:
         self.current += seconds
+
+
+def test_source_ip_ignores_forwarded_header_from_untrusted_peer() -> None:
+    request = _request(peer="198.51.100.10", forwarded_for="203.0.113.7")
+
+    assert _source_ip(request, trusted_proxy_networks=(ip_network("172.30.0.0/24"),)) == (
+        "198.51.100.10"
+    )
+
+
+def test_source_ip_uses_first_forwarded_address_from_trusted_proxy() -> None:
+    request = _request(
+        peer="172.30.0.9",
+        forwarded_for="203.0.113.7, 172.30.0.8",
+    )
+
+    assert _source_ip(request, trusted_proxy_networks=(ip_network("172.30.0.0/24"),)) == (
+        "203.0.113.7"
+    )
+
+
+def test_source_ip_fails_closed_on_invalid_forwarded_address() -> None:
+    request = _request(peer="172.30.0.9", forwarded_for="not-an-ip")
+
+    assert _source_ip(request, trusted_proxy_networks=(ip_network("172.30.0.0/24"),)) == (
+        "172.30.0.9"
+    )
+
+
+def test_trusted_proxy_networks_parse_explicit_cidrs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SMART_AO_TRUSTED_PROXY_CIDRS", "172.30.0.0/24, 2001:db8::/32")
+
+    networks = _trusted_proxy_networks_from_environment()
+
+    assert [str(network) for network in networks] == ["172.30.0.0/24", "2001:db8::/32"]
+
+
+def test_trusted_proxy_networks_reject_invalid_cidr(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SMART_AO_TRUSTED_PROXY_CIDRS", "not-a-cidr")
+
+    with pytest.raises(RuntimeError, match="valid CIDR"):
+        _trusted_proxy_networks_from_environment()
 
 
 def test_progressive_lockout_is_bounded_and_returns_retry_after() -> None:

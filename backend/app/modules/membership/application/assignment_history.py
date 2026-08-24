@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy.orm import Session, sessionmaker
-
-from app.modules.membership.application.queries import AssignmentHistoryLookup
-from app.modules.membership.infrastructure.assignment_history_reader import (
-    SqlAlchemyAssignmentHistoryReader,
+from app.modules.membership.application.queries import (
+    AssignmentHistoryLookup,
+    AssignmentHistoryReader,
 )
 from app.platform.security.audit import (
     AuditEventType,
@@ -33,11 +33,13 @@ class AssignmentHistoryService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
+        session_factory: Any,
+        reader_factory: Callable[[Any], AssignmentHistoryReader],
         policy: AuthorizationPolicyPort,
         audit_writer: SecurityAuditWriter | None = None,
     ) -> None:
         self._session_factory = session_factory
+        self._reader_factory = reader_factory
         self._policy = policy
         self._audit_writer = audit_writer or SecurityAuditWriter()
 
@@ -67,7 +69,7 @@ class AssignmentHistoryService:
             raise PermissionError("ASSIGNMENT_MEMBERSHIP_REQUIRED")
 
         with self._session_factory() as session:
-            lookup = SqlAlchemyAssignmentHistoryReader(session).get(
+            lookup = self._reader_factory(session).get(
                 tenant_id=actor.tenant_id,
                 membership_id=actor.membership_id,
                 assignment_id=assignment_id,

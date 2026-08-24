@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -14,10 +14,13 @@ from app.modules.patron_action.application.transition_service import (
     PatronActionTransitionService,
     patron_action_transition_handlers,
 )
+from app.modules.patron_action.infrastructure.models import (
+    PatronActionRecord,
+    PatronActionTransitionRecord,
+)
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.context import ActorKind
-from app.platform.security.models import PatronActionTransitionRecord
 from sqlalchemy.orm import Session, sessionmaker
 
 from tests.application.test_collab_work_task import _seed
@@ -96,11 +99,59 @@ def test_action_transitions_are_versioned_idempotent_and_append_only(services, s
         assert record is not None
         assert record.from_state == "OPEN"
         assert record.to_state == "IN_PROGRESS"
+        action = session.get(PatronActionRecord, action_id)
+        assert action is not None
+        assert action.state == "IN_PROGRESS"
+        assert action.aggregate_revision == 2
         with pytest.raises(sa.exc.DatabaseError), session.begin_nested():
             session.execute(
                 sa.update(PatronActionTransitionRecord)
                 .where(PatronActionTransitionRecord.id == command.transition_id)
                 .values(to_state="COMPLETED")
+            )
+        session.execute(
+            sa.update(PatronActionRecord)
+            .where(PatronActionRecord.id == action_id)
+            .values(state="WAITING", aggregate_revision=3)
+        )
+        session.commit()
+        with pytest.raises(sa.exc.DatabaseError), session.begin_nested():
+            session.execute(
+                sa.update(PatronActionRecord)
+                .where(PatronActionRecord.id == action_id)
+                .values(title="tampered")
+            )
+
+        locked_mutations = {
+            "id": uuid4(),
+            "tenant_id": uuid4(),
+            "created_at": NOW + timedelta(seconds=1),
+            "case_id": uuid4(),
+            "functional_key": "tampered-functional-key",
+            "action_type": "CONTROL_SUBMISSION",
+            "severity": "URGENT",
+            "title": "tampered-title",
+            "why_now": "tampered-why-now",
+            "impact": "tampered-impact",
+            "recommended_action": "tampered-recommendation",
+            "due_at": NOW,
+            "source_refs_json": ["tampered-source"],
+            "actor_id": uuid4(),
+            "membership_id": uuid4(),
+            "command_id": uuid4(),
+            "idempotency_key": uuid4(),
+            "correlation_id": uuid4(),
+        }
+        for column, value in locked_mutations.items():
+            with pytest.raises(sa.exc.DatabaseError, match="append-only"), session.begin_nested():
+                session.execute(
+                    sa.update(PatronActionRecord)
+                    .where(PatronActionRecord.id == action_id)
+                    .values(**{column: value})
+                )
+        with pytest.raises(sa.exc.DatabaseError, match="append-only"), session.begin_nested():
+            session.execute(
+                sa.delete(PatronActionRecord).where(PatronActionRecord.id == action_id)
             )
 
 

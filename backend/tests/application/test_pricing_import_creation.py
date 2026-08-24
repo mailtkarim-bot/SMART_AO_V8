@@ -23,8 +23,12 @@ from app.platform.persistence.models import (
     DomainEventRecord,
     OutboxMessageRecord,
 )
-from app.platform.security.authorization import AuthorizationPolicy
-from app.platform.security.context import ActorKind
+from app.platform.security.authorization import (
+    AuthorizationDecision,
+    AuthorizationPolicy,
+)
+from app.platform.security.capabilities import Capability
+from app.platform.security.context import ActorKind, DataClassification
 from app.platform.security.models import (
     PricingImportBatchRecord,
     PricingImportRowRecord,
@@ -67,15 +71,39 @@ def _command(case_id, *, command_id=None, idempotency_key=None, rows=None):
     )
 
 
-def _service(session_factory):
+class _RecordingPolicy:
+    def __init__(self):
+        self.requests = []
+
+    def authorize(self, *, context, request):
+        self.requests.append(request)
+        return AuthorizationDecision.allow()
+
+
+def _service(session_factory, *, policy=None):
     return PricingImportCreationService(
         session_factory=session_factory,
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
             handlers=pricing_import_creation_handlers(),
         ),
-        policy=AuthorizationPolicy(),
+        policy=policy or AuthorizationPolicy(),
     )
+
+
+def test_persisted_creation_uses_financial_line_write_private_policy(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    policy = _RecordingPolicy()
+
+    _service(session_factory, policy=policy).create(
+        actor=actor,
+        command=_command(case_id),
+        now=NOW,
+    )
+
+    request = policy.requests[0]
+    assert request.action == Capability.FINANCIAL_REPORT_LINE_WRITE
+    assert request.resource.classification is DataClassification.FINANCIAL_PRIVATE
 
 
 def test_creation_persists_preview_batch_rows_and_non_financial_event(session_factory):
@@ -318,3 +346,96 @@ def test_creation_rejects_duplicate_row_numbers_without_partial_persistence(sess
             )
             == 0
         )
+
+
+def test_creation_persists_valid_and_invalid_rows_with_bounded_counters(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    invalid = CreatePricingImportRowCommand(
+        row_number=3,
+        designation=None,
+        quantity_decimal=None,
+        total_minor=None,
+        errors=["DESIGNATION_REQUIRED", "QUANTITY_REQUIRED"],
+    )
+    command = _command(case_id, rows=[_command(case_id).rows[0], invalid])
+
+    result = _service(session_factory).create(actor=actor, command=command, now=NOW)
+
+    with session_factory() as session:
+        batch = session.scalar(
+            sa.select(PricingImportBatchRecord).where(
+                PricingImportBatchRecord.tenant_id == actor.tenant_id,
+                PricingImportBatchRecord.command_id == command.command_id,
+            )
+        )
+        rows = session.scalars(
+            sa.select(PricingImportRowRecord)
+            .where(
+                PricingImportRowRecord.tenant_id == actor.tenant_id,
+                PricingImportRowRecord.batch_id == batch.id,
+            )
+            .order_by(PricingImportRowRecord.row_number)
+        ).all()
+
+    assert result.result_code == "PRICING_IMPORT_PREVIEWED"
+    assert batch is not None
+    assert batch.row_count == 2
+    assert batch.valid_row_count == 1
+    assert batch.error_count == 2
+    assert batch.total_minor == 12500
+    assert len(rows) == 2
+    assert rows[1].error_codes_json == ["DESIGNATION_REQUIRED", "QUANTITY_REQUIRED"]
+
+
+def test_creation_rolls_back_when_valid_row_has_missing_required_field(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    invalid = CreatePricingImportRowCommand(
+        row_number=2,
+        designation="   ",
+        quantity_decimal="1",
+        total_minor=100,
+    )
+    command = _command(case_id, rows=[invalid])
+
+    with pytest.raises(CommandExecutionError, match="IMPORT_ROWS_INVALID"):
+        _service(session_factory).create(actor=actor, command=command, now=NOW)
+
+    with session_factory() as session:
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(PricingImportBatchRecord)
+                .where(
+                    PricingImportBatchRecord.tenant_id == actor.tenant_id,
+                    PricingImportBatchRecord.command_id == command.command_id,
+                )
+            )
+            == 0
+        )
+        assert (
+            session.scalar(
+                sa.select(sa.func.count())
+                .select_from(PricingImportRowRecord)
+                .where(PricingImportRowRecord.tenant_id == actor.tenant_id)
+            )
+            == 0
+        )
+
+
+def test_creation_does_not_persist_source_binary_or_hash_in_event_payload(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    command = _command(case_id)
+    _service(session_factory).create(actor=actor, command=command, now=NOW)
+
+    with session_factory() as session:
+        event = session.scalar(
+            sa.select(DomainEventRecord).where(
+                DomainEventRecord.tenant_id == actor.tenant_id,
+                DomainEventRecord.event_type == "PricingImportPreviewed",
+            )
+        )
+
+    payload = event.payload_json["data"]
+    assert "source_sha256" not in payload
+    assert "payload" not in payload
+    assert "filename" not in payload

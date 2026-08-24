@@ -7,21 +7,12 @@ outside the public payload and are supplied by the server-side command context.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import ClassVar, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-
-class ApplicationCommand(BaseModel):
-    """Closed Pydantic base for an application write intention."""
-
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, validate_assignment=True)
-
-    command_type: ClassVar[str]
-    command_id: UUID
-    idempotency_key: UUID
-    correlation_id: UUID | None = None
+from app.platform.events.command_contracts import ApplicationCommand
 
 
 class CreateConsultationCommand(ApplicationCommand):

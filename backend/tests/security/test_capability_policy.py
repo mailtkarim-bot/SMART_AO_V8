@@ -70,6 +70,10 @@ def test_patron_admin_receives_server_catalog_but_no_claim_based_authority() -> 
     assert Capability.MEMBERSHIP_MANAGE in capabilities
     assert Capability.CONSULTATION_READ in capabilities
     assert Capability.CASE_DCE_READ in capabilities
+    assert Capability.OPPORTUNITY_PROFILE_READ in capabilities
+    assert Capability.OPPORTUNITY_PROFILE_WRITE in capabilities
+    assert Capability.OPPORTUNITY_OBSERVATION_READ in capabilities
+    assert Capability.OPPORTUNITY_OBSERVATION_QUALIFY in capabilities
 
 
 def test_collaborator_catalog_never_contains_financial_decision_or_submission_capabilities(
@@ -83,6 +87,10 @@ def test_collaborator_catalog_never_contains_financial_decision_or_submission_ca
     assert Capability.PRICING_READ not in capabilities
     assert Capability.DECISION_FINALIZE not in capabilities
     assert Capability.SUBMISSION_AUTHORIZE not in capabilities
+    assert Capability.OPPORTUNITY_PROFILE_READ not in capabilities
+    assert Capability.OPPORTUNITY_PROFILE_WRITE not in capabilities
+    assert Capability.OPPORTUNITY_OBSERVATION_READ not in capabilities
+    assert Capability.OPPORTUNITY_OBSERVATION_QUALIFY not in capabilities
     assert Capability.PRICING_READ not in capabilities
 
 

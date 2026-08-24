@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -9,6 +10,7 @@ from hashlib import sha256
 from io import BytesIO
 from typing import Protocol
 from uuid import UUID, uuid5
+from zipfile import BadZipFile, ZipFile
 
 from docx import Document
 from openpyxl import load_workbook
@@ -24,11 +26,14 @@ from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRec
 from app.modules.dce.infrastructure.models.dce_version import DceDocumentRecord, DceVersionRecord
 from app.platform.events.dispatcher import CommandContext, CommandDispatcher, DispatchResult
 
+logger = logging.getLogger(__name__)
+
 EXTRACTOR_ID = "smart-ao-deterministic"
 EXTRACTOR_VERSION = "1"
 MAX_SOURCE_BYTES = 128 * 1024 * 1024
 MAX_PDF_PAGES = 2_000
 MAX_DOCX_PARAGRAPHS = 100_000
+MAX_DOCX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
 MAX_XLSX_SHEETS = 200
 MAX_XLSX_TEXT_CELLS = 500_000
 MAX_TEXT_LINES = 500_000
@@ -41,6 +46,12 @@ class PrivateDocumentStoragePort(Protocol):
     """Private server-side read port; no route can obtain a storage key through it."""
 
     async def read_bytes(self, *, storage_key: str, max_bytes: int) -> bytes: ...
+
+
+class AdvancedDocumentExtractionPort(Protocol):
+    """Optional local parser port; it must return only bounded source fragments."""
+
+    def extract(self, *, media_type: str, source_bytes: bytes) -> ExtractionProjection: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,10 +81,12 @@ class DceDocumentExtractionService:
         session_factory: sessionmaker[Session],
         dispatcher: CommandDispatcher,
         storage: PrivateDocumentStoragePort,
+        advanced_extractor: AdvancedDocumentExtractionPort | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._dispatcher = dispatcher
         self._storage = storage
+        self._advanced_extractor = advanced_extractor
 
     async def extract(
         self,
@@ -119,6 +132,7 @@ class DceDocumentExtractionService:
                     projection = _project_document(
                         media_type=document.media_type,
                         source_bytes=source_bytes,
+                        advanced_extractor=self._advanced_extractor,
                     )
         command = _recording_command(
             document=document,
@@ -208,8 +222,20 @@ def _recording_command(
     )
 
 
-def _project_document(*, media_type: str, source_bytes: bytes) -> ExtractionProjection:
+def _project_document(
+    *,
+    media_type: str,
+    source_bytes: bytes,
+    advanced_extractor: AdvancedDocumentExtractionPort | None = None,
+) -> ExtractionProjection:
     try:
+        if advanced_extractor is not None:
+            advanced_projection = advanced_extractor.extract(
+                media_type=media_type,
+                source_bytes=source_bytes,
+            )
+            if advanced_projection.status != "UNSUPPORTED":
+                return advanced_projection
         fragments = tuple(_extract_fragments(media_type=media_type, source_bytes=source_bytes))
         if not fragments:
             return ExtractionProjection(
@@ -217,7 +243,6 @@ def _project_document(*, media_type: str, source_bytes: bytes) -> ExtractionProj
                 failure_code="EMPTY_EXTRACTED_TEXT",
                 fragments=(),
             )
-        _validate_total_chars(fragments)
         return ExtractionProjection(
             status="COMPLETED",
             failure_code=None,
@@ -236,12 +261,20 @@ def _project_document(*, media_type: str, source_bytes: bytes) -> ExtractionProj
                 failure_code="MEDIA_TYPE_UNSUPPORTED",
                 fragments=(),
             )
+        logger.warning(
+            "dce_extraction_value_error",
+            extra={"error_type": type(error).__name__, "media_type": media_type},
+        )
         return ExtractionProjection(
             status="FAILED_SAFE",
             failure_code="EXTRACTION_PARSE_FAILED",
             fragments=(),
         )
-    except Exception:
+    except Exception as error:
+        logger.warning(
+            "dce_extraction_parse_failed",
+            extra={"error_type": type(error).__name__, "media_type": media_type},
+        )
         return ExtractionProjection(
             status="FAILED_SAFE",
             failure_code="EXTRACTION_PARSE_FAILED",
@@ -274,6 +307,22 @@ def _extract_pdf(*, source_bytes: bytes) -> tuple[ExtractedFragment, ...]:
 
 
 def _extract_docx(*, source_bytes: bytes) -> tuple[ExtractedFragment, ...]:
+    try:
+        with ZipFile(BytesIO(source_bytes)) as archive:
+            if sum(info.file_size for info in archive.infolist()) > MAX_DOCX_UNCOMPRESSED_BYTES:
+                raise ExtractionLimitError
+            total_bytes = 0
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                with archive.open(info) as member:
+                    while chunk := member.read(1024 * 1024):
+                        total_bytes += len(chunk)
+                        if total_bytes > MAX_DOCX_UNCOMPRESSED_BYTES:
+                            raise ExtractionLimitError
+    except BadZipFile as error:
+        raise ValueError("invalid DOCX archive") from error
+
     document = Document(BytesIO(source_bytes))
     if len(document.paragraphs) > MAX_DOCX_PARAGRAPHS:
         raise ExtractionLimitError
@@ -331,6 +380,8 @@ def _extract_text(*, source_bytes: bytes) -> tuple[ExtractedFragment, ...]:
 def _fragmentize(entries: Iterable[tuple[dict[str, object], str]]) -> tuple[ExtractedFragment, ...]:
     fragments: list[ExtractedFragment] = []
     for locator, raw_text in entries:
+        if len(raw_text) > MAX_TOTAL_CHARS:
+            raise ExtractionLimitError
         normalized = raw_text.strip()
         if not normalized:
             continue
@@ -350,8 +401,3 @@ def _fragmentize(entries: Iterable[tuple[dict[str, object], str]]) -> tuple[Extr
 def _split_text(text: str) -> Iterable[str]:
     for start in range(0, len(text), MAX_FRAGMENT_CHARS):
         yield text[start : start + MAX_FRAGMENT_CHARS]
-
-
-def _validate_total_chars(fragments: Iterable[ExtractedFragment]) -> None:
-    if sum(len(fragment.text) for fragment in fragments) > MAX_TOTAL_CHARS:
-        raise ExtractionLimitError

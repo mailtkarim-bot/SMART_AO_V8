@@ -1,14 +1,17 @@
-from dataclasses import replace
 from datetime import datetime
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
-from app.modules.pricing.application.service import PricingScenarioProjection
+from app.modules.pricing.application.queries import PricingScenarioProjection, PricingScenarioReader
 from app.modules.pricing.application.transition_commands import (
     ArchivePricingScenarioCommand,
     SelectPricingScenarioCommand,
     TransitionPricingScenarioCommand,
+)
+from app.modules.pricing.infrastructure.models import (
+    PricingScenarioRecord,
+    PricingScenarioTransitionRecord,
 )
 from app.platform.events.dispatcher import (
     CommandContext,
@@ -25,14 +28,19 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import PricingScenarioRecord, PricingScenarioTransitionRecord
 
 
 class PricingScenarioTransitionService:
     def __init__(
-        self, *, session_factory, dispatcher: CommandDispatcher, policy: AuthorizationPolicyPort
+        self,
+        *,
+        session_factory,
+        reader: PricingScenarioReader,
+        dispatcher: CommandDispatcher,
+        policy: AuthorizationPolicyPort,
     ) -> None:
         self._session_factory = session_factory
+        self._reader = reader
         self._dispatcher = dispatcher
         self._policy = policy
 
@@ -73,37 +81,7 @@ class PricingScenarioTransitionService:
     def list_for_case(self, *, actor: ActorContext, case_id, now: datetime):
         if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
             raise PermissionError("PATRON_REQUIRED")
-        with self._session_factory() as session:
-            records = session.scalars(
-                sa.select(PricingScenarioRecord)
-                .where(
-                    PricingScenarioRecord.tenant_id == actor.tenant_id,
-                    PricingScenarioRecord.case_id == case_id,
-                )
-                .order_by(PricingScenarioRecord.created_at.desc())
-            ).all()
-            projections = []
-            for record in records:
-                latest = session.scalar(
-                    sa.select(PricingScenarioTransitionRecord)
-                    .where(
-                        PricingScenarioTransitionRecord.tenant_id == actor.tenant_id,
-                        PricingScenarioTransitionRecord.scenario_id == record.id,
-                    )
-                    .order_by(PricingScenarioTransitionRecord.version.desc())
-                    .limit(1)
-                )
-                if latest is None:
-                    projections.append(_projection(record))
-                else:
-                    projections.append(
-                        replace(
-                            _projection(record),
-                            state=latest.to_state,
-                            version=latest.version,
-                        )
-                    )
-            return tuple(projections)
+        return self._reader.list_for_case(tenant_id=actor.tenant_id, case_id=case_id)
 
 
 class TransitionPricingScenarioHandler:
@@ -219,5 +197,13 @@ def _projection(record: PricingScenarioRecord) -> PricingScenarioProjection:
         total_cost_minor=record.total_cost_minor,
         gross_margin_minor=record.gross_margin_minor,
         gross_margin_rate_bps=record.gross_margin_rate_bps,
+        penalty_reserve_minor=record.penalty_reserve_minor,
+        retention_reserve_minor=record.retention_reserve_minor,
+        guarantee_reserve_minor=record.guarantee_reserve_minor,
+        floor_margin_rate_bps=record.floor_margin_rate_bps,
+        target_margin_rate_bps=record.target_margin_rate_bps,
+        break_even_sales_minor=record.break_even_sales_minor,
+        floor_sales_minor=record.floor_sales_minor,
+        target_sales_minor=record.target_sales_minor,
         source_snapshot_revision=record.source_snapshot_revision,
     )

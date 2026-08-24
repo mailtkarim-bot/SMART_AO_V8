@@ -1,14 +1,17 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 from app.modules.patron_action.application.commands import CreatePatronActionCommand
 from app.modules.patron_action.application.service import (
     PatronActionService,
+    PatronActionWriter,
     patron_action_handlers,
 )
-from app.platform.events.dispatcher import CommandDispatcher
+from app.platform.events.dispatcher import CommandContext, CommandDispatcher
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
 from app.platform.security.context import ActorKind
@@ -111,3 +114,68 @@ def test_patron_action_rejects_collaborator_and_duplicate_business_key(
     )
     with pytest.raises(RuntimeError, match="PATRON_ACTION_ALREADY_EXISTS"):
         action_service.execute(actor=patron, command=duplicate, now=NOW)
+
+
+def test_patron_action_writer_creates_review_action_for_confirmed_risk_link() -> None:
+    session = MagicMock()
+    session.scalar.return_value = None
+    context = CommandContext(
+        tenant_id=uuid4(),
+        actor_id=uuid4(),
+        actor_kind="PATRON_ADMIN",
+        received_at=NOW,
+        membership_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+    risk_id = uuid4()
+    requirement_id = uuid4()
+    link_id = uuid4()
+
+    reference = PatronActionWriter().create_from_risk_requirement_link(
+        session=session,
+        context=context,
+        case_id=uuid4(),
+        risk_id=risk_id,
+        requirement_id=requirement_id,
+        link_id=link_id,
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+    )
+
+    assert reference is not None
+    assert reference.id == link_id
+    record = session.add.call_args.args[0]
+    assert record.action_type == "DECIDE_GO_NO_GO"
+    assert record.severity == "BLOCKING"
+    assert record.source_refs_json == [
+        f"decision-risk:{risk_id}",
+        f"dce-requirement:{requirement_id}",
+        f"decision-risk-requirement-link:{link_id}",
+    ]
+    assert "source_excerpt" not in str(record.source_refs_json)
+
+
+def test_patron_action_writer_is_idempotent_for_existing_risk_link_action() -> None:
+    session = MagicMock()
+    session.scalar.return_value = SimpleNamespace(id=uuid4())
+    context = CommandContext(
+        tenant_id=uuid4(),
+        actor_id=uuid4(),
+        actor_kind="PATRON_ADMIN",
+        received_at=NOW,
+        membership_id=uuid4(),
+    )
+
+    reference = PatronActionWriter().create_from_risk_requirement_link(
+        session=session,
+        context=context,
+        case_id=uuid4(),
+        risk_id=uuid4(),
+        requirement_id=uuid4(),
+        link_id=uuid4(),
+        command_id=uuid4(),
+        idempotency_key=uuid4(),
+    )
+
+    assert reference is None
+    session.add.assert_not_called()

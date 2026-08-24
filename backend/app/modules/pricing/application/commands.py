@@ -18,4 +18,9 @@ class CreatePricingScenarioCommand(ApplicationCommand):
     scenario_type: Literal["BASE", "PRUDENT", "CUSTOM"]
     sales_adjustment_bps: int = Field(ge=-5000, le=10000)
     cost_adjustment_bps: int = Field(ge=-5000, le=10000)
+    penalty_reserve_minor: int = Field(default=0, ge=0)
+    retention_reserve_minor: int = Field(default=0, ge=0)
+    guarantee_reserve_minor: int = Field(default=0, ge=0)
+    floor_margin_rate_bps: int = Field(default=0, ge=0, lt=10000)
+    target_margin_rate_bps: int = Field(default=0, ge=0, lt=10000)
     assumptions: dict[str, object]

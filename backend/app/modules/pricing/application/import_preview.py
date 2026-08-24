@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from io import BytesIO
 from zipfile import BadZipFile, ZipFile
 
@@ -86,6 +86,7 @@ class PricingImportPreviewService:
                     raise ValueError("IMPORT_MACROS_REJECTED")
                 if sum(info.file_size for info in archive.infolist()) > MAX_UNCOMPRESSED_BYTES:
                     raise ValueError("IMPORT_ARCHIVE_TOO_LARGE")
+                _check_archive_uncompressed_size(archive)
             workbook = load_workbook(BytesIO(payload), read_only=True, data_only=True)
         except (BadZipFile, OSError, ValueError) as error:
             if isinstance(error, ValueError) and str(error).startswith("IMPORT_"):
@@ -93,16 +94,19 @@ class PricingImportPreviewService:
             raise ValueError("IMPORT_WORKBOOK_INVALID") from error
         try:
             sheet = workbook.active
-            rows = list(sheet.iter_rows(values_only=True))
-            if not rows:
+            rows = sheet.iter_rows(values_only=True)
+            header = next(rows, None)
+            if header is None:
                 raise ValueError("IMPORT_EMPTY_WORKBOOK")
-            header_map = _resolve_headers(rows[0])
+            header_map = _resolve_headers(header)
             if "designation" not in header_map:
                 raise ValueError("IMPORT_DESIGNATION_COLUMN_REQUIRED")
             parsed: list[PricingImportRow] = []
             total_minor = 0
             errors = 0
-            for row_number, values in enumerate(rows[1 : MAX_ROWS + 1], start=2):
+            for row_number, values in enumerate(rows, start=2):
+                if row_number > MAX_ROWS + 1:
+                    break
                 if not any(value not in (None, "") for value in values):
                     continue
                 item = _parse_row(row_number=row_number, values=values, header_map=header_map)
@@ -127,11 +131,11 @@ class PricingImportPreviewService:
 
     def _authorize(self, *, actor: ActorContext, case_id) -> None:
         if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
-            raise PermissionError("PATRON_REQUIRED")
+            raise PermissionError("FINANCIAL_REPORT_PATRON_REQUIRED")
         decision = self._policy.authorize(
             context=actor,
             request=AuthorizationRequest(
-                action=Capability.PRICING_WRITE,
+                action=Capability.FINANCIAL_REPORT_LINE_WRITE,
                 resource=AuthorizationResource(
                     resource_type="PRICING_IMPORT",
                     resource_id=case_id,
@@ -144,6 +148,18 @@ class PricingImportPreviewService:
         )
         if not decision.allowed:
             raise PermissionError(decision.code)
+
+
+def _check_archive_uncompressed_size(archive: ZipFile) -> None:
+    total_bytes = 0
+    for info in archive.infolist():
+        if getattr(info, "is_dir", lambda: False)():
+            continue
+        with archive.open(info) as member:
+            while chunk := member.read(1024 * 1024):
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UNCOMPRESSED_BYTES:
+                    raise ValueError("IMPORT_ARCHIVE_TOO_LARGE")
 
 
 def _normalize_header(value: object) -> str:
@@ -186,8 +202,12 @@ def _parse_row(
         errors.append("QUANTITY_INVALID")
     if total is None and unit_price is None:
         errors.append("PRICE_REQUIRED")
-    if total is None and unit_price is not None and quantity is not None:
-        total = int((Decimal(quantity) * Decimal(unit_price)).to_integral_value())
+    if unit_price is not None and quantity is not None:
+        calculated_total = _calculate_total_minor(quantity=quantity, unit_price_minor=unit_price)
+        if total is None:
+            total = calculated_total
+        elif total != calculated_total:
+            errors.append("TOTAL_PRICE_MISMATCH")
     return PricingImportRow(
         row_number=row_number,
         code=code,
@@ -209,11 +229,8 @@ def _text(value: object) -> str | None:
 def _decimal_text(value: object, *, default: str | None = None) -> str | None:
     if value in (None, ""):
         return default
-    try:
-        decimal = Decimal(str(value).replace(",", "."))
-    except (InvalidOperation, ValueError):
-        return None
-    if decimal < 0:
+    decimal = _decimal(value)
+    if decimal is None or decimal < 0:
         return None
     return format(decimal, "f")
 
@@ -221,10 +238,31 @@ def _decimal_text(value: object, *, default: str | None = None) -> str | None:
 def _minor(value: object) -> int | None:
     if value in (None, ""):
         return None
+    decimal = _decimal(value)
+    if decimal is None or decimal < 0:
+        return None
+    return int((decimal * 100).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def _calculate_total_minor(*, quantity: str, unit_price_minor: int) -> int:
+    return int(
+        (Decimal(quantity) * Decimal(unit_price_minor)).to_integral_value(
+            rounding=ROUND_HALF_UP
+        )
+    )
+
+
+def _decimal(value: object) -> Decimal | None:
+    text = str(value).strip().replace("\u00a0", "").replace(" ", "")
+    if "," in text and "." in text:
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    else:
+        text = text.replace(",", ".")
     try:
-        decimal = Decimal(str(value).replace(",", "."))
+        decimal = Decimal(text)
     except (InvalidOperation, ValueError):
         return None
-    if decimal < 0:
-        return None
-    return int((decimal * 100).to_integral_value())
+    return decimal if decimal.is_finite() else None

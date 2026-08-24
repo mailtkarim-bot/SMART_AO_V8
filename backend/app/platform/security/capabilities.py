@@ -12,9 +12,15 @@ class Capability(StrEnum):
     """Stable action names recognized by the first authorization perimeter."""
 
     CONSULTATION_CREATE = "consultation.create"
+    CASE_CREATE = "case.create"
     CONSULTATION_READ = "consultation.read"
     DCE_PREPARE = "dce.prepare"
     CASE_DCE_READ = "case.dce.read"
+    MARKET_WATCH_READ = "market.watch.read"
+    OPPORTUNITY_PROFILE_READ = "opportunity.profile.read"
+    OPPORTUNITY_PROFILE_WRITE = "opportunity.profile.write"
+    OPPORTUNITY_OBSERVATION_READ = "opportunity.observation.read"
+    OPPORTUNITY_OBSERVATION_QUALIFY = "opportunity.observation.qualify"
     DCE_REQUIREMENT_CONFIRM = "dce.requirement.confirm"
     ASSIGNMENT_ACKNOWLEDGE = "assignment.acknowledge"
     ASSIGNMENT_CLARIFY = "assignment.clarify"
@@ -34,9 +40,14 @@ class Capability(StrEnum):
     MEMBERSHIP_MANAGE = "membership.manage"
     TENANT_MANAGE = "tenant.manage"
     DECISION_FINALIZE = "decision.finalize"
+    DECISION_RISK_WRITE = "decision.risk.write"
+    DECISION_RISK_LINK_WRITE = "decision.risk.link.write"
+    DECISION_RISK_READ = "decision.risk.read"
     PRICING_READ = "pricing.read"
     PRICING_WRITE = "pricing.write"
     SUBMISSION_AUTHORIZE = "submission.authorize"
+    SUBMISSION_SIGNATURE_READ = "submission.signature.read"
+    SUBMISSION_SIGNATURE_WRITE = "submission.signature.write"
     PATRON_ACTION_READ = "patron.action.read"
     PATRON_ACTION_WRITE = "patron.action.write"
     SENSITIVE_EXPORT = "export.sensitive"
@@ -46,6 +57,7 @@ class Capability(StrEnum):
     FINANCIAL_REPORT_PUBLISH = "financial.report.publish"
     FINANCIAL_REPORT_LINE_WRITE = "financial.report.line.write"
     ENTERPRISE_LIBRARY_READ = "enterprise.library.read"
+    ENTERPRISE_REGISTRY_READ = "enterprise.registry.read"
     ENTERPRISE_LIBRARY_WRITE = "enterprise.library.write"
     ENTERPRISE_CAPABILITY_READ = "enterprise.capability.read"
     ENTERPRISE_CAPABILITY_WRITE = "enterprise.capability.write"
@@ -55,9 +67,15 @@ class Capability(StrEnum):
 _PATRON_ADMIN_CAPABILITIES = frozenset(
     {
         Capability.CONSULTATION_CREATE,
+        Capability.CASE_CREATE,
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
+        Capability.MARKET_WATCH_READ,
+        Capability.OPPORTUNITY_PROFILE_READ,
+        Capability.OPPORTUNITY_PROFILE_WRITE,
+        Capability.OPPORTUNITY_OBSERVATION_READ,
+        Capability.OPPORTUNITY_OBSERVATION_QUALIFY,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.ASSIGNMENT_MANAGE,
         Capability.DOCUMENT_ADMIN_READ,
@@ -67,9 +85,14 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.MEMBERSHIP_MANAGE,
         Capability.TENANT_MANAGE,
         Capability.DECISION_FINALIZE,
+        Capability.DECISION_RISK_WRITE,
+        Capability.DECISION_RISK_LINK_WRITE,
+        Capability.DECISION_RISK_READ,
         Capability.PRICING_READ,
         Capability.PRICING_WRITE,
         Capability.SUBMISSION_AUTHORIZE,
+        Capability.SUBMISSION_SIGNATURE_READ,
+        Capability.SUBMISSION_SIGNATURE_WRITE,
         Capability.PATRON_ACTION_READ,
         Capability.PATRON_ACTION_WRITE,
         Capability.SENSITIVE_EXPORT,
@@ -79,6 +102,7 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.FINANCIAL_REPORT_PUBLISH,
         Capability.FINANCIAL_REPORT_LINE_WRITE,
         Capability.ENTERPRISE_LIBRARY_READ,
+        Capability.ENTERPRISE_REGISTRY_READ,
         Capability.ENTERPRISE_LIBRARY_WRITE,
         Capability.ENTERPRISE_CAPABILITY_READ,
         Capability.ENTERPRISE_CAPABILITY_WRITE,
@@ -90,6 +114,7 @@ _COLLABORATOR_CAPABILITIES = frozenset(
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
+        Capability.MARKET_WATCH_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.ASSIGNMENT_ACKNOWLEDGE,
         Capability.ASSIGNMENT_CLARIFY,
@@ -111,6 +136,7 @@ _DELEGABLE_CAPABILITIES = frozenset(
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,
+        Capability.MARKET_WATCH_READ,
         Capability.DCE_REQUIREMENT_CONFIRM,
         Capability.DOCUMENT_ADMIN_READ,
         Capability.WORK_TASK_READ,

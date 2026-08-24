@@ -43,10 +43,11 @@ load_environment() {
   # shellcheck disable=SC1090
   source "${ENV_FILE}"
   set +a
-  for variable in SMART_AO_PUBLIC_HOST SMART_AO_DATABASE_URL SMART_AO_JWT_SIGNING_KEY SMART_AO_JWT_ISSUER SMART_AO_JWT_AUDIENCE POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD; do
+  for variable in SMART_AO_PUBLIC_HOST SMART_AO_DATABASE_URL SMART_AO_JWT_SIGNING_KEY SMART_AO_JWT_ISSUER SMART_AO_JWT_AUDIENCE POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD PGPASSWORD; do
     [[ -n "${!variable:-}" ]] || fail "${variable} is required"
     [[ "${!variable}" != REPLACE_WITH_* ]] || fail "${variable} still contains a placeholder"
   done
+  [[ "${PGPASSWORD}" == "${POSTGRES_PASSWORD}" ]] || fail "PGPASSWORD must match POSTGRES_PASSWORD for the configured application role"
 }
 
 compose() {
@@ -92,7 +93,7 @@ deploy() {
   exec 9>"${LOCK_FILE}"
   flock -n 9 || fail "another deployment is already running: ${LOCK_FILE}"
   compose pull caddy postgres clamav
-  compose build --pull backend frontend
+  compose build --pull backend submission-export-webhook-worker submission-export-smtp-worker frontend
   compose up -d postgres clamav
   wait_postgres
   if compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public'" | grep -q '^0$'; then
@@ -101,7 +102,7 @@ deploy() {
     backup_database
   fi
   compose run --rm backend alembic -c /app/backend/alembic.ini upgrade head
-  compose up -d backend dce-retention-worker submission-export-webhook-worker frontend caddy
+  compose up -d backend dce-retention-worker submission-export-webhook-worker submission-export-smtp-worker frontend caddy
   smoke
   printf 'Deployment completed successfully. No automatic downgrade was attempted.\n'
 }

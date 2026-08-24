@@ -28,6 +28,7 @@ from app.interfaces.http.routes.authentication import (
     build_authentication_router,
 )
 from app.interfaces.http.routes.case_assigned import build_assigned_case_router
+from app.interfaces.http.routes.case_creation import build_case_creation_router
 from app.interfaces.http.routes.case_dce_reading import build_case_dce_reading_router
 from app.interfaces.http.routes.collaborator_capabilities import (
     build_collaborator_capability_router,
@@ -47,6 +48,8 @@ from app.interfaces.http.routes.dce_requirement_confirmations import (
 )
 from app.interfaces.http.routes.dce_staging import build_dce_staging_router
 from app.interfaces.http.routes.dce_versions import build_dce_version_router
+from app.interfaces.http.routes.knowledge import build_knowledge_router
+from app.interfaces.http.routes.market_watch import build_market_watch_router
 from app.interfaces.http.routes.observability import build_observability_router
 from app.interfaces.http.routes.patron_actions import build_patron_action_router
 from app.interfaces.http.routes.patron_assignment_cockpit import (
@@ -55,6 +58,9 @@ from app.interfaces.http.routes.patron_assignment_cockpit import (
 from app.interfaces.http.routes.patron_assignment_management import (
     build_patron_assignment_management_router,
 )
+from app.interfaces.http.routes.patron_boamp_opportunities import (
+    build_patron_boamp_opportunity_router,
+)
 from app.interfaces.http.routes.patron_decisions import build_patron_decision_router
 from app.interfaces.http.routes.patron_enterprise_capabilities import (
     build_patron_enterprise_capability_router,
@@ -62,14 +68,23 @@ from app.interfaces.http.routes.patron_enterprise_capabilities import (
 from app.interfaces.http.routes.patron_enterprise_library import (
     build_patron_enterprise_library_router,
 )
+from app.interfaces.http.routes.patron_enterprise_registry import (
+    build_patron_enterprise_registry_router,
+)
 from app.interfaces.http.routes.patron_financial_reports import (
     build_patron_financial_report_router,
+)
+from app.interfaces.http.routes.patron_opportunity_watch_profiles import (
+    build_patron_opportunity_watch_profile_router,
 )
 from app.interfaces.http.routes.patron_pricing import build_patron_pricing_router
 from app.interfaces.http.routes.patron_pricing_import import build_patron_pricing_import_router
 from app.interfaces.http.routes.patron_submission import build_patron_submission_router
 from app.interfaces.http.routes.patron_submission_evidence import (
     build_patron_submission_evidence_router,
+)
+from app.interfaces.http.routes.patron_submission_signature import (
+    build_patron_submission_signature_router,
 )
 from app.interfaces.http.routes.preparation import (
     build_preparation_review_router,
@@ -78,7 +93,9 @@ from app.interfaces.http.routes.preparation import (
 from app.interfaces.http.routes.preparation_transmission import (
     build_preparation_transmission_router,
 )
+from app.modules.case.application.handlers import CreateCaseHandler
 from app.modules.case.infrastructure.models.case import CaseRecord
+from app.modules.case.infrastructure.repositories import SqlAlchemyCaseRepository
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
     CreateConsultationHandler,
@@ -116,7 +133,38 @@ from app.modules.dce.infrastructure.quarantine import (
     LocalQuarantineStorageAdapter,
     PythonMagicContentInspectionAdapter,
 )
+from app.modules.dce.infrastructure.repositories import SqlAlchemyConsultationRepository
+from app.modules.decision.application.finalize import (
+    PatronDecisionFinalizationService,
+    decision_finalization_handlers,
+)
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
+from app.modules.decision.application.risk import (
+    PatronDecisionRiskService,
+    decision_risk_handlers,
+)
+from app.modules.decision.application.risk_requirement import (
+    PatronDecisionRiskRequirementService,
+    decision_risk_requirement_link_handlers,
+)
+from app.modules.decision.application.risk_requirement_read import (
+    PatronDecisionRiskRequirementReadService,
+)
+from app.modules.decision.infrastructure.condition_repository import (
+    SqlAlchemyDecisionConditionRepository,
+)
+from app.modules.decision.infrastructure.dossier_reader import SqlAlchemyDecisionDossierReader
+from app.modules.decision.infrastructure.repositories import SqlAlchemyDecisionRepository
+from app.modules.decision.infrastructure.risk_repository import SqlAlchemyDecisionRiskRepository
+from app.modules.decision.infrastructure.risk_requirement_reader import (
+    SqlAlchemyDecisionRiskRequirementReader,
+)
+from app.modules.decision.infrastructure.risk_requirement_repository import (
+    SqlAlchemyDecisionRiskRequirementLinkRepository,
+)
+from app.modules.decision.infrastructure.verified_context_reader import (
+    SqlAlchemyDecisionVerifiedContextReader,
+)
 from app.modules.enterprise.application.enterprise_capability import (
     EnterpriseCapabilityService,
     enterprise_capability_handlers,
@@ -129,6 +177,15 @@ from app.modules.enterprise.application.enterprise_upload import (
     EnterprisePrivateUploadService,
     enterprise_upload_handlers,
 )
+from app.modules.enterprise.application.registry_lookup import EnterpriseRegistryLookupService
+from app.modules.enterprise.infrastructure.insee_registry import (
+    CompanyRegistryPort,
+    InseeSireneRegistry,
+)
+from app.modules.knowledge.application.service import KnowledgeRetrievalService
+from app.modules.market_watch.application.ports import PublicNoticeSearchPort
+from app.modules.market_watch.application.service import PublicNoticeSearchService
+from app.modules.market_watch.infrastructure.boamp import BoampReadOnlySearch
 from app.modules.membership.application.assignment import (
     AssignmentInteractionService,
     assignment_handlers,
@@ -166,6 +223,22 @@ from app.modules.membership.application.patron_assignment import (
 from app.modules.membership.application.patron_assignment_cockpit import (
     PatronAssignmentCockpitService,
 )
+from app.modules.membership.infrastructure.assignment_history_reader import (
+    SqlAlchemyAssignmentHistoryReader,
+)
+from app.modules.membership.infrastructure.assignment_management_reader import (
+    SqlAlchemyAssignmentManagementReader,
+)
+from app.modules.membership.infrastructure.patron_assignment_cockpit_reader import (
+    SqlAlchemyPatronAssignmentCockpitReader,
+)
+from app.modules.opportunity.application.patron_watch_profile import (
+    PatronWatchProfileService,
+    opportunity_watch_profile_handlers,
+)
+from app.modules.opportunity.infrastructure.boamp_qualification_repository import (
+    BoampQualificationRepository,
+)
 from app.modules.patron_action.application.service import (
     PatronActionService,
     PatronActionWriter,
@@ -188,9 +261,15 @@ from app.modules.preparation.infrastructure.dce_preparation_reader import (
     SqlAlchemyPreparationDceReader,
 )
 from app.modules.preparation.infrastructure.document_storage import (
+    GeneratedDocumentStorage,
     LocalGeneratedDocumentStorage,
 )
+from app.modules.pricing.application.import_creation import (
+    PricingImportCreationService,
+    pricing_import_creation_handlers,
+)
 from app.modules.pricing.application.import_preview import PricingImportPreviewService
+from app.modules.pricing.application.import_read import PricingImportReadService
 from app.modules.pricing.application.import_service import (
     PricingImportService,
     pricing_import_handlers,
@@ -203,16 +282,40 @@ from app.modules.pricing.application.transition_service import (
     PricingScenarioTransitionService,
     pricing_scenario_transition_handlers,
 )
+from app.modules.pricing.infrastructure.scenario_reader import SqlAlchemyPricingScenarioReader
+from app.modules.submission.application.calendar import SubmissionDeadlineCalendarPort
 from app.modules.submission.application.evidence_service import (
     SubmissionEvidenceService,
     submission_evidence_handlers,
 )
+from app.modules.submission.application.notifications import SubmissionExportNotificationPort
 from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
-from app.modules.submission.application.signature_service import submission_signature_handlers
+from app.modules.submission.application.signature_service import (
+    SubmissionSignatureReadService,
+    SubmissionSignatureService,
+    submission_signature_handlers,
+)
+from app.modules.submission.infrastructure.decision_gate_reader import (
+    SqlAlchemySubmissionDecisionGateReader,
+)
+from app.modules.submission.infrastructure.ics_calendar import IcsSubmissionDeadlineCalendar
+from app.modules.submission.infrastructure.signature_reader import (
+    SqlAlchemySubmissionSignatureReader,
+)
+from app.modules.submission.infrastructure.smtp_notifications import (
+    AioSmtpSubmissionExportNotifier,
+)
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.observability.http import RequestObservabilityMiddleware
+from app.platform.persistence.schema import EXPECTED_ALEMBIC_HEAD
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
+from app.platform.security.headers import SecurityHeadersMiddleware
+from app.platform.storage.object_storage import S3PrivateObjectStorage
+
+
+def _decision_risk_requirement_link_repository(_session: object):
+    return SqlAlchemyDecisionRiskRequirementLinkRepository()
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,7 +336,12 @@ class AppRuntime:
     session_factory: sessionmaker[Session]
     dispatcher: CommandDispatcher
     dce_upload_service: DceUploadService
-    preparation_storage: LocalGeneratedDocumentStorage
+    preparation_storage: GeneratedDocumentStorage
+    company_registry: CompanyRegistryPort | None = None
+    submission_export_notifier: SubmissionExportNotificationPort | None = None
+    submission_deadline_calendar: SubmissionDeadlineCalendarPort | None = None
+    public_notice_search: PublicNoticeSearchPort | None = None
+    boamp_qualification_repository: BoampQualificationRepository | None = None
 
     @classmethod
     def create(
@@ -242,15 +350,21 @@ class AppRuntime:
         session_factory: sessionmaker[Session],
         dce_upload_service_factory: Callable[[CommandDispatcher], DceUploadService] | None = None,
     ) -> AppRuntime:
-        preparation_storage = LocalGeneratedDocumentStorage(
-            root=Path(os.getenv("SMART_AO_DCE_QUARANTINE_ROOT", "/var/lib/smart_ao/dce-quarantine"))
-        )
+        preparation_storage = _build_preparation_storage()
+        company_registry = _build_company_registry()
+        submission_export_notifier = _build_submission_export_notifier()
+        submission_deadline_calendar = _build_submission_deadline_calendar()
+        public_notice_search = _build_public_notice_search()
         dispatcher = CommandDispatcher(
             session_factory=session_factory,
             handlers={
                 **enterprise_upload_handlers(),
                 "ClaimDceStagedObjectUpload": ClaimDceStagedObjectUploadHandler(),
                 "CreateConsultation": CreateConsultationHandler(),
+                "CreateCase": CreateCaseHandler(
+                    repository_factory=SqlAlchemyCaseRepository,
+                    consultation_reader_factory=SqlAlchemyConsultationRepository,
+                ),
                 "ExpireDceStagedObject": ExpireDceStagedObjectHandler(),
                 "PrepareDceStaging": PrepareDceStagingHandler(),
                 "RecordDceStagedObjectQuarantine": RecordDceStagedObjectQuarantineHandler(),
@@ -282,11 +396,27 @@ class AppRuntime:
                 **preparation_transmission_handlers(action_writer=PatronActionWriter()),
                 **patron_action_handlers(),
                 **patron_action_transition_handlers(),
+                **decision_risk_handlers(
+                    repository_factory=lambda _session: SqlAlchemyDecisionRiskRepository()
+                ),
+                **decision_risk_requirement_link_handlers(
+                    repository_factory=_decision_risk_requirement_link_repository,
+                    action_writer=PatronActionWriter(),
+                ),
+                **decision_finalization_handlers(
+                    repository_factory=lambda session: SqlAlchemyDecisionRepository(session),
+                    verified_context_reader=SqlAlchemyDecisionVerifiedContextReader(),
+                    condition_repository=SqlAlchemyDecisionConditionRepository(),
+                ),
                 **pricing_scenario_handlers(),
                 **pricing_scenario_transition_handlers(),
+                **pricing_import_creation_handlers(),
                 **pricing_import_handlers(),
+                **opportunity_watch_profile_handlers(),
                 **preparation_review_handlers(storage=preparation_storage),
-                **submission_handlers(),
+                **submission_handlers(
+                    decision_gate_reader=SqlAlchemySubmissionDecisionGateReader(),
+                ),
                 **submission_evidence_handlers(),
                 **submission_signature_handlers(),
             },
@@ -301,6 +431,11 @@ class AppRuntime:
             dispatcher=dispatcher,
             dce_upload_service=upload_service,
             preparation_storage=preparation_storage,
+            company_registry=company_registry,
+            submission_export_notifier=submission_export_notifier,
+            submission_deadline_calendar=submission_deadline_calendar,
+            public_notice_search=public_notice_search,
+            boamp_qualification_repository=BoampQualificationRepository(),
         )
 
     def get_dce_staged_object_upload_target(
@@ -445,6 +580,7 @@ def _default_dce_upload_service(*, dispatcher: CommandDispatcher) -> DceUploadSe
             timeout_seconds=float(os.getenv("SMART_AO_CLAMD_TIMEOUT_SECONDS", "30")),
         ),
         allowed_media_types=_ALLOWED_DCE_MEDIA_TYPES,
+        max_bytes=int(os.getenv("SMART_AO_DCE_MAX_BYTES", "150000000")),
     )
 
 
@@ -470,16 +606,97 @@ def _default_enterprise_private_upload_service(
     )
 
 
+def _build_company_registry() -> CompanyRegistryPort | None:
+    if os.getenv("SMART_AO_INSEE_ENABLED", "0") != "1":
+        return None
+    token = os.getenv("SMART_AO_INSEE_API_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError("SMART_AO_INSEE_API_TOKEN is required when INSEE is enabled")
+    return InseeSireneRegistry(
+        token=token,
+        base_url=os.getenv("SMART_AO_INSEE_BASE_URL", "https://api.insee.fr/api-sirene/3.11"),
+        timeout_seconds=float(os.getenv("SMART_AO_INSEE_TIMEOUT_SECONDS", "5")),
+    )
+
+
+def _build_submission_export_notifier() -> SubmissionExportNotificationPort | None:
+    if os.getenv("SMART_AO_SMTP_ENABLED", "0") != "1":
+        return None
+    hostname = os.getenv("SMART_AO_SMTP_HOST", "").strip()
+    sender = os.getenv("SMART_AO_SMTP_FROM", "").strip()
+    if not hostname:
+        raise RuntimeError("SMART_AO_SMTP_HOST is required when SMTP is enabled")
+    if not sender:
+        raise RuntimeError("SMART_AO_SMTP_FROM is required when SMTP is enabled")
+    username = os.getenv("SMART_AO_SMTP_USERNAME") or None
+    password = os.getenv("SMART_AO_SMTP_PASSWORD") or None
+    start_tls_value = os.getenv("SMART_AO_SMTP_START_TLS", "")
+    return AioSmtpSubmissionExportNotifier(
+        hostname=hostname,
+        port=int(os.getenv("SMART_AO_SMTP_PORT", "587")),
+        sender=sender,
+        username=username,
+        password=password,
+        use_tls=os.getenv("SMART_AO_SMTP_USE_TLS", "0") == "1",
+        start_tls=(start_tls_value == "1") if start_tls_value else None,
+        timeout_seconds=float(os.getenv("SMART_AO_SMTP_TIMEOUT_SECONDS", "10")),
+    )
+
+
+def _build_submission_deadline_calendar() -> SubmissionDeadlineCalendarPort | None:
+    if os.getenv("SMART_AO_CALENDAR_ENABLED", "0") != "1":
+        return None
+    return IcsSubmissionDeadlineCalendar()
+
+
+def _build_public_notice_search() -> PublicNoticeSearchPort | None:
+    if os.getenv("SMART_AO_BOAMP_ENABLED", "0") != "1":
+        return None
+    return BoampReadOnlySearch(
+        base_url=os.getenv(
+            "SMART_AO_BOAMP_BASE_URL",
+            "https://www.boamp.fr/api/explore/v2.1/catalog/datasets/boamp/records",
+        ),
+        timeout_seconds=float(os.getenv("SMART_AO_BOAMP_TIMEOUT_SECONDS", "5")),
+    )
+
+
+def _build_preparation_storage() -> GeneratedDocumentStorage:
+    if os.getenv("SMART_AO_OBJECT_STORAGE_ENABLED", "0") != "1":
+        return LocalGeneratedDocumentStorage(
+            root=Path(os.getenv("SMART_AO_DCE_QUARANTINE_ROOT", "/var/lib/smart_ao/dce-quarantine"))
+        )
+    bucket = os.getenv("SMART_AO_OBJECT_STORAGE_BUCKET", "").strip()
+    if not bucket:
+        raise RuntimeError(
+            "SMART_AO_OBJECT_STORAGE_BUCKET is required when object storage is enabled"
+        )
+    return S3PrivateObjectStorage(
+        bucket=bucket,
+        endpoint_url=os.getenv("SMART_AO_OBJECT_STORAGE_ENDPOINT_URL") or None,
+        region_name=os.getenv("SMART_AO_OBJECT_STORAGE_REGION") or None,
+        server_side_encryption=os.getenv("SMART_AO_OBJECT_STORAGE_SSE", "AES256") or None,
+    )
+
+
 def create_app(
     *,
     runtime: AppRuntime | None = None,
     authentication_runtime: AuthenticationHttpRuntime | None = None,
+    knowledge_service: KnowledgeRetrievalService | None = None,
+    public_notice_search: PublicNoticeSearchPort | None = None,
+    company_registry: CompanyRegistryPort | None = None,
+    expose_api_docs: bool = True,
 ) -> FastAPI:
     app = FastAPI(
         title="SMART_AO V8",
         version="0.1.0",
         description="SaaS BTP d'analyse DCE et de décision d'appel d'offres.",
+        openapi_url="/openapi.json" if expose_api_docs else None,
+        docs_url="/docs" if expose_api_docs else None,
+        redoc_url="/redoc" if expose_api_docs else None,
     )
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestObservabilityMiddleware)
     app.include_router(build_observability_router())
 
@@ -493,7 +710,11 @@ def create_app(
 
     @app.get("/healthz/ready", tags=["system"])
     def readiness() -> JSONResponse:
-        checks: dict[str, str] = {"database": "unknown", "clamav": "unknown"}
+        checks: dict[str, str] = {
+            "database": "unknown",
+            "schema": "unknown",
+            "clamav": "unknown",
+        }
         if runtime is None:
             return JSONResponse(
                 status_code=503,
@@ -505,6 +726,16 @@ def create_app(
             checks["database"] = "ok"
         except sa.exc.SQLAlchemyError:
             checks["database"] = "failed"
+
+        if checks["database"] == "ok":
+            try:
+                with runtime.session_factory() as session:
+                    schema_head = session.scalar(
+                        sa.text("SELECT version_num FROM alembic_version")
+                    )
+                checks["schema"] = "ok" if schema_head == EXPECTED_ALEMBIC_HEAD else "failed"
+            except sa.exc.SQLAlchemyError:
+                checks["schema"] = "failed"
         try:
             with socket.create_connection(
                 (
@@ -592,36 +823,75 @@ def create_app(
             policy=security_policy,
         )
         patron_decision_dossier_service = PatronDecisionDossierService(
-            session_factory=runtime.session_factory,
+            reader=SqlAlchemyDecisionDossierReader(runtime.session_factory),
+            policy=security_policy,
+        )
+        patron_decision_risk_service = PatronDecisionRiskService(
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        patron_decision_risk_requirement_service = PatronDecisionRiskRequirementService(
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        decision_risk_requirement_reader = SqlAlchemyDecisionRiskRequirementReader(
+            runtime.session_factory
+        )
+        patron_decision_risk_requirement_read_service = PatronDecisionRiskRequirementReadService(
+            reader=decision_risk_requirement_reader,
+            pricing_reader=decision_risk_requirement_reader,
+            policy=security_policy,
+        )
+        patron_decision_finalization_service = PatronDecisionFinalizationService(
+            dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
         pricing_scenario_service = PricingScenarioService(
             session_factory=runtime.session_factory,
+            reader=SqlAlchemyPricingScenarioReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
         pricing_scenario_transition_service = PricingScenarioTransitionService(
             session_factory=runtime.session_factory,
+            reader=SqlAlchemyPricingScenarioReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
         pricing_import_preview_service = PricingImportPreviewService(policy=security_policy)
+        pricing_import_creation_service = PricingImportCreationService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        pricing_import_read_service = PricingImportReadService(
+            session_factory=runtime.session_factory,
+            policy=security_policy,
+        )
         pricing_import_service = PricingImportService(
+            session_factory=runtime.session_factory,
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        opportunity_watch_profile_service = PatronWatchProfileService(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
         assignment_history_service = AssignmentHistoryService(
             session_factory=runtime.session_factory,
+            reader_factory=SqlAlchemyAssignmentHistoryReader,
             policy=security_policy,
         )
         patron_assignment_management_service = PatronAssignmentManagementService(
             session_factory=runtime.session_factory,
+            reader=SqlAlchemyAssignmentManagementReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
         patron_assignment_cockpit_service = PatronAssignmentCockpitService(
             session_factory=runtime.session_factory,
+            reader_factory=SqlAlchemyPatronAssignmentCockpitReader,
             policy=security_policy,
         )
         patron_financial_report_service = PatronFinancialReportService(
@@ -662,15 +932,73 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        signature_provider = os.getenv("SMART_AO_SIGNATURE_PROVIDER", "").strip()
+        signature_callback_secret = os.getenv("SMART_AO_SIGNATURE_CALLBACK_SECRET", "")
+        submission_signature_service = None
+        submission_signature_read_service = None
+        if signature_provider and signature_callback_secret:
+            submission_signature_service = SubmissionSignatureService(
+                dispatcher=runtime.dispatcher,
+                policy=security_policy,
+                provider=signature_provider,
+            )
+            submission_signature_read_service = SubmissionSignatureReadService(
+                reader=SqlAlchemySubmissionSignatureReader(
+                    session_factory=runtime.session_factory,
+                ),
+                policy=security_policy,
+            )
         submission_package_service = SubmissionPackageService(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
             policy=security_policy,
             storage=runtime.preparation_storage,
+            decision_gate_reader=SqlAlchemySubmissionDecisionGateReader(),
         )
         app.include_router(
             build_case_dce_reading_router(
                 runtime=runtime,
+                security_runtime=security_runtime,
+            )
+        )
+        if knowledge_service is not None:
+            app.include_router(
+                build_knowledge_router(
+                    service=knowledge_service,
+                    runtime=runtime,
+                    security_runtime=security_runtime,
+                )
+            )
+        if public_notice_search is not None:
+            app.include_router(
+                build_market_watch_router(
+                    service=PublicNoticeSearchService(search_port=public_notice_search),
+                    security_runtime=security_runtime,
+                )
+            )
+        app.include_router(
+            build_patron_opportunity_watch_profile_router(
+                service=opportunity_watch_profile_service,
+                security_runtime=security_runtime,
+            )
+        )
+        if runtime.boamp_qualification_repository is not None:
+            app.include_router(
+                build_patron_boamp_opportunity_router(
+                    runtime=runtime,
+                    security_runtime=security_runtime,
+                )
+            )
+        if company_registry is not None:
+            app.include_router(
+                build_patron_enterprise_registry_router(
+                    service=EnterpriseRegistryLookupService(registry=company_registry),
+                    security_runtime=security_runtime,
+                )
+            )
+        app.include_router(
+            build_case_creation_router(
+                dispatcher=runtime.dispatcher,
                 security_runtime=security_runtime,
             )
         )
@@ -756,6 +1084,10 @@ def create_app(
         app.include_router(
             build_patron_decision_router(
                 service=patron_decision_dossier_service,
+                risk_service=patron_decision_risk_service,
+                risk_requirement_service=patron_decision_risk_requirement_service,
+                risk_requirement_read_service=patron_decision_risk_requirement_read_service,
+                finalization_service=patron_decision_finalization_service,
                 security_runtime=security_runtime,
             )
         )
@@ -770,6 +1102,8 @@ def create_app(
             build_patron_pricing_import_router(
                 service=pricing_import_preview_service,
                 commit_service=pricing_import_service,
+                creation_service=pricing_import_creation_service,
+                read_service=pricing_import_read_service,
                 security_runtime=security_runtime,
             )
         )
@@ -812,6 +1146,18 @@ def create_app(
                 security_runtime=security_runtime,
             )
         )
+        if (
+            submission_signature_service is not None
+            and submission_signature_read_service is not None
+        ):
+            app.include_router(
+                build_patron_submission_signature_router(
+                    service=submission_signature_service,
+                    read_service=submission_signature_read_service,
+                    security_runtime=security_runtime,
+                    callback_secret=signature_callback_secret,
+                )
+            )
         app.include_router(
             build_patron_enterprise_library_router(
                 service=enterprise_library_service,

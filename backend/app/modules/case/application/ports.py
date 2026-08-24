@@ -64,10 +64,41 @@ class CaseSnapshot:
     dce_applicability_history: tuple[CaseDceApplicabilitySnapshot, ...]
 
 
+class ConsultationReferenceReader(Protocol):
+    """Reads only the tenant-bound revision needed to link a Consultation."""
+
+    def get_revision(self, *, tenant_id: UUID | str, consultation_id: UUID | str) -> int | None: ...
+
+
 class CaseRepository(Protocol):
     """Persists only Case and entities owned internally by Case."""
 
     def get(self, *, tenant_id: UUID | str, aggregate_id: UUID | str) -> CaseSnapshot | None: ...
+
+    def has_active_functional_identity(
+        self, *, tenant_id: UUID | str, functional_identity_hash: str
+    ) -> bool: ...
+
+    def create(
+        self,
+        *,
+        aggregate_id: UUID,
+        tenant_id: UUID,
+        aggregate_revision: int,
+        functional_identity_hash: str,
+        title: str,
+        object_description: str,
+        business_origin: str,
+        origin_reference_id: UUID | None,
+        origin_rationale: str | None,
+        consultation_id: UUID | None,
+        consultation_scope_snapshot_json: Mapping[str, object] | None,
+        consultation_rationale: str | None,
+        scope_kind: str,
+        scope_json: Mapping[str, object],
+        scope_fingerprint: str,
+        actor_id: UUID | str,
+    ) -> None: ...
 
     def update_root(
         self,
