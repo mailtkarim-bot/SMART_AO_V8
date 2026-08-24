@@ -13,7 +13,6 @@ from app.modules.preparation.application.review_commands import (
     DecidePreparationReviewCommand,
     RequestPreparationReviewCommand,
 )
-from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
 from app.modules.preparation.infrastructure.models import (
     GeneratedTechnicalDocumentRecord,
     PreparationPackageRecord,
@@ -37,6 +36,7 @@ from app.platform.security.authorization import (
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
 from app.platform.security.models import CaseAssignmentRecord
+from app.platform.storage.ports import GeneratedDocumentStorage
 
 _REVIEW_COMMANDS = frozenset(
     {

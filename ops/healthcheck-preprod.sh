@@ -49,6 +49,8 @@ main() {
     || fail "application readiness payload is not healthy"
   grep -Eq '"database"[[:space:]]*:[[:space:]]*"ok"' <<<"${ready_body}" \
     || fail "application database readiness check is not healthy"
+  grep -Eq '"schema"[[:space:]]*:[[:space:]]*"ok"' <<<"${ready_body}" \
+    || fail "application schema readiness check is not healthy"
   grep -Eq '"clamav"[[:space:]]*:[[:space:]]*"ok"' <<<"${ready_body}" \
     || fail "application ClamAV readiness check is not healthy"
 

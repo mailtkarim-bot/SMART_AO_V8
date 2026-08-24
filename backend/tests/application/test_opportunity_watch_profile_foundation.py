@@ -150,7 +150,7 @@ def test_profile_create_replay_and_version_are_atomic(
             session.scalars(
                 sa.select(OutboxMessageRecord).where(
                     OutboxMessageRecord.tenant_id == actor.tenant_id,
-                    OutboxMessageRecord.payload_json["profile_id"].astext
+                    OutboxMessageRecord.payload_json["data"]["profile_id"].astext
                     == str(command.profile_id),
                 )
             )

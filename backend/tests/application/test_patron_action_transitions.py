@@ -109,6 +109,18 @@ def test_action_transitions_are_versioned_idempotent_and_append_only(services, s
                 .where(PatronActionTransitionRecord.id == command.transition_id)
                 .values(to_state="COMPLETED")
             )
+        session.execute(
+            sa.update(PatronActionRecord)
+            .where(PatronActionRecord.id == action_id)
+            .values(state="WAITING", aggregate_revision=3)
+        )
+        session.commit()
+        with pytest.raises(sa.exc.DatabaseError), session.begin_nested():
+            session.execute(
+                sa.update(PatronActionRecord)
+                .where(PatronActionRecord.id == action_id)
+                .values(title="tampered")
+            )
 
 
 def test_action_transition_requires_current_revision_and_patron(services, session_factory):

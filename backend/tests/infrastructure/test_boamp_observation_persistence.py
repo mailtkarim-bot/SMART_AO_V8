@@ -59,6 +59,7 @@ def _seed(session_factory: sessionmaker[Session]):
         session.add(
             TenantRecord(id=tenant_id, slug=f"tenant-{tenant_id.hex[:12]}", lifecycle="ACTIVE")
         )
+        session.flush()
         session.add(
             IdentityRecord(
                 id=actor_id,

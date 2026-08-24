@@ -26,7 +26,6 @@ from app.modules.preparation.application.document_content import (
     build_technical_document,
 )
 from app.modules.preparation.application.ports import PreparationDceReader
-from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
 from app.modules.preparation.infrastructure.models import (
     GeneratedTechnicalDocumentRecord,
     PreparationPackageRecord,
@@ -52,6 +51,7 @@ from app.platform.security.models import (
     CollaboratorTaskRecord,
     CollaboratorTaskResultRecord,
 )
+from app.platform.storage.ports import GeneratedDocumentStorage
 
 _PREPARATION_COMMANDS = frozenset({"EvaluatePreparationReadiness", "GenerateTechnicalDocument"})
 

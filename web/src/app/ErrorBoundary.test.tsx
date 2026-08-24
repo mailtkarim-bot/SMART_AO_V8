@@ -8,7 +8,7 @@ function BrokenPanel(): never {
 }
 
 describe("ErrorBoundary", () => {
-  it("shows a recoverable fallback when a child throws", async () => {
+  it("shows a recoverable fallback when a child throws", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       render(

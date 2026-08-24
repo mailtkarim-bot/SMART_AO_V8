@@ -188,7 +188,7 @@ def test_capacity_run_rejects_idempotency_reuse_with_changed_input(
     service.execute(command)
     input_port.value = _input(actor.tenant_id, case_id, required_units=1)
 
-    with pytest.raises(ValueError, match="idempotency"):
+    with pytest.raises(ValueError, match="reused with a different request"):
         service.execute(command)
 
     with session_factory() as session:

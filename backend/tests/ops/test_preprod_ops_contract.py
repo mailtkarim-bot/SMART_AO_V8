@@ -70,6 +70,9 @@ def test_preprod_trusts_forwarded_client_ip_only_on_internal_proxy_network() -> 
     assert "--proxy-headers" in dockerfile
     assert "--forwarded-allow-ips=172.30.0.0/24" in dockerfile
     assert "subnet: 172.30.0.0/24" in compose
+    assert "  migrate:\n" in compose
+    assert 'command: ["alembic", "-c", "/app/backend/alembic.ini", "upgrade", "head"]' in compose
+    assert compose.count("service_completed_successfully") >= 7
     assert 'backend:\n' in compose and '      - internal\n' in compose
 
 
@@ -115,6 +118,7 @@ def test_healthcheck_validates_application_json_payloads() -> None:
     assert 'ready_body="$(curl' in healthcheck
     assert '"process"[[:space:]]*:[[:space:]]*"ok"' in healthcheck
     assert '"database"[[:space:]]*:[[:space:]]*"ok"' in healthcheck
+    assert '"schema"[[:space:]]*:[[:space:]]*"ok"' in healthcheck
     assert '"clamav"[[:space:]]*:[[:space:]]*"ok"' in healthcheck
 
 
@@ -141,7 +145,10 @@ def test_dev_compose_is_loopback_bound_and_not_repurposable_as_preprod() -> None
     assert 'SMART_AO_ENV: development' in compose
     assert '"127.0.0.1:5432:5432"' in compose
     assert '"127.0.0.1:8000:8000"' in compose
-    assert compose.count("no-new-privileges:true") >= 4
+    assert compose.count("no-new-privileges:true") >= 5
+    assert "service_completed_successfully" in compose
+    local_override = (ROOT / "compose.local-dev.yml").read_text(encoding="utf-8")
+    assert '"127.0.0.1:5433:5432"' in local_override
 
 
 def test_frontend_image_and_service_run_non_root_with_healthcheck() -> None:
@@ -182,10 +189,13 @@ def test_optional_dependency_build_flags_are_explicit() -> None:
     dockerfile = (OPS / "docker/backend.Dockerfile").read_text(encoding="utf-8")
     compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
     assert "ARG SMART_AO_INSTALL_CONNECTORS=0" in dockerfile
+    assert "ARG SMART_AO_INSTALL_OBJECT_STORAGE=0" in dockerfile
+    assert "uv sync --frozen --no-dev --no-editable --extra object-storage" in dockerfile
     assert "uv sync --frozen --no-dev --no-editable --extra connectors" in dockerfile
     assert "SMART_AO_INSTALL_CONNECTORS" in compose
     assert "SMART_AO_INSTALL_RAG" in compose
     assert "SMART_AO_INSTALL_DOCUMENT_ADVANCED" in compose
+    assert "SMART_AO_INSTALL_OBJECT_STORAGE" in compose
 
 
 def test_insee_connector_is_disabled_by_default_and_secret_is_backend_only() -> None:

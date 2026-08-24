@@ -20,5 +20,5 @@ def test_readiness_without_production_runtime_is_not_ready() -> None:
     assert response.json() == {
         "status": "not_ready",
         "service": "smart-ao-v8",
-        "checks": {"database": "unknown", "clamav": "unknown"},
+        "checks": {"database": "unknown", "schema": "unknown", "clamav": "unknown"},
     }

@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, Fragment, type ErrorInfo, type ReactNode } from "react";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
@@ -6,15 +6,16 @@ type ErrorBoundaryProps = {
 
 type ErrorBoundaryState = {
   hasError: boolean;
+  resetKey: number;
 };
 
 export default class ErrorBoundary extends Component<
   ErrorBoundaryProps,
   ErrorBoundaryState
 > {
-  state: ErrorBoundaryState = { hasError: false };
+  state: ErrorBoundaryState = { hasError: false, resetKey: 0 };
 
-  static getDerivedStateFromError(): ErrorBoundaryState {
+  static getDerivedStateFromError(): Partial<ErrorBoundaryState> {
     return { hasError: true };
   }
 
@@ -23,11 +24,13 @@ export default class ErrorBoundary extends Component<
   }
 
   private reset = (): void => {
-    this.setState({ hasError: false });
+    this.setState((state) => ({ hasError: false, resetKey: state.resetKey + 1 }));
   };
 
   render(): ReactNode {
-    if (!this.state.hasError) return this.props.children;
+    if (!this.state.hasError) {
+      return <Fragment key={this.state.resetKey}>{this.props.children}</Fragment>;
+    }
     return (
       <main role="alert" aria-live="assertive">
         <h1>Le cockpit a rencontré un problème</h1>

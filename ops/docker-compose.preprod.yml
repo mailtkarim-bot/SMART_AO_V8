@@ -54,6 +54,24 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  migrate:
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: ["alembic", "-c", "/app/backend/alembic.ini", "upgrade", "head"]
+    restart: "no"
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
   backend:
     build:
       context: ..
@@ -61,6 +79,7 @@ services:
       args:
         SMART_AO_INSTALL_RAG: ${SMART_AO_INSTALL_RAG:-0}
         SMART_AO_INSTALL_DOCUMENT_ADVANCED: ${SMART_AO_INSTALL_DOCUMENT_ADVANCED:-0}
+        SMART_AO_INSTALL_OBJECT_STORAGE: ${SMART_AO_INSTALL_OBJECT_STORAGE:-0}
         SMART_AO_INSTALL_CONNECTORS: ${SMART_AO_INSTALL_CONNECTORS:-0}
         SMART_AO_INSTALL_NOTIFICATIONS: ${SMART_AO_INSTALL_NOTIFICATIONS:-0}
         SMART_AO_INSTALL_CALENDAR: ${SMART_AO_INSTALL_CALENDAR:-0}
@@ -120,6 +139,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       clamav:
         condition: service_healthy
     volumes:
@@ -158,6 +179,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
     networks:
@@ -181,6 +204,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - internal
     security_opt:
@@ -202,6 +227,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - internal
     security_opt:
@@ -230,6 +257,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       # edge grants outbound HTTPS to the external deposit portal only;
       # internal keeps database access. No inbound exposure is declared.
@@ -268,6 +297,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - edge
       - internal
@@ -296,6 +327,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - edge
       - internal

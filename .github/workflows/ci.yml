@@ -45,7 +45,7 @@ jobs:
           --exclude-files '^docs/|^web/pnpm-lock.yaml$'
       - name: Dependency vulnerability audit
         run: >-
-          uv export --no-emit-project --no-dev --format requirements-txt
+          uv export --all-extras --no-emit-project --no-dev --format requirements-txt
           -o /tmp/smart_ao_requirements.txt
           && uv run pip-audit --strict -r /tmp/smart_ao_requirements.txt
       - name: Python SAST
@@ -105,7 +105,14 @@ jobs:
       - name: Verify deployment Dockerfile
         run: test -f ops/docker/backend.Dockerfile
       - name: Build deployment image
-        run: docker build --file ops/docker/backend.Dockerfile --tag smart-ao-v8:ci .
+        run: >-
+          docker build --file ops/docker/backend.Dockerfile --tag smart-ao-v8:ci
+          --build-arg SMART_AO_INSTALL_RAG=1
+          --build-arg SMART_AO_INSTALL_DOCUMENT_ADVANCED=1
+          --build-arg SMART_AO_INSTALL_OBJECT_STORAGE=1
+          --build-arg SMART_AO_INSTALL_CONNECTORS=1
+          --build-arg SMART_AO_INSTALL_NOTIFICATIONS=1
+          --build-arg SMART_AO_INSTALL_CALENDAR=1 .
       - name: Scan backend deployment image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

@@ -19,6 +19,21 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  migrate:
+    build:
+      context: .
+      dockerfile: ops/docker/backend.Dockerfile
+    command: ["alembic", "-c", "/app/alembic.ini", "upgrade", "head"]
+    restart: "no"
+    environment:
+      SMART_AO_ENV: development
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
   backend:
     build:
       context: .
@@ -37,6 +52,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       clamav:
         condition: service_healthy
     volumes:
@@ -60,6 +77,7 @@ services:
       context: .
       dockerfile: ops/docker/backend.Dockerfile
     command: python -m app.workers.dce_retention
+    restart: unless-stopped
     environment:
       SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:-postgresql+psycopg://smart_ao:smart_ao@postgres:5432/smart_ao}
       SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
@@ -69,6 +87,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
     security_opt:

@@ -31,6 +31,7 @@ def _seed_outbox(
                 lifecycle="ACTIVE",
             )
         )
+        session.flush()
         session.add(
             DomainEventRecord(
                 id=event_id,

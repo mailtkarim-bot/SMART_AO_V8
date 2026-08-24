@@ -20,6 +20,7 @@ COPY pyproject.toml README.md uv.lock ./
 COPY backend ./backend
 ARG SMART_AO_INSTALL_RAG=0
 ARG SMART_AO_INSTALL_DOCUMENT_ADVANCED=0
+ARG SMART_AO_INSTALL_OBJECT_STORAGE=0
 ARG SMART_AO_INSTALL_CONNECTORS=0
 ARG SMART_AO_INSTALL_NOTIFICATIONS=0
 ARG SMART_AO_INSTALL_CALENDAR=0
@@ -30,6 +31,9 @@ RUN pip install --no-cache-dir uv==0.12.1 \
     fi \
     && if [ "$SMART_AO_INSTALL_DOCUMENT_ADVANCED" = "1" ]; then \
         uv sync --frozen --no-dev --no-editable --extra document-advanced; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_OBJECT_STORAGE" = "1" ]; then \
+        uv sync --frozen --no-dev --no-editable --extra object-storage; \
     fi \
     && if [ "$SMART_AO_INSTALL_CONNECTORS" = "1" ]; then \
         uv sync --frozen --no-dev --no-editable --extra connectors; \
