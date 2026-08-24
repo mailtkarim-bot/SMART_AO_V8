@@ -341,3 +341,12 @@ La tentative de recette PostgreSQL réelle n’a pas pu démarrer dans le sandbo
 Le domaine `decision/submission_gate.py` prépare le futur contrôle de soumission sans montant financier. Il bloque une Decision non finalisée, une issue `NO_GO` ou inconnue, un contexte non gelé, une exigence DCE non confirmée, un `CONDITIONAL_GO` dont les conditions ne sont pas satisfaites et une action de risque non résolue. Le garde ne publie rien et ne remplace pas la décision humaine.
 
 Le gate local après cette extension est de **971 tests passés et 458 désélectionnés**, dont **39 tests ciblés passés** avec un avertissement Starlette existant. Ruff, mypy ciblé et detect-secrets sont passés. La recette PostgreSQL online, Docker, VPS, ClamAV, HTTPS et la CI réellement exécutée restent ouvertes.
+
+
+## Recette CI et PostgreSQL Docker — 24 août 2026
+
+Le contrôle du run CI `32761180934` associé à `8798f36` confirme que `backend`, `frontend` et `image-security` ont terminé en échec avec `runnerName: null` et zéro étape. La récupération des journaux renvoie `log not found`; aucun test, build ou scan distant n’a donc été exécuté. La CI reste non validée.
+
+La simulation Docker locale n’a pas pu démarrer dans le sandbox : l’exécutable `docker` est absent. Le Docker présent sur l’ordinateur de l’utilisateur n’est pas accessible depuis cet environnement. La migration `0059` n’est donc vérifiable ici qu’en SQL offline ; la persistence PostgreSQL, le seed, l’outbox, les triggers et les FKs restent à recetter sur une machine équipée.
+
+Le gate local hors DB reste à **971 tests passés et 458 désélectionnés**, avec Ruff, mypy ciblé et detect-secrets passés. Le statut de production et de recette PostgreSQL demeure **NO-GO** jusqu’à obtention d’un runner et d’une instance PostgreSQL réellement exécutants.

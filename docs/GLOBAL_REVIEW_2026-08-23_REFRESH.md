@@ -244,3 +244,12 @@ La recette PostgreSQL réelle n’a pas été exécutée dans le sandbox : aucun
 Un garde domaine de soumission est néanmoins préparé. Il accepte uniquement une Decision finalisée `GO` ou `CONDITIONAL_GO`, sur contexte `FROZEN`, avec exigences DCE confirmées, conditions satisfaites pour un GO conditionnel et actions de risques résolues. Il renvoie des raisons de blocage non financières, ne publie aucun dossier et ne calcule aucun montant.
 
 Le gate local compte **971 tests passés et 458 désélectionnés**, avec 39 tests ciblés sur la tranche récente. Ruff, mypy ciblé et detect-secrets sont passés. La recette PostgreSQL online, Docker, VPS, fournisseurs externes et la CI avec runner effectif demeurent non démontrés.
+
+
+## Mise à jour du 24 août 2026 — diagnostic CI et recette Docker/PostgreSQL
+
+Le dernier run CI `32761180934`, associé au commit `8798f36`, est terminé en échec avant exécution : les trois jobs `backend`, `frontend` et `image-security` ont `runnerName: null` et zéro étape. La récupération des journaux renvoie `log not found`. Aucun test, build ou scan distant ne peut donc être analysé comme un résultat de code.
+
+La simulation PostgreSQL Docker n’a pas démarré car l’exécutable `docker` est absent du sandbox. Le Docker de l’ordinateur utilisateur n’est pas accessible depuis cet environnement. La migration 0059 reste contrôlée offline uniquement ; il n’existe pas de preuve PostgreSQL online, de seed, d’outbox, de FKs ou de trigger exercé.
+
+Le rapport associé décrit la recette à rejouer sur une machine équipée, avec tenant, Case, DCE applicable, exigence confirmée, risque sourcé, Decision gelée et `CONDITIONAL_GO`. Le seed doit vérifier l’état `OPEN` des conditions et refuser toute ressource étrangère ou document non vérifié. Le gate local reste à **971 tests passés et 458 désélectionnés**.

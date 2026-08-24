@@ -262,3 +262,10 @@ La tentative de recette PostgreSQL réelle n’a pas pu être lancée dans le sa
 Le garde domaine de soumission est préparé. Il bloque les Decisions non finalisées, `NO_GO`, les contextes non gelés, les exigences DCE non confirmées, les conditions ouvertes d’un `CONDITIONAL_GO` et les actions de risques non résolues. Il ne lit ni ne renvoie de montants financiers.
 
 Le gate local courant est de **971 tests passés et 458 désélectionnés** ; 39 tests ciblés de la tranche récente passent. Ruff, mypy ciblé et detect-secrets passent. La prochaine recette nécessite PostgreSQL réellement accessible et doit couvrir la migration 0059, la persistence des conditions `OPEN`, l’outbox, l’idempotence, l’isolation tenant, l’append-only et les scénarios inter-tenant.
+
+
+## Diagnostic CI et recette PostgreSQL Docker — 24 août 2026
+
+Le run `32761180934` associé à `8798f36` a terminé en échec avant toute étape : backend, frontend et image-security ont `runnerName: null` et zéro step ; `gh run view --log-failed` retourne `log not found`. Aucun résultat de test, build ou scan CI ne peut être retenu.
+
+La simulation Docker éphémère n’a pas été exécutée : `docker` est absent du sandbox. La recette réelle reste à jouer sur une machine équipée, avec migrations, seed contrôlé, assertions tenant/version, conditions `OPEN`, outbox, idempotence, append-only et refus inter-tenant.
