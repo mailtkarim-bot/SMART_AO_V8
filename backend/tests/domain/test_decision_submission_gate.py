@@ -72,3 +72,32 @@ def test_conditional_go_becomes_ready_only_when_conditions_are_satisfied() -> No
     )
 
     assert result.status is SubmissionGateStatus.READY
+
+
+@pytest.mark.domain
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"open_condition_count": -1},
+        {"unresolved_risk_action_count": -1},
+        {"open_condition_count": True},
+        {"unresolved_risk_action_count": "0"},
+        {"all_dce_requirements_confirmed": "true"},
+    ],
+)
+def test_submission_gate_blocks_invalid_snapshot_values(overrides) -> None:
+    result = evaluate_submission_gate(_snapshot(**overrides))
+
+    assert result.status is SubmissionGateStatus.BLOCKED
+    assert result.can_submit is False
+    assert "INVALID_DECISION_SNAPSHOT" in result.reasons
+
+
+@pytest.mark.domain
+def test_go_with_contradictory_open_condition_status_is_blocked() -> None:
+    result = evaluate_submission_gate(
+        _snapshot(condition_status="OPEN", open_condition_count=0)
+    )
+
+    assert result.status is SubmissionGateStatus.BLOCKED
+    assert result.reasons == ("UNEXPECTED_OPEN_CONDITIONS",)

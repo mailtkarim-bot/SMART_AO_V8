@@ -269,3 +269,23 @@ Le gate local courant est de **971 tests passés et 458 désélectionnés** ; 39
 Le run `32761180934` associé à `8798f36` a terminé en échec avant toute étape : backend, frontend et image-security ont `runnerName: null` et zéro step ; `gh run view --log-failed` retourne `log not found`. Aucun résultat de test, build ou scan CI ne peut être retenu.
 
 La simulation Docker éphémère n’a pas été exécutée : `docker` est absent du sandbox. La recette réelle reste à jouer sur une machine équipée, avec migrations, seed contrôlé, assertions tenant/version, conditions `OPEN`, outbox, idempotence, append-only et refus inter-tenant.
+
+
+## Audit non-exposition financière et garde de soumission — 24 août 2026
+
+### Livré et vérifié localement
+
+- [x] Auditer le reader Decision : projection allowlistée sans `quantity_decimal`, `unit_price_minor` ni `total_minor`.
+- [x] Vérifier les DTOs publics Decision `extra="forbid"` et ajouter le rejet runtime des clés financières injectées.
+- [x] Vérifier `DECISION_RISK_READ`, l’absence de capability collaborateur/délégué et la policy ABAC tenant/classification.
+- [x] Vérifier les événements Decision/PatronAction/Submission audités : identifiants, états, révisions, hashes et marqueurs uniquement, sans montants.
+- [x] Renforcer le garde domaine contre compteurs négatifs/mal typés, confirmation DCE non booléenne et statut de conditions contradictoire.
+- [x] Rétablir mypy sur le port structurel Decision–PatronAction.
+- [x] Ajouter `docs/AUDIT_NON_EXPOSITION_FINANCIERE_GARDE_SOUMISSION_2026-08-24.md`.
+
+### Écart bloquant confirmé
+
+- [ ] Intégrer `evaluate_submission_gate` dans Submission : créer `SubmissionDecisionGateReader` tenant-scoped, reconstruire le snapshot depuis Decision/conditions/actions/exigences confirmées et bloquer fail-closed avant `prepare` et `export`.
+- [ ] Définir explicitement l’autorité `PATRON_DELEGATE`, qui peut aujourd’hui posséder `SUBMISSION_AUTHORIZE` mais pas `DECISION_RISK_READ`.
+- [ ] Ajouter les tests de composition et de persistence : Decision absente/obsolète, tenant étranger, contexte non gelé, exigence non confirmée, action/condition ouverte, révision concurrente et rollback transactionnel.
+- [ ] Recetter reader, concaténation UUID, migration `0059`, FKs, triggers, outbox et conditions sur PostgreSQL réel ; aucune validation online n’est disponible dans le sandbox.

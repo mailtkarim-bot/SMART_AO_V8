@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from app.modules.decision.domain.risk import StructuredRisk
@@ -138,8 +138,11 @@ class DecisionRiskRequirementLinkDraft:
 
 
 class DecisionPatronActionReference(Protocol):
-    id: UUID
-    aggregate_revision: int
+    @property
+    def id(self) -> UUID: ...
+
+    @property
+    def aggregate_revision(self) -> int: ...
 
 
 class DecisionPatronActionWriter(Protocol):
@@ -148,8 +151,8 @@ class DecisionPatronActionWriter(Protocol):
     def create_from_risk_requirement_link(
         self,
         *,
-        session: object,
-        context: object,
+        session: Any,
+        context: Any,
         case_id: UUID,
         risk_id: UUID,
         requirement_id: UUID,

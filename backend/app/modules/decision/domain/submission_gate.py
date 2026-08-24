@@ -35,6 +35,16 @@ def evaluate_submission_gate(
 ) -> DecisionSubmissionGateResult:
     """Return a non-financial, explainable gate for future submission authorization."""
     reasons: list[str] = []
+    if (
+        not isinstance(snapshot.open_condition_count, int)
+        or isinstance(snapshot.open_condition_count, bool)
+        or snapshot.open_condition_count < 0
+        or not isinstance(snapshot.unresolved_risk_action_count, int)
+        or isinstance(snapshot.unresolved_risk_action_count, bool)
+        or snapshot.unresolved_risk_action_count < 0
+        or snapshot.all_dce_requirements_confirmed is not True
+    ):
+        reasons.append("INVALID_DECISION_SNAPSHOT")
     if snapshot.lifecycle != "FINALIZED":
         reasons.append("DECISION_NOT_FINALIZED")
     if snapshot.outcome == "NO_GO":
@@ -48,7 +58,9 @@ def evaluate_submission_gate(
     if snapshot.outcome == "CONDITIONAL_GO":
         if snapshot.condition_status != "SATISFIED" or snapshot.open_condition_count:
             reasons.append("CONDITIONAL_GO_OPEN_CONDITIONS")
-    elif snapshot.open_condition_count:
+    elif (
+        snapshot.condition_status != "NOT_APPLICABLE" or snapshot.open_condition_count != 0
+    ):
         reasons.append("UNEXPECTED_OPEN_CONDITIONS")
     if snapshot.unresolved_risk_action_count:
         reasons.append("UNRESOLVED_RISK_ACTIONS")
