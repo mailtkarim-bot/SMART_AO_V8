@@ -230,3 +230,22 @@ Cette section supersède les formulations historiques contradictoires sur les co
 | CI/Docker/VPS | Workflow, Compose, digests et runbooks améliorés statiquement. | Runner GitHub, Docker/ClamAV/EICAR, HTTPS, backup/restore et production. |
 
 Le statut global reste **greffable par slices mais non opérationnel de bout en bout**. Ajouter une dépendance au manifest ou un adaptateur ne vaut ni installation sur cible, ni recette fournisseur, ni preuve métier. Les secrets, tokens, poids de modèle et URLs réelles doivent rester des paramètres runtime hors Git.
+
+
+## 12. Réconciliation du rapport d’audit légendaire — 24 août 2026
+
+Le rapport légendaire est pertinent sur les deux nouveaux écarts d’exploitation. Le test de contrat Compose n’avait pas été aligné avec le port PostgreSQL hôte paramétrable, et le fallback JWT du Compose development commençait par `dev-only-`, préfixe explicitement interdit par le runtime production.
+
+Le Compose development utilise maintenant `local-development-signing-key-change-me-0123456789`, avec un commentaire indiquant que cette valeur est exclusivement locale. `.env.example` contient la même valeur pour que le quickstart `cp .env.example .env; make up` fournisse une configuration cohérente. La configuration préproduction reste distincte : elle exige un secret runtime et conserve les placeholders `REPLACE_WITH_`; la garde production n’a pas été diminuée.
+
+Le test de contrat exige désormais le mapping `127.0.0.1:${SMART_AO_POSTGRES_HOST_PORT:-5432}:5432`, le loopback, l’environnement development et la clé locale documentée. Cette correction ne constitue pas une preuve de démarrage Docker dans le sandbox courant : Docker n’y est pas disponible. Le démarrage à froid doit être rejoué sur l’hôte Docker cible.
+
+| Mesure | État exact |
+|---|---|
+| Backend hors `db` après correction | 906 tests passés, 458 désélectionnés. |
+| Frontend | 98 tests dans 23 fichiers, typecheck/lint/build passés ; deux warnings hooks connus. |
+| Baseline detect-secrets | 14 entrées qualifiées dans le clone courant ; le rapport auditeur mesure 10 dans son environnement, sans équivalence automatique. |
+| Docker/PostgreSQL online | Non exécutés dans le sandbox courant ; les résultats live du rapport sont externes. |
+| CI | Run post-push sans runner ni steps ; non vert. |
+
+Le statut des intégrations reste inchangé sur le fond : OR-Tools, RAG/BGE, Docling/OCR, S3/MinIO, BOAMP, INSEE, SMTP/ICS, bus et signature disposent d’antennes ou adaptateurs optionnels, mais aucune recette fournisseur réelle ne doit être déduite de leur présence dans les manifests. Le produit reste greffable par slices, pas opérationnel de bout en bout.

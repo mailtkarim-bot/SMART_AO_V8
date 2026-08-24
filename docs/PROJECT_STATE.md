@@ -271,3 +271,18 @@ Ces validations sont uniquement locales. Le sandbox courant ne fournit pas Docke
 | Dépendances externes | Antennes/adaptateurs optionnels existants ; aucune recette fournisseur, corpus BGE, bucket, SMTP, signature qualifiée ou bus réel. |
 | Métier BTP | Plusieurs slices documentaires et pricing existent ; croisement CCTP–DPGF–BPU–CCAP, coût de revient/prix plancher, OCR métier, DC1/DC2/DC4 et décision complète restent à coder. |
 | Production | **NO-GO** tant que les preuves Docker/PostgreSQL/HTTPS/backup-restore/VPS/CI et les slices métier critiques ne sont pas obtenus. |
+
+
+## Réponse au rapport d’audit légendaire — 24 août 2026
+
+Le rapport `docs/operator-reports/AUDIT_LEGENDAIRE_SMART_AO_V8_2026-08-24.md` a été lu intégralement. Sa conclusion est pertinente : il a détecté une régression réelle du test de contrat Compose et une incohérence réelle du démarrage à froid du stack de développement. La réponse développeur détaillée est `docs/AUDIT_RECONCILIATION_2026-08-24_7_LEGENDAIRE.md`.
+
+Le finding **OPS-L-001** est corrigé dans `backend/tests/ops/test_preprod_ops_contract.py`. L’assertion attend désormais le mapping paramétrable `127.0.0.1:${SMART_AO_POSTGRES_HOST_PORT:-5432}:5432`, tout en contrôlant le loopback, l’environnement `development`, l’override local et l’absence de la clé `dev-only-signing-key`.
+
+Le finding **OPS-L-002** est corrigé localement sans affaiblir la production. Le Compose de développement utilise désormais le fallback explicitement local `local-development-signing-key-change-me-0123456789`, documenté dans `.env.example`. `backend/app/bootstrap/production.py` continue d’exiger une clé injectée et de refuser les valeurs `dev-only-*`, les placeholders et les variables manquantes. La Compose préproduction n’utilise aucun fallback de développement.
+
+Validation locale après cette correction : **906 tests backend hors `db` passés et 458 désélectionnés**, `uv lock --check`, Ruff, scripts shell et tests de production ciblés passés ; **98 tests frontend dans 23 fichiers**, typecheck, lint et build Vite passés. Le lint frontend conserve deux warnings `react-hooks/exhaustive-deps` connus. Le comptage local de la baseline detect-secrets est de 14 entrées qualifiées ; le rapport auditeur mentionne 10 dans son environnement, différence qui n’est pas transformée en prétendue mesure locale identique.
+
+Le test Docker cold-start et la migration PostgreSQL online rapportés par l’auditeur restent des preuves de son environnement. Docker est indisponible dans le sandbox courant ; le démarrage `make up`, ClamAV/EICAR, les triggers online, le backup/restore, HTTPS public et les fournisseurs externes doivent être rejoués sur les environnements correspondants. La CI GitHub reste bloquée : le run post-push `32728988801` a échoué avec `runnerName` nul et `steps: []`.
+
+Le verdict opérationnel reste **NO-GO**. Le quickstart dev est corrigé dans la configuration et couvert statiquement, mais la plateforme AO complète reste inachevée : MFA/TOTP, rate limiting distribué, `cockpit_projection`, coût de revient/prix plancher, analyse CCAP et croisement documentaire, OCR, DC1/DC2/DC4, décision finalisable, signature qualifiée, dépôt externe et recettes d’intégrations restent ouverts.

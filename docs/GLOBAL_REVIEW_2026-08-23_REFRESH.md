@@ -182,3 +182,14 @@ La dette ARCH-001, le MFA/TOTP complet, le rate limiter distribué, le contrat e
 | Docker/PostgreSQL/VPS/CI externe | Non exécutés ici ; aucune preuve locale ou distante verte ne doit être déduite du code statique. |
 
 Le verdict demeure **NO-GO opérationnel** pour une vente ou une mise en production revendiquée tant que la CI n’exécute pas réellement ses étapes, que la recette PostgreSQL/Docker/VPS n’est pas produite et que les capacités métier centrales ne sont pas livrées.
+
+
+## 12. Réponse au rapport d’audit légendaire — 24 août 2026
+
+Le rapport `docs/operator-reports/AUDIT_LEGENDAIRE_SMART_AO_V8_2026-08-24.md` confirme globalement le verdict NO-GO et apporte deux constats nouveaux correctement étayés. Le premier est une régression de contrat : le test attendait encore le port littéral `127.0.0.1:5432:5432` après que le Compose eut été sécurisé par `SMART_AO_POSTGRES_HOST_PORT`. Le second est une incohérence cold-start : le fallback `dev-only-signing-key-change-me-0123456789` était refusé par la garde du runtime production.
+
+Ces deux points sont corrigés. Le test accepte désormais le mapping paramétrable tout en conservant le binding loopback et contrôle la présence d’une clé explicitement locale dans `.env.example`. Le Compose development utilise `local-development-signing-key-change-me-0123456789`; la garde production, les exigences préproduction et les placeholders restent inchangés. Docker n’étant pas disponible dans le sandbox courant, le démarrage à froid n’est pas revendiqué comme rejoué localement ; il doit être vérifié sur l’hôte Docker de l’auditeur ou du propriétaire.
+
+La suite backend locale hors `db` est maintenant verte : **906 passed, 458 deselected**. Le frontend reste vert avec **98 tests dans 23 fichiers**, typecheck et build passés, lint sans erreur mais avec deux warnings hooks connus. Le rapport auditeur indiquait 905+1 failed au commit `33986fb`; cette observation est confirmée et corrigée. La baseline locale contient 14 entrées qualifiées ; le nombre 10 donné par l’auditeur est une mesure de son clone et n’est pas substitué sans analyse supplémentaire.
+
+La CI reste non exploitable : le run post-push `32728988801` a échoué avant toute étape, avec `runnerName` nul pour `backend`, `frontend` et `image-security`. Les résultats Docker/PostgreSQL/ClamAV live de l’auditeur sont conservés comme preuves externes. Le verdict ne change pas : socle renforcé, mais **NO-GO opérationnel** jusqu’à rétablissement de la CI, recette Docker/PostgreSQL/HTTPS/backup-restore et livraison des fonctions métier centrales.

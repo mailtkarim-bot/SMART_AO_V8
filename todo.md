@@ -126,3 +126,26 @@ Les sections antérieures restent conservées comme journal historique. La check
 - [ ] Recetter séparément BGE/RAG, Docling/OCR, S3/MinIO, BOAMP/INSEE, SMTP/ICS, signature et bus avec credentials runtime hors Git.
 
 **État de preuve local au 24 août :** 906 tests backend hors `db` passent ; 458 tests DB sont désélectionnés ; 98 tests frontend passent ; typecheck, lint, build, Ruff, mypy ciblé, lock UV, detect-secrets, scripts shell et Alembic offline `0056` passent. Docker, PostgreSQL online, VPS, HTTPS public, EICAR, backup/restore, fournisseur réel et CI avec steps exécutés ne sont pas prouvés dans le sandbox.
+
+
+## Réponse au rapport d’audit légendaire — 24 août 2026
+
+Le rapport `docs/operator-reports/AUDIT_LEGENDAIRE_SMART_AO_V8_2026-08-24.md` est archivé. La réponse développeur est `docs/AUDIT_RECONCILIATION_2026-08-24_7_LEGENDAIRE.md`. Les sections historiques ne doivent pas être utilisées pour contredire cette mise à jour.
+
+### Corrections ajoutées après ce rapport
+
+- [x] **OPS-L-001** — mettre à jour `test_dev_compose_is_loopback_bound_and_not_repurposable_as_preprod` pour accepter `SMART_AO_POSTGRES_HOST_PORT` tout en conservant le binding loopback et l’override local.
+- [x] **OPS-L-002** — remplacer le fallback JWT `dev-only-*` du Compose development par une clé explicitement locale cohérente avec la garde production et l’exemple `.env.example`; maintenir l’exigence stricte des secrets en préproduction.
+- [x] **DOC-L-001** — corriger la mesure de suite backend : 906 passés et 458 désélectionnés après le fix du contrat Compose ; ne pas reprendre sans qualification les 1 363 tests/90,95 % exécutés dans l’environnement externe de l’auditeur.
+
+### Validations et blocages restant canoniques
+
+- [ ] Rejouer `cp .env.example .env; make up` sur un hôte Docker réel et conserver les preuves health/readiness/logs ; le sandbox courant ne fournit pas Docker.
+- [ ] Rétablir des runners GitHub Actions et obtenir un run avec steps, conclusions et artifacts ; le run `32728988801` reste un échec avant steps.
+- [ ] Révoquer le PAT exposé dans le clone audité et vérifier le journal de sécurité GitHub ; le remote du clone développeur est sans credential, mais cela ne prouve pas la révocation historique.
+- [ ] Exécuter PostgreSQL online, les tests DB/CreateCase et les triggers append-only sur une base isolée.
+- [ ] Définir l’alerte/rétention outbox et le contrat `cockpit_projection` sans purge ou consumer spéculatif.
+- [ ] Livrer l’écran frontend CreateCase et un E2E navigateur HTTPS.
+- [ ] Coder les fonctions métier centrales COST-BASIS, CCAP-RISK, croisement documentaire, OCR, DC1/DC2/DC4 et décision finalisable.
+
+**Mesure locale de sortie du correctif :** 906 tests backend hors `db` passent ; 458 sont désélectionnés ; 98 tests frontend passent ; typecheck, lint et build passent ; Ruff, lock UV et scripts shell passent. Les preuves Docker/PostgreSQL online, EICAR, HTTPS public, backup/restore, fournisseur réel et CI avec steps exécutés restent externes ou non obtenues.
