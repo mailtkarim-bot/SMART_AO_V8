@@ -84,3 +84,8 @@ La couverture de 90,99 % et la réussite PostgreSQL de 1 342/1 343 annoncées pa
 Les corrections seront publiées dans un commit de code dédié et la présente réconciliation, avec le rapport source archivé, dans un commit documentaire séparé. La branche `docs/pricing-http-next-lot-28` ne doit pas être fusionnée vers `main` sur la base d’un run CI qui échoue avant ses étapes.
 
 > **Conclusion :** l’audit n°5 a trouvé un défaut réel de démarrage dev et plusieurs faiblesses de preuve. Ils sont maintenant traités. Le résultat améliore la démarrabilité, la détectabilité des dérives et la stabilité des tests, mais ne constitue ni une recette Docker/PostgreSQL online ni l’achèvement du produit métier BTP.
+
+
+## 6. Preuve CI après publication
+
+Après publication de `0071301`, le run GitHub Actions `32712883828` s’est terminé en échec. Les trois jobs `backend`, `frontend` et `image-security` ont `steps: []` et aucune étape de test, build, pip-audit ou Trivy n’a exécuté le code. Ce résultat confirme la persistance du blocage de provisioning des runners ; il ne constitue pas un verdict fonctionnel sur les corrections locales.

@@ -237,3 +237,6 @@ Le rapport source est archivé dans [`operator-reports/RAPPORT_AUDIT_05_VERIFICA
 Validation locale du lot : backend non-DB `888 passed, 458 deselected, 4 warnings`; frontend `23 fichiers, 98 tests passés`; typecheck/build frontend passés; ESLint 0 erreur et 2 warnings `exhaustive-deps`; Ruff, mypy sécurité, `uv lock --check`, installation pnpm frozen, syntaxe shell et `git diff --check` passés. Le test ciblé architecture/ops/readiness a donné `31 passed, 1 warning`. Docker et PostgreSQL online ne sont pas disponibles dans ce sandbox ; les résultats PostgreSQL/coverage annoncés par le rapport source restent des preuves externes non reproduites ici.
 
 Le projet reste NO-GO production tant que le démarrage Docker, les migrations PostgreSQL online, ClamAV/EICAR, HTTPS, sauvegarde-restauration, CI avec runners actifs et les lots métier BTP ne sont pas exécutés sur leurs cibles. La PR #49 et `main` ne doivent pas être fusionnées sur un run CI sans étapes.
+
+
+Le run CI déclenché après publication du cinquième audit est `32712883828` sur `0071301`. Il s’est terminé en échec avec les jobs `backend`, `frontend` et `image-security` à `steps: []`; aucune étape de code, test ou scan n’a été exécutée. Le blocage de provisioning des runners persiste. La PR #49 reste ouverte et `main` reste à `970c9ff`.
