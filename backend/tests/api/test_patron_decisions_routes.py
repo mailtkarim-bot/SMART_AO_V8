@@ -51,7 +51,7 @@ def _runtime(*, resolver_error=None):
 
 def _client(
     *, service=None, risk_service=None, risk_requirement_service=None, finalization_service=None,
-    resolver_error=None
+    risk_requirement_read_service=None, resolver_error=None
 ):
     app = FastAPI()
     app.include_router(
@@ -60,6 +60,7 @@ def _client(
             risk_service=risk_service,
             risk_requirement_service=risk_requirement_service,
             finalization_service=finalization_service,
+            risk_requirement_read_service=risk_requirement_read_service,
             security_runtime=_runtime(resolver_error=resolver_error),
         )
     )
@@ -185,6 +186,53 @@ class _RiskRequirementService:
             replayed=False,
         )
         return result
+
+
+class _ReadService:
+    def __init__(self, *, error=None):
+        self.error = error
+
+    def list_links(self, **kwargs):
+        if self.error is not None:
+            raise self.error
+        return SimpleNamespace(
+            items=(
+                SimpleNamespace(
+                    link_id=uuid4(),
+                    case_id=kwargs["case_id"],
+                    risk_id=uuid4(),
+                    requirement_id=uuid4(),
+                    dce_version_id=uuid4(),
+                    relationship="IMPACTS",
+                    rationale="Revue patronale requise.",
+                    source_refs=("decision-risk:1", "dce-requirement:2"),
+                    created_at=datetime.now(tz=UTC),
+                    action_id=uuid4(),
+                    action_state="OPEN",
+                    action_severity="BLOCKING",
+                    action_revision=1,
+                ),
+            ),
+            next_cursor="next-page",
+        )
+
+    def reconcile_pricing(self, **kwargs):
+        if self.error is not None:
+            raise self.error
+        return (
+            SimpleNamespace(
+                link_id=kwargs["link_id"],
+                batch_id=uuid4(),
+                document_kind="DPGF",
+                batch_state="COMMITTED",
+                row_number=12,
+                code="BET-001",
+                designation="Béton de structure",
+                unit="m3",
+                match_basis="CODE_OR_DESIGNATION",
+                verification_status="COMMITTED_NORMALIZED_IMPORT",
+            ),
+        )
 
 
 class _FinalizeService:
@@ -355,6 +403,69 @@ def test_link_risk_requirement_rejects_forbidden_extra_fields():
     )
 
     assert response.status_code == 422
+
+
+def test_list_risk_requirement_links_returns_paged_patron_projection():
+    case_id = uuid4()
+    response = _client(risk_requirement_read_service=_ReadService()).get(
+        f"/api/v1/patron/cases/{case_id}/risk-requirement-links?limit=10",
+        headers=_headers(),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["next_cursor"] == "next-page"
+    assert body["items"][0]["case_id"] == str(case_id)
+    assert body["items"][0]["action_state"] == "OPEN"
+
+
+def test_reconcile_pricing_returns_no_monetary_columns():
+    case_id = uuid4()
+    link_id = uuid4()
+    response = _client(risk_requirement_read_service=_ReadService()).get(
+        f"/api/v1/patron/cases/{case_id}/risk-requirement-links/{link_id}/pricing-reconciliation",
+        params={"search": "béton", "limit": 10},
+        headers=_headers(),
+    )
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["document_kind"] == "DPGF"
+    assert "unit_price_minor" not in item
+    assert "total_minor" not in item
+
+
+def test_collaborator_read_service_error_maps_to_forbidden():
+    response = _client(
+        risk_requirement_read_service=_ReadService(error=PermissionError("PATRON_REQUIRED"))
+    ).get(
+        f"/api/v1/patron/cases/{uuid4()}/risk-requirement-links",
+        headers=_headers(),
+    )
+
+    assert response.status_code == 403
+
+
+def test_finalize_conditional_go_returns_condition_count():
+    payload = _finalize_payload()
+    payload["outcome"] = "CONDITIONAL_GO"
+    payload["conditions"] = [
+        {
+            "condition_id": str(uuid4()),
+            "label": "Obtenir la validation documentaire",
+            "owner_actor_id": str(uuid4()),
+            "due_date_absence_reason": "Date fixée dans le planning patronal.",
+            "failure_consequence": "Réexaminer la décision.",
+        }
+    ]
+    response = _client(finalization_service=_FinalizeService()).post(
+        f"/api/v1/patron/cases/{uuid4()}/decisions/{uuid4()}/go-no-go",
+        json=payload,
+        headers=_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["condition_count"] == 1
 
 
 def test_finalize_go_no_go_returns_closed_receipt_and_forwards_path_ids():

@@ -234,3 +234,22 @@ Le rapport `docs/operator-reports/AUDIT_LEGENDAIRE_SMART_AO_V8_2026-08-24.md` es
 - [ ] Relier les risques vérifiés aux lignes DPGF/BPU sans exposer le pricing confidentiel.
 - [ ] Matérialiser explicitement les références `DCE_REQUIREMENT` dans le contexte Decision.
 - [ ] Ajouter conditions de GO conditionnel et contrôles de soumission.
+
+
+## Tranche lecture Decision et rapprochement DPGF/BPU — 24 août 2026
+
+### Livré
+
+- [x] Ajouter le port et la projection patronale paginée des liens risque–exigence avec curseur stable `(created_at, link_id)` et plafond de 100 éléments.
+- [x] Joindre à chaque lien l’état, la sévérité et la révision de l’action `DECIDE_GO_NO_GO` correspondante.
+- [x] Ajouter une route patronale de recherche de candidats DPGF/BPU sur lots normalisés `COMMITTED` de la même Case.
+- [x] Exclure de la projection de rapprochement les quantités, prix unitaires et totaux.
+- [x] Réserver la lecture à `decision.risk.read`, absente des capacités collaborateur.
+- [x] Consolider `CONDITIONAL_GO` avec 1 à 32 conditions structurées, responsables, échéances ou raisons d’absence et conséquences d’échec.
+
+### Validation restante
+
+- [ ] Exécuter la migration et les requêtes de pagination/rapprochement sur PostgreSQL réel.
+- [ ] Tester en base l’isolation tenant, les lots non `COMMITTED`, la concurrence et la transaction outbox.
+- [ ] Persister une décision de rapprochement patronale si la conservation de la correspondance devient nécessaire.
+- [ ] Rétablir des runners GitHub Actions exécutants ; le run `32748619776` est en échec avant toute étape avec `runnerName: null` et zéro étape.

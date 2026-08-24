@@ -4,11 +4,17 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-from app.modules.decision.application.finalize_commands import FinalizeGoNoGoDecisionCommand
+from app.modules.decision.application.finalize_commands import (
+    ConditionalGoConditionInput,
+    FinalizeGoNoGoDecisionCommand,
+)
 from app.modules.decision.application.ports import (
+    DecisionConditionDraft,
+    DecisionConditionRepository,
     DecisionRepository,
     DecisionVerifiedContextReader,
 )
+from app.modules.decision.domain.decision import DecisionCondition
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -85,9 +91,11 @@ class FinalizeGoNoGoDecisionHandler:
         *,
         repository_factory: Callable[[Any], DecisionRepository],
         verified_context_reader: DecisionVerifiedContextReader,
+        condition_repository: DecisionConditionRepository,
     ) -> None:
         self._repository_factory = repository_factory
         self._verified_context_reader = verified_context_reader
+        self._condition_repository = condition_repository
 
     def execute(self, *, session: Any, command, context: CommandContext) -> HandlerOutcome:
         if context.actor_kind not in {
@@ -121,6 +129,15 @@ class FinalizeGoNoGoDecisionHandler:
             raise CommandExecutionError("STALE_DECISION_CONTEXT")
         if not snapshot.context_references:
             raise CommandExecutionError("DECISION_CONTEXT_REFERENCES_REQUIRED")
+        if command.outcome != "CONDITIONAL_GO" and command.conditions:
+            raise CommandExecutionError("CONDITIONS_ONLY_FOR_CONDITIONAL_GO")
+        if command.outcome == "CONDITIONAL_GO" and not command.conditions:
+            raise CommandExecutionError("CONDITIONAL_GO_REQUIRES_CONDITIONS")
+        condition_drafts = self._condition_drafts(
+            command.conditions,
+            tenant_id=context.tenant_id,
+            decision_id=command.decision_id,
+        )
         if not self._verified_context_reader.has_confirmed_dce_requirements(
             session=session,
             tenant_id=context.tenant_id,
@@ -138,7 +155,9 @@ class FinalizeGoNoGoDecisionHandler:
                     "lifecycle": "FINALIZED",
                     "outcome": command.outcome,
                     "validity": "CURRENT",
-                    "condition_status": "NOT_APPLICABLE",
+                    "condition_status": (
+                        "OPEN" if command.outcome == "CONDITIONAL_GO" else "NOT_APPLICABLE"
+                    ),
                     "context_status": "FROZEN",
                     "selected_final_context_id": current_context.id,
                     "final_justification": command.justification.strip(),
@@ -149,6 +168,8 @@ class FinalizeGoNoGoDecisionHandler:
             )
         except OptimisticRevisionConflictError as error:
             raise CommandExecutionError("STALE_DECISION_REVISION") from error
+        if condition_drafts:
+            self._condition_repository.create_many(session=session, drafts=condition_drafts)
         return HandlerOutcome(
             result_code="DECISION_FINALIZED",
             aggregate_refs=(
@@ -168,21 +189,61 @@ class FinalizeGoNoGoDecisionHandler:
                         "decision_id": str(command.decision_id),
                         "case_id": str(command.case_id),
                         "outcome": command.outcome,
+                        "condition_count": len(condition_drafts),
                         "aggregate_revision": new_revision,
                     },
                 ),
             ),
         )
 
+    @staticmethod
+    def _condition_drafts(
+        conditions: tuple[ConditionalGoConditionInput, ...],
+        *,
+        tenant_id,
+        decision_id,
+    ) -> tuple[DecisionConditionDraft, ...]:
+        if len({condition.condition_id for condition in conditions}) != len(conditions):
+            raise CommandExecutionError("CONDITION_IDENTIFIERS_MUST_BE_UNIQUE")
+        drafts = []
+        for condition in conditions:
+            domain_condition = DecisionCondition.proposed(
+                condition_id=condition.condition_id,
+                label=condition.label,
+                owner=str(condition.owner_actor_id),
+                due_at=condition.due_at,
+                due_date_absence_reason=condition.due_date_absence_reason,
+                failure_consequence=condition.failure_consequence,
+            )
+            try:
+                domain_condition.validate_for_approval()
+            except ValueError as error:
+                raise CommandExecutionError("CONDITIONAL_GO_INVALID") from error
+            drafts.append(
+                DecisionConditionDraft(
+                    id=domain_condition.id,
+                    tenant_id=tenant_id,
+                    decision_id=decision_id,
+                    label=domain_condition.label,
+                    owner_actor_id=condition.owner_actor_id,
+                    due_at=domain_condition.due_at,
+                    due_date_absence_reason=domain_condition.due_date_absence_reason,
+                    failure_consequence=domain_condition.failure_consequence or "",
+                )
+            )
+        return tuple(drafts)
+
 
 def decision_finalization_handlers(
     *,
     repository_factory: Callable[[Any], DecisionRepository],
     verified_context_reader: DecisionVerifiedContextReader,
+    condition_repository: DecisionConditionRepository,
 ) -> dict[str, object]:
     return {
         FinalizeGoNoGoDecisionCommand.command_type: FinalizeGoNoGoDecisionHandler(
             repository_factory=repository_factory,
             verified_context_reader=verified_context_reader,
+            condition_repository=condition_repository,
         )
     }

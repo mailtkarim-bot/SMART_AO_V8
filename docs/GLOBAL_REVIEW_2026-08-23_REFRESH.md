@@ -223,4 +223,15 @@ Le premier croisement risques–exigences est codé par une liaison tenant-scope
 
 La finalisation `GO` ou `NO_GO` est une décision patronale explicite, non une qualification automatique. Le handler impose un contexte Decision `FROZEN`, un fingerprint affiché, des références de contexte, la confirmation humaine des références `DCE_REQUIREMENT` et une révision optimiste. Aucun montant financier, extrait, justification ou détail `FINANCIAL_PRIVATE` n’entre dans les DTO ou événements de cette surface.
 
-La validation ciblée est de **41 tests passés et 2 désélectionnés**, avec Ruff passé, et le gate backend complet hors `db` compte **954 tests passés et 458 désélectionnés**. SQL Alembic offline a été généré jusqu’à `20260824_0059`. Cette validation ne remplace pas une exécution PostgreSQL online. Le GO/NO-GO ne doit pas être présenté comme un moteur automatique BTP : le croisement CCAP/CCTP avec DPGF/BPU, l’OCR/RAG qualifiant, la génération DC1/DC2/DC4 et la recette opérationnelle restent ouverts.
+La validation ciblée est de **41 tests passés et 2 désélectionnés**, avec Ruff passé, et le gate backend complet hors `db` compte **964 tests passés et 458 désélectionnés**. SQL Alembic offline a été généré jusqu’à `20260824_0059`. Cette validation ne remplace pas une exécution PostgreSQL online. Le GO/NO-GO ne doit pas être présenté comme un moteur automatique BTP : le croisement CCAP/CCTP avec DPGF/BPU, l’OCR/RAG qualifiant, la génération DC1/DC2/DC4 et la recette opérationnelle restent ouverts.
+
+
+## Mise à jour du 24 août 2026 — lecture Decision et rapprochement pricing contrôlé
+
+La surface patronale Decision expose désormais une lecture paginée des liens risque–exigence, ordonnée par `(created_at, link_id)` et plafonnée à 100 éléments. L’action `DECIDE_GO_NO_GO` associée est jointe à la projection sous forme d’état, sévérité et révision. Le filtre tenant/Case est appliqué côté adaptateur et la capability dédiée `decision.risk.read` n’est pas accordée au collaborateur.
+
+Le rapprochement DPGF/BPU est volontairement limité à des candidats issus de lots normalisés `COMMITTED` de la même Case et de type `DPGF` ou `BPU`. La recherche porte sur le code ou la désignation, tandis que la projection exclut quantité, prix unitaire et total. Aucun résultat n’est présenté comme une qualification ou un calcul financier ; la confirmation patronale et la provenance restent nécessaires.
+
+Le contrat GO conditionnel est consolidé : l’issue `CONDITIONAL_GO` exige au moins une et au plus 32 conditions structurées, avec responsable, échéance ou justification de son absence et conséquence d’échec. Les conditions sont validées par les invariants domaine, persistées à l’état `OPEN` dans la transaction Decision et comptées dans le receipt. `GO` et `NO_GO` refusent les conditions excédentaires.
+
+Les nouveaux tests ciblés portent le total intermédiaire à **32 tests passés**, avec Ruff et mypy passés sur 38 fichiers. Le run CI `32748619776` est terminé en échec avant toute étape de runner (`runnerName: null`, zéro étape pour backend, frontend et image-security). La CI n’est donc pas une preuve distante ; PostgreSQL online, Docker, VPS, fournisseurs externes et corpus réel restent non exécutés.

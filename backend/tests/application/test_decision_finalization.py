@@ -5,7 +5,10 @@ from uuid import uuid4
 
 import pytest
 from app.modules.decision.application.finalize import FinalizeGoNoGoDecisionHandler
-from app.modules.decision.application.finalize_commands import FinalizeGoNoGoDecisionCommand
+from app.modules.decision.application.finalize_commands import (
+    ConditionalGoConditionInput,
+    FinalizeGoNoGoDecisionCommand,
+)
 from app.platform.events.dispatcher import CommandContext, CommandExecutionError
 from app.platform.persistence.repository import OptimisticRevisionConflictError
 
@@ -39,6 +42,10 @@ def _verified_reader(*, confirmed: bool = True) -> MagicMock:
     reader = MagicMock()
     reader.has_confirmed_dce_requirements.return_value = confirmed
     return reader
+
+
+def _condition_repository() -> MagicMock:
+    return MagicMock()
 
 
 def _context() -> CommandContext:
@@ -81,6 +88,7 @@ def test_finalize_go_updates_only_after_frozen_context_and_revision_check() -> N
     outcome = FinalizeGoNoGoDecisionHandler(
         repository_factory=lambda _session: repository,
         verified_context_reader=_verified_reader(),
+        condition_repository=_condition_repository(),
     ).execute(session=MagicMock(), command=_command(), context=_context())
 
     changes = repository.update_root.call_args.kwargs["changes"]
@@ -93,6 +101,38 @@ def test_finalize_go_updates_only_after_frozen_context_and_revision_check() -> N
     assert "justification" not in outcome.events[0].payload
 
 
+def test_finalize_conditional_go_persists_explicit_conditions() -> None:
+    repository = MagicMock()
+    repository.get.return_value = _snapshot()
+    repository.update_root.return_value = 4
+    condition_repository = _condition_repository()
+    condition = ConditionalGoConditionInput(
+        condition_id=uuid4(),
+        label="Obtenir la validation documentaire du point bloquant",
+        owner_actor_id=ACTOR_ID,
+        due_date_absence_reason="Échéance fixée dans le planning de revue patronale.",
+        failure_consequence="Réexaminer le GO avant transmission.",
+    )
+
+    outcome = FinalizeGoNoGoDecisionHandler(
+        repository_factory=lambda _session: repository,
+        verified_context_reader=_verified_reader(),
+        condition_repository=condition_repository,
+    ).execute(
+        session=MagicMock(),
+        command=_command(outcome="CONDITIONAL_GO", conditions=(condition,)),
+        context=_context(),
+    )
+
+    changes = repository.update_root.call_args.kwargs["changes"]
+    assert changes["outcome"] == "CONDITIONAL_GO"
+    assert changes["condition_status"] == "OPEN"
+    condition_repository.create_many.assert_called_once()
+    draft = condition_repository.create_many.call_args.kwargs["drafts"][0]
+    assert draft.label == condition.label
+    assert outcome.events[0].payload["condition_count"] == 1
+
+
 def test_finalize_rejects_unconfirmed_dce_requirement_references() -> None:
     repository = MagicMock()
     repository.get.return_value = _snapshot()
@@ -101,7 +141,26 @@ def test_finalize_rejects_unconfirmed_dce_requirement_references() -> None:
         FinalizeGoNoGoDecisionHandler(
             repository_factory=lambda _session: repository,
             verified_context_reader=_verified_reader(confirmed=False),
+            condition_repository=_condition_repository(),
         ).execute(session=MagicMock(), command=_command(), context=_context())
+
+    repository.update_root.assert_not_called()
+
+
+def test_finalize_rejects_conditional_go_without_conditions() -> None:
+    repository = MagicMock()
+    repository.get.return_value = _snapshot()
+
+    with pytest.raises(CommandExecutionError, match="CONDITIONAL_GO_REQUIRES_CONDITIONS"):
+        FinalizeGoNoGoDecisionHandler(
+            repository_factory=lambda _session: repository,
+            verified_context_reader=_verified_reader(),
+            condition_repository=_condition_repository(),
+        ).execute(
+            session=MagicMock(),
+            command=_command(outcome="CONDITIONAL_GO"),
+            context=_context(),
+        )
 
     repository.update_root.assert_not_called()
 
@@ -114,6 +173,7 @@ def test_finalize_no_go_is_human_choice_and_does_not_compute_from_documents() ->
     outcome = FinalizeGoNoGoDecisionHandler(
         repository_factory=lambda _session: repository,
         verified_context_reader=_verified_reader(),
+        condition_repository=_condition_repository(),
     ).execute(
         session=MagicMock(),
         command=_command(outcome="NO_GO"),
@@ -142,6 +202,7 @@ def test_finalize_rejects_stale_or_unreferenced_context(snapshot, command, error
         FinalizeGoNoGoDecisionHandler(
             repository_factory=lambda _session: repository,
             verified_context_reader=_verified_reader(),
+            condition_repository=_condition_repository(),
         ).execute(session=MagicMock(), command=command, context=_context())
 
     if error != "STALE_DECISION_REVISION":

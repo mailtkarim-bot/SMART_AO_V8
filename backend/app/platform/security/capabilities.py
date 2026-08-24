@@ -42,6 +42,7 @@ class Capability(StrEnum):
     DECISION_FINALIZE = "decision.finalize"
     DECISION_RISK_WRITE = "decision.risk.write"
     DECISION_RISK_LINK_WRITE = "decision.risk.link.write"
+    DECISION_RISK_READ = "decision.risk.read"
     PRICING_READ = "pricing.read"
     PRICING_WRITE = "pricing.write"
     SUBMISSION_AUTHORIZE = "submission.authorize"
@@ -86,6 +87,7 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.DECISION_FINALIZE,
         Capability.DECISION_RISK_WRITE,
         Capability.DECISION_RISK_LINK_WRITE,
+        Capability.DECISION_RISK_READ,
         Capability.PRICING_READ,
         Capability.PRICING_WRITE,
         Capability.SUBMISSION_AUTHORIZE,

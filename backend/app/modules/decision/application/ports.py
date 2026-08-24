@@ -84,6 +84,18 @@ class DecisionConditionSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class DecisionConditionDraft:
+    id: UUID
+    tenant_id: UUID
+    decision_id: UUID
+    label: str
+    owner_actor_id: UUID | None
+    due_at: datetime | None
+    due_date_absence_reason: str | None
+    failure_consequence: str
+
+
+@dataclass(frozen=True, slots=True)
 class DecisionSnapshot:
     root: DecisionRootSnapshot
     contexts: tuple[DecisionContextSnapshot, ...]
@@ -220,6 +232,14 @@ class DecisionVerifiedContextReader(Protocol):
     def has_confirmed_dce_requirements(
         self, *, session: object, tenant_id: UUID, context_id: UUID, case_id: UUID
     ) -> bool: ...
+
+
+class DecisionConditionRepository(Protocol):
+    """Persists immutable initial conditions owned by a Decision."""
+
+    def create_many(
+        self, *, session: object, drafts: tuple[DecisionConditionDraft, ...]
+    ) -> None: ...
 
 
 class DecisionRepository(Protocol):

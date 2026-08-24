@@ -147,9 +147,18 @@ from app.modules.decision.application.risk_requirement import (
     PatronDecisionRiskRequirementService,
     decision_risk_requirement_link_handlers,
 )
+from app.modules.decision.application.risk_requirement_read import (
+    PatronDecisionRiskRequirementReadService,
+)
+from app.modules.decision.infrastructure.condition_repository import (
+    SqlAlchemyDecisionConditionRepository,
+)
 from app.modules.decision.infrastructure.dossier_reader import SqlAlchemyDecisionDossierReader
 from app.modules.decision.infrastructure.repositories import SqlAlchemyDecisionRepository
 from app.modules.decision.infrastructure.risk_repository import SqlAlchemyDecisionRiskRepository
+from app.modules.decision.infrastructure.risk_requirement_reader import (
+    SqlAlchemyDecisionRiskRequirementReader,
+)
 from app.modules.decision.infrastructure.risk_requirement_repository import (
     SqlAlchemyDecisionRiskRequirementLinkRepository,
 )
@@ -394,6 +403,7 @@ class AppRuntime:
                 **decision_finalization_handlers(
                     repository_factory=lambda session: SqlAlchemyDecisionRepository(session),
                     verified_context_reader=SqlAlchemyDecisionVerifiedContextReader(),
+                    condition_repository=SqlAlchemyDecisionConditionRepository(),
                 ),
                 **pricing_scenario_handlers(),
                 **pricing_scenario_transition_handlers(),
@@ -819,6 +829,14 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        decision_risk_requirement_reader = SqlAlchemyDecisionRiskRequirementReader(
+            runtime.session_factory
+        )
+        patron_decision_risk_requirement_read_service = PatronDecisionRiskRequirementReadService(
+            reader=decision_risk_requirement_reader,
+            pricing_reader=decision_risk_requirement_reader,
+            policy=security_policy,
+        )
         patron_decision_finalization_service = PatronDecisionFinalizationService(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
@@ -1062,6 +1080,7 @@ def create_app(
                 service=patron_decision_dossier_service,
                 risk_service=patron_decision_risk_service,
                 risk_requirement_service=patron_decision_risk_requirement_service,
+                risk_requirement_read_service=patron_decision_risk_requirement_read_service,
                 finalization_service=patron_decision_finalization_service,
                 security_runtime=security_runtime,
             )
