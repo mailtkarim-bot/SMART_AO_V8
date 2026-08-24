@@ -15,7 +15,11 @@ from app.modules.dce.infrastructure.models import (  # noqa: F401
     dce_staging,
     dce_version,
 )
-from app.modules.decision.infrastructure.models import decision, risk  # noqa: F401
+from app.modules.decision.infrastructure.models import (  # noqa: F401
+    decision,
+    risk,
+    risk_requirement,
+)
 from app.modules.knowledge.infrastructure import models as knowledge_models  # noqa: F401
 from app.modules.opportunity.infrastructure import models as opportunity_models  # noqa: F401
 from app.modules.opportunity.infrastructure import (

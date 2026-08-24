@@ -217,6 +217,66 @@ class PatronActionWriter:
         )
 
 
+    def create_from_risk_requirement_link(
+        self,
+        *,
+        session: Session,
+        context: CommandContext,
+        case_id: UUID,
+        risk_id: UUID,
+        requirement_id: UUID,
+        link_id: UUID,
+        command_id: UUID,
+        idempotency_key: UUID,
+    ) -> PatronActionReference | None:
+        """Create one patron review action for a confirmed risk–requirement link."""
+        functional_key = f"decision-risk-requirement:{link_id}"
+        existing = session.scalar(
+            sa.select(PatronActionRecord).where(
+                PatronActionRecord.tenant_id == context.tenant_id,
+                PatronActionRecord.functional_key == functional_key,
+            )
+        )
+        if existing is not None:
+            return None
+        record = PatronActionRecord(
+            id=link_id,
+            tenant_id=context.tenant_id,
+            case_id=case_id,
+            functional_key=functional_key,
+            action_type="DECIDE_GO_NO_GO",
+            severity="BLOCKING",
+            state="OPEN",
+            title="Évaluer le risque DCE lié à une exigence confirmée",
+            why_now="Un risque patronal vient d’être relié à une exigence DCE confirmée.",
+            impact="La décision GO/NO-GO doit intégrer ce risque et son exigence source.",
+            recommended_action=(
+                "Revoir le risque et décider du traitement patronal avant toute décision finale."
+            ),
+            due_at=None,
+            source_refs_json=[
+                f"decision-risk:{risk_id}",
+                f"dce-requirement:{requirement_id}",
+                f"decision-risk-requirement-link:{link_id}",
+            ],
+            aggregate_revision=1,
+            actor_id=context.actor_id,
+            membership_id=context.membership_id,
+            command_id=command_id,
+            idempotency_key=idempotency_key,
+            correlation_id=context.correlation_id,
+        )
+        session.add(record)
+        return PatronActionReference(
+            id=record.id,
+            case_id=record.case_id,
+            action_type=record.action_type,
+            severity=record.severity,
+            state=record.state,
+            aggregate_revision=record.aggregate_revision,
+        )
+
+
 class PatronActionHandler:
 
     """Persist the first version of an explainable patron action."""

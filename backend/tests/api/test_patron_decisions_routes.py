@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.patron_decisions import build_patron_decision_router
+from app.platform.events.dispatcher import CommandExecutionError
 from app.platform.security.authenticated_context import UnauthenticatedError
 from app.platform.security.context import ActorContext, ActorKind, MembershipState
 from fastapi import FastAPI
@@ -48,12 +49,17 @@ def _runtime(*, resolver_error=None):
     )
 
 
-def _client(*, service=None, risk_service=None, resolver_error=None):
+def _client(
+    *, service=None, risk_service=None, risk_requirement_service=None, finalization_service=None,
+    resolver_error=None
+):
     app = FastAPI()
     app.include_router(
         build_patron_decision_router(
             service=service or _DecisionService(),
             risk_service=risk_service,
+            risk_requirement_service=risk_requirement_service,
+            finalization_service=finalization_service,
             security_runtime=_runtime(resolver_error=resolver_error),
         )
     )
@@ -156,6 +162,56 @@ class _RiskService:
         return result
 
 
+class _RiskRequirementService:
+    def __init__(self, *, error=None):
+        self.error = error
+        self.calls = []
+
+    def execute(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        result = SimpleNamespace(
+            command_id=str(kwargs["command"].command_id),
+            idempotency_key=str(kwargs["command"].idempotency_key),
+            result_code="DECISION_RISK_REQUIREMENT_LINKED",
+            aggregate_refs=[
+                {
+                    "aggregate_id": str(kwargs["command"].link_id),
+                    "aggregate_revision": 1,
+                }
+            ],
+            event_ids=[str(uuid4())],
+            replayed=False,
+        )
+        return result
+
+
+class _FinalizeService:
+    def __init__(self, *, error=None):
+        self.error = error
+        self.calls = []
+
+    def execute(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        result = SimpleNamespace(
+            command_id=str(kwargs["command"].command_id),
+            idempotency_key=str(kwargs["command"].idempotency_key),
+            result_code="DECISION_FINALIZED",
+            aggregate_refs=[
+                {
+                    "aggregate_id": str(kwargs["command"].decision_id),
+                    "aggregate_revision": 4,
+                }
+            ],
+            event_ids=[str(uuid4())],
+            replayed=False,
+        )
+        return result
+
+
 class _DecisionService:
     def __init__(self, *, error=None):
         self.error = error
@@ -164,6 +220,31 @@ class _DecisionService:
         if self.error is not None:
             raise self.error
         return _dossier(kwargs["case_id"])
+
+
+def _link_payload():
+    return {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "link_id": str(uuid4()),
+        "requirement_id": str(uuid4()),
+        "dce_version_id": str(uuid4()),
+        "relationship": "IMPACTS",
+        "rationale": "L’exigence confirmée doit être prise en compte pour traiter le risque.",
+    }
+
+
+def _finalize_payload():
+    return {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "expected_revision": 3,
+        "displayed_fingerprint": "a" * 64,
+        "outcome": "GO",
+        "justification": "Le patron finalise après revue humaine des sources confirmées.",
+    }
 
 
 def _headers():
@@ -230,6 +311,84 @@ def test_register_risk_rejects_forbidden_extra_fields():
     )
 
     assert response.status_code == 422
+
+
+def test_link_risk_requirement_returns_closed_receipt_and_forwards_path_ids():
+    link_service = _RiskRequirementService()
+    case_id = uuid4()
+    risk_id = uuid4()
+
+    response = _client(risk_requirement_service=link_service).post(
+        f"/api/v1/patron/cases/{case_id}/risks/{risk_id}/requirements",
+        json=_link_payload(),
+        headers=_headers(),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["result_code"] == "DECISION_RISK_REQUIREMENT_LINKED"
+    command = link_service.calls[0]["command"]
+    assert command.case_id == case_id
+    assert command.risk_id == risk_id
+    assert "rationale" not in response.json()
+
+
+def test_link_risk_requirement_maps_duplicate_to_409():
+    response = _client(
+        risk_requirement_service=_RiskRequirementService(
+            error=CommandExecutionError("RISK_REQUIREMENT_LINK_ALREADY_EXISTS")
+        )
+    ).post(
+        f"/api/v1/patron/cases/{uuid4()}/risks/{uuid4()}/requirements",
+        json=_link_payload(),
+        headers=_headers(),
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "RISK_REQUIREMENT_LINK_ALREADY_EXISTS"}
+
+
+def test_link_risk_requirement_rejects_forbidden_extra_fields():
+    response = _client(risk_requirement_service=_RiskRequirementService()).post(
+        f"/api/v1/patron/cases/{uuid4()}/risks/{uuid4()}/requirements",
+        json={**_link_payload(), "tenant_id": str(uuid4())},
+        headers=_headers(),
+    )
+
+    assert response.status_code == 422
+
+
+def test_finalize_go_no_go_returns_closed_receipt_and_forwards_path_ids():
+    finalization_service = _FinalizeService()
+    case_id = uuid4()
+    decision_id = uuid4()
+
+    response = _client(finalization_service=finalization_service).post(
+        f"/api/v1/patron/cases/{case_id}/decisions/{decision_id}/go-no-go",
+        json=_finalize_payload(),
+        headers=_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result_code"] == "DECISION_FINALIZED"
+    command = finalization_service.calls[0]["command"]
+    assert command.case_id == case_id
+    assert command.decision_id == decision_id
+    assert "justification" not in response.json()
+
+
+def test_finalize_go_no_go_maps_stale_revision_to_409():
+    response = _client(
+        finalization_service=_FinalizeService(
+            error=CommandExecutionError("STALE_DECISION_REVISION")
+        )
+    ).post(
+        f"/api/v1/patron/cases/{uuid4()}/decisions/{uuid4()}/go-no-go",
+        json=_finalize_payload(),
+        headers=_headers(),
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "STALE_DECISION_REVISION"}
 
 
 def test_read_decision_dossier_returns_frozen_projection():

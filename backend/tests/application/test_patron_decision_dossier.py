@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
+from app.modules.decision.infrastructure.dossier_reader import SqlAlchemyDecisionDossierReader
 from app.platform.security.authorization import AuthorizationDecision, AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
 from app.platform.security.context import ActorKind
@@ -31,7 +32,7 @@ class _DenyPolicy:
 
 def _service(session):
     return PatronDecisionDossierService(
-        session_factory=lambda: _SessionContext(session),
+        reader=SqlAlchemyDecisionDossierReader(lambda: _SessionContext(session)),
         policy=AuthorizationPolicy(),
     )
 
@@ -145,7 +146,8 @@ def test_patron_decision_dossier_refuses_non_patron_and_denied_policy(session_fa
             actor=collaborator, case_id=case_id, now=datetime.now(tz=UTC)
         )
     denied = PatronDecisionDossierService(
-        session_factory=lambda: _SessionContext(MagicMock()), policy=_DenyPolicy()
+        reader=SqlAlchemyDecisionDossierReader(lambda: _SessionContext(MagicMock())),
+        policy=_DenyPolicy(),
     )
     with pytest.raises(PermissionError, match="AUTHORIZATION_DENIED"):
         denied.read(actor=actor, case_id=case_id, now=datetime.now(tz=UTC))

@@ -308,3 +308,16 @@ Le registre structuré des risques est livré sous `decision.domain.risk`, `deci
 Validation locale de la tranche : **929 tests backend hors `db` passés, 458 désélectionnés**, Ruff passé, mypy passé sur 57 fichiers, tests HTTP/application/architecture risques passés, scripts shell passés et SQL Alembic offline rendu jusqu’au head `20260824_0058`. PostgreSQL online, Docker, CI avec runner, VPS et fournisseurs réels ne sont pas revendiqués.
 
 Le rapport détaillé est `docs/ARCH001_RISK_REGISTER_REMEDIATION_2026-08-24.md`. ARCH-001 reste une dette progressive sur les autres services ; les prochaines capacités métier sont le croisement risques/exigences et DPGF/BPU, l’OCR/corpus Golden, DC1/DC2/DC4 et GO/NO-GO.
+
+
+## Bounded context Decision : risques, exigences confirmées et GO/NO-GO — 24 août 2026
+
+Le prochain bounded context ARCH-001 explicitement choisi est **Decision**. `PatronDecisionDossierService` dépend maintenant d’un `DecisionDossierReader`, et le garde d’architecture correspondant vérifie que le service applicatif n’importe ni SQLAlchemy ni infrastructure. La lecture SQLAlchemy reste dans `decision/infrastructure/dossier_reader.py` et est câblée exclusivement par la composition root.
+
+Le croisement métier est désormais matérialisé par `decision_risk_requirement_links` : un risque structuré peut être relié à une exigence DCE seulement si l’affaire et la version DCE correspondent, si le risque appartient à cette affaire/version, et si la projection courante de confirmation de l’exigence porte l’issue `CONFIRMED`. Une exigence simplement extraite ou encore `PENDING_HUMAN_CONFIRMATION` est refusée. La migration additive `20260824_0059` porte les FKs composites tenant-scoped, l’identité fonctionnelle/idempotente et un trigger PostgreSQL append-only.
+
+Chaque liaison confirmée génère, dans le même root transactionnel, une action patronale `DECIDE_GO_NO_GO` avec références d’identifiants uniquement. L’événement de liaison et l’événement d’action sont sparse : ils ne contiennent ni extrait, ni justification, ni montant financier. Les DTOs de cette surface sont fermés et la capability de liaison est réservée au patron administrateur.
+
+La finalisation GO/NO-GO est exposée par `POST /api/v1/patron/cases/{case_id}/decisions/{decision_id}/go-no-go`. Elle n’analyse pas automatiquement un document et ne transforme pas un signal non vérifié en qualification : elle exige une Decision `GO_NO_GO` en attente patronale, un contexte gelé, un fingerprint affiché concordant, des références de contexte et la confirmation humaine de toutes les références `DCE_REQUIREMENT`. La mise à jour est gardée par `expected_revision`; l’événement de finalisation ne transporte pas la justification.
+
+La validation ciblée de cette tranche est de **41 tests passés et 2 désélectionnés**, avec Ruff passé. Le gate backend complet hors `db` compte désormais **954 tests passés et 458 désélectionnés**, avec Ruff et mypy ciblé passés. La recette PostgreSQL online, Docker, CI avec runner, VPS et fournisseurs externes ne sont pas revendiqués. Le produit ne possède toujours pas de moteur automatique CCAP/CCTP–DPGF/BPU, OCR/RAG de qualification, génération DC1/DC2/DC4 ou décision automatique : le GO/NO-GO livré reste une décision humaine contrôlée sur contexte vérifié.

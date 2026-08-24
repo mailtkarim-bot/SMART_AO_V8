@@ -213,3 +213,14 @@ Les lectures préparatoires des services mutationnels membership et pricing pass
 Le registre structuré des risques CCAP/CCTP est codé derrière la capability patronale dédiée `decision.risk.write`. Chaque risque doit référencer une affaire tenant-scoped, sa version DCE applicable, une analyse d’extraction terminée et un fragment dont l’extrait et les offsets concordent avec le texte source. La migration `20260824_0058` ajoute la persistence, les FKs composites et les contraintes de catégorie, sévérité, vraisemblance, traitement et provenance. L’événement est sparse et ne contient pas le texte financier ou documentaire sensible.
 
 La validation locale de cette tranche est de **929 tests backend hors `db` passés**, avec **458 désélectionnés**, Ruff et mypy ciblé passés, scripts shell validés et Alembic offline généré jusqu’à `20260824_0058`. PostgreSQL online, Docker, CI avec runner, VPS et fournisseurs externes ne sont pas revendiqués. Le registre n’est pas encore un moteur complet d’analyse AO : DPGF/BPU, OCR/corpus Golden, DC1/DC2/DC4 et GO/NO-GO restent à implémenter et recetter.
+
+
+## Mise à jour du 24 août 2026 — bounded context Decision et décision patronale contrôlée
+
+Le bounded context explicitement choisi pour la prochaine extraction ARCH-001 est désormais **Decision**. Le `PatronDecisionDossierService` lit via un port `DecisionDossierReader`; son adaptateur SQLAlchemy reste en infrastructure et un test de frontière empêche le retour d’imports ORM dans le service applicatif.
+
+Le premier croisement risques–exigences est codé par une liaison tenant-scoped append-only. Il ne s’exécute que contre une exigence dont la confirmation humaine courante est `CONFIRMED`, avec concordance affaire/version et risque/version contrôlée côté serveur. Les documents simplement extraits, non confirmés ou ambigus ne peuvent pas produire cette liaison. La liaison génère une action patronale `DECIDE_GO_NO_GO` dans la même transaction et conserve uniquement des références d’identifiants sûres.
+
+La finalisation `GO` ou `NO_GO` est une décision patronale explicite, non une qualification automatique. Le handler impose un contexte Decision `FROZEN`, un fingerprint affiché, des références de contexte, la confirmation humaine des références `DCE_REQUIREMENT` et une révision optimiste. Aucun montant financier, extrait, justification ou détail `FINANCIAL_PRIVATE` n’entre dans les DTO ou événements de cette surface.
+
+La validation ciblée est de **41 tests passés et 2 désélectionnés**, avec Ruff passé, et le gate backend complet hors `db` compte **954 tests passés et 458 désélectionnés**. SQL Alembic offline a été généré jusqu’à `20260824_0059`. Cette validation ne remplace pas une exécution PostgreSQL online. Le GO/NO-GO ne doit pas être présenté comme un moteur automatique BTP : le croisement CCAP/CCTP avec DPGF/BPU, l’OCR/RAG qualifiant, la génération DC1/DC2/DC4 et la recette opérationnelle restent ouverts.

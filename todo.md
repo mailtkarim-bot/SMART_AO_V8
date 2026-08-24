@@ -206,3 +206,31 @@ Le rapport `docs/operator-reports/AUDIT_LEGENDAIRE_SMART_AO_V8_2026-08-24.md` es
 - [ ] Croiser CCAP/CCTP avec DPGF/BPU et conserver la provenance de chaque résultat.
 - [ ] Ajouter le corpus Golden et la qualification humaine avant toute automatisation OCR/RAG.
 - [ ] Finaliser DC1/DC2/DC4 et GO/NO-GO.
+
+
+## Tranche Decision — croisement risques/exigences et GO/NO-GO — 24 août 2026
+
+### Livré
+
+- [x] Choisir explicitement le bounded context `decision` pour la prochaine extraction ARCH-001.
+- [x] Ajouter le garde AST interdisant SQLAlchemy/infrastructure dans `PatronDecisionDossierService`.
+- [x] Relier un risque structuré à une exigence DCE uniquement lorsque la confirmation humaine courante est `CONFIRMED`.
+- [x] Vérifier tenant, Case, version DCE applicable, appartenance du risque et idempotence fonctionnelle.
+- [x] Générer une action patronale `DECIDE_GO_NO_GO` dans le même root transactionnel avec références sûres.
+- [x] Ajouter la finalisation humaine `GO`/`NO_GO` avec contexte gelé, fingerprint affiché et révision optimiste.
+- [x] Refuser toute finalisation lorsqu’une référence `DCE_REQUIREMENT` n’est pas confirmée ou n’appartient pas à la version DCE applicable.
+- [x] Ne pas placer de justification, extrait documentaire ou montant financier dans les DTOs/événements.
+
+### À recetter sur PostgreSQL réel
+
+- [ ] Appliquer Alembic `20260824_0059` sur une base jetable.
+- [ ] Vérifier le trigger append-only et les FKs composites sous UPDATE/DELETE et accès inter-tenant.
+- [ ] Tester concurrence, replay idempotent et transaction lien + action + événements/outbox.
+- [ ] Tester la finalisation sur une Decision réellement préparée avec références `DCE_REQUIREMENT` confirmées.
+
+### Prochaine valeur métier BTP
+
+- [ ] Ajouter la lecture patronale paginée des liens et actions, sans surface collaborateur.
+- [ ] Relier les risques vérifiés aux lignes DPGF/BPU sans exposer le pricing confidentiel.
+- [ ] Matérialiser explicitement les références `DCE_REQUIREMENT` dans le contexte Decision.
+- [ ] Ajouter conditions de GO conditionnel et contrôles de soumission.

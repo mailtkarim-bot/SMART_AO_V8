@@ -134,12 +134,28 @@ from app.modules.dce.infrastructure.quarantine import (
     PythonMagicContentInspectionAdapter,
 )
 from app.modules.dce.infrastructure.repositories import SqlAlchemyConsultationRepository
+from app.modules.decision.application.finalize import (
+    PatronDecisionFinalizationService,
+    decision_finalization_handlers,
+)
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
 from app.modules.decision.application.risk import (
     PatronDecisionRiskService,
     decision_risk_handlers,
 )
+from app.modules.decision.application.risk_requirement import (
+    PatronDecisionRiskRequirementService,
+    decision_risk_requirement_link_handlers,
+)
+from app.modules.decision.infrastructure.dossier_reader import SqlAlchemyDecisionDossierReader
+from app.modules.decision.infrastructure.repositories import SqlAlchemyDecisionRepository
 from app.modules.decision.infrastructure.risk_repository import SqlAlchemyDecisionRiskRepository
+from app.modules.decision.infrastructure.risk_requirement_repository import (
+    SqlAlchemyDecisionRiskRequirementLinkRepository,
+)
+from app.modules.decision.infrastructure.verified_context_reader import (
+    SqlAlchemyDecisionVerifiedContextReader,
+)
 from app.modules.enterprise.application.enterprise_capability import (
     EnterpriseCapabilityService,
     enterprise_capability_handlers,
@@ -286,6 +302,10 @@ from app.platform.security.headers import SecurityHeadersMiddleware
 from app.platform.storage.object_storage import S3PrivateObjectStorage
 
 
+def _decision_risk_requirement_link_repository(_session: object):
+    return SqlAlchemyDecisionRiskRequirementLinkRepository()
+
+
 @dataclass(frozen=True, slots=True)
 class DceStagedObjectUploadTarget:
     """Internal facts required to authorize and stream one staged DCE object."""
@@ -366,6 +386,14 @@ class AppRuntime:
                 **patron_action_transition_handlers(),
                 **decision_risk_handlers(
                     repository_factory=lambda _session: SqlAlchemyDecisionRiskRepository()
+                ),
+                **decision_risk_requirement_link_handlers(
+                    repository_factory=_decision_risk_requirement_link_repository,
+                    action_writer=PatronActionWriter(),
+                ),
+                **decision_finalization_handlers(
+                    repository_factory=lambda session: SqlAlchemyDecisionRepository(session),
+                    verified_context_reader=SqlAlchemyDecisionVerifiedContextReader(),
                 ),
                 **pricing_scenario_handlers(),
                 **pricing_scenario_transition_handlers(),
@@ -780,10 +808,18 @@ def create_app(
             policy=security_policy,
         )
         patron_decision_dossier_service = PatronDecisionDossierService(
-            session_factory=runtime.session_factory,
+            reader=SqlAlchemyDecisionDossierReader(runtime.session_factory),
             policy=security_policy,
         )
         patron_decision_risk_service = PatronDecisionRiskService(
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        patron_decision_risk_requirement_service = PatronDecisionRiskRequirementService(
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        patron_decision_finalization_service = PatronDecisionFinalizationService(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
@@ -1025,6 +1061,8 @@ def create_app(
             build_patron_decision_router(
                 service=patron_decision_dossier_service,
                 risk_service=patron_decision_risk_service,
+                risk_requirement_service=patron_decision_risk_requirement_service,
+                finalization_service=patron_decision_finalization_service,
                 security_runtime=security_runtime,
             )
         )
