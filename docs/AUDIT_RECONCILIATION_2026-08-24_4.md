@@ -88,3 +88,8 @@ Le rapport source annonce une couverture online de 89,10 %. Cette mesure est pla
 - [`20260824_0056_patron_action_projection_sync.py`](../backend/alembic/versions/20260824_0056_patron_action_projection_sync.py) — garde append-only colonne-scopée.
 - [`application.py`](../backend/app/bootstrap/application.py) — readiness database/schema/ClamAV.
 - [`docker-compose.yml`](../docker-compose.yml) et [`docker-compose.preprod.yml`](../ops/docker-compose.preprod.yml) — service migrate et dépendances.
+
+
+## Preuve CI après publication
+
+Le push vers `7be6263` a déclenché le run GitHub Actions `32680863228`. Il s’est terminé en échec après quelques secondes ; les jobs `backend`, `frontend` et `image-security` ont tous `steps: []`. Aucune étape de test, build, pip-audit ou Trivy n’a été exécutée. Ce run confirme le blocage de provisioning des runners et ne constitue pas un verdict fonctionnel du code.

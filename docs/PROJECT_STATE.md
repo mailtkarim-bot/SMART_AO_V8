@@ -225,3 +225,6 @@ La readiness vérifie désormais la connexion PostgreSQL, la tête Alembic `2026
 Les seeds/assertions DB BOAMP, event-bus, veille et OR-Tools ont été corrigés. Les services application preparation/submission importent le port de stockage depuis `platform.storage`. ErrorBoundary remonte son sous-arbre après Réessayer. Validation locale : backend non-DB `885 passed, 458 deselected, 4 warnings`; frontend `98 passed` sur 23 fichiers, typecheck/build passés, ESLint 0 erreur avec 2 warnings connus ; Ruff, mypy sécurité, lockfile, shell syntax et scan detect-secrets passés ; Alembic offline jusqu’à `0056` passé. Docker et PostgreSQL online restent non disponibles dans ce sandbox, et la CI GitHub n’est pas un gate vert.
 
 La branche reste NO-GO production et `main`/PR #49 ne doivent pas être fusionnés sans run CI exécuté, migration PostgreSQL online, recette Docker/ClamAV/HTTPS et validation opérateur.
+
+
+Le push du quatrième lot a déclenché le run CI `32680863228` sur `7be6263`. Il s’est terminé en échec avec les trois jobs `backend`, `frontend` et `image-security` à `steps: []`; aucune étape n’a exécuté le code. Ce résultat confirme le blocage de provisioning des runners. La branche reste publiée, la PR #49 reste ouverte et `main` reste non fusionné.
