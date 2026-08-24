@@ -17,6 +17,11 @@ from app.platform.events.external_bus import (
     ExternalEventBusPort,
     HttpExternalEventBus,
 )
+from app.platform.events.retry_policy import (
+    DEFAULT_MAX_OUTBOX_ATTEMPTS,
+    MAX_OUTBOX_ATTEMPTS_LIMIT,
+    decide_retry,
+)
 from app.platform.persistence.models import OutboxMessageRecord
 
 BOAMP_INGESTION_TOPIC = "opportunity.boamp.ingestion.recorded"
@@ -30,6 +35,7 @@ class EventBusRunResult:
     delivered: int = 0
     skipped: int = 0
     retried: int = 0
+    failed: int = 0
 
 
 class OpportunityEventBusWorker:
@@ -42,15 +48,19 @@ class OpportunityEventBusWorker:
         bus: ExternalEventBusPort | None,
         batch_size: int = 50,
         lease_seconds: int = 120,
+        max_attempts: int = DEFAULT_MAX_OUTBOX_ATTEMPTS,
     ) -> None:
         if not 1 <= batch_size <= 200:
             raise ValueError("batch_size must be between 1 and 200")
         if not 1 <= lease_seconds <= 3600:
             raise ValueError("lease_seconds must be between 1 and 3600")
+        if not 1 <= max_attempts <= MAX_OUTBOX_ATTEMPTS_LIMIT:
+            raise ValueError("max_attempts must be between 1 and 100")
         self._session_factory = session_factory
         self._bus = bus
         self._batch_size = batch_size
         self._lease_seconds = lease_seconds
+        self._max_attempts = max_attempts
 
     def run_once(self, *, now: datetime | None = None) -> EventBusRunResult:
         effective_now = now or datetime.now(tz=UTC)
@@ -125,11 +135,19 @@ class OpportunityEventBusWorker:
             message = session.get(OutboxMessageRecord, message_id, with_for_update=True)
             if message is None or message.status == "PUBLISHED":
                 return EventBusRunResult(skipped=1)
-            message.status = "RETRY"
-            message.attempt_count += 1
-            message.next_attempt_at = now + _retry_delay(message.attempt_count)
+            decision = decide_retry(
+                attempt_count=message.attempt_count,
+                now=now,
+                max_attempts=self._max_attempts,
+            )
+            message.status = decision.status
+            message.attempt_count = decision.attempt_count
+            message.next_attempt_at = decision.next_attempt_at
             message.last_error_code = error_code
-        return EventBusRunResult(retried=1)
+        return EventBusRunResult(
+            retried=1 if decision.status == "RETRY" else 0,
+            failed=1 if decision.status == "FAILED" else 0,
+        )
 
 
 def _safe_payload(topic: str, payload_json: object) -> dict[str, object] | None:
@@ -164,6 +182,7 @@ def _merge(first: EventBusRunResult, second: EventBusRunResult) -> EventBusRunRe
         delivered=first.delivered + second.delivered,
         skipped=first.skipped + second.skipped,
         retried=first.retried + second.retried,
+        failed=first.failed + second.failed,
     )
 
 
@@ -195,6 +214,12 @@ def build_default_worker() -> OpportunityEventBusWorker:
         bus=bus,
         batch_size=int(os.getenv("SMART_AO_EXTERNAL_EVENT_BUS_BATCH_SIZE", "50")),
         lease_seconds=int(os.getenv("SMART_AO_EXTERNAL_EVENT_BUS_LEASE_SECONDS", "120")),
+        max_attempts=int(
+            os.getenv(
+                "SMART_AO_EXTERNAL_EVENT_BUS_MAX_ATTEMPTS",
+                str(DEFAULT_MAX_OUTBOX_ATTEMPTS),
+            )
+        ),
     )
 
 

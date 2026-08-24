@@ -17,6 +17,11 @@ from app.modules.dce.application.handlers import ExpireDceStagedObjectHandler
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
 from app.modules.dce.infrastructure.quarantine import LocalQuarantineStorageAdapter
 from app.platform.events.dispatcher import CommandContext, CommandDispatcher, CommandExecutionError
+from app.platform.events.retry_policy import (
+    DEFAULT_MAX_OUTBOX_ATTEMPTS,
+    MAX_OUTBOX_ATTEMPTS_LIMIT,
+    decide_retry,
+)
 from app.platform.persistence.models import OutboxMessageRecord
 
 RETENTION_TOPIC = "dce_staging_retention"
@@ -31,6 +36,7 @@ class RetentionRunResult:
     expired: int = 0
     published: int = 0
     retried: int = 0
+    failed: int = 0
     skipped: int = 0
 
     def merged(self, other: RetentionRunResult) -> RetentionRunResult:
@@ -38,6 +44,7 @@ class RetentionRunResult:
             expired=self.expired + other.expired,
             published=self.published + other.published,
             retried=self.retried + other.retried,
+            failed=self.failed + other.failed,
             skipped=self.skipped + other.skipped,
         )
 
@@ -53,12 +60,16 @@ class DceRetentionWorker:
         storage: LocalQuarantineStorageAdapter,
         batch_size: int = 50,
         lease_seconds: int = 120,
+        max_attempts: int = DEFAULT_MAX_OUTBOX_ATTEMPTS,
     ) -> None:
         self._session_factory = session_factory
         self._dispatcher = dispatcher
         self._storage = storage
         self._batch_size = batch_size
         self._lease_seconds = lease_seconds
+        if not 1 <= max_attempts <= MAX_OUTBOX_ATTEMPTS_LIMIT:
+            raise ValueError("max_attempts must be between 1 and 100")
+        self._max_attempts = max_attempts
 
     async def run_once(self, *, now: datetime | None = None) -> RetentionRunResult:
         """Run one deterministic sweep; safe to call concurrently or repeatedly."""
@@ -201,11 +212,19 @@ class DceRetentionWorker:
             message = session.get(OutboxMessageRecord, message_id, with_for_update=True)
             if message is None or message.status == "PUBLISHED":
                 return RetentionRunResult(skipped=1)
-            message.status = "RETRY"
-            message.attempt_count += 1
-            message.next_attempt_at = now + _retry_delay(message.attempt_count)
+            decision = decide_retry(
+                attempt_count=message.attempt_count,
+                now=now,
+                max_attempts=self._max_attempts,
+            )
+            message.status = decision.status
+            message.attempt_count = decision.attempt_count
+            message.next_attempt_at = decision.next_attempt_at
             message.last_error_code = error_code
-        return RetentionRunResult(retried=1)
+        return RetentionRunResult(
+            retried=1 if decision.status == "RETRY" else 0,
+            failed=1 if decision.status == "FAILED" else 0,
+        )
 
 
 def _retry_delay(attempt_count: int) -> timedelta:
@@ -254,6 +273,9 @@ def build_default_worker() -> DceRetentionWorker:
         storage=storage,
         batch_size=int(os.getenv("SMART_AO_RETENTION_BATCH_SIZE", "50")),
         lease_seconds=int(os.getenv("SMART_AO_RETENTION_LEASE_SECONDS", "120")),
+        max_attempts=int(
+            os.getenv("SMART_AO_OUTBOX_MAX_ATTEMPTS", str(DEFAULT_MAX_OUTBOX_ATTEMPTS))
+        ),
     )
 
 

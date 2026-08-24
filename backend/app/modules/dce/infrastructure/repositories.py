@@ -49,6 +49,16 @@ class SqlAlchemyConsultationRepository(ConsultationRepository):
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def get_revision(
+        self, *, tenant_id: UUID | str, consultation_id: UUID | str
+    ) -> int | None:
+        return self._session.scalar(
+            sa.select(ConsultationRecord.aggregate_revision).where(
+                ConsultationRecord.tenant_id == tenant_id,
+                ConsultationRecord.id == consultation_id,
+            )
+        )
+
     def get(
         self,
         *,

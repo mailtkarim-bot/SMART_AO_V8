@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from urllib.error import URLError
 from uuid import uuid4
 
+import app.platform.security.public_http as public_http
 import app.workers.submission_export_webhook as webhook_module
 import pytest
 from app.workers.submission_export_webhook import (
@@ -295,9 +296,9 @@ def test_post_json_validates_and_sends_request(monkeypatch: pytest.MonkeyPatch) 
         captured.append(request)
         return context
 
-    monkeypatch.setattr(webhook_module, "urlopen", fake_urlopen)
+    monkeypatch.setattr(webhook_module, "open_public_https", fake_urlopen)
     monkeypatch.setattr(
-        webhook_module.socket,
+        public_http.socket,
         "getaddrinfo",
         lambda *_args, **_kwargs: [(None, None, None, None, ("93.184.216.34", 443))],
     )
@@ -317,7 +318,7 @@ def test_post_json_rejects_http_and_private_dns(monkeypatch: pytest.MonkeyPatch)
         _post_json("http://example.test/hook", {}, 1.0, "test-secret")
 
     monkeypatch.setattr(
-        webhook_module.socket,
+        public_http.socket,
         "getaddrinfo",
         lambda *_args, **_kwargs: [(None, None, None, None, ("127.0.0.1", 443))],
     )
@@ -329,7 +330,7 @@ def test_post_json_rejects_dns_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail_dns(*_args: object, **_kwargs: object) -> list[object]:
         raise OSError("no DNS")
 
-    monkeypatch.setattr(webhook_module.socket, "getaddrinfo", fail_dns)
+    monkeypatch.setattr(public_http.socket, "getaddrinfo", fail_dns)
     with pytest.raises(ValueError, match="DNS resolution failed"):
         _post_json("https://example.test/hook", {}, 1.0, "test-secret")
 

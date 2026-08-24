@@ -10,8 +10,10 @@ from dataclasses import dataclass
 from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request
 from uuid import UUID
+
+from app.platform.security.public_http import open_public_https
 
 
 class ExternalEventBusPort(Protocol):
@@ -81,9 +83,9 @@ class HttpExternalEventBus:
             },
         )
         try:
-            with urlopen(request, timeout=self.timeout_seconds) as response:  # nosec B310
+            with open_public_https(request, timeout=self.timeout_seconds) as response:
                 status = int(response.status)
-        except (HTTPError, URLError, TimeoutError, OSError) as error:
+        except (HTTPError, URLError, TimeoutError, OSError, ValueError) as error:
             raise ExternalEventBusDeliveryError("external event bus delivery failed") from error
         if status < 200 or status >= 300:
             raise ExternalEventBusDeliveryError("external event bus rejected notification")

@@ -12,6 +12,7 @@ class Capability(StrEnum):
     """Stable action names recognized by the first authorization perimeter."""
 
     CONSULTATION_CREATE = "consultation.create"
+    CASE_CREATE = "case.create"
     CONSULTATION_READ = "consultation.read"
     DCE_PREPARE = "dce.prepare"
     CASE_DCE_READ = "case.dce.read"
@@ -63,6 +64,7 @@ class Capability(StrEnum):
 _PATRON_ADMIN_CAPABILITIES = frozenset(
     {
         Capability.CONSULTATION_CREATE,
+        Capability.CASE_CREATE,
         Capability.CONSULTATION_READ,
         Capability.DCE_PREPARE,
         Capability.CASE_DCE_READ,

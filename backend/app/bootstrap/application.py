@@ -28,6 +28,7 @@ from app.interfaces.http.routes.authentication import (
     build_authentication_router,
 )
 from app.interfaces.http.routes.case_assigned import build_assigned_case_router
+from app.interfaces.http.routes.case_creation import build_case_creation_router
 from app.interfaces.http.routes.case_dce_reading import build_case_dce_reading_router
 from app.interfaces.http.routes.collaborator_capabilities import (
     build_collaborator_capability_router,
@@ -92,7 +93,9 @@ from app.interfaces.http.routes.preparation import (
 from app.interfaces.http.routes.preparation_transmission import (
     build_preparation_transmission_router,
 )
+from app.modules.case.application.handlers import CreateCaseHandler
 from app.modules.case.infrastructure.models.case import CaseRecord
+from app.modules.case.infrastructure.repositories import SqlAlchemyCaseRepository
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
     CreateConsultationHandler,
@@ -130,6 +133,7 @@ from app.modules.dce.infrastructure.quarantine import (
     LocalQuarantineStorageAdapter,
     PythonMagicContentInspectionAdapter,
 )
+from app.modules.dce.infrastructure.repositories import SqlAlchemyConsultationRepository
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
 from app.modules.enterprise.application.enterprise_capability import (
     EnterpriseCapabilityService,
@@ -263,6 +267,7 @@ from app.platform.observability.http import RequestObservabilityMiddleware
 from app.platform.persistence.schema import EXPECTED_ALEMBIC_HEAD
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationPolicy
+from app.platform.security.headers import SecurityHeadersMiddleware
 from app.platform.storage.object_storage import S3PrivateObjectStorage
 
 
@@ -309,6 +314,10 @@ class AppRuntime:
                 **enterprise_upload_handlers(),
                 "ClaimDceStagedObjectUpload": ClaimDceStagedObjectUploadHandler(),
                 "CreateConsultation": CreateConsultationHandler(),
+                "CreateCase": CreateCaseHandler(
+                    repository_factory=SqlAlchemyCaseRepository,
+                    consultation_reader_factory=SqlAlchemyConsultationRepository,
+                ),
                 "ExpireDceStagedObject": ExpireDceStagedObjectHandler(),
                 "PrepareDceStaging": PrepareDceStagingHandler(),
                 "RecordDceStagedObjectQuarantine": RecordDceStagedObjectQuarantineHandler(),
@@ -510,6 +519,7 @@ def _default_dce_upload_service(*, dispatcher: CommandDispatcher) -> DceUploadSe
             timeout_seconds=float(os.getenv("SMART_AO_CLAMD_TIMEOUT_SECONDS", "30")),
         ),
         allowed_media_types=_ALLOWED_DCE_MEDIA_TYPES,
+        max_bytes=int(os.getenv("SMART_AO_DCE_MAX_BYTES", "150000000")),
     )
 
 
@@ -625,6 +635,7 @@ def create_app(
         docs_url="/docs" if expose_api_docs else None,
         redoc_url="/redoc" if expose_api_docs else None,
     )
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestObservabilityMiddleware)
     app.include_router(build_observability_router())
 
@@ -898,6 +909,12 @@ def create_app(
                     security_runtime=security_runtime,
                 )
             )
+        app.include_router(
+            build_case_creation_router(
+                dispatcher=runtime.dispatcher,
+                security_runtime=security_runtime,
+            )
+        )
         app.include_router(
             build_assigned_case_router(
                 runtime=runtime,
