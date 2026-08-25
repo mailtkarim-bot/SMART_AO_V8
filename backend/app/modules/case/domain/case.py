@@ -253,9 +253,12 @@ class Case:
         cls._validate_optional_reference_tenant(tenant_id, consultation_reference)
         if consultation_reference and consultation_reference.aggregate_type != "CONSULTATION":
             raise ValueError("case consultation reference must have aggregate type CONSULTATION")
-        if origin.kind is not CaseOriginKind.MANUAL and consultation_reference is None:
+        if (
+            origin.kind not in {CaseOriginKind.MANUAL, CaseOriginKind.OPPORTUNITY}
+            and consultation_reference is None
+        ):
             raise CaseScopeAmbiguousError(
-                "non-manual case origin requires a consultation reference"
+                "this case origin requires a consultation reference"
             )
 
         case = cls(

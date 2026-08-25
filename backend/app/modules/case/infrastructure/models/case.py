@@ -45,7 +45,8 @@ class CaseRecord(RevisionedAggregateRecord, Base):
             name="business_origin",
         ),
         sa.CheckConstraint(
-            "consultation_id IS NOT NULL OR business_origin = 'MANUAL'",
+            "consultation_id IS NOT NULL OR business_origin = 'MANUAL' OR "
+            "(business_origin = 'OPPORTUNITY' AND origin_reference_id IS NOT NULL)",
             name="consultation_required_unless_manual",
         ),
         sa.CheckConstraint(

@@ -83,11 +83,29 @@ def test_create_case_rejects_duplicate_active_functional_identity() -> None:
 
 
 @pytest.mark.application
-def test_create_case_requires_consultation_for_non_manual_origin() -> None:
-    with pytest.raises(ValueError, match="consultation reference"):
-        CreateCaseHandler(lambda _session: MagicMock()).execute(
+def test_create_case_allows_qualified_opportunity_without_consultation() -> None:
+    repository = MagicMock()
+    repository.has_active_functional_identity.return_value = False
+
+    outcome = CreateCaseHandler(lambda _session: repository).execute(
+        session=MagicMock(),
+        command=_command(origin_kind="OPPORTUNITY", origin_reference_id=uuid4()),
+        context=_context(),
+    )
+
+    assert outcome.result_code == "CASE_CREATED"
+    assert repository.create.call_args.kwargs["business_origin"] == "OPPORTUNITY"
+    assert repository.create.call_args.kwargs["consultation_id"] is None
+
+
+@pytest.mark.application
+def test_create_case_requires_consultation_for_import_origin() -> None:
+    repository = MagicMock()
+
+    with pytest.raises(ValueError, match="CONSULTATION_REQUIRED_OR_STALE"):
+        CreateCaseHandler(lambda _session: repository).execute(
             session=MagicMock(),
-            command=_command(origin_kind="OPPORTUNITY", origin_reference_id=uuid4()),
+            command=_command(origin_kind="IMPORT", origin_reference_id=uuid4()),
             context=_context(),
         )
 
