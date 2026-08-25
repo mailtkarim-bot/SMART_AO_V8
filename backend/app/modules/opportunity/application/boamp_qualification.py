@@ -109,16 +109,18 @@ class PatronBoampObservationService:
     ) -> QualificationPersistenceResult:
         if context.actor_kind != ActorKind.PATRON_ADMIN.value:
             raise PermissionError("BOAMP_QUALIFICATION_PATRON_REQUIRED")
+        tenant_id = UUID(str(context.tenant_id))
+        actor_id = UUID(str(context.actor_id))
         command.validate()
         self._require_patron_membership(
             session=session,
-            tenant_id=context.tenant_id,
-            actor_id=context.actor_id,
+            tenant_id=tenant_id,
+            actor_id=actor_id,
             actor_kind=context.actor_kind,
         )
         observation = session.scalar(
             sa.select(BoampOpportunityObservationRecord).where(
-                BoampOpportunityObservationRecord.tenant_id == context.tenant_id,
+                BoampOpportunityObservationRecord.tenant_id == tenant_id,
                 BoampOpportunityObservationRecord.id == command.observation_id,
             )
         )
@@ -126,8 +128,8 @@ class PatronBoampObservationService:
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
         return self._repository.persist_qualification(
             session=session,
-            tenant_id=context.tenant_id,
-            actor_id=context.actor_id,
+            tenant_id=tenant_id,
+            actor_id=actor_id,
             observation=observation,
             command=command,
             now=now,

@@ -359,7 +359,7 @@ class PrepareSubmissionPackageHandler:
         _assert_decision_gate(
             reader=self._decision_gate_reader,
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=UUID(str(context.tenant_id)),
             case_id=preparation.case_id,
         )
         enterprise_entries = self._validated_enterprise_entries(
