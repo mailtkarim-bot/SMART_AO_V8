@@ -90,12 +90,13 @@ class CreateDecisionHandler:
     def execute(
         self, *, session, command: CreateDecisionCommand, context: CommandContext
     ) -> HandlerOutcome:
+        tenant_id = UUID(str(context.tenant_id))
         if not self._repository.case_exists(
-            session=session, tenant_id=context.tenant_id, case_id=command.case_id
+            session=session, tenant_id=tenant_id, case_id=command.case_id
         ):
             raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
         case_scope_fingerprint = self._repository.case_scope_fingerprint(
-            session=session, tenant_id=context.tenant_id, case_id=command.case_id
+            session=session, tenant_id=tenant_id, case_id=command.case_id
         )
         if case_scope_fingerprint is None:
             raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
@@ -114,7 +115,7 @@ class CreateDecisionHandler:
         )
         if self._repository.active_decision_exists(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             decision_key_hash=decision_key_hash,
         ):
             raise CommandExecutionError("DECISION_ALREADY_ACTIVE")
@@ -129,7 +130,7 @@ class CreateDecisionHandler:
             decision_key_hash=decision_key_hash,
             cycle_number=self._repository.next_cycle_number(
                 session=session,
-                tenant_id=context.tenant_id,
+                tenant_id=tenant_id,
                 decision_key_hash=decision_key_hash,
             ),
             actor_id=UUID(str(context.actor_id)),

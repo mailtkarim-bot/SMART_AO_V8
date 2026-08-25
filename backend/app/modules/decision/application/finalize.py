@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from app.modules.decision.application.finalize_commands import (
     ConditionalGoConditionInput,
@@ -98,6 +99,7 @@ class FinalizeGoNoGoDecisionHandler:
         self._condition_repository = condition_repository
 
     def execute(self, *, session: Any, command, context: CommandContext) -> HandlerOutcome:
+        tenant_id = UUID(str(context.tenant_id))
         if context.actor_kind not in {
             ActorKind.PATRON_ADMIN.value,
             ActorKind.PATRON_DELEGATE.value,
@@ -105,7 +107,7 @@ class FinalizeGoNoGoDecisionHandler:
             raise CommandExecutionError("PATRON_REQUIRED")
         repository = self._repository_factory(session)
         snapshot = repository.get(
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             aggregate_id=command.decision_id,
         )
         if snapshot is None or snapshot.root.case_id != command.case_id:
@@ -140,7 +142,7 @@ class FinalizeGoNoGoDecisionHandler:
         )
         if not self._verified_context_reader.has_confirmed_dce_requirements(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             context_id=current_context.id,
             case_id=command.case_id,
         ):
