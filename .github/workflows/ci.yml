@@ -140,6 +140,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: trivy-backend.sarif
+          category: trivy-backend
       - name: Build frontend deployment image
         run: docker build --file ops/docker/frontend.Dockerfile --tag smart-ao-v8-frontend:ci .
       - name: Scan frontend deployment image
@@ -156,6 +157,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: trivy-frontend.sarif
+          category: trivy-frontend
       - name: Upload image scan reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
