@@ -14,6 +14,7 @@ from app.modules.dce.application.analysis import is_valid_rc_observation
 from app.modules.dce.application.classification import (
     ClassificationDocument,
     ClassificationFragment,
+    ClassificationProjection,
     classification_input_manifest_sha256,
     project_dce_classification,
 )
@@ -852,7 +853,7 @@ class RecordDceDocumentClassificationRunHandler:
                         tenant_id=context.tenant_id,
                         classification_result_id=result_record.id,
                         fragment_id=evidence.fragment_id,
-                        classification_id=classification.id,
+                        classification_id=classification.id if classification is not None else None,
                         rule_id=evidence.rule_id,
                         rule_version=evidence.rule_version,
                         start_byte_offset=evidence.start_byte_offset,
@@ -1224,7 +1225,7 @@ class RegisterDceVersionHandler:
 def _validate_classification_command(
     *,
     command: RecordDceDocumentClassificationRunCommand,
-    expected_projection: object,
+    expected_projection: ClassificationProjection,
     fragment_records: dict[UUID, DceDocumentExtractionFragmentRecord],
 ) -> None:
     expected_status = expected_projection.status
