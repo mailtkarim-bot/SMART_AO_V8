@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
+from app.modules.decision.infrastructure.dossier_reader import SqlAlchemyDecisionDossierReader
 from app.platform.security.authorization import AuthorizationDecision, AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
 from app.platform.security.context import ActorKind
@@ -31,7 +32,7 @@ class _DenyPolicy:
 
 def _service(session):
     return PatronDecisionDossierService(
-        session_factory=lambda: _SessionContext(session),
+        reader=SqlAlchemyDecisionDossierReader(lambda: _SessionContext(session)),
         policy=AuthorizationPolicy(),
     )
 
@@ -42,6 +43,7 @@ def test_patron_decision_dossier_projects_selected_context_and_conditions(sessio
     context_id = uuid4()
     record = SimpleNamespace(
         id=decision_id,
+        aggregate_revision=1,
         case_id=case_id,
         decision_type="GO_CONDITIONNEL",
         lifecycle="FINALIZED",
@@ -91,6 +93,7 @@ def test_patron_decision_dossier_falls_back_to_latest_context(session_factory):
     actor, case_id, _, _ = _seed_draft(session_factory)
     record = SimpleNamespace(
         id=uuid4(),
+        aggregate_revision=1,
         case_id=case_id,
         decision_type="GO",
         lifecycle="FINALIZED",
@@ -121,13 +124,24 @@ def test_patron_decision_dossier_refuses_missing_record_and_context(session_fact
     with pytest.raises(PermissionError, match="NOT_FOUND_OR_FORBIDDEN"):
         _service(missing_record).read(actor=actor, case_id=case_id, now=datetime.now(tz=UTC))
 
-    record = SimpleNamespace(id=uuid4(), case_id=case_id)
+    record = SimpleNamespace(
+        id=uuid4(),
+        aggregate_revision=1,
+        case_id=case_id,
+        decision_type="GO_NO_GO",
+        lifecycle="DRAFT",
+        outcome="UNDECIDED",
+        validity="CURRENT",
+        context_status="INCOMPLETE",
+        final_justification=None,
+    )
     missing_context = MagicMock()
     missing_context.scalar.side_effect = [record, None, None]
-    with pytest.raises(PermissionError, match="DECISION_CONTEXT_NOT_FOUND"):
-        _service(missing_context).read(
-            actor=actor, case_id=case_id, now=datetime.now(tz=UTC)
-        )
+    result = _service(missing_context).read(
+        actor=actor, case_id=case_id, now=datetime.now(tz=UTC)
+    )
+    assert result.context_status == "INCOMPLETE"
+    assert result.sources == ()
 
 
 def test_patron_decision_dossier_refuses_non_patron_and_denied_policy(session_factory):
@@ -145,7 +159,8 @@ def test_patron_decision_dossier_refuses_non_patron_and_denied_policy(session_fa
             actor=collaborator, case_id=case_id, now=datetime.now(tz=UTC)
         )
     denied = PatronDecisionDossierService(
-        session_factory=lambda: _SessionContext(MagicMock()), policy=_DenyPolicy()
+        reader=SqlAlchemyDecisionDossierReader(lambda: _SessionContext(MagicMock())),
+        policy=_DenyPolicy(),
     )
     with pytest.raises(PermissionError, match="AUTHORIZATION_DENIED"):
         denied.read(actor=actor, case_id=case_id, now=datetime.now(tz=UTC))

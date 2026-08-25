@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -31,6 +32,8 @@ from app.platform.storage.quarantine import (
 from app.platform.storage.quarantine import (
     QuarantineStoragePort as DceQuarantineStoragePort,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["MalwareScanResult", "QuarantineWriteResult"]
 
@@ -269,19 +272,29 @@ class DceUploadService:
                 ),
                 context=_system_context(tenant_id=tenant_id),
             )
-        except CommandExecutionError:
-            return
+        except CommandExecutionError as error:
+            logger.warning(
+                "dce_upload_rejection_persistence_failed",
+                extra={"error_type": type(error).__name__, "rejection_code": rejection_code},
+            )
 
     async def _delete_quarantine(self, *, storage_key: str) -> None:
         try:
             await self._storage.delete(storage_key=storage_key)
-        except Exception:
-            return
+        except Exception as error:
+            logger.warning(
+                "dce_quarantine_delete_failed",
+                extra={"error_type": type(error).__name__},
+            )
 
     async def _scan(self, *, storage_key: str) -> MalwareScanResult:
         try:
             return await self._scanner.scan(storage_key=storage_key)
-        except Exception:
+        except Exception as error:
+            logger.warning(
+                "dce_upload_scanner_failed",
+                extra={"error_type": type(error).__name__},
+            )
             return MalwareScanResult(
                 verdict="ERROR",
                 scanner_name="clamd",

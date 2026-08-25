@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import os
 from collections.abc import AsyncIterable
 from datetime import UTC, datetime
@@ -20,6 +21,8 @@ from app.modules.dce.application.upload import (
     MalwareScanResult,
     QuarantineWriteResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class LocalQuarantineStorageAdapter(DceQuarantineStoragePort):
@@ -154,7 +157,11 @@ class ClamdTcpMalwareScanAdapter(DceMalwareScanPort):
                 scanner_signature_version=version,
                 scanned_at=scanned_at,
             )
-        except Exception:
+        except Exception as error:
+            logger.warning(
+                "dce_clamav_scan_failed",
+                extra={"scanner_name": "clamd", "error_type": type(error).__name__},
+            )
             return MalwareScanResult(
                 verdict="ERROR",
                 scanner_name="clamd",
@@ -198,9 +205,12 @@ def _unlink_missing_ok(path: Path) -> None:
 
 
 def _clamd_verdict(*, response: bytes) -> str:
-    normalized = response.rstrip(b"\x00").decode("utf-8", errors="replace").casefold()
-    if normalized.endswith("ok"):
+    normalized = response.rstrip(b"\x00").decode("utf-8", errors="replace").casefold().strip()
+    if not normalized.startswith("stream:"):
+        return "ERROR"
+    verdict_text = normalized.partition(":")[2].strip()
+    if verdict_text == "ok":
         return "CLEAN"
-    if normalized.endswith("found"):
+    if verdict_text.endswith(" found"):
         return "INFECTED"
     return "ERROR"

@@ -17,6 +17,7 @@ En cas de différence entre un PDF et son Markdown correspondant, le Markdown do
 | Emplacement | Contenu | Usage |
 |---|---|---|
 | `docs/PROJECT_STATE.md` | État actuel, dernier commit vert, prochaine action. | **Premier fichier à lire** lors d’une reprise. |
+| `docs/DEPENDENCY_INTEGRATION_STATUS_2026-08-22.md` | État réel des dépendances installées, services raccordés et intégrations futures. | **À lire avant tout greffage externe**. |
 | `docs/ROADMAP_01_PLAN_GLOBAL_CODAGE.md` | Ordre global des slices et jalons produit. | Lire après PROJECT_STATE pour comprendre la trajectoire entière. |
 | `docs/reference/` | Sources Markdown de vision, domaine, API, tests, persistance et architecture. | Référence de conception et de code. |
 | `docs/pdf/` | PDF de consultation, partage et archivage. | Lecture humaine et comparaison avec les sources Markdown. |
@@ -34,7 +35,7 @@ En cas de différence entre un PDF et son Markdown correspondant, le Markdown do
 | Coder le premier slice | DOMAIN-01 → DOMAIN-03 → APP-01 → TEST-01 → DATA-01 → ARC-01. |
 | Coder une commande collaborateur | Contrat Collaborateur → Matrice vue/action collaborateur → DOMAIN-02 → tests du slice. |
 | Coder une commande patron | Cahier Patron → Contrat patron → Matrice transitions patron → Spécification idempotence. |
-| Préparer la préproduction VPS | Architecture infrastructure → ARC-01 → `SEC-01` → futurs `OPS-01`, `BACKUP-01`, `DEPLOY-01`. |
+| Préparer la préproduction VPS | Architecture infrastructure → [`DEPENDENCY_INTEGRATION_STATUS_2026-08-22.md`](DEPENDENCY_INTEGRATION_STATUS_2026-08-22.md) → ARC-01 → `SEC-01` → futurs `OPS-01`, `BACKUP-01`, `DEPLOY-01`. |
 
 ---
 

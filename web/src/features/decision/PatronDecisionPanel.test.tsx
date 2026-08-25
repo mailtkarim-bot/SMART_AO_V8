@@ -6,6 +6,7 @@ import { PatronDecisionPanel } from "./PatronDecisionPanel";
 
 const decisionDossier: PatronDecisionDossier = {
   decision_id: "decision-1",
+  aggregate_revision: 1,
   case_id: "case-1",
   decision_type: "GO_CONDITIONNEL",
   lifecycle: "FINALIZED",

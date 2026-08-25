@@ -35,6 +35,28 @@ class AssignmentHistoryLookup:
     items: tuple[AssignmentHistoryItemProjection, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class AssignmentManagementCase:
+    id: UUID
+    lifecycle: str
+
+
+@dataclass(frozen=True, slots=True)
+class AssignmentManagementTarget:
+    id: UUID
+    case_id: UUID
+
+
+class AssignmentManagementReader(Protocol):
+    """Read tenant-scoped targets before patron assignment mutations."""
+
+    def get_case(self, *, tenant_id: UUID, case_id: UUID) -> AssignmentManagementCase | None: ...
+
+    def get_assignment(
+        self, *, tenant_id: UUID, assignment_id: UUID
+    ) -> AssignmentManagementTarget | None: ...
+
+
 class AssignmentHistoryReader(Protocol):
     """Read only an assignment owned by a trusted tenant and membership."""
 
@@ -120,3 +142,12 @@ class PatronAssignmentCockpitReader(Protocol):
         assignment_id: UUID,
         limit: int,
     ) -> PatronAssignmentJournalLookup | None: ...
+
+    def get_interactions(
+        self,
+        *,
+        tenant_id: UUID,
+        assignment_id: UUID,
+        kind: str | None,
+        limit: int,
+    ) -> PatronAssignmentInteractionsLookup | None: ...

@@ -16,6 +16,11 @@ class CreatePricingScenarioRequest(BaseModel):
     scenario_type: Literal["BASE", "PRUDENT", "CUSTOM"]
     sales_adjustment_bps: int = Field(ge=-5000, le=10000)
     cost_adjustment_bps: int = Field(ge=-5000, le=10000)
+    penalty_reserve_minor: int = Field(default=0, ge=0)
+    retention_reserve_minor: int = Field(default=0, ge=0)
+    guarantee_reserve_minor: int = Field(default=0, ge=0)
+    floor_margin_rate_bps: int = Field(default=0, ge=0, lt=10000)
+    target_margin_rate_bps: int = Field(default=0, ge=0, lt=10000)
     assumptions: dict[str, object]
 
 
@@ -33,6 +38,14 @@ class PricingScenarioResponse(BaseModel):
     total_cost_minor: int
     gross_margin_minor: int
     gross_margin_rate_bps: int
+    penalty_reserve_minor: int
+    retention_reserve_minor: int
+    guarantee_reserve_minor: int
+    floor_margin_rate_bps: int
+    target_margin_rate_bps: int
+    break_even_sales_minor: int
+    floor_sales_minor: int
+    target_sales_minor: int
     source_snapshot_revision: int
 
 

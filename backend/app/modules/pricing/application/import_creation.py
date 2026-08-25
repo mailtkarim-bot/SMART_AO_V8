@@ -11,6 +11,10 @@ from app.modules.pricing.application.import_commands import (
     CreatePricingImportPreviewCommand,
     CreatePricingImportRowCommand,
 )
+from app.modules.pricing.infrastructure.models import (
+    PricingImportBatchRecord,
+    PricingImportRowRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -26,7 +30,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import PricingImportBatchRecord, PricingImportRowRecord
 
 
 class PricingImportCreationService:
@@ -56,7 +59,7 @@ class PricingImportCreationService:
         decision = self._policy.authorize(
             context=actor,
             request=AuthorizationRequest(
-                action=Capability.PRICING_WRITE,
+                action=Capability.FINANCIAL_REPORT_LINE_WRITE,
                 resource=AuthorizationResource(
                     resource_type="PRICING_IMPORT",
                     resource_id=command.case_id,

@@ -26,6 +26,7 @@ from tests.support.database import REPOSITORY_ROOT
 
 POST_SLICE_MODULES = (
     "enterprise",
+    "decision",
     "membership",
     "patron_action",
     "preparation",
@@ -63,6 +64,52 @@ def test_post_slice_modules_expose_application_and_public_boundaries() -> None:
         module_root = modules_root / module_name
         assert (module_root / "application").is_dir(), module_name
         assert (module_root / "public").is_dir(), module_name
+
+
+@pytest.mark.architecture
+def test_membership_read_services_use_only_application_ports() -> None:
+    source_paths = (
+        REPOSITORY_ROOT
+        / "backend/app/modules/membership/application/patron_assignment_cockpit.py",
+        REPOSITORY_ROOT / "backend/app/modules/membership/application/assignment_history.py",
+    )
+    for source_path in source_paths:
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        imported_modules = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        imported_names = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        assert "sqlalchemy" not in imported_names, source_path
+        assert "sqlalchemy" not in imported_modules, source_path
+        assert not any(".infrastructure" in module for module in imported_modules), source_path
+
+
+@pytest.mark.architecture
+def test_decision_application_dossier_uses_reader_boundary() -> None:
+    source_path = REPOSITORY_ROOT / "backend/app/modules/decision/application/patron_dossier.py"
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    imported_modules = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module
+    }
+    imported_names = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    assert "sqlalchemy" not in imported_names
+    assert "sqlalchemy" not in imported_modules
+    assert not any(".infrastructure" in module for module in imported_modules)
+    assert "app.modules.decision.application.queries" in imported_modules
 
 
 @pytest.mark.architecture

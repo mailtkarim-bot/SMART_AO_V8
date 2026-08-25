@@ -134,6 +134,7 @@ def test_migration_creates_decision_and_owned_history_tables(database_engine: sa
         "decision_contexts",
         "decision_context_references",
         "decision_conditions",
+        "decision_condition_transitions",
     }.issubset(set(inspector.get_table_names()))
 
 
@@ -145,6 +146,27 @@ def test_decision_case_reference_is_tenant_scoped(connection: sa.Connection) -> 
 
     with pytest.raises(IntegrityError), connection.begin_nested():
         _insert_decision(connection, tenant_id=tenant_b, case_id=case_a)
+
+
+@pytest.mark.db
+def test_active_decision_key_has_a_database_unique_index(database_engine: sa.Engine) -> None:
+    with database_engine.connect() as connection:
+        index_definition = connection.scalar(
+            sa.text(
+                "SELECT indexdef FROM pg_indexes "
+                "WHERE schemaname = 'public' AND indexname = "
+                "'ux_decisions__tenant_active_key'"
+            )
+        )
+    assert index_definition is not None
+    normalized = " ".join(str(index_definition).lower().split())
+    assert "unique index" in normalized
+    assert "(tenant_id, decision_key_hash)" in normalized
+    where_clause = normalized.split(" where ", 1)[1] if " where " in normalized else ""
+    assert "validity" in where_clause
+    assert "current" in where_clause
+    assert "superseded" in where_clause
+    assert "cancelled" in where_clause
 
 
 @pytest.mark.db

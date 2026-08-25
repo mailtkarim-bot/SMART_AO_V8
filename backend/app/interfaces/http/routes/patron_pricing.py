@@ -5,8 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
+from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
-from app.interfaces.http.routes.dce_versions import _resolve_context
 from app.modules.pricing.application.commands import CreatePricingScenarioCommand
 from app.modules.pricing.application.service import PricingScenarioService
 from app.modules.pricing.application.transition_commands import (
@@ -183,6 +183,11 @@ def build_patron_pricing_router(
                     scenario_type=request.scenario_type,
                     sales_adjustment_bps=request.sales_adjustment_bps,
                     cost_adjustment_bps=request.cost_adjustment_bps,
+                    penalty_reserve_minor=request.penalty_reserve_minor,
+                    retention_reserve_minor=request.retention_reserve_minor,
+                    guarantee_reserve_minor=request.guarantee_reserve_minor,
+                    floor_margin_rate_bps=request.floor_margin_rate_bps,
+                    target_margin_rate_bps=request.target_margin_rate_bps,
                     assumptions=request.assumptions,
                 ),
                 now=datetime.now(tz=UTC),

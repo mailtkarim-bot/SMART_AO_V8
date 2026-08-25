@@ -31,6 +31,7 @@ EOF
 [[ -f "${OPS_DIR}/Caddyfile" ]] || fail "missing ${OPS_DIR}/Caddyfile"
 [[ -f "${OPS_DIR}/docker/backend.Dockerfile" ]] || fail "missing backend Dockerfile"
 [[ -f "${OPS_DIR}/docker/frontend.Dockerfile" ]] || fail "missing frontend Dockerfile"
+[[ -x "${OPS_DIR}/run-knowledge-embeddings-preprod.sh" ]] || fail "missing executable RAG indexing wrapper"
 
 # These checks intentionally inspect text only. They do not source .env.preprod.
 grep -q '^services:' "${COMPOSE_FILE}" || fail "Compose services section is missing"
@@ -40,6 +41,8 @@ grep -q '^  postgres:' "${COMPOSE_FILE}" || fail "postgres service is missing"
 grep -q '^  clamav:' "${COMPOSE_FILE}" || fail "clamav service is missing"
 grep -q '^  dce-retention-worker:' "${COMPOSE_FILE}" || fail "DCE retention worker is missing"
 grep -q '^  submission-export-webhook-worker:' "${COMPOSE_FILE}" || fail "submission webhook worker is missing"
+grep -q '^  submission-export-smtp-worker:' "${COMPOSE_FILE}" || fail "submission SMTP worker is missing"
+grep -q 'SMART_AO_RAG_INDEXING_ENABLED' "${COMPOSE_FILE}" || fail "RAG indexing opt-in is missing"
 grep -q 'internal: true' "${COMPOSE_FILE}" || fail "internal Docker network is missing"
 grep -q 'healthcheck:' "${COMPOSE_FILE}" || fail "healthchecks are missing"
 grep -q '80:80' "${COMPOSE_FILE}" || fail "HTTP edge port is missing"

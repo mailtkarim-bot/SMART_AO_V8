@@ -9,6 +9,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.dce.application.commands import AddFinancialReportLineCommand
+from app.modules.pricing.infrastructure.models import (
+    FinancialReportLineRecord,
+    FinancialReportSnapshotRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -24,10 +28,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    FinancialReportLineRecord,
-    FinancialReportSnapshotRecord,
-)
 
 _CATEGORY_TOTAL_FIELDS = {
     "SALES": "sales_total_minor",

@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
+from app.interfaces.http.dependencies.auth import resolve_bearer_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.modules.dce.public.contracts import (
     DceVersionMetadataResponse,
@@ -19,7 +20,6 @@ from app.platform.events.dispatcher import (
     CommandExecutionError,
     IdempotencyKeyReusedError,
 )
-from app.platform.security.authenticated_context import UnauthenticatedError
 from app.platform.security.authorization import AuthorizationRequest, AuthorizationResource
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import DataClassification
@@ -158,15 +158,7 @@ def build_dce_version_router(
 
 
 def _resolve_context(*, authorization: str | None, context_resolver):
-    if authorization is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="UNAUTHENTICATED")
-    scheme, _, access_token = authorization.partition(" ")
-    if scheme.casefold() != "bearer" or not access_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="UNAUTHENTICATED")
-    try:
-        return context_resolver.resolve(access_token=access_token)
-    except UnauthenticatedError as error:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="UNAUTHENTICATED",
-        ) from error
+    return resolve_bearer_context(
+        authorization=authorization,
+        context_resolver=context_resolver,
+    )

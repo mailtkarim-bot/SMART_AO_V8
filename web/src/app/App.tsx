@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { PricingPanel } from "../features/pricing/PricingPanel";
 import { usePricingImport } from "../features/pricing/usePricingImport";
 import { SubmissionPanel } from "../features/submission/SubmissionPanel";
@@ -10,12 +10,15 @@ import { useCollaboratorWizard } from "../features/wizard/useCollaboratorWizard"
 import { PatronCockpitPanel } from "../features/cockpit/PatronCockpitPanel";
 import { PatronDecisionPanel } from "../features/decision/PatronDecisionPanel";
 import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
+import { BoampOpportunityPanel } from "../features/opportunities/BoampOpportunityPanel";
+import { useBoampOpportunities } from "../features/opportunities/useBoampOpportunities";
 import { FinancialDraftPanel } from "../features/draft/FinancialDraftPanel";
 import { useFinancialDraft } from "../features/draft/useFinancialDraft";
-import { createApiClient } from "../infrastructure/api";
+import { DceKnowledgePanel } from "../features/dce/DceKnowledgePanel";
+import { useDceKnowledge } from "../features/dce/useDceKnowledge";
+import { useAuthentication } from "../features/auth/useAuthentication";
 import { useBackendReadiness } from "../features/connection/useBackendReadiness";
 import {
-  API_BASE_URL_STORAGE_KEY,
   assertRuntimeApiUrl,
   resolveApiBaseUrl,
 } from "../infrastructure/runtimeConfig";
@@ -24,6 +27,8 @@ import type {
   FinancialCategory,
   PatronAction,
   PatronDecisionDossier,
+  FreezeDecisionContextRequest,
+  ResolveDecisionConditionRequest,
   PricingScenario,
 } from "../shared/types";
 import "./styles.css";
@@ -56,11 +61,15 @@ const formatDate = (value: string) =>
 
 function App() {
   const [baseUrl, setBaseUrl] = useState(() =>
-    resolveApiBaseUrl(localStorage, import.meta.env.VITE_API_BASE_URL, window.location.protocol),
+    resolveApiBaseUrl(
+      import.meta.env.VITE_API_BASE_URL,
+      window.location.protocol,
+      window.location.origin,
+    ),
   );
-  const [token, setToken] = useState(
-    () => localStorage.getItem("smart-ao-token") ?? "",
-  );
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [tenantId, setTenantId] = useState("");
   const [cases, setCases] = useState<AssignedCase[]>([]);
   const [actions, setActions] = useState<PatronAction[]>([]);
   const [scenarios, setScenarios] = useState<PricingScenario[]>([]);
@@ -70,7 +79,19 @@ function App() {
   const [message, setMessage] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [showConnection, setShowConnection] = useState(false);
   const [activeNav, setActiveNav] = useState("overview");
-  const api = useMemo(() => createApiClient(baseUrl, token), [baseUrl, token]);
+  const {
+    accessToken,
+    currentActor,
+    isRestoring,
+    isAuthenticated,
+    api,
+    login,
+    logout,
+  } = useAuthentication(baseUrl);
+  const isPatron =
+    currentActor?.actor_kind === "PATRON_ADMIN" ||
+    currentActor?.actor_kind === "PATRON_DELEGATE";
+  const isCollaborator = currentActor?.actor_kind === "COLLABORATEUR";
   const {
     backendReadiness,
     backendReadinessState,
@@ -133,6 +154,8 @@ function App() {
     setSelectedCaseId(caseId);
     await refreshScenarios(caseId);
   });
+  const boamp = useBoampOpportunities(api, setMessage);
+  const dceKnowledge = useDceKnowledge(api, setMessage, selectedCaseId);
   const {
     assignments,
     selectedAssignmentId,
@@ -170,18 +193,29 @@ function App() {
     : [];
 
   useEffect(() => {
-    if (!token.trim()) return;
+    if (!accessToken.trim()) return;
     void refreshCases();
-    void refreshAssignments();
-    void refreshActions();
-    void refreshEnterpriseCompany();
-  }, []);
+    if (isPatron) {
+      void refreshAssignments();
+      void refreshActions();
+      void refreshEnterpriseCompany();
+      void boamp.refreshObservations();
+    }
+  // These effects are keyed to authenticated session, role and selected case. The hook APIs are
+  // imperative callbacks recreated by feature hooks and must not trigger a fetch on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, isPatron]);
 
   useEffect(() => {
-    if (!selectedCaseId || !token.trim()) return;
-    void refreshScenarios(selectedCaseId);
-    void refreshDecisionDossier(selectedCaseId);
-  }, [selectedCaseId, token]);
+    if (!selectedCaseId || !accessToken.trim()) return;
+    if (isPatron) {
+      void refreshScenarios(selectedCaseId);
+      void refreshDecisionDossier(selectedCaseId);
+    }
+    if (isPatron || isCollaborator) void dceKnowledge.loadReading(selectedCaseId);
+  // See the session/case keying rationale above; feature-hook commands are intentionally omitted.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCaseId, accessToken, isCollaborator, isPatron]);
 
   async function refreshCases() {
     setLoading(true);
@@ -202,24 +236,95 @@ function App() {
     try {
       const result = await api.listPatronActions();
       setActions(result.items);
-    } catch {
-      setActions([]);
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de charger les actions.",
+      });
     }
   }
 
   async function refreshScenarios(caseId: string) {
     try {
       setScenarios(await api.listPricingScenarios(caseId));
-    } catch {
-      setScenarios([]);
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Impossible de charger les scénarios de chiffrage.",
+      });
+    }
+  }
+
+  async function createDecision() {
+    if (!selectedCaseId || currentActor?.actor_kind !== "PATRON_ADMIN") {
+      setMessage({ tone: "warning", text: "Sélectionnez une affaire avec un compte patron administrateur." });
+      return;
+    }
+    try {
+      await api.createDecision(selectedCaseId, {});
+      await refreshDecisionDossier(selectedCaseId);
+      setMessage({ tone: "success", text: "Brouillon de décision créé." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de créer la décision.",
+      });
+    }
+  }
+
+  async function freezeDecisionContext(input: FreezeDecisionContextRequest) {
+    if (!selectedCaseId || !decisionDossier || currentActor?.actor_kind !== "PATRON_ADMIN") return;
+    try {
+      await api.freezeDecisionContext(selectedCaseId, decisionDossier.decision_id, input);
+      await refreshDecisionDossier(selectedCaseId);
+      setMessage({ tone: "success", text: "Contexte de décision gelé." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de geler le contexte.",
+      });
+    }
+  }
+
+  async function resolveDecisionCondition(
+    conditionId: string,
+    input: ResolveDecisionConditionRequest,
+  ) {
+    if (!selectedCaseId || !decisionDossier || currentActor?.actor_kind !== "PATRON_ADMIN") return;
+    try {
+      await api.resolveDecisionCondition(
+        selectedCaseId,
+        decisionDossier.decision_id,
+        conditionId,
+        input,
+      );
+      await refreshDecisionDossier(selectedCaseId);
+      setMessage({ tone: "success", text: "Condition de décision mise à jour." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de résoudre la condition.",
+      });
     }
   }
 
   async function refreshDecisionDossier(caseId: string) {
     try {
       setDecisionDossier(await api.getDecisionDossier(caseId));
-    } catch {
+    } catch (error) {
       setDecisionDossier(null);
+      // 404 = pas encore de dossier de décision pour cette affaire : état normal.
+      if ((error as { status?: number }).status === 404) return;
+      setMessage({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Impossible de charger le dossier de décision.",
+      });
     }
   }
 
@@ -228,21 +333,40 @@ function App() {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function saveConnection(event: React.FormEvent<HTMLFormElement>) {
+  async function saveConnection(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      const normalizedBaseUrl = assertRuntimeApiUrl(baseUrl, window.location.protocol);
-      setBaseUrl(normalizedBaseUrl);
-      localStorage.setItem(API_BASE_URL_STORAGE_KEY, normalizedBaseUrl);
-      localStorage.setItem("smart-ao-token", token.trim());
-      void checkBackendReadiness(createApiClient(normalizedBaseUrl, token));
+      const normalizedBaseUrl = assertRuntimeApiUrl(
+        baseUrl,
+        window.location.protocol,
+        window.location.origin,
+      );
+      if (normalizedBaseUrl !== baseUrl) {
+        setBaseUrl(normalizedBaseUrl);
+        setMessage({ tone: "warning", text: "URL API enregistrée. Validez de nouveau la connexion avec cette origine." });
+        return;
+      }
+      await checkBackendReadiness();
+      await login({ email: loginEmail, password: loginPassword, tenant_id: tenantId });
+      setLoginPassword("");
       setShowConnection(false);
-      setMessage({ tone: "success", text: "Connexion enregistrée dans ce navigateur." });
-      void refreshCases();
+      setMessage({ tone: "success", text: "Connexion sécurisée active." });
     } catch (error) {
       setMessage({
         tone: "error",
-        text: error instanceof Error ? error.message : "URL API invalide.",
+        text: error instanceof Error ? error.message : "Connexion impossible.",
+      });
+    }
+  }
+
+  async function signOut() {
+    try {
+      await logout();
+      setMessage({ tone: "success", text: "Session fermée." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de fermer la session.",
       });
     }
   }
@@ -251,19 +375,22 @@ function App() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand"><span className="brand-mark">S</span><span>SMART_AO <em>V8</em></span></div>
-        <div className="workspace-label">ESPACE PATRON</div>
+        <div className="workspace-label">{isCollaborator ? "ESPACE COLLABORATEUR" : "ESPACE PATRON"}</div>
         <nav className="nav-list" aria-label="Navigation principale">
-          <button className={`nav-item ${activeNav === "overview" ? "active" : ""}`} onClick={() => navigateTo("overview-section", "overview")}><span className="nav-icon">▦</span>Vue d’ensemble</button>
+          {isPatron && <button className={`nav-item ${activeNav === "overview" ? "active" : ""}`} onClick={() => navigateTo("overview-section", "overview")}><span className="nav-icon">▦</span>Vue d’ensemble</button>}
           <button className={`nav-item ${activeNav === "preparation" ? "active" : ""}`} onClick={() => navigateTo("preparation-section", "preparation")}><span className="nav-icon">◇</span>Préparation</button>
           <button className={`nav-item ${activeNav === "review" ? "active" : ""}`} onClick={() => navigateTo("review-section", "review")}><span className="nav-icon">◌</span>Revue</button>
+          {isPatron && <button className={`nav-item ${activeNav === "opportunities" ? "active" : ""}`} onClick={() => navigateTo("boamp-section", "opportunities")}><span className="nav-icon">◎</span>Opportunités BOAMP</button>}
+          <button className={`nav-item ${activeNav === "dce" ? "active" : ""}`} onClick={() => navigateTo("dce-knowledge-section", "dce")}><span className="nav-icon">⌕</span>Lecture DCE / RAG</button>
           <button className={`nav-item ${activeNav === "wizard" ? "active" : ""}`} onClick={() => navigateTo("collaborator-wizard-section", "wizard")}><span className="nav-icon">⌁</span>Wizard collaborateur</button>
-          <button className={`nav-item ${activeNav === "library" ? "active" : ""}`} onClick={() => navigateTo("library-section", "library")}><span className="nav-icon">▤</span>Bibliothèque</button>
-          <button className={`nav-item ${activeNav === "decision" ? "active" : ""}`} onClick={() => navigateTo("decision-section", "decision")}><span className="nav-icon">◇</span>Décision</button>
-          <button className={`nav-item ${activeNav === "submission" ? "active" : ""}`} onClick={() => navigateTo("submission-section", "submission")}><span className="nav-icon">↗</span>Dépôt</button>
+          {isPatron && <button className={`nav-item ${activeNav === "library" ? "active" : ""}`} onClick={() => navigateTo("library-section", "library")}><span className="nav-icon">▤</span>Bibliothèque</button>}
+          {isPatron && <button className={`nav-item ${activeNav === "decision" ? "active" : ""}`} onClick={() => navigateTo("decision-section", "decision")}><span className="nav-icon">◇</span>Décision</button>}
+          {isPatron && <button className={`nav-item ${activeNav === "submission" ? "active" : ""}`} onClick={() => navigateTo("submission-section", "submission")}><span className="nav-icon">↗</span>Dépôt</button>}
         </nav>
         <div className="sidebar-bottom">
-          <button className="nav-item" onClick={() => setShowConnection(true)}><span className="nav-icon">⚙</span>Connexion API</button>
-          <div className="operator-card"><div className="avatar">PA</div><div><strong>Patron administrateur</strong><span>Accès financier contrôlé</span></div></div>
+          <button className="nav-item" onClick={() => setShowConnection(true)}><span className="nav-icon">⚙</span>{isAuthenticated ? "Session" : "Connexion"}</button>
+          {isAuthenticated && <button className="nav-item" onClick={() => void signOut()}><span className="nav-icon">↪</span>Se déconnecter</button>}
+          <div className="operator-card"><div className="avatar">{currentActor?.actor_kind === "COLLABORATEUR" ? "CO" : "PA"}</div><div><strong>{currentActor?.actor_kind ?? "Utilisateur non connecté"}</strong><span>{currentActor ? `Membership ${currentActor.membership_state}` : "Authentification requise"}</span></div></div>
         </div>
       </aside>
 
@@ -275,12 +402,15 @@ function App() {
 
         {message && <div className={`notice ${message.tone}`} role="status"><span>{message.tone === "success" ? "✓" : "!"}</span>{message.text}</div>}
 
-        <section className="section-block command-center-section" id="overview-section">
-          <div className="section-heading"><div><span className="section-kicker">COMMAND CENTER</span><h2>Actions à traiter</h2></div><span className="count-pill">{actions.length} ouverte{actions.length > 1 ? "s" : ""}</span></div>
-          {actions.length === 0 ? <div className="empty-card"><strong>Aucune action patronale ouverte</strong><p>Les transmissions et contrôles autorisés alimenteront cette file tenant-scopée.</p></div> : <div className="action-grid">{actions.slice(0, 6).map((action) => <article className="action-card" key={action.action_id}><div className="case-top"><span className={`state-badge state-${action.severity.toLowerCase()}`}>{action.severity}</span><span className="rule-tag">{action.state}</span></div><h3>{action.title}</h3><p>{action.why_now}</p><small>{action.recommended_action}</small></article>)}</div>}
-        </section>
+        {isPatron && (
+          <section className="section-block command-center-section" id="overview-section">
+            <div className="section-heading"><div><span className="section-kicker">COMMAND CENTER</span><h2>Actions à traiter</h2></div><span className="count-pill">{actions.length} ouverte{actions.length > 1 ? "s" : ""}</span></div>
+            {actions.length === 0 ? <div className="empty-card"><strong>Aucune action patronale ouverte</strong><p>Les transmissions et contrôles autorisés alimenteront cette file tenant-scopée.</p></div> : <div className="action-grid">{actions.slice(0, 6).map((action) => <article className="action-card" key={action.action_id}><div className="case-top"><span className={`state-badge state-${action.severity.toLowerCase()}`}>{action.severity}</span><span className="rule-tag">{action.state}</span></div><h3>{action.title}</h3><p>{action.why_now}</p><small>{action.recommended_action}</small></article>)}</div>}
+          </section>
+        )}
 
-        <EnterpriseLibraryPanel
+        {isPatron && (
+          <EnterpriseLibraryPanel
           enterpriseCompany={enterpriseCompany}
           enterpriseCapabilities={enterpriseCapabilities}
           enterpriseCapabilityForm={enterpriseCapabilityForm}
@@ -305,10 +435,12 @@ function App() {
           onCreateCapability={() => void createEnterpriseCapability()}
           onAddCapabilityVersion={() => void addEnterpriseCapabilityVersion()}
           onUploadDocument={() => void uploadEnterpriseDocument()}
-          onVerifyDocument={() => void verifyEnterpriseDocument()}
-        />
+            onVerifyDocument={() => void verifyEnterpriseDocument()}
+          />
+        )}
 
-        <section className="section-block" id="pricing-section">
+        {isPatron && (
+          <section className="section-block" id="pricing-section">
           <PricingPanel
             scenarios={scenarios}
             formatMoney={formatMoney}
@@ -318,21 +450,55 @@ function App() {
             pricingImportBatchRevision={pricingImport.pricingImportBatchRevision}
             pricingImportReportRevision={pricingImport.pricingImportReportRevision}
             pricingImportState={pricingImport.pricingImportState}
+            pricingImportPreview={pricingImport.pricingImportPreview}
             pricingImportReloadState={pricingImport.pricingImportReloadState}
+            pricingImportUploading={pricingImport.pricingImportUploading}
+            pricingImportLoading={pricingImport.pricingImportLoading}
             pricingImportSubmitting={pricingImport.pricingImportSubmitting}
             setPricingImportBatchId={pricingImport.setPricingImportBatchId}
             setPricingImportBatchRevision={pricingImport.setPricingImportBatchRevision}
             setPricingImportReportRevision={pricingImport.setPricingImportReportRevision}
+            onPreview={(file) => void pricingImport.previewPricingImport(file)}
+            onReload={() => void pricingImport.reloadPricingImport()}
             onCommit={() => void pricingImport.commitPricingImport()}
-          />
-        </section>
+            />
+          </section>
+        )}
 
         <section className="hero-grid" id="preparation-section">
           <div className="hero-card"><div className="hero-copy"><span className="hero-kicker">CETTE SEMAINE</span><h2>Décider avec la<br /><strong>bonne information.</strong></h2><p>Retrouvez vos affaires actives et reprenez chaque chiffrage là où vous l’avez laissé.</p><button className="primary-button" onClick={() => document.getElementById("draft-section")?.scrollIntoView({ behavior: "smooth" })}>Ouvrir un chiffrage <span>→</span></button></div><div className="hero-orbit"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit-core">AO<br /><small>V8</small></div></div></div>
-          <div className="metric-stack"><div className="small-metric"><span className="metric-label">AFFAIRES ACTIVES</span><strong>{cases.length.toString().padStart(2, "0")}</strong><span className="metric-meta">dans votre périmètre</span></div><div className="small-metric"><span className="metric-label">ÉTAT DE LA CONNEXION</span><strong className={token.trim() ? "text-green" : "text-amber"}>{token.trim() ? "Prête" : "À configurer"}</strong><span className="metric-meta">{baseUrl}</span></div></div>
+          <div className="metric-stack"><div className="small-metric"><span className="metric-label">AFFAIRES ACTIVES</span><strong>{cases.length.toString().padStart(2, "0")}</strong><span className="metric-meta">dans votre périmètre</span></div><div className="small-metric"><span className="metric-label">ÉTAT DE LA CONNEXION</span><strong className={isAuthenticated ? "text-green" : "text-amber"}>{isAuthenticated ? "Prête" : isRestoring ? "Restauration…" : "À configurer"}</strong><span className="metric-meta">{baseUrl}</span></div></div>
         </section>
 
-        <section className="section-block" id="review-section"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Configurez votre Bearer token puis actualisez pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
+        <section className="section-block" id="review-section"><div className="section-heading"><div><span className="section-kicker">PORTEFEUILLE</span><h2>Mes affaires</h2></div><span className="count-pill">{cases.length} visible{cases.length > 1 ? "s" : ""}</span></div><div className="case-grid">{cases.length === 0 ? <div className="empty-card"><strong>Aucune affaire chargée</strong><p>Connectez-vous avec votre compte pour charger les affaires auxquelles vous avez accès.</p><button className="secondary-button" onClick={() => setShowConnection(true)}>Configurer la connexion</button></div> : cases.map((item) => <button key={item.case_id} className={`case-card ${item.case_id === selectedCaseId ? "selected" : ""}`} onClick={() => setSelectedCaseId(item.case_id)}><div className="case-top"><span className="case-status">{item.dce_availability}</span><span className="case-arrow">↗</span></div><h3>{item.work_label}</h3><p>{item.case_id}</p><div className="case-footer"><span>{item.commercial_stage}</span><span>{item.case_lifecycle}</span></div></button>)}</div></section>
+
+        {isPatron && (
+          <BoampOpportunityPanel
+          observations={boamp.observations}
+          selectedObservationId={boamp.selectedObservationId}
+          qualificationForm={boamp.qualificationForm}
+          loading={boamp.loading}
+          qualifying={boamp.qualifying}
+          onRefresh={() => void boamp.refreshObservations()}
+          onSelect={boamp.selectObservation}
+          onDecisionChange={boamp.setDecision}
+          onReasonChange={boamp.setReason}
+            onQualify={() => void boamp.qualifySelected()}
+          />
+        )}
+
+        <DceKnowledgePanel
+          selectedCaseId={selectedCaseId}
+          reading={dceKnowledge.reading}
+          results={dceKnowledge.results}
+          query={dceKnowledge.query}
+          loading={dceKnowledge.loading}
+          searching={dceKnowledge.searching}
+          onQueryChange={dceKnowledge.setQuery}
+          onLoad={() => void dceKnowledge.loadReading()}
+          onSearch={() => void dceKnowledge.searchKnowledge()}
+          onResetSearch={dceKnowledge.resetSearch}
+        />
 
         <CollaboratorWizardPanel
           wizardCaseId={wizardCaseId}
@@ -360,32 +526,57 @@ function App() {
           onTransmitSnapshot={() => void transmitWizardSnapshot()}
         />
 
-        <PatronCockpitPanel
+        {isPatron && (
+          <PatronCockpitPanel
           assignments={assignments}
           selectedAssignmentId={selectedAssignmentId}
           journal={journal}
           interactions={interactions}
-          onSelectAssignment={(assignment) => void selectAssignment(assignment)}
-        />
+            onSelectAssignment={(assignment) => void selectAssignment(assignment)}
+          />
+        )}
 
-        <PatronDecisionPanel decisionDossier={decisionDossier} formatDate={formatDate} />
+        {isPatron && (
+          <PatronDecisionPanel
+            decisionDossier={decisionDossier}
+            formatDate={formatDate}
+            canManage={currentActor?.actor_kind === "PATRON_ADMIN"}
+            onCreateDecision={() => void createDecision()}
+            onFreezeContext={(input) => void freezeDecisionContext(input)}
+            onResolveCondition={(conditionId, input) =>
+              void resolveDecisionCondition(conditionId, input)
+            }
+          />
+        )}
 
-        <SubmissionPanel
+        {isPatron && (
+          <SubmissionPanel
           preparationPackageId={submissionActions.preparationPackageId}
           preparationRevision={submissionActions.preparationRevision}
           submissionPackageId={submissionActions.submissionPackageId}
           submissionExported={submissionActions.submissionExported}
+          signatureId={submissionActions.signatureId}
+          signaturePackageVersion={submissionActions.signaturePackageVersion}
+          signatureStatus={submissionActions.signatureStatus}
+          signatureProvider={submissionActions.signatureProvider}
+          signatureRevision={submissionActions.signatureRevision}
           evidenceForm={submissionActions.evidenceForm}
           setPreparationPackageId={submissionActions.setPreparationPackageId}
           setPreparationRevision={submissionActions.setPreparationRevision}
           setSubmissionPackageId={submissionActions.setSubmissionPackageId}
+          setSignatureId={submissionActions.setSignatureId}
+          setSignaturePackageVersion={submissionActions.setSignaturePackageVersion}
           setEvidenceForm={submissionActions.setEvidenceForm}
           onPrepare={() => void submissionActions.prepareSubmissionPackage()}
+          onRequestSignature={() => void submissionActions.requestSignature()}
+          onLoadSignature={() => void submissionActions.loadSignature()}
           onExport={() => void submissionActions.exportSubmissionPackage()}
-          onRecordEvidence={() => void submissionActions.recordSubmissionEvidence()}
-        />
+            onRecordEvidence={() => void submissionActions.recordSubmissionEvidence()}
+          />
+        )}
 
-        <FinancialDraftPanel
+        {isPatron && (
+          <FinancialDraftPanel
           cases={cases}
           selectedCaseId={selectedCaseId}
           setSelectedCaseId={setSelectedCaseId}
@@ -401,13 +592,14 @@ function App() {
           submitLine={submitLine}
           formatMoney={formatMoney}
           formatDate={formatDate}
-          categoryLabel={categoryLabel}
-        />
+            categoryLabel={categoryLabel}
+          />
+        )}
 
         <footer className="footer"><span>SMART_AO V8</span><span>Architecture sécurisée · Tenant-scoped · Auditée</span><span>API {baseUrl}</span></footer>
       </main>
 
-      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2>Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>Le token est conservé uniquement dans le stockage local de ce navigateur. Il n’est jamais envoyé ailleurs que vers l’URL configurée.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><div className={`readiness-indicator readiness-${backendReadinessState}`} role="status"><strong>{backendReadinessState === "checking" ? "Vérification en cours…" : backendReadinessState === "ready" ? "Backend prêt" : backendReadinessState === "not_ready" ? "Backend non prêt" : backendReadinessState === "error" ? "Backend inaccessible" : "Backend non vérifié"}</strong>{backendReadiness && <small>PostgreSQL : {backendReadiness.checks.database} · ClamAV : {backendReadiness.checks.clamav}</small>}</div><label><span>Bearer token</span><textarea required rows={4} value={token} onChange={(event) => setToken(event.target.value)} placeholder="eyJhbGciOiJIUzI1NiIs…" /></label><button className="primary-button" type="submit">Enregistrer et charger <span>→</span></button></form></div>}
+      {showConnection && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setShowConnection(false); }}><form className="connection-modal" role="dialog" aria-modal="true" aria-labelledby="connection-modal-title" onSubmit={saveConnection}><div className="modal-top"><div><span className="section-kicker">CONFIGURATION</span><h2 id="connection-modal-title">Connexion au backend</h2></div><button type="button" className="close-button" onClick={() => setShowConnection(false)}>×</button></div><p>La session utilise un cookie de renouvellement HttpOnly et un jeton d’accès conservé uniquement en mémoire.</p><label><span>URL API</span><input required value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><div className={`readiness-indicator readiness-${backendReadinessState}`} role="status"><strong>{backendReadinessState === "checking" ? "Vérification en cours…" : backendReadinessState === "ready" ? "Backend prêt" : backendReadinessState === "not_ready" ? "Backend non prêt" : backendReadinessState === "error" ? "Backend inaccessible" : "Backend non vérifié"}</strong>{backendReadiness && <small>PostgreSQL : {backendReadiness.checks.database} · ClamAV : {backendReadiness.checks.clamav}</small>}</div><label><span>Email</span><input required type="email" autoComplete="username" value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} /></label><label><span>Tenant ID</span><input required value={tenantId} onChange={(event) => setTenantId(event.target.value)} /></label><label><span>Mot de passe</span><input required type="password" autoComplete="current-password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} /></label><button className="primary-button" type="submit">Se connecter <span>→</span></button></form></div>}
     </div>
   );
 }

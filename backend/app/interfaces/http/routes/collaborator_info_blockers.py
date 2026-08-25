@@ -6,8 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
+from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
-from app.interfaces.http.routes.dce_versions import _resolve_context
 from app.modules.membership.application.collab_info_blockers import CollaboratorInfoBlockerService
 from app.modules.membership.application.collab_info_blockers_commands import (
     CreateInformationRequestCommand,

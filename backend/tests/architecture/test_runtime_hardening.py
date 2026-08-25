@@ -16,3 +16,11 @@ def test_backend_image_is_digest_pinned_and_runs_non_root() -> None:
     ) in content
     assert "SMART_AO_DCE_QUARANTINE_ROOT=" in content
     assert "/var/lib/smart_ao/dce-quarantine" in content
+
+
+def test_backend_image_installs_from_frozen_uv_lock() -> None:
+    content = DOCKERFILE.read_text(encoding="utf-8")
+
+    assert "COPY pyproject.toml README.md uv.lock ./" in content
+    assert "uv sync --frozen --no-dev --no-editable" in content
+    assert "pip install --no-cache-dir ." not in content

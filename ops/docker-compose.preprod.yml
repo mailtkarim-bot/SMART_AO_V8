@@ -42,9 +42,31 @@ services:
     logging: *default-logging
     init: true
     expose:
-      - "80"
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - edge
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: ["alembic", "-c", "/app/backend/alembic.ini", "upgrade", "head"]
+    restart: "no"
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
       - internal
     security_opt:
       - no-new-privileges:true
@@ -53,25 +75,76 @@ services:
     build:
       context: ..
       dockerfile: ops/docker/backend.Dockerfile
+      args:
+        SMART_AO_INSTALL_RAG: ${SMART_AO_INSTALL_RAG:-0}
+        SMART_AO_INSTALL_DOCUMENT_ADVANCED: ${SMART_AO_INSTALL_DOCUMENT_ADVANCED:-0}
+        SMART_AO_INSTALL_OBJECT_STORAGE: ${SMART_AO_INSTALL_OBJECT_STORAGE:-0}
+        SMART_AO_INSTALL_CONNECTORS: ${SMART_AO_INSTALL_CONNECTORS:-0}
+        SMART_AO_INSTALL_NOTIFICATIONS: ${SMART_AO_INSTALL_NOTIFICATIONS:-0}
+        SMART_AO_INSTALL_CALENDAR: ${SMART_AO_INSTALL_CALENDAR:-0}
     restart: unless-stopped
     logging: *default-logging
     init: true
-    env_file:
-      - .env.preprod
     environment:
       SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+      SMART_AO_JWT_SIGNING_KEY: ${SMART_AO_JWT_SIGNING_KEY:?SMART_AO_JWT_SIGNING_KEY is required}
+      SMART_AO_JWT_ISSUER: ${SMART_AO_JWT_ISSUER:?SMART_AO_JWT_ISSUER is required}
+      SMART_AO_JWT_AUDIENCE: ${SMART_AO_JWT_AUDIENCE:?SMART_AO_JWT_AUDIENCE is required}
+      SMART_AO_JWT_KEY_ID: ${SMART_AO_JWT_KEY_ID:-active}
+      SMART_AO_JWT_VERIFICATION_KEYS_JSON: ${SMART_AO_JWT_VERIFICATION_KEYS_JSON:-}
+      SMART_AO_LOGIN_MAX_FAILURES: ${SMART_AO_LOGIN_MAX_FAILURES:-5}
+      SMART_AO_LOGIN_FAILURE_WINDOW_SECONDS: ${SMART_AO_LOGIN_FAILURE_WINDOW_SECONDS:-900}
+      SMART_AO_LOGIN_BASE_LOCKOUT_SECONDS: ${SMART_AO_LOGIN_BASE_LOCKOUT_SECONDS:-30}
+      SMART_AO_LOGIN_MAX_LOCKOUT_SECONDS: ${SMART_AO_LOGIN_MAX_LOCKOUT_SECONDS:-900}
+      SMART_AO_TRUSTED_PROXY_CIDRS: ${SMART_AO_TRUSTED_PROXY_CIDRS:-172.30.0.0/24}
       SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
       SMART_AO_CLAMD_HOST: clamav
       SMART_AO_CLAMD_PORT: "3310"
+      SMART_AO_CLAMD_TIMEOUT_SECONDS: ${SMART_AO_CLAMD_TIMEOUT_SECONDS:-30}
+      SMART_AO_RAG_ENABLED: ${SMART_AO_RAG_ENABLED:-0}
+      SMART_AO_RAG_INDEXING_ENABLED: ${SMART_AO_RAG_INDEXING_ENABLED:-0}
+      SMART_AO_BGE_MODEL_ID: ${SMART_AO_BGE_MODEL_ID:-BAAI/bge-m3}
+      SMART_AO_BGE_CACHE_DIR: /var/lib/smart_ao/models
+      SMART_AO_BGE_LOCAL_FILES_ONLY: ${SMART_AO_BGE_LOCAL_FILES_ONLY:-1}
+      SMART_AO_ADVANCED_EXTRACTION_ENABLED: ${SMART_AO_ADVANCED_EXTRACTION_ENABLED:-0}
+      SMART_AO_OBJECT_STORAGE_ENABLED: ${SMART_AO_OBJECT_STORAGE_ENABLED:-0}
+      SMART_AO_OBJECT_STORAGE_BUCKET: ${SMART_AO_OBJECT_STORAGE_BUCKET:-}
+      SMART_AO_OBJECT_STORAGE_ENDPOINT_URL: ${SMART_AO_OBJECT_STORAGE_ENDPOINT_URL:-}
+      SMART_AO_OBJECT_STORAGE_REGION: ${SMART_AO_OBJECT_STORAGE_REGION:-}
+      SMART_AO_OBJECT_STORAGE_SSE: ${SMART_AO_OBJECT_STORAGE_SSE:-AES256}
+      SMART_AO_INSEE_ENABLED: ${SMART_AO_INSEE_ENABLED:-0}
+      SMART_AO_INSEE_API_TOKEN: ${SMART_AO_INSEE_API_TOKEN:-}
+      SMART_AO_INSEE_BASE_URL: ${SMART_AO_INSEE_BASE_URL:-https://api.insee.fr/api-sirene/3.11}
+      SMART_AO_INSEE_TIMEOUT_SECONDS: ${SMART_AO_INSEE_TIMEOUT_SECONDS:-5}
+      SMART_AO_SMTP_ENABLED: ${SMART_AO_SMTP_ENABLED:-0}
+      SMART_AO_SMTP_HOST: ${SMART_AO_SMTP_HOST:-}
+      SMART_AO_SMTP_PORT: ${SMART_AO_SMTP_PORT:-587}
+      SMART_AO_SMTP_FROM: ${SMART_AO_SMTP_FROM:-}
+      SMART_AO_SMTP_USERNAME: ${SMART_AO_SMTP_USERNAME:-}
+      SMART_AO_SMTP_PASSWORD: ${SMART_AO_SMTP_PASSWORD:-}
+      SMART_AO_SMTP_USE_TLS: ${SMART_AO_SMTP_USE_TLS:-0}
+      SMART_AO_SMTP_START_TLS: ${SMART_AO_SMTP_START_TLS:-}
+      SMART_AO_SMTP_TIMEOUT_SECONDS: ${SMART_AO_SMTP_TIMEOUT_SECONDS:-10}
+      SMART_AO_SIGNATURE_PROVIDER: ${SMART_AO_SIGNATURE_PROVIDER:-}
+      SMART_AO_SIGNATURE_CALLBACK_SECRET: ${SMART_AO_SIGNATURE_CALLBACK_SECRET:-}
+      SMART_AO_CALENDAR_ENABLED: ${SMART_AO_CALENDAR_ENABLED:-0}
+      SMART_AO_BOAMP_ENABLED: ${SMART_AO_BOAMP_ENABLED:-0}
+      SMART_AO_BOAMP_BASE_URL: ${SMART_AO_BOAMP_BASE_URL:-https://www.boamp.fr/api/explore/v2.1/catalog/datasets/boamp/records}
+      SMART_AO_BOAMP_TIMEOUT_SECONDS: ${SMART_AO_BOAMP_TIMEOUT_SECONDS:-5}
     expose:
       - "8000"
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       clamav:
         condition: service_healthy
     volumes:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
+      - bge_models:/var/lib/smart_ao/models:ro
     networks:
       - internal
     healthcheck:
@@ -94,19 +167,68 @@ services:
     restart: unless-stopped
     logging: *default-logging
     init: true
-    env_file:
-      - .env.preprod
     environment:
       SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
       SMART_AO_DCE_QUARANTINE_ROOT: /var/lib/smart_ao/dce-quarantine
       SMART_AO_RETENTION_BATCH_SIZE: ${SMART_AO_RETENTION_BATCH_SIZE:-50}
       SMART_AO_RETENTION_LEASE_SECONDS: ${SMART_AO_RETENTION_LEASE_SECONDS:-120}
       SMART_AO_RETENTION_POLL_SECONDS: ${SMART_AO_RETENTION_POLL_SECONDS:-30}
+      SMART_AO_OUTBOX_MAX_ATTEMPTS: ${SMART_AO_OUTBOX_MAX_ATTEMPTS:-10}
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - dce_quarantine:/var/lib/smart_ao/dce-quarantine
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  dce-rc-analysis-runner:
+    profiles: ["dce-analysis"]
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: ["python", "-m", "app.workers.dce_analysis"]
+    restart: "no"
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  dce-requirements-runner:
+    profiles: ["dce-requirements"]
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: ["python", "-m", "app.workers.dce_requirements"]
+    restart: "no"
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - internal
     security_opt:
@@ -116,23 +238,102 @@ services:
     build:
       context: ..
       dockerfile: ops/docker/backend.Dockerfile
+      args:
+        SMART_AO_INSTALL_NOTIFICATIONS: ${SMART_AO_INSTALL_NOTIFICATIONS:-0}
     command: python -m app.workers.submission_export_webhook
     restart: unless-stopped
     logging: *default-logging
     init: true
-    env_file:
-      - .env.preprod
     environment:
       SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
       SMART_AO_EXPORT_WEBHOOK_URL: ${SMART_AO_EXPORT_WEBHOOK_URL:-}
+      SMART_AO_EXPORT_WEBHOOK_SECRET: ${SMART_AO_EXPORT_WEBHOOK_SECRET:-}
       SMART_AO_EXPORT_WEBHOOK_BATCH_SIZE: ${SMART_AO_EXPORT_WEBHOOK_BATCH_SIZE:-50}
       SMART_AO_EXPORT_WEBHOOK_LEASE_SECONDS: ${SMART_AO_EXPORT_WEBHOOK_LEASE_SECONDS:-120}
       SMART_AO_EXPORT_WEBHOOK_POLL_SECONDS: ${SMART_AO_EXPORT_WEBHOOK_POLL_SECONDS:-30}
       SMART_AO_EXPORT_WEBHOOK_TIMEOUT_SECONDS: ${SMART_AO_EXPORT_WEBHOOK_TIMEOUT_SECONDS:-10}
+      SMART_AO_OUTBOX_MAX_ATTEMPTS: ${SMART_AO_OUTBOX_MAX_ATTEMPTS:-10}
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
+      # edge grants outbound HTTPS to the external deposit portal only;
+      # internal keeps database access. No inbound exposure is declared.
+      - edge
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  submission-export-smtp-worker:
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+      args:
+        SMART_AO_INSTALL_NOTIFICATIONS: ${SMART_AO_INSTALL_NOTIFICATIONS:-0}
+    command: python -m app.workers.submission_export_smtp
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+      SMART_AO_SMTP_ENABLED: ${SMART_AO_SMTP_ENABLED:-0}
+      SMART_AO_SMTP_HOST: ${SMART_AO_SMTP_HOST:-}
+      SMART_AO_SMTP_PORT: ${SMART_AO_SMTP_PORT:-587}
+      SMART_AO_SMTP_FROM: ${SMART_AO_SMTP_FROM:-}
+      SMART_AO_SMTP_TO: ${SMART_AO_SMTP_TO:-}
+      SMART_AO_SMTP_USERNAME: ${SMART_AO_SMTP_USERNAME:-}
+      SMART_AO_SMTP_PASSWORD: ${SMART_AO_SMTP_PASSWORD:-}
+      SMART_AO_SMTP_USE_TLS: ${SMART_AO_SMTP_USE_TLS:-0}
+      SMART_AO_SMTP_START_TLS: ${SMART_AO_SMTP_START_TLS:-}
+      SMART_AO_SMTP_TIMEOUT_SECONDS: ${SMART_AO_SMTP_TIMEOUT_SECONDS:-10}
+      SMART_AO_SMTP_BATCH_SIZE: ${SMART_AO_SMTP_BATCH_SIZE:-50}
+      SMART_AO_SMTP_LEASE_SECONDS: ${SMART_AO_SMTP_LEASE_SECONDS:-120}
+      SMART_AO_SMTP_POLL_SECONDS: ${SMART_AO_SMTP_POLL_SECONDS:-30}
+      SMART_AO_OUTBOX_MAX_ATTEMPTS: ${SMART_AO_OUTBOX_MAX_ATTEMPTS:-10}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - edge
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
+  opportunity-event-bus-worker:
+    profiles: ["external-bus"]
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: python -m app.workers.opportunity_event_bus
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+      SMART_AO_EXTERNAL_EVENT_BUS_ENABLED: ${SMART_AO_EXTERNAL_EVENT_BUS_ENABLED:-0}
+      SMART_AO_EXTERNAL_EVENT_BUS_URL: ${SMART_AO_EXTERNAL_EVENT_BUS_URL:-}
+      SMART_AO_EXTERNAL_EVENT_BUS_TOKEN: ${SMART_AO_EXTERNAL_EVENT_BUS_TOKEN:-}
+      SMART_AO_EXTERNAL_EVENT_BUS_BATCH_SIZE: ${SMART_AO_EXTERNAL_EVENT_BUS_BATCH_SIZE:-50}
+      SMART_AO_EXTERNAL_EVENT_BUS_LEASE_SECONDS: ${SMART_AO_EXTERNAL_EVENT_BUS_LEASE_SECONDS:-120}
+      SMART_AO_EXTERNAL_EVENT_BUS_POLL_SECONDS: ${SMART_AO_EXTERNAL_EVENT_BUS_POLL_SECONDS:-30}
+      SMART_AO_OUTBOX_MAX_ATTEMPTS: ${SMART_AO_OUTBOX_MAX_ATTEMPTS:-10}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - edge
       - internal
     security_opt:
       - no-new-privileges:true
@@ -170,6 +371,9 @@ services:
     volumes:
       - clamav_database:/var/lib/clamav
     networks:
+      # edge grants signature-database update egress; internal keeps clamd
+      # reachable only by the backend. No host ports are published.
+      - edge
       - internal
     healthcheck:
       test: ["CMD-SHELL", "clamdscan --ping 1"]
@@ -187,6 +391,7 @@ volumes:
   caddy_data:
   caddy_config:
   caddy_logs:
+  bge_models:
 
 networks:
   edge:
@@ -194,3 +399,6 @@ networks:
   internal:
     driver: bridge
     internal: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

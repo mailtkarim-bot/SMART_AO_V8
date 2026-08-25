@@ -336,3 +336,37 @@ def test_logout_refuses_invalid_access_token_neutrally_without_mutation(
             .select_from(AuthSessionRecord)
             .where(AuthSessionRecord.tenant_id == tenant_id)
         ) == 0
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_current_actor_returns_server_resolved_membership_facts(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id = _insert_tenant(database_engine)
+    identity_id, _, email = _active_identity_with_membership(
+        database_engine,
+        tenant_id=tenant_id,
+    )
+    client, _ = _client(session_factory)
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": email,
+            "password": "Correct#Pass123",
+            "tenant_id": str(tenant_id),
+        },
+    )
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["identity_id"] == str(identity_id)
+    assert body["actor_kind"] == "PATRON_ADMIN"
+    assert body["membership_state"] == "ACTIVE"

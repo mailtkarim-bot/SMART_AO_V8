@@ -10,9 +10,24 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.modules.enterprise.infrastructure.models import EnterpriseDocumentRecord
-from app.modules.preparation.infrastructure.document_storage import GeneratedDocumentStorage
+from app.modules.decision.domain.submission_gate import evaluate_submission_gate
+from app.modules.enterprise.infrastructure.models import (
+    CaseCapabilityProposalRecord,
+    EnterpriseCapabilityProofLinkRecord,
+    EnterpriseCapabilityRecord,
+    EnterpriseCapabilityVersionRecord,
+    EnterpriseDocumentRecord,
+)
+from app.modules.preparation.infrastructure.models import (
+    GeneratedTechnicalDocumentRecord,
+    PreparationPackageRecord,
+    PreparationReadinessRecord,
+)
+from app.modules.pricing.infrastructure.models import FinancialReportSnapshotRecord
 from app.modules.submission.application.commands import PrepareSubmissionPackageCommand
+from app.modules.submission.application.notifications import SUBMISSION_EXPORT_EMAIL_TOPIC
+from app.modules.submission.application.ports import SubmissionDecisionGateReader
+from app.modules.submission.infrastructure.models import SubmissionPackageRecord
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -36,17 +51,7 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    CaseCapabilityProposalRecord,
-    EnterpriseCapabilityProofLinkRecord,
-    EnterpriseCapabilityRecord,
-    EnterpriseCapabilityVersionRecord,
-    FinancialReportSnapshotRecord,
-    GeneratedTechnicalDocumentRecord,
-    PreparationPackageRecord,
-    PreparationReadinessRecord,
-    SubmissionPackageRecord,
-)
+from app.platform.storage.ports import GeneratedDocumentStorage
 
 
 class SubmissionPackageService:
@@ -60,12 +65,14 @@ class SubmissionPackageService:
         policy: AuthorizationPolicyPort,
         storage: GeneratedDocumentStorage | None = None,
         audit_writer: SecurityAuditWriter | None = None,
+        decision_gate_reader: SubmissionDecisionGateReader | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._dispatcher = dispatcher
         self._policy = policy
         self._storage = storage
         self._audit_writer = audit_writer or SecurityAuditWriter()
+        self._decision_gate_reader = decision_gate_reader
 
     def export(
         self, *, actor: ActorContext, submission_package_id: UUID, now: datetime
@@ -111,6 +118,11 @@ class SubmissionPackageService:
             )
             if document is None:
                 raise CommandExecutionError("TECHNICAL_DOCUMENT_REQUIRED")
+            self._assert_decision_gate(
+                session=session,
+                tenant_id=actor.tenant_id,
+                case_id=record.case_id,
+            )
             technical_bytes = self._storage.read(storage_key=document.storage_key)
         with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b") as archive:
             with zipfile.ZipFile(
@@ -136,6 +148,10 @@ class SubmissionPackageService:
             "manifest_sha256": record.manifest_sha256,
             "archive_sha256": archive_sha256,
             "delivery": "DOWNLOAD",
+        }
+        email_payload = {
+            "submission_package_id": str(submission_package_id),
+            "delivery": "EXPORT_READY",
         }
         with self._session_factory.begin() as session:
             self._audit_writer.record(
@@ -197,7 +213,37 @@ class SubmissionPackageService:
                     dedupe_key=f"submission-export:{event_id}",
                 )
             )
+            session.add(
+                OutboxMessageRecord(
+                    id=uuid4(),
+                    tenant_id=actor.tenant_id,
+                    event_id=event_id,
+                    topic=SUBMISSION_EXPORT_EMAIL_TOPIC,
+                    payload_version=1,
+                    payload_json=email_payload,
+                    status="PENDING",
+                    attempt_count=0,
+                    next_attempt_at=now,
+                    published_at=None,
+                    last_error_code=None,
+                    dedupe_key=f"submission-export-email:{event_id}",
+                )
+            )
         return archive_bytes
+
+    def _assert_decision_gate(self, *, session: Session, tenant_id: UUID, case_id: UUID) -> None:
+        if self._decision_gate_reader is None:
+            raise CommandExecutionError("DECISION_GATE_NOT_CONFIGURED")
+        snapshot = self._decision_gate_reader.read(
+            session=session,
+            tenant_id=tenant_id,
+            case_id=case_id,
+        )
+        if snapshot is None:
+            raise CommandExecutionError("DECISION_GATE_NOT_AVAILABLE")
+        result = evaluate_submission_gate(snapshot)
+        if not result.can_submit:
+            raise CommandExecutionError("DECISION_SUBMISSION_BLOCKED")
 
     def prepare(
         self,
@@ -240,6 +286,9 @@ class SubmissionPackageService:
 
 class PrepareSubmissionPackageHandler:
     """Freeze server-resolved references; never claim external submission success."""
+
+    def __init__(self, *, decision_gate_reader: SubmissionDecisionGateReader | None = None) -> None:
+        self._decision_gate_reader = decision_gate_reader
 
     def execute(
         self,
@@ -307,6 +356,12 @@ class PrepareSubmissionPackageHandler:
         )
         if snapshot is None:
             raise CommandExecutionError("OFFICIAL_PRICE_NOT_PUBLISHED")
+        _assert_decision_gate(
+            reader=self._decision_gate_reader,
+            session=session,
+            tenant_id=context.tenant_id,
+            case_id=preparation.case_id,
+        )
         enterprise_entries = self._validated_enterprise_entries(
             session=session,
             preparation=preparation,
@@ -492,6 +547,24 @@ class PrepareSubmissionPackageHandler:
         return tuple(entries)
 
 
-def submission_handlers() -> dict[str, PrepareSubmissionPackageHandler]:
-    handler = PrepareSubmissionPackageHandler()
+def submission_handlers(
+    *, decision_gate_reader: SubmissionDecisionGateReader | None = None
+) -> dict[str, PrepareSubmissionPackageHandler]:
+    handler = PrepareSubmissionPackageHandler(decision_gate_reader=decision_gate_reader)
     return {PrepareSubmissionPackageCommand.command_type: handler}
+
+
+def _assert_decision_gate(
+    *,
+    reader: SubmissionDecisionGateReader | None,
+    session: Session,
+    tenant_id: UUID,
+    case_id: UUID,
+) -> None:
+    if reader is None:
+        raise CommandExecutionError("DECISION_GATE_NOT_CONFIGURED")
+    snapshot = reader.read(session=session, tenant_id=tenant_id, case_id=case_id)
+    if snapshot is None:
+        raise CommandExecutionError("DECISION_GATE_NOT_AVAILABLE")
+    if not evaluate_submission_gate(snapshot).can_submit:
+        raise CommandExecutionError("DECISION_SUBMISSION_BLOCKED")

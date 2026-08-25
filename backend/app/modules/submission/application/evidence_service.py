@@ -4,6 +4,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.modules.submission.application.evidence_commands import RecordSubmissionEvidenceCommand
+from app.modules.submission.infrastructure.models import (
+    SubmissionEvidenceRecord,
+    SubmissionPackageRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -19,7 +23,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import SubmissionEvidenceRecord, SubmissionPackageRecord
 
 
 class SubmissionEvidenceService:

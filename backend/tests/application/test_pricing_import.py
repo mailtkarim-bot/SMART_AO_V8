@@ -2,6 +2,7 @@ from dataclasses import replace
 from io import BytesIO
 from uuid import uuid4
 
+import app.modules.pricing.application.import_preview as import_preview_module
 import pytest
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.patron_pricing_import import build_patron_pricing_import_router
@@ -53,6 +54,53 @@ def test_pricing_import_preview_parses_dpgf_rows_without_persisting_raw_file(ses
     assert preview.error_count == 0
     assert preview.total_minor == 32_500
     assert preview.rows[0].total_minor == 12_500
+    assert preview.truncated is False
+    assert preview.limit_reason is None
+
+
+def test_pricing_import_preview_reports_row_limit_truncation(session_factory, monkeypatch):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    monkeypatch.setattr(import_preview_module, "MAX_ROWS", 3)
+    payload = _xlsx(
+        [["Code", "Désignation", "Unité", "Quantité", "Prix unitaire"]]
+        + [[f"A-{index:02d}", "Terrassement", "m2", 1, 10] for index in range(1, 6)]
+    )
+    preview = PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+        actor=actor,
+        case_id=case_id,
+        document_kind="DPGF",
+        filename="bordereau.xlsx",
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        payload=payload,
+    )
+    assert preview.truncated is True
+    assert preview.limit_reason == "ROW_LIMIT"
+    assert preview.row_count < 5
+    assert all(row.errors == () for row in preview.rows)
+
+
+def test_pricing_import_preview_reports_error_limit_truncation(session_factory, monkeypatch):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    monkeypatch.setattr(import_preview_module, "MAX_ERRORS", 1)
+    payload = _xlsx(
+        [
+            ["Code", "Désignation", "Unité", "Quantité", "Prix unitaire"],
+            ["A-01", "Lot un", "m2", -5, 10],
+            ["A-02", "Lot deux", "m3", 2, 20],
+            ["A-03", "Lot trois", "m2", 3, 30],
+        ]
+    )
+    preview = PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+        actor=actor,
+        case_id=case_id,
+        document_kind="DPGF",
+        filename="bordereau.xlsx",
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        payload=payload,
+    )
+    assert preview.error_count >= 1
+    assert preview.truncated is True
+    assert preview.limit_reason == "ERROR_LIMIT"
 
 
 def test_pricing_import_preview_reports_missing_designation_and_refuses_non_xlsx(session_factory):
@@ -101,7 +149,7 @@ def test_pricing_import_preview_refuses_collaborator_before_reading_financial_ro
         actor_kind=ActorKind.COLLABORATEUR,
         capabilities=capabilities_for(ActorKind.COLLABORATEUR),
     )
-    with pytest.raises(PermissionError, match="PATRON_REQUIRED"):
+    with pytest.raises(PermissionError, match="FINANCIAL_REPORT_PATRON_REQUIRED"):
         PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
             actor=collaborator,
             case_id=case_id,
@@ -297,6 +345,58 @@ def test_pricing_import_preview_http_contract(session_factory):
     assert denied.status_code == 403
 
 
+def test_pricing_import_preview_rejects_actual_uncompressed_size(
+    session_factory,
+    monkeypatch,
+):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+
+    class _Member:
+        def __init__(self):
+            self.remaining = import_preview_module.MAX_UNCOMPRESSED_BYTES + 1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, size):
+            chunk_size = min(size, self.remaining)
+            self.remaining -= chunk_size
+            return b"x" * chunk_size
+
+    class _Archive:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def namelist(self):
+            return []
+
+        def infolist(self):
+            return [type("Info", (), {"file_size": 1})()]
+
+        def open(self, info):
+            return _Member()
+
+    monkeypatch.setattr(import_preview_module, "ZipFile", _Archive)
+    with pytest.raises(ValueError, match="IMPORT_ARCHIVE_TOO_LARGE"):
+        PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+            actor=actor,
+            case_id=case_id,
+            document_kind="EXCEL",
+            filename="bomb.xlsx",
+            content_type=None,
+            payload=b"metadata-only",
+        )
+
+
 def test_pricing_import_preview_rejects_zip_bomb_metadata(session_factory, monkeypatch):
     actor, case_id, _, _ = _seed_draft(session_factory)
 
@@ -328,3 +428,33 @@ def test_pricing_import_preview_rejects_zip_bomb_metadata(session_factory, monke
             content_type=None,
             payload=b"metadata-only",
         )
+
+
+def test_pricing_import_normalizes_european_amounts_and_rejects_inconsistent_total(
+    session_factory,
+):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    preview = PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+        actor=actor,
+        case_id=case_id,
+        document_kind="BPU",
+        filename="amounts.xlsx",
+        content_type=None,
+        payload=_xlsx(
+            [
+                ["Désignation", "Quantité", "Prix unitaire", "Total"],
+                ["Arrondi commercial", 1, 1.005, None],
+                ["Format européen", "1,5", "1 234,56", "1 851,84"],
+                ["Total incohérent", 2, 10, 19],
+            ]
+        ),
+    )
+
+    assert preview.rows[0].unit_price_minor == 101
+    assert preview.rows[0].total_minor == 101
+    assert preview.rows[1].unit_price_minor == 123456
+    assert preview.rows[1].total_minor == 185184
+    assert preview.rows[1].errors == ()
+    assert preview.rows[2].errors == ("TOTAL_PRICE_MISMATCH",)
+    assert preview.valid_row_count == 2
+    assert preview.total_minor == 185285

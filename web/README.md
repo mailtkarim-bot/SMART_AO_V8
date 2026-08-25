@@ -13,9 +13,9 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-L’interface est disponible sur `http://localhost:5173`. Le proxy Vite redirige `/api` vers `http://localhost:8000` en développement. Une URL API différente peut être renseignée depuis **Connexion API**.
+L’interface est disponible sur `http://localhost:5173`. L’URL API est configurée explicitement depuis **Connexion API** et, par défaut, vaut `http://localhost:8000` en développement. En production, une page HTTPS ne peut utiliser qu’une API HTTPS.
 
-Le Bearer token est conservé uniquement dans le stockage local du navigateur pour permettre la démonstration locale. Il n’est envoyé qu’à l’URL API configurée et ne doit pas être utilisé comme mécanisme de stockage de session définitif en production.
+Le Bearer token est conservé uniquement en mémoire JavaScript. Le renouvellement utilise le cookie HttpOnly de session et le jeton CSRF associé ; aucun token d’accès n’est écrit dans `localStorage` ou `sessionStorage`.
 
 ## Contrat consommé
 
@@ -30,7 +30,10 @@ Les receipts de commande ne sont pas utilisés pour afficher des montants : ils 
 ## Validation
 
 ```bash
+pnpm typecheck
+pnpm lint
+pnpm test
 pnpm build
 ```
 
-Le build TypeScript strict est également exécuté par le workflow CI à chaque Pull Request.
+Les contrôles TypeScript strict, ESLint, tests Vitest et build sont également exécutés par le workflow CI à chaque Pull Request.

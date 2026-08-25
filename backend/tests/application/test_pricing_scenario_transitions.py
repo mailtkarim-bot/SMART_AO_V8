@@ -14,6 +14,7 @@ from app.modules.pricing.application.transition_service import (
     PricingScenarioTransitionService,
     pricing_scenario_transition_handlers,
 )
+from app.modules.pricing.infrastructure.scenario_reader import SqlAlchemyPricingScenarioReader
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
@@ -36,14 +37,17 @@ def services(session_factory: sessionmaker[Session]):
         },
     )
     policy = AuthorizationPolicy()
+    reader = SqlAlchemyPricingScenarioReader(session_factory)
     return (
         PricingScenarioService(
             session_factory=session_factory,
+            reader=reader,
             dispatcher=dispatcher,
             policy=policy,
         ),
         PricingScenarioTransitionService(
             session_factory=session_factory,
+            reader=reader,
             dispatcher=dispatcher,
             policy=policy,
         ),

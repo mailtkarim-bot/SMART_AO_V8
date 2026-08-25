@@ -1,12 +1,25 @@
-from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.modules.pricing.application.commands import CreatePricingScenarioCommand
+from app.modules.pricing.application.queries import (
+    PricingScenarioProjection,
+    PricingScenarioReader,
+)
+from app.modules.pricing.domain.cost_basis import (
+    CostBasisInput,
+    CostBasisValidationError,
+    calculate_cost_basis,
+)
 from app.modules.pricing.domain.scenario import calculate_pricing_scenario_amounts
+from app.modules.pricing.infrastructure.models import (
+    FinancialReportSnapshotRecord,
+    PricingScenarioRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -22,34 +35,19 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import FinancialReportSnapshotRecord, PricingScenarioRecord
-
-
-@dataclass(frozen=True, slots=True)
-class PricingScenarioProjection:
-    scenario_id: UUID
-    case_id: UUID
-    scenario_key: str
-    scenario_type: str
-    version: int
-    state: str
-    assumptions: dict[str, object]
-    sales_total_minor: int
-    total_cost_minor: int
-    gross_margin_minor: int
-    gross_margin_rate_bps: int
-    source_snapshot_revision: int
 
 
 class PricingScenarioService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
+        session_factory: Any,
+        reader: PricingScenarioReader,
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
     ) -> None:
         self._session_factory = session_factory
+        self._reader = reader
         self._dispatcher = dispatcher
         self._policy = policy
 
@@ -90,18 +88,7 @@ class PricingScenarioService:
     def list_for_case(self, *, actor: ActorContext, case_id: UUID, now: datetime):
         if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
             raise PermissionError("PATRON_REQUIRED")
-        with self._session_factory() as session:
-            return tuple(
-                _projection(row)
-                for row in session.scalars(
-                    sa.select(PricingScenarioRecord)
-                    .where(
-                        PricingScenarioRecord.tenant_id == actor.tenant_id,
-                        PricingScenarioRecord.case_id == case_id,
-                    )
-                    .order_by(PricingScenarioRecord.created_at.desc())
-                ).all()
-            )
+        return self._reader.list_for_case(tenant_id=actor.tenant_id, case_id=case_id)
 
 
 class PricingScenarioHandler:
@@ -137,6 +124,23 @@ class PricingScenarioHandler:
             sales_adjustment_bps=command.sales_adjustment_bps,
             cost_adjustment_bps=command.cost_adjustment_bps,
         )
+        try:
+            cost_basis = calculate_cost_basis(
+                CostBasisInput(
+                    sales_total_minor=amounts.sales_total_minor,
+                    direct_cost_total_minor=amounts.total_cost_minor,
+                    overhead_total_minor=0,
+                    subcontracting_total_minor=0,
+                    contingency_total_minor=0,
+                    penalty_reserve_minor=command.penalty_reserve_minor,
+                    retention_reserve_minor=command.retention_reserve_minor,
+                    guarantee_reserve_minor=command.guarantee_reserve_minor,
+                    floor_margin_rate_bps=command.floor_margin_rate_bps,
+                    target_margin_rate_bps=command.target_margin_rate_bps,
+                )
+            )
+        except CostBasisValidationError as error:
+            raise CommandExecutionError("INVALID_COST_BASIS") from error
         record = PricingScenarioRecord(
             id=command.scenario_id,
             tenant_id=context.tenant_id,
@@ -147,10 +151,18 @@ class PricingScenarioHandler:
             version=version,
             state="DRAFT",
             assumptions_json=command.assumptions,
-            sales_total_minor=amounts.sales_total_minor,
-            total_cost_minor=amounts.total_cost_minor,
-            gross_margin_minor=amounts.gross_margin_minor,
-            gross_margin_rate_bps=amounts.gross_margin_rate_bps,
+            sales_total_minor=cost_basis.sales_total_minor,
+            total_cost_minor=cost_basis.total_cost_minor,
+            gross_margin_minor=cost_basis.gross_margin_minor,
+            gross_margin_rate_bps=cost_basis.gross_margin_rate_bps,
+            penalty_reserve_minor=cost_basis.penalty_reserve_minor,
+            retention_reserve_minor=cost_basis.retention_reserve_minor,
+            guarantee_reserve_minor=cost_basis.guarantee_reserve_minor,
+            floor_margin_rate_bps=command.floor_margin_rate_bps,
+            target_margin_rate_bps=command.target_margin_rate_bps,
+            break_even_sales_minor=cost_basis.break_even_sales_minor,
+            floor_sales_minor=cost_basis.floor_sales_minor,
+            target_sales_minor=cost_basis.target_sales_minor,
             source_snapshot_revision=snapshot.aggregate_revision,
             actor_id=context.actor_id,
             membership_id=context.membership_id,
@@ -202,5 +214,13 @@ def _projection(record: PricingScenarioRecord) -> PricingScenarioProjection:
         total_cost_minor=record.total_cost_minor,
         gross_margin_minor=record.gross_margin_minor,
         gross_margin_rate_bps=record.gross_margin_rate_bps,
+        penalty_reserve_minor=record.penalty_reserve_minor,
+        retention_reserve_minor=record.retention_reserve_minor,
+        guarantee_reserve_minor=record.guarantee_reserve_minor,
+        floor_margin_rate_bps=record.floor_margin_rate_bps,
+        target_margin_rate_bps=record.target_margin_rate_bps,
+        break_even_sales_minor=record.break_even_sales_minor,
+        floor_sales_minor=record.floor_sales_minor,
+        target_sales_minor=record.target_sales_minor,
         source_snapshot_revision=record.source_snapshot_revision,
     )

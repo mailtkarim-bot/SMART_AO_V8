@@ -1,0 +1,7 @@
+# Local-only override: host 5432 is occupied by the legacy smart_ao_postgres (V7)
+# container. Dev/test PostgreSQL is exposed on loopback port 5433 instead.
+# Usage: docker compose -f docker-compose.yml -f compose.local-dev.yml up -d postgres
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:5433:5432"

@@ -1,15 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-import sqlalchemy as sa
-from sqlalchemy.orm import Session, sessionmaker
-
-from app.modules.decision.infrastructure.models.decision import (
-    DecisionConditionRecord,
-    DecisionContextRecord,
-    DecisionContextReferenceRecord,
-    DecisionRecord,
-)
+from app.modules.decision.application.queries import DecisionDossierReader
 from app.platform.security.authorization import (
     AuthorizationPolicyPort,
     AuthorizationRequest,
@@ -22,6 +14,7 @@ from app.platform.security.context import ActorContext, ActorKind, DataClassific
 @dataclass(frozen=True, slots=True)
 class PatronDecisionDossier:
     decision_id: UUID
+    aggregate_revision: int
     case_id: UUID
     decision_type: str
     lifecycle: str
@@ -40,9 +33,9 @@ class PatronDecisionDossierService:
     """Read-only patron projection of one frozen decision context."""
 
     def __init__(
-        self, *, session_factory: sessionmaker[Session], policy: AuthorizationPolicyPort
+        self, *, reader: DecisionDossierReader, policy: AuthorizationPolicyPort
     ) -> None:
-        self._session_factory = session_factory
+        self._reader = reader
         self._policy = policy
 
     def read(self, *, actor: ActorContext, case_id: UUID, now) -> PatronDecisionDossier:
@@ -64,56 +57,43 @@ class PatronDecisionDossierService:
         )
         if not decision.allowed:
             raise PermissionError(decision.code)
-        with self._session_factory() as session:
-            record = session.scalar(
-                sa.select(DecisionRecord)
-                .where(
-                    DecisionRecord.tenant_id == actor.tenant_id,
-                    DecisionRecord.case_id == case_id,
-                    DecisionRecord.validity == "CURRENT",
-                )
-                .order_by(DecisionRecord.cycle_number.desc(), DecisionRecord.updated_at.desc())
-                .limit(1)
+
+        lookup = self._reader.read(tenant_id=actor.tenant_id, case_id=case_id)
+        if lookup.decision is None:
+            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+        if lookup.context is None:
+            return PatronDecisionDossier(
+                decision_id=lookup.decision.id,
+                aggregate_revision=lookup.decision.aggregate_revision,
+                case_id=lookup.decision.case_id,
+                decision_type=lookup.decision.decision_type,
+                lifecycle=lookup.decision.lifecycle,
+                outcome=lookup.decision.outcome,
+                validity=lookup.decision.validity,
+                context_status=lookup.decision.context_status,
+                final_justification=lookup.decision.final_justification,
+                known=(),
+                unknowns=(),
+                risks=(),
+                conditions=(),
+                sources=(),
             )
-            if record is None:
-                raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
-            context = session.scalar(
-                sa.select(DecisionContextRecord)
-                .where(
-                    DecisionContextRecord.tenant_id == actor.tenant_id,
-                    DecisionContextRecord.decision_id == record.id,
-                    DecisionContextRecord.is_selected_final.is_(True),
-                )
-                .order_by(DecisionContextRecord.sequence_number.desc())
-                .limit(1)
-            )
-            if context is None:
-                context = session.scalar(
-                    sa.select(DecisionContextRecord)
-                    .where(
-                        DecisionContextRecord.tenant_id == actor.tenant_id,
-                        DecisionContextRecord.decision_id == record.id,
-                    )
-                    .order_by(DecisionContextRecord.sequence_number.desc())
-                    .limit(1)
-                )
-            if context is None:
-                raise PermissionError("DECISION_CONTEXT_NOT_FOUND")
-            references = tuple(
-                {
-                    "aggregate_type": item.aggregate_type,
-                    "aggregate_id": str(item.aggregate_id),
-                    "aggregate_revision": item.aggregate_revision,
-                    "role": item.reference_role,
-                }
-                for item in session.scalars(
-                    sa.select(DecisionContextReferenceRecord).where(
-                        DecisionContextReferenceRecord.tenant_id == actor.tenant_id,
-                        DecisionContextReferenceRecord.decision_context_id == context.id,
-                    )
-                ).all()
-            )
-            conditions = tuple(
+
+        canonical = lookup.context.canonical_context_json
+        return PatronDecisionDossier(
+            decision_id=lookup.decision.id,
+            aggregate_revision=lookup.decision.aggregate_revision,
+            case_id=lookup.decision.case_id,
+            decision_type=lookup.decision.decision_type,
+            lifecycle=lookup.decision.lifecycle,
+            outcome=lookup.decision.outcome,
+            validity=lookup.decision.validity,
+            context_status=lookup.decision.context_status,
+            final_justification=lookup.decision.final_justification,
+            known=_as_tuple(canonical.get("known", canonical.get("references", []))),
+            unknowns=lookup.context.unknowns_json,
+            risks=_as_tuple(canonical.get("risks", [])),
+            conditions=tuple(
                 {
                     "condition_id": str(item.id),
                     "label": item.label,
@@ -121,26 +101,21 @@ class PatronDecisionDossierService:
                     "due_at": item.due_at.isoformat() if item.due_at else None,
                     "failure_consequence": item.failure_consequence,
                 }
-                for item in session.scalars(
-                    sa.select(DecisionConditionRecord).where(
-                        DecisionConditionRecord.tenant_id == actor.tenant_id,
-                        DecisionConditionRecord.decision_id == record.id,
-                    )
-                ).all()
-            )
-            canonical = context.canonical_context_json
-            return PatronDecisionDossier(
-                decision_id=record.id,
-                case_id=record.case_id,
-                decision_type=record.decision_type,
-                lifecycle=record.lifecycle,
-                outcome=record.outcome,
-                validity=record.validity,
-                context_status=record.context_status,
-                final_justification=record.final_justification,
-                known=tuple(canonical.get("known", canonical.get("references", []))),
-                unknowns=tuple(context.unknowns_json),
-                risks=tuple(canonical.get("risks", [])),
-                conditions=conditions,
-                sources=references,
-            )
+                for item in lookup.conditions
+            ),
+            sources=tuple(
+                {
+                    "aggregate_type": item.aggregate_type,
+                    "aggregate_id": str(item.aggregate_id),
+                    "aggregate_revision": item.aggregate_revision,
+                    "role": item.reference_role,
+                }
+                for item in lookup.references
+            ),
+        )
+
+
+def _as_tuple(value: object) -> tuple[object, ...]:
+    if isinstance(value, (list, tuple)):
+        return tuple(value)
+    return ()

@@ -5,8 +5,8 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from app.modules.dce.application.commands import ApplicationCommand
 from app.modules.membership.public.text_safety import contains_forbidden_text
+from app.platform.events.command_contracts import ApplicationCommand
 
 
 class ProposeCapabilityForCaseCommand(ApplicationCommand):

@@ -4,6 +4,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/backend \
+    PATH=/app/.venv/bin:$PATH \
     SMART_AO_DCE_QUARANTINE_ROOT=/var/lib/smart_ao/dce-quarantine
 
 RUN apt-get update \
@@ -12,13 +13,40 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 10001 smartao \
     && useradd --system --uid 10001 --gid 10001 --home-dir /app --no-create-home smartao \
-    && install --directory --owner=smartao --group=smartao --mode=0700 /var/lib/smart_ao/dce-quarantine
+    && install --directory --owner=smartao --group=smartao --mode=0700 /var/lib/smart_ao/dce-quarantine \
+    && install --directory --owner=smartao --group=smartao --mode=0700 /var/lib/smart_ao/models
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md uv.lock ./
 COPY backend ./backend
-RUN pip install --no-cache-dir . \
+ARG SMART_AO_INSTALL_RAG=0
+ARG SMART_AO_INSTALL_DOCUMENT_ADVANCED=0
+ARG SMART_AO_INSTALL_OBJECT_STORAGE=0
+ARG SMART_AO_INSTALL_CONNECTORS=0
+ARG SMART_AO_INSTALL_NOTIFICATIONS=0
+ARG SMART_AO_INSTALL_CALENDAR=0
+RUN python -m pip install --no-cache-dir --upgrade pip==26.1.2 \
+    && python -m pip install --no-cache-dir uv==0.12.1 \
+    && uv sync --frozen --no-dev --no-editable \
+    && if [ "$SMART_AO_INSTALL_RAG" = "1" ]; then \
+        uv sync --frozen --no-dev --no-editable --extra rag; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_DOCUMENT_ADVANCED" = "1" ]; then \
+        uv sync --frozen --no-dev --no-editable --extra document-advanced; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_OBJECT_STORAGE" = "1" ]; then \
+        uv sync --frozen --no-dev --no-editable --extra object-storage; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_CONNECTORS" = "1" ]; then \
+        uv sync --frozen --no-dev --no-editable --extra connectors; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_NOTIFICATIONS" = "1" ]; then \
+        uv sync --frozen --no-dev --no-editable --extra notifications; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_CALENDAR" = "1" ]; then \
+        uv sync --frozen --no-dev --no-editable --extra calendar; \
+    fi \
     && chown -R smartao:smartao /app
 
 USER smartao
 EXPOSE 8000
-CMD ["uvicorn", "app.bootstrap.production:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.bootstrap.production:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=172.30.0.0/24"]

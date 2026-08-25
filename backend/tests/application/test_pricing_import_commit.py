@@ -8,6 +8,7 @@ from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.interfaces.http.routes.patron_pricing_import import build_patron_pricing_import_router
 from app.modules.pricing.application.import_commands import CommitPricingImportCommand
 from app.modules.pricing.application.import_preview import PricingImportPreviewService
+from app.modules.pricing.application.import_read import PricingImportReadService
 from app.modules.pricing.application.import_service import (
     PricingImportService,
     pricing_import_handlers,
@@ -214,7 +215,7 @@ def test_commit_pricing_import_http_contract(session_factory):
         headers={"Authorization": "Bearer test-token"},
     )
     assert first.status_code == 201
-    assert replay.status_code == 201
+    assert replay.status_code == 200
     assert replay.json()["replayed"] is True
     assert "total_minor" not in str(first.json())
     assert "designation" not in str(first.json())
@@ -298,3 +299,53 @@ def test_commit_does_not_cross_tenant_boundaries(session_factory):
             command=_command(case_id, report_id, batch.id),
             now=NOW,
         )
+
+
+
+def test_pricing_import_read_http_contract_is_tenant_scoped(session_factory):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    other_actor, other_case_id, _, _ = _seed_draft(session_factory)
+    batch, rows = _batch_and_rows(actor, case_id)
+    with session_factory.begin() as session:
+        session.add(batch)
+        session.add_all(rows)
+
+    class _Resolver:
+        def __init__(self, resolved_actor):
+            self.resolved_actor = resolved_actor
+
+        def resolve(self, *, access_token):
+            assert access_token == "test-token"
+            return self.resolved_actor
+
+    def _app_for(resolved_actor):
+        app = FastAPI()
+        app.include_router(
+            build_patron_pricing_import_router(
+                service=PricingImportPreviewService(policy=AuthorizationPolicy()),
+                read_service=PricingImportReadService(
+                    session_factory=session_factory,
+                    policy=AuthorizationPolicy(),
+                ),
+                security_runtime=ConsultationSecurityRuntime(
+                    context_resolver=_Resolver(resolved_actor),
+                    policy=AuthorizationPolicy(),
+                ),
+            )
+        )
+        return TestClient(app)
+
+    response = _app_for(actor).get(
+        f"/api/v1/patron/cases/{case_id}/pricing-import/{batch.id}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    cross_tenant = _app_for(other_actor).get(
+        f"/api/v1/patron/cases/{other_case_id}/pricing-import/{batch.id}",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["batch_id"] == str(batch.id)
+    assert response.json()["rows"][0]["designation"] == "Terrassement"
+    assert "source_sha256" not in response.json()
+    assert cross_tenant.status_code == 404

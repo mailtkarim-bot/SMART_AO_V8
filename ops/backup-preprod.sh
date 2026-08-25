@@ -46,8 +46,11 @@ backup_volume() {
   local container="$1" destination="$2" output="$3" mountpoint
   mountpoint="$(volume_mountpoint "${container}" "${destination}")"
   if [[ -z "${mountpoint}" || ! -d "${mountpoint}" ]]; then
-    printf 'Skipping absent volume %s (no running mounted container).\n' "${destination}" >&2
-    return 0
+    if [[ "${SMART_AO_BACKUP_ALLOW_MISSING_VOLUMES:-0}" == "1" ]]; then
+      printf 'WARNING: skipping absent volume %s by explicit override.\n' "${destination}" >&2
+      return 0
+    fi
+    fail "expected persistent volume is not mounted: ${destination}"
   fi
   tar --numeric-owner --xattrs --acls -czf "${output}.tmp" -C "${mountpoint}" .
   mv -- "${output}.tmp" "${output}"

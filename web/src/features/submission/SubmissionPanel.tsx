@@ -12,12 +12,21 @@ type SubmissionPanelProps = {
   preparationRevision: string;
   submissionPackageId: string;
   submissionExported: boolean;
+  signatureId: string;
+  signaturePackageVersion: string;
+  signatureStatus: "REQUESTED" | "SIGNED" | "REJECTED" | null;
+  signatureProvider: string;
+  signatureRevision: number | null;
   evidenceForm: SubmissionEvidenceForm;
   setPreparationPackageId: Dispatch<SetStateAction<string>>;
   setPreparationRevision: Dispatch<SetStateAction<string>>;
   setSubmissionPackageId: Dispatch<SetStateAction<string>>;
+  setSignatureId: Dispatch<SetStateAction<string>>;
+  setSignaturePackageVersion: Dispatch<SetStateAction<string>>;
   setEvidenceForm: Dispatch<SetStateAction<SubmissionEvidenceForm>>;
   onPrepare: () => void;
+  onRequestSignature: () => void;
+  onLoadSignature: () => void;
   onExport: () => void;
   onRecordEvidence: () => void;
 };
@@ -27,12 +36,21 @@ export function SubmissionPanel({
   preparationRevision,
   submissionPackageId,
   submissionExported,
+  signatureId,
+  signaturePackageVersion,
+  signatureStatus,
+  signatureProvider,
+  signatureRevision,
   evidenceForm,
   setPreparationPackageId,
   setPreparationRevision,
   setSubmissionPackageId,
+  setSignatureId,
+  setSignaturePackageVersion,
   setEvidenceForm,
   onPrepare,
+  onRequestSignature,
+  onLoadSignature,
   onExport,
   onRecordEvidence,
 }: SubmissionPanelProps) {
@@ -153,6 +171,47 @@ export function SubmissionPanel({
           </label>
           <button className="primary-button" type="button" onClick={onRecordEvidence}>
             Enregistrer la preuve <span>→</span>
+          </button>
+          <small className="invariant-note">
+            Invariant serveur : <strong>external_submission: NOT_PERFORMED</strong>.
+          </small>
+        </div>
+        <div className="detail-panel signature-panel">
+          <div className="panel-heading">
+            <div>
+              <h3>Signature électronique</h3>
+              <p>Le provider est configuré côté serveur; le navigateur ne fabrique aucune preuve.</p>
+            </div>
+          </div>
+          <label>
+            <span>Révision attendue du paquet</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={signaturePackageVersion}
+              onChange={(event) => setSignaturePackageVersion(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Identifiant de signature</span>
+            <input
+              value={signatureId}
+              onChange={(event) => setSignatureId(event.target.value)}
+              placeholder="UUID de la signature"
+            />
+          </label>
+          <div className="signature-status" aria-live="polite">
+            <span>État</span>
+            <strong>{signatureStatus ?? "NON_DEMANDÉE"}</strong>
+            {signatureProvider && <small>Provider : {signatureProvider}</small>}
+            {signatureRevision !== null && <small>Révision signature : {signatureRevision}</small>}
+          </div>
+          <button className="primary-button" type="button" onClick={onRequestSignature}>
+            Demander la signature <span>→</span>
+          </button>
+          <button className="secondary-button" type="button" onClick={onLoadSignature}>
+            Recharger l’état <span>↻</span>
           </button>
           <small className="invariant-note">
             Invariant serveur : <strong>external_submission: NOT_PERFORMED</strong>.

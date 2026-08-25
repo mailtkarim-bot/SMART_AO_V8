@@ -73,6 +73,18 @@ main() {
     -tAc "SELECT to_regclass('public.tenants'), to_regclass('public.command_receipts'), to_regclass('public.outbox_messages')" \
     | grep -q 'tenants.*command_receipts.*outbox_messages' \
     || fail "restored database is missing required durability tables"
+
+  local expected_head actual_head trigger_count
+  expected_head="$(sed -nE 's/^[[:space:]]*EXPECTED_ALEMBIC_HEAD[[:space:]]*=[[:space:]]*[\"'"'"']([^\"'"'"']+)[\"'"'"'].*/\1/p' "${ROOT_DIR}/backend/app/platform/persistence/schema.py")"
+  [[ -n "${expected_head}" ]] || fail "cannot determine expected Alembic head"
+  actual_head="$(compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${restore_db}" -tAc "SELECT version_num FROM alembic_version")"
+  [[ "${actual_head}" == "${expected_head}" ]] || fail "restored database head ${actual_head} differs from expected ${expected_head}"
+  compose exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_USER}" -d "${restore_db}" \
+    -tAc "SELECT to_regclass('public.decision_condition_transitions')" \
+    | grep -q 'decision_condition_transitions' \
+    || fail "restored database is missing Decision condition transition table"
+  trigger_count="$(compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${restore_db}" -tAc "SELECT count(*) FROM pg_trigger WHERE tgname = 'trg_decision_condition_transitions_append_only' AND NOT tgisinternal")"
+  [[ "${trigger_count//[[:space:]]/}" == "1" ]] || fail "restored database is missing append-only Decision condition trigger"
   cleanup_done=1
   compose exec -T postgres dropdb --if-exists -U "${POSTGRES_USER}" "${restore_db}" >/dev/null
   printf 'Isolated restore verification passed for %s\n' "${backup_file}"

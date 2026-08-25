@@ -1,0 +1,1 @@
+"""Opportunity persistence adapters."""

@@ -7,6 +7,7 @@ from app.modules.pricing.application.service import (
     PricingScenarioService,
     pricing_scenario_handlers,
 )
+from app.modules.pricing.infrastructure.scenario_reader import SqlAlchemyPricingScenarioReader
 from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.models import FinancialReportSnapshotRecord
@@ -21,6 +22,7 @@ NOW = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
 def pricing_service(session_factory: sessionmaker[Session]) -> PricingScenarioService:
     return PricingScenarioService(
         session_factory=session_factory,
+        reader=SqlAlchemyPricingScenarioReader(session_factory),
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
             handlers=pricing_scenario_handlers(),

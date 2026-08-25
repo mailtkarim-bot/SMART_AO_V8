@@ -16,6 +16,7 @@ from app.modules.submission.application.evidence_service import (
     SubmissionEvidenceService,
     submission_evidence_handlers,
 )
+from app.modules.submission.application.ports import SubmissionDecisionGateReader
 from app.modules.submission.application.service import SubmissionPackageService, submission_handlers
 from app.platform.events.dispatcher import (
     CommandContext,
@@ -31,6 +32,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from tests.application.test_submission_package import (
     _prepare_generated_document,
     _publish_snapshot,
+    _ReadySubmissionDecisionGateReader,
 )
 
 pytest_plugins = ("tests.application.test_submission_package",)
@@ -39,6 +41,7 @@ pytest_plugins = ("tests.application.test_submission_package",)
 @pytest.fixture
 def services(session_factory: sessionmaker[Session], tmp_path):
     storage = LocalGeneratedDocumentStorage(root=tmp_path / "generated")
+    decision_gate_reader: SubmissionDecisionGateReader = _ReadySubmissionDecisionGateReader()
     dispatcher = CommandDispatcher(
         session_factory=session_factory,
         handlers={
@@ -46,7 +49,7 @@ def services(session_factory: sessionmaker[Session], tmp_path):
                 storage=storage,
                 dce_reader=SqlAlchemyPreparationDceReader(),
             ),
-            **submission_handlers(),
+            **submission_handlers(decision_gate_reader=decision_gate_reader),
         },
     )
     policy = AuthorizationPolicy()
@@ -61,6 +64,7 @@ def services(session_factory: sessionmaker[Session], tmp_path):
             session_factory=session_factory,
             dispatcher=dispatcher,
             policy=policy,
+            decision_gate_reader=decision_gate_reader,
         ),
     )
 

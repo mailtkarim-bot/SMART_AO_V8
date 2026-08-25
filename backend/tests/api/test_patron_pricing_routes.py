@@ -116,6 +116,14 @@ class _Scenario:
     total_cost_minor: int
     gross_margin_minor: int
     gross_margin_rate_bps: int
+    penalty_reserve_minor: int
+    retention_reserve_minor: int
+    guarantee_reserve_minor: int
+    floor_margin_rate_bps: int
+    target_margin_rate_bps: int
+    break_even_sales_minor: int
+    floor_sales_minor: int
+    target_sales_minor: int
     source_snapshot_revision: int
 
 
@@ -124,6 +132,7 @@ class _PricingService:
         self.execute_error = execute_error
         self.list_error = list_error
         self.execute_calls = 0
+        self.commands = []
 
     def list_for_case(self, **kwargs):
         if self.list_error is not None:
@@ -142,12 +151,21 @@ class _PricingService:
                 total_cost_minor=100_000,
                 gross_margin_minor=20_000,
                 gross_margin_rate_bps=1667,
+                penalty_reserve_minor=0,
+                retention_reserve_minor=0,
+                guarantee_reserve_minor=0,
+                floor_margin_rate_bps=0,
+                target_margin_rate_bps=0,
+                break_even_sales_minor=100_000,
+                floor_sales_minor=100_000,
+                target_sales_minor=100_000,
                 source_snapshot_revision=4,
             )
         ]
 
     def execute(self, **kwargs):
         self.execute_calls += 1
+        self.commands.append(kwargs["command"])
         if self.execute_error is not None:
             raise self.execute_error
         return _result(
@@ -223,6 +241,35 @@ def test_list_scenarios_maps_permission_error_to_403():
 
     assert response.status_code == 403
     assert response.json() == {"detail": "FORBIDDEN"}
+
+
+def test_create_scenario_forwards_cost_basis_inputs():
+    service = _PricingService()
+    client = _client(service=service)
+    payload = _create_payload()
+    payload.update(
+        {
+            "penalty_reserve_minor": 1000,
+            "retention_reserve_minor": 500,
+            "guarantee_reserve_minor": 250,
+            "floor_margin_rate_bps": 1000,
+            "target_margin_rate_bps": 2000,
+        }
+    )
+
+    response = client.post(
+        f"/api/v1/patron/cases/{uuid4()}/pricing-scenarios",
+        json=payload,
+        headers=_headers(),
+    )
+
+    assert response.status_code == 201
+    command = service.commands[0]
+    assert command.penalty_reserve_minor == 1000
+    assert command.retention_reserve_minor == 500
+    assert command.guarantee_reserve_minor == 250
+    assert command.floor_margin_rate_bps == 1000
+    assert command.target_margin_rate_bps == 2000
 
 
 def test_create_scenario_returns_201_then_200_on_replay():

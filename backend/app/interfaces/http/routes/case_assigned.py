@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Header
 
+from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
-from app.interfaces.http.routes.dce_versions import _resolve_context
 from app.modules.dce.public.contracts import AssignedCaseResponse
 from app.platform.security.authorization import AuthorizationRequest, AuthorizationResource
 from app.platform.security.capabilities import Capability

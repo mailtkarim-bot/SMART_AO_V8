@@ -58,6 +58,15 @@ class DecisionRecord(RevisionedAggregateRecord, Base):
             "cycle_number",
             name="uq_decisions__tenant_key_cycle",
         ),
+        sa.Index(
+            "ux_decisions__tenant_active_key",
+            "tenant_id",
+            "decision_key_hash",
+            unique=True,
+            postgresql_where=sa.text(
+                "validity = 'CURRENT' AND lifecycle NOT IN ('SUPERSEDED', 'CANCELLED')"
+            ),
+        ),
         sa.CheckConstraint(
             "decision_type IN ("
             "'GO_NO_GO', 'RISK_ACCEPTANCE', 'PARTNER_SELECTION', "
@@ -255,6 +264,56 @@ class DecisionContextReferenceRecord(TenantScopedRecord, Base):
     aggregate_revision: Mapped[int] = mapped_column(sa.Integer(), nullable=False)
     content_hash: Mapped[str | None] = mapped_column(sa.CHAR(64), nullable=True)
     reference_role: Mapped[str] = mapped_column(sa.String(80), nullable=False)
+
+
+class DecisionConditionTransitionRecord(TenantScopedRecord, Base):
+    __tablename__ = "decision_condition_transitions"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "decision_id"],
+            ["decisions.tenant_id", "decisions.id"],
+            name="fk_decision_condition_transitions__decision",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "condition_id"],
+            ["decision_conditions.tenant_id", "decision_conditions.id"],
+            name="fk_decision_condition_transitions__condition",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_decision_condition_transitions__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "command_id",
+            name="uq_decision_condition_transitions__command",
+        ),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_decision_condition_transitions__idempotency",
+        ),
+        sa.CheckConstraint(
+            "from_status = 'OPEN' AND to_status IN ('SATISFIED', 'FAILED')",
+            name="valid_transition",
+        ),
+        sa.CheckConstraint("aggregate_revision > 0", name="positive_revision"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    decision_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    condition_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    from_status: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    to_status: Mapped[str] = mapped_column(sa.String(24), nullable=False)
+    satisfied_evidence_ref_json: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    failure_reason: Mapped[str | None] = mapped_column(sa.Text(), nullable=True)
+    aggregate_revision: Mapped[int] = mapped_column(sa.Integer(), nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
 class DecisionConditionRecord(TenantScopedRecord, Base):

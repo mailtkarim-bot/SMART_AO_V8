@@ -72,11 +72,17 @@ class CollaboratorWorkTaskService:
         if actor.membership_id is None:
             self._deny(actor=actor, command=command, now=now, reason="MEMBERSHIP_REQUIRED")
             raise PermissionError("MEMBERSHIP_REQUIRED")
-        assignment_id = command.assignment_id if hasattr(command, "assignment_id") else None
+        candidate_assignment_id = getattr(command, "assignment_id", None)
+        assignment_id: UUID | None = (
+            candidate_assignment_id if isinstance(candidate_assignment_id, UUID) else None
+        )
         if assignment_id is None:
             assignment_id = self._task_assignment_id(
                 tenant_id=actor.tenant_id, task_id=command.task_id
             )
+        if assignment_id is None:
+            self._deny(actor=actor, command=command, now=now, reason="NOT_FOUND_OR_FORBIDDEN")
+            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
         assignment = self._resolve_assignment(
             tenant_id=actor.tenant_id,
             membership_id=actor.membership_id,

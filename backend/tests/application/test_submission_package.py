@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
+from app.modules.decision.domain.submission_gate import DecisionSubmissionGateSnapshot
 from app.modules.preparation.application.commands import GenerateTechnicalDocumentCommand
 from app.modules.preparation.application.service import PreparationService, preparation_handlers
 from app.modules.preparation.infrastructure.dce_preparation_reader import (
@@ -18,6 +19,7 @@ from app.modules.preparation.infrastructure.dce_preparation_reader import (
 )
 from app.modules.preparation.infrastructure.document_storage import LocalGeneratedDocumentStorage
 from app.modules.submission.application.commands import PrepareSubmissionPackageCommand
+from app.modules.submission.application.ports import SubmissionDecisionGateReader
 from app.modules.submission.application.service import (
     PrepareSubmissionPackageHandler,
     SubmissionPackageService,
@@ -51,9 +53,23 @@ from tests.application.test_preparation_completeness import (
 pytest_plugins = ("tests.application.test_collab_work_task",)
 
 
+class _ReadySubmissionDecisionGateReader:
+    def read(self, *, session, tenant_id, case_id):
+        return DecisionSubmissionGateSnapshot(
+            lifecycle="FINALIZED",
+            outcome="GO",
+            context_status="FROZEN",
+            condition_status="NOT_APPLICABLE",
+            open_condition_count=0,
+            unresolved_risk_action_count=0,
+            all_dce_requirements_confirmed=True,
+        )
+
+
 @pytest.fixture
 def services(session_factory: sessionmaker[Session], tmp_path):
     storage = LocalGeneratedDocumentStorage(root=tmp_path / "generated")
+    decision_gate_reader: SubmissionDecisionGateReader = _ReadySubmissionDecisionGateReader()
     dispatcher = CommandDispatcher(
         session_factory=session_factory,
         handlers={
@@ -61,7 +77,7 @@ def services(session_factory: sessionmaker[Session], tmp_path):
                 storage=storage,
                 dce_reader=SqlAlchemyPreparationDceReader(),
             ),
-            **submission_handlers(),
+            **submission_handlers(decision_gate_reader=decision_gate_reader),
         },
     )
     policy = AuthorizationPolicy()
@@ -76,6 +92,7 @@ def services(session_factory: sessionmaker[Session], tmp_path):
         dispatcher=dispatcher,
         policy=policy,
         storage=storage,
+        decision_gate_reader=decision_gate_reader,
     )
     return preparation, submission
 
@@ -230,6 +247,20 @@ def test_submission_package_is_hashed_idempotent_and_append_only(services, sessi
         assert audit.metadata_json == {"channel": "download"}
         assert notification is not None
         assert notification.payload_json["archive_sha256"]
+        smtp_notification = session.scalar(
+            sa.select(OutboxMessageRecord).where(
+                OutboxMessageRecord.tenant_id == actor.tenant_id,
+                OutboxMessageRecord.topic == "submission.package.exported.smtp",
+            )
+        )
+        assert smtp_notification is not None
+        assert smtp_notification.event_id == notification.event_id
+        assert smtp_notification.payload_json == {
+            "submission_package_id": str(record.id),
+            "delivery": "EXPORT_READY",
+        }
+        assert "archive_sha256" not in smtp_notification.payload_json
+        assert "financial_snapshot_id" not in smtp_notification.payload_json
 
 
     with pytest.raises(sa.exc.ProgrammingError), session_factory.begin() as session:

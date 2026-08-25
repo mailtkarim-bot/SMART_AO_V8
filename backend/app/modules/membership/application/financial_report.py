@@ -9,13 +9,16 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.modules.pricing.infrastructure.models import (
+    FinancialReportLineRecord,
+    FinancialReportSnapshotRecord,
+)
 from app.platform.security.authorization import (
     AuthorizationRequest,
     AuthorizationResource,
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import FinancialReportLineRecord, FinancialReportSnapshotRecord
 
 
 @dataclass(frozen=True, slots=True)

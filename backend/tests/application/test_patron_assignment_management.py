@@ -16,6 +16,9 @@ from app.modules.membership.application.patron_assignment import (
     PatronAssignmentManagementService,
     patron_assignment_handlers,
 )
+from app.modules.membership.infrastructure.assignment_management_reader import (
+    SqlAlchemyAssignmentManagementReader,
+)
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
@@ -155,6 +158,7 @@ def _seed_case_and_memberships(
 def _service(session_factory: sessionmaker[Session]) -> PatronAssignmentManagementService:
     return PatronAssignmentManagementService(
         session_factory=session_factory,
+        reader=SqlAlchemyAssignmentManagementReader(session_factory),
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
             handlers=patron_assignment_handlers(),

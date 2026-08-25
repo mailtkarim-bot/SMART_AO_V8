@@ -1,0 +1,1 @@
+"""Knowledge retrieval bounded context."""

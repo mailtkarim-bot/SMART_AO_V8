@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from urllib.error import URLError
 from uuid import uuid4
 
+import app.platform.security.public_http as public_http
 import app.workers.submission_export_webhook as webhook_module
 import pytest
 from app.workers.submission_export_webhook import (
@@ -88,9 +89,10 @@ def test_webhook_worker_skips_without_configured_endpoint_and_publishes() -> Non
 
     result = asyncio.run(worker._process_message(message.id, NOW))
 
-    assert result.skipped == 1
-    assert message.status == "PUBLISHED"
-    assert message.last_error_code is None
+    assert result.not_configured == 1
+    assert message.status == "NOT_CONFIGURED"
+    assert message.published_at is None
+    assert message.last_error_code == "WEBHOOK_NOT_CONFIGURED"
 
 
 def test_webhook_url_rejects_non_http_scheme() -> None:
@@ -161,7 +163,9 @@ def test_process_retries_invalid_payload() -> None:
     message.payload_json = {"delivery": "DOWNLOAD"}
     factory = _factory_for_message(message)
     worker = SubmissionExportWebhookWorker(
-        session_factory=factory, webhook_url="https://example.test"
+        session_factory=factory,
+        webhook_url="https://example.test",
+        webhook_secret="test-secret",  # pragma: allowlist secret
     )
 
     result = asyncio.run(worker._process_message(message.id, NOW))
@@ -175,7 +179,9 @@ def test_process_retries_non_success_webhook_response(monkeypatch: pytest.Monkey
     message = _message()
     monkeypatch.setattr(webhook_module, "_post_json", lambda *_args: 503)
     worker = SubmissionExportWebhookWorker(
-        session_factory=_factory_for_message(message), webhook_url="https://example.test"
+        session_factory=_factory_for_message(message),
+        webhook_url="https://example.test",
+        webhook_secret="test-secret",  # pragma: allowlist secret
     )
 
     result = asyncio.run(worker._process_message(message.id, NOW))
@@ -210,7 +216,9 @@ def test_process_delivers_successful_webhook_response(monkeypatch: pytest.Monkey
     message = _message()
     monkeypatch.setattr(webhook_module, "_post_json", lambda *_args: 204)
     worker = SubmissionExportWebhookWorker(
-        session_factory=_factory_for_message(message), webhook_url="https://example.test"
+        session_factory=_factory_for_message(message),
+        webhook_url="https://example.test",
+        webhook_secret="test-secret",  # pragma: allowlist secret
     )
 
     result = asyncio.run(worker._process_message(message.id, NOW))
@@ -231,7 +239,9 @@ def test_process_retries_delivery_exceptions(
 
     monkeypatch.setattr(webhook_module, "_post_json", raise_error)
     worker = SubmissionExportWebhookWorker(
-        session_factory=_factory_for_message(message), webhook_url="https://example.test"
+        session_factory=_factory_for_message(message),
+        webhook_url="https://example.test",
+        webhook_secret="test-secret",  # pragma: allowlist secret
     )
 
     result = asyncio.run(worker._process_message(message.id, NOW))
@@ -281,11 +291,22 @@ def test_post_json_validates_and_sends_request(monkeypatch: pytest.MonkeyPatch) 
     response = MagicMock(status=202)
     context = MagicMock()
     context.__enter__.return_value = response
-    monkeypatch.setattr(webhook_module, "urlopen", lambda request, timeout: context)
+    captured: list[object] = []
 
-    status = _post_json("https://example.test/hook", {"event": "ok"}, 2.5)
+    def fake_urlopen(request: object, timeout: float) -> MagicMock:
+        captured.append(request)
+        return context
+
+    monkeypatch.setattr(webhook_module, "open_public_https", fake_urlopen)
+    monkeypatch.setattr(
+        public_http.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [(None, None, None, None, ("93.184.216.34", 443))],
+    )
+    status = _post_json("https://example.test/hook", {"event": "ok"}, 2.5, "test-secret")
 
     assert status == 202
+    assert captured[0].get_header("X-smart-ao-signature").startswith("sha256=")
 
 
 def test_post_json_rejects_missing_host() -> None:
@@ -293,11 +314,36 @@ def test_post_json_rejects_missing_host() -> None:
         _post_json("https:///hook", {}, 1.0)
 
 
+def test_post_json_rejects_http_and_private_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(ValueError, match="invalid webhook URL"):
+        _post_json("http://example.test/hook", {}, 1.0, "test-secret")
+
+    monkeypatch.setattr(
+        public_http.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [(None, None, None, None, ("127.0.0.1", 443))],
+    )
+    with pytest.raises(ValueError, match="not public"):
+        _post_json("https://example.test/hook", {}, 1.0, "test-secret")
+
+
+def test_post_json_rejects_dns_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_dns(*_args: object, **_kwargs: object) -> list[object]:
+        raise OSError("no DNS")
+
+    monkeypatch.setattr(public_http.socket, "getaddrinfo", fail_dns)
+    with pytest.raises(ValueError, match="DNS resolution failed"):
+        _post_json("https://example.test/hook", {}, 1.0, "test-secret")
+
+
 def test_build_default_worker_reads_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     engine = object()
     factory = object()
     monkeypatch.setenv("SMART_AO_DATABASE_URL", "postgresql://test")
-    monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_URL", "https://example.test/hook")
+    monkeypatch.setenv(  # pragma: allowlist secret
+        "SMART_AO_EXPORT_WEBHOOK_URL", "https://example.test/hook"
+    )
+    monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_SECRET", "test-secret")  # pragma: allowlist secret
     monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_BATCH_SIZE", "3")
     monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_LEASE_SECONDS", "7")
     monkeypatch.setenv("SMART_AO_EXPORT_WEBHOOK_TIMEOUT_SECONDS", "2.5")
@@ -308,6 +354,7 @@ def test_build_default_worker_reads_environment(monkeypatch: pytest.MonkeyPatch)
 
     assert worker._session_factory is factory
     assert worker._webhook_url == "https://example.test/hook"
+    assert worker._webhook_secret == "test-secret"  # pragma: allowlist secret
     assert worker._batch_size == 3
     assert worker._lease_seconds == 7
     assert worker._timeout_seconds == 2.5

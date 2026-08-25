@@ -124,8 +124,70 @@ export type PatronAction = {
   aggregate_revision: number;
 };
 
+export type DecisionContextReferenceInput = {
+  aggregate_type: "CASE" | "DCE_VERSION" | "DCE_REQUIREMENT" | "DECISION_RISK" | "PRICING_SCENARIO";
+  aggregate_id: string;
+  aggregate_revision: number;
+  content_hash?: string;
+  reference_role: string;
+};
+
+export type CreateDecisionRequest = {
+  scope_fingerprint?: string;
+  command_id?: string;
+  idempotency_key?: string;
+};
+
+export type FreezeDecisionContextRequest = {
+  context_id: string;
+  expected_revision: number;
+  rationale: string;
+  unknowns?: string[];
+  risks?: string[];
+  references: DecisionContextReferenceInput[];
+  command_id?: string;
+  idempotency_key?: string;
+};
+
+export type ResolveDecisionConditionRequest = {
+  transition_id?: string;
+  expected_revision: number;
+  target_status: "SATISFIED" | "FAILED";
+  evidence_reference?: string;
+  failure_reason?: string;
+  command_id?: string;
+  idempotency_key?: string;
+};
+
+type DecisionCommandReceipt = Omit<CommandReceipt, "result_code"> & {
+  result_code: string;
+};
+
+export type CreateDecisionResponse = DecisionCommandReceipt & {
+  result_code: "DECISION_DRAFT_CREATED";
+  decision_id: string;
+  version: number;
+};
+
+export type FreezeDecisionContextResponse = DecisionCommandReceipt & {
+  result_code: "DECISION_CONTEXT_FROZEN";
+  decision_id: string;
+  context_id: string;
+  fingerprint: string;
+  version: number;
+};
+
+export type ResolveDecisionConditionResponse = DecisionCommandReceipt & {
+  result_code: "DECISION_CONDITION_RESOLVED";
+  decision_id: string;
+  condition_id: string;
+  status: "SATISFIED" | "FAILED";
+  version: number;
+};
+
 export type PatronDecisionDossier = {
   decision_id: string;
+  aggregate_revision: number;
   case_id: string;
   decision_type: string;
   lifecycle: string;
@@ -261,6 +323,41 @@ export type EnterpriseDocumentVerificationInput = {
     | "DOCUMENT_DUPLICATE";
 };
 
+export type PricingImportRow = {
+  row_number: number;
+  code: string | null;
+  designation: string | null;
+  unit: string | null;
+  quantity_decimal: string | null;
+  unit_price_minor: number | null;
+  total_minor: number | null;
+  errors: string[];
+};
+
+export type PricingImportBatchRead = {
+  batch_id: string;
+  case_id: string;
+  document_kind: "DPGF" | "BPU" | "EXCEL";
+  state: "PREVIEWED" | "COMMITTED";
+  aggregate_revision: number;
+  row_count: number;
+  valid_row_count: number;
+  error_count: number;
+  total_minor: number;
+  rows: PricingImportRow[];
+};
+
+export type PricingImportPreview = PricingImportBatchRead & {
+  filename: string;
+  truncated: boolean;
+  limit_reason: "ROW_LIMIT" | "ERROR_LIMIT" | null;
+  result_code: "PRICING_IMPORT_PREVIEWED";
+  command_id: string;
+  idempotency_key: string;
+  event_ids: string[];
+  replayed: boolean;
+};
+
 export type CommitPricingImportRequest = {
   command_id: string;
   idempotency_key: string;
@@ -290,6 +387,22 @@ export type SubmissionPackageReceipt = CommandReceipt & {
 
 export type SubmissionEvidenceReceipt = CommandReceipt & {
   result_code: "SUBMISSION_EVIDENCE_RECORDED";
+  external_submission: "NOT_PERFORMED";
+};
+
+export type SubmissionSignatureReceipt = CommandReceipt & {
+  result_code: "SUBMISSION_SIGNATURE_REQUESTED" | "SUBMISSION_SIGNATURE_RECORDED";
+  external_submission: "NOT_PERFORMED";
+};
+
+export type SubmissionSignatureProjection = {
+  signature_id: string;
+  submission_package_id: string;
+  case_id: string;
+  provider: string;
+  status: "REQUESTED" | "SIGNED" | "REJECTED";
+  expected_package_version: number;
+  revision: 1 | 2;
   external_submission: "NOT_PERFORMED";
 };
 
@@ -348,6 +461,113 @@ export type BackendReadiness = {
   service: "smart-ao-v8";
   checks: {
     database: "unknown" | "ok" | "failed";
+    schema: "unknown" | "ok" | "failed";
     clamav: "unknown" | "ok" | "failed";
   };
+};
+
+
+export type AuthSession = {
+  access_token: string;
+  token_type: "Bearer";
+  expires_in: number;
+};
+
+export type ActorKind = "PATRON_ADMIN" | "PATRON_DELEGATE" | "COLLABORATEUR";
+export type MembershipState = "ACTIVE" | "SUSPENDED" | "REVOKED";
+
+export type CurrentActor = {
+  actor_id: string;
+  identity_id: string;
+  actor_kind: ActorKind;
+  membership_state: MembershipState;
+};
+
+
+export type BoampObservation = {
+  observation_id: string;
+  source_notice_id: string;
+  title: string | null;
+  publication_date: string | null;
+  response_deadline: string | null;
+  department_codes: string[];
+  market_types: string[];
+  source_status: string | null;
+  score_version: string;
+  score: number;
+  score_explanation: Record<string, unknown>;
+  fingerprint_sha256: string;
+};
+
+export type BoampQualificationDecision = "QUALIFIED" | "REJECTED" | "SNOOZED";
+export type BoampQualificationReason =
+  | "RELEVANT_PUBLIC_SIGNAL"
+  | "NOT_RELEVANT"
+  | "INSUFFICIENT_PUBLIC_DATA"
+  | "EXPIRED";
+
+export type BoampQualificationInput = {
+  decision: BoampQualificationDecision;
+  reason_code: BoampQualificationReason;
+};
+
+export type BoampQualificationReceipt = {
+  qualification_id: string;
+  event_id: string;
+  replayed: boolean;
+};
+
+export type BoampQualificationForm = {
+  decision: BoampQualificationDecision;
+  reason_code: BoampQualificationReason;
+};
+
+export type BoampOpportunity = BoampObservation;
+
+
+export type CaseDceReading = {
+  case_id: string;
+  work_label: string;
+  case_lifecycle: string;
+  commercial_stage: string;
+  dce_freshness: string;
+  availability: "AVAILABLE";
+  dce: {
+    dce_version_id: string;
+    lifecycle: string;
+    integrity: string;
+    classification_readiness: string;
+    analysis_readiness: string;
+    source_received_at: string;
+  };
+  counters: {
+    total: number;
+    pending_human_confirmation: number;
+    confirmed: number;
+    review_required: number;
+    not_applicable: number;
+  };
+  requirements: Array<{
+    requirement_id: string;
+    requirement_type: string;
+    directive_signal: string;
+    confirmation_outcome: string;
+    uncertainty_status: string;
+    document_family: string;
+    source_locator_label: string;
+  }>;
+};
+
+export type KnowledgeSearchResult = {
+  source_fragment_id: string;
+  dce_version_id: string;
+  score: number;
+  locator: Record<string, unknown>;
+  embedding_model: string;
+};
+
+export type KnowledgeSearchResponse = {
+  case_id: string;
+  query: string;
+  results: KnowledgeSearchResult[];
 };
