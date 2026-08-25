@@ -298,7 +298,7 @@ class PreparationHandler:
                 raise CommandExecutionError("VERSION_CONFLICT")
         dce = self._dce_reader.read(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=UUID(str(context.tenant_id)),
             dce_version_id=package.dce_version_id,
             as_of=context.received_at,
         )
@@ -534,7 +534,7 @@ class PreparationHandler:
             raise CommandExecutionError("PREPARATION_BLOCKED")
         dce = self._dce_reader.read(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=UUID(str(context.tenant_id)),
             dce_version_id=package.dce_version_id,
             as_of=context.received_at,
         )
