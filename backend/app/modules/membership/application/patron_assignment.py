@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -487,6 +488,9 @@ class PatronAssignmentManagementHandler:
             raise CommandExecutionError("CASE_VERSION_CONFLICT")
         if context.case_id is not None and context.case_id != case.id:
             raise CommandExecutionError("CASE_CONTEXT_MISMATCH")
+        if context.membership_id is None:
+            raise CommandExecutionError("PATRON_REQUIRED")
+        membership_id = UUID(str(context.membership_id))
 
         target_membership = session.scalar(
             sa.select(TenantMembershipRecord)
@@ -526,7 +530,7 @@ class PatronAssignmentManagementHandler:
             state="ACTIVE",
             scope_actions_json=list(command.scope_actions),
             scope_classifications_json=list(command.scope_classifications),
-            granted_by_membership_id=context.membership_id,
+            granted_by_membership_id=membership_id,
             granted_at=context.received_at,
             starts_at=command.starts_at,
             ends_at=command.ends_at,
@@ -537,7 +541,7 @@ class PatronAssignmentManagementHandler:
         session.add(
             _change_event_for_creation(
                 assignment=assignment,
-                author_membership_id=context.membership_id,
+                author_membership_id=membership_id,
                 command=command,
             )
         )
@@ -925,11 +929,17 @@ class PatronAssignmentManagementHandler:
             raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
         if context.case_id is not None and context.case_id != assignment.case_id:
             raise CommandExecutionError("CASE_CONTEXT_MISMATCH")
-        source_model = {
+        source_models: dict[
+            str,
+            type[CaseAssignmentAcknowledgementRecord]
+            | type[AssignmentClarificationRequestRecord]
+            | type[CaseAssignmentUnavailabilityRecord],
+        ] = {
             "ACKNOWLEDGEMENT": CaseAssignmentAcknowledgementRecord,
             "CLARIFICATION_REQUEST": AssignmentClarificationRequestRecord,
             "UNAVAILABILITY_REPORT": CaseAssignmentUnavailabilityRecord,
-        }[command.interaction_kind]
+        }
+        source_model = source_models[command.interaction_kind]
         source = session.scalar(
             sa.select(source_model)
             .where(
@@ -1030,7 +1040,7 @@ def _aggregate_ref(*, assignment: CaseAssignmentRecord, revision: int) -> dict[s
     }
 
 
-def _scope_fingerprint(*, actions: list[str], classifications: list[str]) -> str:
+def _scope_fingerprint(*, actions: Sequence[str], classifications: Sequence[str]) -> str:
     payload = json.dumps(
         {"actions": actions, "classifications": classifications},
         ensure_ascii=True,
