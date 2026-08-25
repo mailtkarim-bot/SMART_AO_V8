@@ -848,21 +848,24 @@ class RecordDceDocumentClassificationRunHandler:
             )
             session.add(result_record)
             session.flush()
-            for evidence in result.evidence:
-                session.add(
-                    DceDocumentClassificationEvidenceRecord(
-                        id=uuid4(),
-                        tenant_id=context.tenant_id,
-                        classification_result_id=result_record.id,
-                        fragment_id=evidence.fragment_id,
-                        classification_id=classification.id if classification is not None else None,
-                        rule_id=evidence.rule_id,
-                        rule_version=evidence.rule_version,
-                        start_byte_offset=evidence.start_byte_offset,
-                        end_byte_offset=evidence.end_byte_offset,
-                        excerpt=evidence.excerpt,
+            if result.evidence:
+                if classification_record is None:
+                    raise ValueError("DCE_CLASSIFICATION_EVIDENCE_WITHOUT_CLASSIFICATION")
+                for evidence in result.evidence:
+                    session.add(
+                        DceDocumentClassificationEvidenceRecord(
+                            id=uuid4(),
+                            tenant_id=context.tenant_id,
+                            classification_result_id=result_record.id,
+                            fragment_id=evidence.fragment_id,
+                            classification_id=classification_record.id,
+                            rule_id=evidence.rule_id,
+                            rule_version=evidence.rule_version,
+                            start_byte_offset=evidence.start_byte_offset,
+                            end_byte_offset=evidence.end_byte_offset,
+                            excerpt=evidence.excerpt,
+                        )
                     )
-                )
 
         dce_version.classification_readiness = _classification_readiness(command=command)
         dce_version.aggregate_revision += 1
