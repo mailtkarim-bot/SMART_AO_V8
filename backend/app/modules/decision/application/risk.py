@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from app.modules.decision.application.ports import DecisionRiskDraft, DecisionRiskRepository
 from app.modules.decision.application.risk_commands import RegisterStructuredRiskCommand
@@ -92,28 +93,32 @@ class RegisterStructuredRiskHandler:
     def execute(self, *, session: Any, command, context: CommandContext) -> HandlerOutcome:
         if context.actor_kind != ActorKind.PATRON_ADMIN.value or context.membership_id is None:
             raise CommandExecutionError("PATRON_REQUIRED")
+        tenant_id = UUID(str(context.tenant_id))
+        actor_id = UUID(str(context.actor_id))
+        membership_id = UUID(str(context.membership_id))
+        correlation_id = UUID(str(context.correlation_id)) if context.correlation_id else None
         repository = self._repository_factory(session)
         if not repository.case_exists(
-            session=session, tenant_id=context.tenant_id, case_id=command.case_id
+            session=session, tenant_id=tenant_id, case_id=command.case_id
         ):
             raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
         if not repository.case_uses_dce_version(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             case_id=command.case_id,
             dce_version_id=command.dce_version_id,
         ):
             raise CommandExecutionError("STALE_DCE_CONTEXT")
         if not repository.source_exists(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             dce_version_id=command.dce_version_id,
             source_fragment_id=command.source_fragment_id,
         ):
             raise CommandExecutionError("SOURCE_FRAGMENT_NOT_FOUND_OR_FORBIDDEN")
         if not repository.source_supports(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             dce_version_id=command.dce_version_id,
             source_fragment_id=command.source_fragment_id,
             source_excerpt=command.source_excerpt,
@@ -144,22 +149,22 @@ class RegisterStructuredRiskHandler:
             )
         )
         if repository.functional_exists(
-            session=session, tenant_id=context.tenant_id, functional_key=functional_key
+            session=session, tenant_id=tenant_id, functional_key=functional_key
         ):
             raise CommandExecutionError("RISK_ALREADY_REGISTERED")
         draft = DecisionRiskDraft(
             id=command.risk_id,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             case_id=command.case_id,
             dce_version_id=command.dce_version_id,
             source_fragment_id=command.source_fragment_id,
             functional_key=functional_key,
             risk=risk,
-            actor_id=context.actor_id,
-            membership_id=context.membership_id,
+            actor_id=actor_id,
+            membership_id=membership_id,
             command_id=command.command_id,
             idempotency_key=command.idempotency_key,
-            correlation_id=context.correlation_id,
+            correlation_id=correlation_id,
             due_at=command.due_at,
         )
         repository.create(session=session, draft=draft)
