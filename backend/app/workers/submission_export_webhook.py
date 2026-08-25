@@ -220,7 +220,9 @@ def _post_json(
         },
     )
     with open_public_https(request, timeout=timeout) as response:
-        return int(response.status)
+        if response.status is None:
+            raise ValueError("webhook response has no status")
+        return response.status
 
 
 def _merge(first: WebhookRunResult, second: WebhookRunResult) -> WebhookRunResult:
