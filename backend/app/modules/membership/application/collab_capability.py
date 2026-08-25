@@ -332,6 +332,7 @@ class ProposeCapabilityForCaseHandler:
         command: ProposeCapabilityForCaseCommand,
         context: CommandContext,
     ) -> HandlerOutcome:
+        tenant_id = UUID(str(context.tenant_id))
         _require_active_assignment(
             session,
             context=context,
@@ -341,7 +342,7 @@ class ProposeCapabilityForCaseHandler:
         )
         _validate_source(
             session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             case_id=command.case_id,
             assignment_id=command.assignment_id,
             requirement_id=command.requirement_id,
@@ -442,6 +443,7 @@ class ReportCapabilityGapHandler:
         command: ReportCapabilityGapCommand,
         context: CommandContext,
     ) -> HandlerOutcome:
+        tenant_id = UUID(str(context.tenant_id))
         _require_active_assignment(
             session,
             context=context,
@@ -451,7 +453,7 @@ class ReportCapabilityGapHandler:
         )
         _validate_source(
             session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             case_id=command.case_id,
             assignment_id=command.assignment_id,
             requirement_id=command.requirement_id,
