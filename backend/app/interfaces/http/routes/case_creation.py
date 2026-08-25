@@ -8,6 +8,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
+from app.interfaces.http.aggregate_refs import require_aggregate_revision
 from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.modules.case.application.commands import CreateCaseCommand
@@ -97,7 +98,7 @@ def build_case_creation_router(
             idempotency_key=UUID(result.idempotency_key),
             result_code="CASE_CREATED",
             case_id=UUID(str(reference["aggregate_id"])),
-            version=int(reference["aggregate_revision"]),
+            version=require_aggregate_revision(reference["aggregate_revision"]),
             event_ids=[UUID(event_id) for event_id in result.event_ids],
             replayed=result.replayed,
         )
