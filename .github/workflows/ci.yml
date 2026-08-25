@@ -136,7 +136,7 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
       - name: Upload backend image scan
-        if: always()
+        if: always() && hashFiles('trivy-backend.sarif') != ''
         uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: trivy-backend.sarif
@@ -152,7 +152,16 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
       - name: Upload frontend image scan
-        if: always()
+        if: always() && hashFiles('trivy-frontend.sarif') != ''
         uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: trivy-frontend.sarif
+      - name: Upload image scan reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-scan-reports-${{ github.sha }}
+          path: |
+            trivy-backend.sarif
+            trivy-frontend.sarif
+          if-no-files-found: warn
