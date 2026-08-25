@@ -27,6 +27,7 @@ from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
     CommandExecutionError,
+    CommandHandler,
     DispatchResult,
     HandlerOutcome,
     PendingDomainEvent,
@@ -455,7 +456,7 @@ def decision_lifecycle_handlers(
     lifecycle_repository: DecisionLifecycleRepository,
     repository_factory: Callable[[Any], DecisionRepository],
     condition_repository: DecisionConditionRepository,
-) -> dict[str, object]:
+) -> dict[str, CommandHandler]:
     return {
         CreateDecisionCommand.command_type: CreateDecisionHandler(repository=lifecycle_repository),
         FreezeDecisionContextCommand.command_type: FreezeDecisionContextHandler(

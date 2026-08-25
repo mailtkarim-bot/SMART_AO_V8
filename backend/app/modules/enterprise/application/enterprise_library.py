@@ -21,6 +21,7 @@ from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
     CommandExecutionError,
+    CommandHandler,
     DispatchResult,
     HandlerOutcome,
     PendingDomainEvent,
@@ -411,7 +412,7 @@ class RegisterEnterpriseDocumentHandler:
         )
 
 
-def enterprise_library_handlers() -> dict[str, object]:
+def enterprise_library_handlers() -> dict[str, CommandHandler]:
     """Return the closed dispatcher registry for enterprise library writes."""
 
     return {

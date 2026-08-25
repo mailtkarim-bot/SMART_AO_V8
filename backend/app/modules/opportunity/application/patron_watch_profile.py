@@ -24,6 +24,7 @@ from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
     CommandExecutionError,
+    CommandHandler,
     DispatchResult,
     HandlerOutcome,
     PendingDomainEvent,
@@ -360,7 +361,7 @@ class AddOpportunityWatchProfileVersionHandler:
         )
 
 
-def opportunity_watch_profile_handlers() -> dict[str, object]:
+def opportunity_watch_profile_handlers() -> dict[str, CommandHandler]:
     return {
         "CreateOpportunityWatchProfile": CreateOpportunityWatchProfileHandler(),
         "AddOpportunityWatchProfileVersion": AddOpportunityWatchProfileVersionHandler(),

@@ -22,6 +22,7 @@ from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
     CommandExecutionError,
+    CommandHandler,
     DispatchResult,
     HandlerOutcome,
     PendingDomainEvent,
@@ -422,7 +423,7 @@ class AddEnterpriseCapabilityVersionHandler:
         )
 
 
-def enterprise_capability_handlers() -> dict[str, object]:
+def enterprise_capability_handlers() -> dict[str, CommandHandler]:
     return {
         "CreateEnterpriseCapability": CreateEnterpriseCapabilityHandler(),
         "AddEnterpriseCapabilityVersion": AddEnterpriseCapabilityVersionHandler(),

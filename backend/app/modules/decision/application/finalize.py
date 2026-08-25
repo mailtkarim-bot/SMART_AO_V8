@@ -20,6 +20,7 @@ from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
     CommandExecutionError,
+    CommandHandler,
     DispatchResult,
     HandlerOutcome,
     PendingDomainEvent,
@@ -241,7 +242,7 @@ def decision_finalization_handlers(
     repository_factory: Callable[[Any], DecisionRepository],
     verified_context_reader: DecisionVerifiedContextReader,
     condition_repository: DecisionConditionRepository,
-) -> dict[str, object]:
+) -> dict[str, CommandHandler]:
     return {
         FinalizeGoNoGoDecisionCommand.command_type: FinalizeGoNoGoDecisionHandler(
             repository_factory=repository_factory,

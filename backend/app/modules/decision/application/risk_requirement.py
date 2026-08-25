@@ -19,6 +19,7 @@ from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
     CommandExecutionError,
+    CommandHandler,
     DispatchResult,
     HandlerOutcome,
     PendingDomainEvent,
@@ -230,7 +231,7 @@ def decision_risk_requirement_link_handlers(
     *,
     repository_factory: Callable[[Any], DecisionRiskRequirementLinkRepository],
     action_writer: DecisionPatronActionWriter | None = None,
-) -> dict[str, object]:
+) -> dict[str, CommandHandler]:
     return {
         LinkRiskToRequirementCommand.command_type: LinkRiskToRequirementHandler(
             repository_factory=repository_factory,
