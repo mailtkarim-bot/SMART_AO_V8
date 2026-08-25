@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from app.modules.membership.application.collab_capability_commands import (
+        ProposeCapabilityForCaseCommand,
+        ReportCapabilityGapCommand,
+    )
 
 
 class CollaboratorCapabilityPublicModel(BaseModel):
@@ -22,7 +28,7 @@ class ProposeCapabilityForCaseRequest(CollaboratorCapabilityPublicModel):
     justification: str = Field(min_length=1, max_length=2_000)
     source_locator: str | None = Field(default=None, max_length=500)
 
-    def to_command(self, *, case_id: UUID) -> object:
+    def to_command(self, *, case_id: UUID) -> ProposeCapabilityForCaseCommand:
         from app.modules.membership.application.collab_capability_commands import (
             ProposeCapabilityForCaseCommand,
         )
@@ -48,7 +54,7 @@ class ReportCapabilityGapRequest(CollaboratorCapabilityPublicModel):
     source_locator: str | None = Field(default=None, max_length=500)
     recommended_action: str = Field(min_length=1, max_length=1_000)
 
-    def to_command(self, *, case_id: UUID) -> object:
+    def to_command(self, *, case_id: UUID) -> ReportCapabilityGapCommand:
         from app.modules.membership.application.collab_capability_commands import (
             ReportCapabilityGapCommand,
         )
