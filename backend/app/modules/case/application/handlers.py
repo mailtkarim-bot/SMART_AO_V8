@@ -76,6 +76,8 @@ class CreateCaseHandler:
             raise ValueError("NON_MANUAL_ORIGIN_REQUIRES_REFERENCE")
         if command.consultation_id is None and command.consultation_revision is not None:
             raise ValueError("CONSULTATION_REQUIRED_OR_STALE")
+        if command.consultation_id is None and command.origin_kind not in {"MANUAL", "OPPORTUNITY"}:
+            raise ValueError("CONSULTATION_REQUIRED_OR_STALE")
         consultation_revision: int | None = None
         if command.consultation_id is not None:
             if command.consultation_revision is None or self._consultation_reader_factory is None:
