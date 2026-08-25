@@ -1,5 +1,7 @@
 import type {
   AssignedCase,
+  CreateCaseInput,
+  CreateCaseResponse,
   AuthSession,
   CurrentActor,
   BackendReadiness,
@@ -259,6 +261,16 @@ export function createApiClient(
     logout,
     getBackendReadiness: () => request<BackendReadiness>("/healthz/ready"),
     listAssignedCases: () => request<AssignedCase[]>("/api/v1/cases/assigned"),
+    createCase: (input: CreateCaseInput) =>
+      request<CreateCaseResponse>("/api/v1/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          command_id: makeId(),
+          idempotency_key: makeId(),
+          correlation_id: makeId(),
+          ...input,
+        }),
+      }),
     listPatronAssignments: () =>
       request<{ items: PatronAssignment[] }>("/api/v1/patron/assignments"),
     getAssignmentJournal: (assignmentId: string) =>

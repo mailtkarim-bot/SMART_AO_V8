@@ -269,3 +269,19 @@ input:focus, select:focus, textarea:focus { border-color: #8096fc; box-shadow: 0
 .muted-copy { color: #8a97aa; font-size: 0.76rem; line-height: 1.5; }
 @media (max-width: 900px) { .dce-knowledge-layout { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .dce-counter-grid { grid-template-columns: 1fr 1fr; } .dce-meta { display: grid; } .knowledge-actions { align-items: stretch; flex-direction: column; } }
+
+
+/* CreateCase */
+.create-case-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; padding: 1.35rem; border: 1px solid #e0e7f0; border-radius: 0.8rem; background: #fff; }
+.create-case-form label { min-width: 0; }
+.create-case-form textarea { resize: vertical; }
+.create-case-form small { color: #8a97a9; font-size: 0.68rem; font-weight: 500; letter-spacing: 0; }
+.form-wide { grid-column: 1 / -1; }
+.form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; }
+.form-actions .primary-button { margin: 0; }
+@media (max-width: 650px) {
+  .create-case-form { grid-template-columns: 1fr; }
+  .form-wide { grid-column: auto; }
+  .form-actions { justify-content: stretch; }
+  .form-actions .primary-button { width: 100%; }
+}
