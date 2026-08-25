@@ -15,8 +15,11 @@ from app.platform.security.models import (
     PasswordCredentialRecord,
     RefreshTokenRecord,
     TenantMembershipRecord,
+    TotpFactorRecord,
 )
 from app.platform.security.tokens import JwtAccessTokenCodec
+from app.platform.security.totp import TotpService, _totp_code
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -103,7 +106,11 @@ def _active_identity_with_membership(
     return identity_id, membership_id, email
 
 
-def _client(session_factory: sessionmaker[Session]) -> tuple[TestClient, JwtAccessTokenCodec]:
+def _client(
+    session_factory: sessionmaker[Session],
+    *,
+    totp_service: TotpService | None = None,
+) -> tuple[TestClient, JwtAccessTokenCodec]:
     authentication_service = AuthenticationService(
         session_factory=session_factory,
         password_verifier=StubPasswordVerifier(),
@@ -122,6 +129,7 @@ def _client(session_factory: sessionmaker[Session]) -> tuple[TestClient, JwtAcce
         access_tokens=access_tokens,
         csrf_token_generator=SequenceTokenGenerator("csrf-1", "csrf-2", "csrf-3"),
         clock=FixedClock(),
+        totp_service=totp_service,
     )
     app = create_app(authentication_runtime=runtime)
     return TestClient(app, base_url="https://smart-ao.test"), access_tokens
@@ -370,3 +378,138 @@ def test_current_actor_returns_server_resolved_membership_facts(
     assert body["identity_id"] == str(identity_id)
     assert body["actor_kind"] == "PATRON_ADMIN"
     assert body["membership_state"] == "ACTIVE"
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_mfa_routes_require_csrf_and_return_not_configured_explicitly(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id = _insert_tenant(database_engine)
+    _, _, email = _active_identity_with_membership(database_engine, tenant_id=tenant_id)
+    client, _ = _client(session_factory)
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": "Correct#Pass123", "tenant_id": str(tenant_id)},
+    )
+    token = login.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    missing_csrf = client.post("/api/v1/auth/mfa/totp/enroll", headers=headers)
+    not_configured = client.post(
+        "/api/v1/auth/mfa/totp/enroll",
+        headers={**headers, "X-CSRF-Token": client.cookies.get("smart_ao_csrf")},
+    )
+
+    assert missing_csrf.status_code == 403
+    assert missing_csrf.json() == {"detail": "CSRF_REJECTED"}
+    assert not_configured.status_code == 503
+    assert not_configured.json() == {"detail": "MFA_NOT_CONFIGURED"}
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_mfa_enrollment_confirmation_reissues_access_token_and_step_up_is_rate_limited(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id = _insert_tenant(database_engine)
+    identity_id, _, email = _active_identity_with_membership(
+        database_engine, tenant_id=tenant_id
+    )
+    totp_service = TotpService(
+        session_factory=session_factory,
+        encryption_key=Fernet.generate_key().decode("ascii"),
+    )
+    client, access_tokens = _client(session_factory, totp_service=totp_service)
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": "Correct#Pass123", "tenant_id": str(tenant_id)},
+    )
+    token = login.json()["access_token"]
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-CSRF-Token": client.cookies.get("smart_ao_csrf"),
+    }
+
+    enrollment = client.post("/api/v1/auth/mfa/totp/enroll", headers=headers)
+    assert enrollment.status_code == 200
+    body = enrollment.json()
+    secret = body["otpauth_uri"].split("secret=", 1)[1].split("&", 1)[0]
+    code = _totp_code(secret, int(FIXED_NOW.timestamp()) // 30)
+
+    confirmation = client.post(
+        "/api/v1/auth/mfa/totp/confirm",
+        headers=headers,
+        json={"factor_id": body["factor_id"], "code": code},
+    )
+    assert confirmation.status_code == 200
+    refreshed_token = confirmation.json()["access_token"]
+    assert refreshed_token != token
+    assert access_tokens.decode(refreshed_token).session_id == access_tokens.decode(
+        token
+    ).session_id
+
+    with Session(database_engine) as session:
+        auth_session = session.scalar(
+            sa.select(AuthSessionRecord).where(AuthSessionRecord.identity_id == identity_id)
+        )
+        assert auth_session is not None and auth_session.auth_strength == "MFA"
+
+    step_headers = {
+        "Authorization": f"Bearer {refreshed_token}",
+        "X-CSRF-Token": client.cookies.get("smart_ao_csrf"),
+    }
+    responses = [
+        client.post(
+            "/api/v1/auth/mfa/totp/step-up",
+            headers=step_headers,
+            json={"code": "000000"},
+        )
+        for _ in range(6)
+    ]
+    assert [response.status_code for response in responses[:5]] == [422] * 5
+    assert responses[5].status_code == 429
+    assert responses[5].json() == {"detail": "RATE_LIMITED"}
+    assert int(responses[5].headers["Retry-After"]) >= 1
+
+
+@pytest.mark.api
+@pytest.mark.db
+@pytest.mark.security
+def test_mfa_confirm_rejects_invalid_code_without_activating_factor(
+    database_engine: sa.Engine,
+    session_factory: sessionmaker[Session],
+) -> None:
+    tenant_id = _insert_tenant(database_engine)
+    _, _, email = _active_identity_with_membership(database_engine, tenant_id=tenant_id)
+    totp_service = TotpService(
+        session_factory=session_factory,
+        encryption_key=Fernet.generate_key().decode("ascii"),
+    )
+    client, _ = _client(session_factory, totp_service=totp_service)
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": "Correct#Pass123", "tenant_id": str(tenant_id)},
+    )
+    headers = {
+        "Authorization": f"Bearer {login.json()['access_token']}",
+        "X-CSRF-Token": client.cookies.get("smart_ao_csrf"),
+    }
+    enrollment = client.post("/api/v1/auth/mfa/totp/enroll", headers=headers)
+    body = enrollment.json()
+
+    response = client.post(
+        "/api/v1/auth/mfa/totp/confirm",
+        headers=headers,
+        json={"factor_id": body["factor_id"], "code": "000000"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "TOTP_CODE_INVALID"}
+    with Session(database_engine) as session:
+        factor = session.get(TotpFactorRecord, UUID(body["factor_id"]))
+        assert factor is not None and factor.state == "PENDING"

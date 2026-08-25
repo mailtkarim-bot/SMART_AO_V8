@@ -33,8 +33,15 @@ from app.platform.security.authentication import (
     InvalidCredentialsError,
     RefreshRejectedError,
 )
+from app.platform.security.context import ActorContext
+from app.platform.security.models import AuthSessionRecord
 from app.platform.security.rate_limit import LoginRateLimiter
 from app.platform.security.tokens import JwtAccessTokenCodec
+from app.platform.security.totp import (
+    TotpEnrollmentError,
+    TotpService,
+    TotpVerificationError,
+)
 
 _REFRESH_COOKIE_NAME = "smart_ao_refresh"
 _CSRF_COOKIE_NAME = "smart_ao_csrf"
@@ -64,6 +71,7 @@ class AuthenticationHttpRuntime:
     clock: Clock
     context_resolver: AuthenticationContextResolver
     rate_limiter: LoginRateLimiter = field(default_factory=LoginRateLimiter.from_environment)
+    totp_service: TotpService | None = None
     trusted_proxy_networks: tuple[IPv4Network | IPv6Network, ...] = field(
         default_factory=lambda: _trusted_proxy_networks_from_environment()
     )
@@ -79,6 +87,7 @@ class AuthenticationHttpRuntime:
         clock: Clock,
         rate_limiter: LoginRateLimiter | None = None,
         trusted_proxy_networks: tuple[IPv4Network | IPv6Network, ...] | None = None,
+        totp_service: TotpService | None = None,
     ) -> AuthenticationHttpRuntime:
         audited_service = (
             authentication_service
@@ -102,6 +111,11 @@ class AuthenticationHttpRuntime:
                 clock=clock,
             ),
             rate_limiter=rate_limiter or LoginRateLimiter.from_environment(),
+            totp_service=(
+                totp_service
+                if totp_service is not None
+                else TotpService.from_environment(session_factory=session_factory)
+            ),
             trusted_proxy_networks=(
                 trusted_proxy_networks
                 if trusted_proxy_networks is not None
@@ -135,6 +149,27 @@ class CurrentActorResponse(BaseModel):
     identity_id: UUID
     actor_kind: str
     membership_state: str
+
+
+class TotpCodeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    code: str = Field(min_length=6, max_length=32)
+
+
+class TotpEnrollmentResponse(BaseModel):
+    factor_id: UUID
+    otpauth_uri: str
+    recovery_codes: tuple[str, ...]
+    expires_at: datetime
+
+
+class TotpConfirmRequest(TotpCodeRequest):
+    factor_id: UUID
+
+
+class TotpStepUpResponse(AccessTokenResponse):
+    used_recovery_code: bool = False
 
 
 def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRouter:
@@ -265,6 +300,249 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
         )
         return response
 
+    @router.post("/mfa/totp/enroll", response_model=TotpEnrollmentResponse)
+    def begin_totp_enrollment(
+        http_request: Request,
+        authorization: str | None = Header(default=None),
+        csrf_header: str | None = Header(default=None, alias=_CSRF_HEADER_NAME),
+    ) -> TotpEnrollmentResponse:
+        context = _resolve_authenticated_context(
+            authorization=authorization,
+            context_resolver=runtime.context_resolver,
+        )
+        _require_authenticated_session(context)
+        _require_csrf(request=http_request, csrf_header=csrf_header)
+        identity, source_ip = _mfa_rate_limit_identity(
+            runtime=runtime, context=context, request=http_request, namespace="mfa-enroll"
+        )
+        decision = runtime.rate_limiter.check(
+            namespace="mfa-enroll", identity=identity, source_ip=source_ip
+        )
+        if not decision.allowed:
+            _record_mfa_rate_limit_denial(
+                runtime=runtime, context=context, action="auth.mfa.enrollment.start"
+            )
+            raise _rate_limited(decision.retry_after_seconds)
+        service = _require_totp_service(runtime)
+        try:
+            result = service.begin_enrollment(
+                identity_id=context.identity_id,
+                now=runtime.clock.now(),
+            )
+        except TotpEnrollmentError as error:
+            runtime.rate_limiter.record_failure(
+                namespace="mfa-enroll", identity=identity, source_ip=source_ip
+            )
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+        runtime.rate_limiter.record_success(
+            namespace="mfa-enroll", identity=identity, source_ip=source_ip
+        )
+        _record_mfa_event(
+            runtime=runtime,
+            context=context,
+            event_type=AuditEventType.AUTH_MFA_ENROLLMENT_STARTED,
+            outcome=AuditOutcome.SUCCEEDED,
+            severity=AuditSeverity.INFO,
+            action="auth.mfa.enrollment.start",
+            reason_code="MFA_ENROLLMENT_STARTED",
+        )
+        return TotpEnrollmentResponse(
+            factor_id=result.factor_id,
+            otpauth_uri=result.otpauth_uri,
+            recovery_codes=result.recovery_codes,
+            expires_at=result.expires_at,
+        )
+
+    @router.post("/mfa/totp/confirm", response_model=AccessTokenResponse)
+    def confirm_totp_enrollment(
+        request: TotpConfirmRequest,
+        http_request: Request,
+        authorization: str | None = Header(default=None),
+        csrf_header: str | None = Header(default=None, alias=_CSRF_HEADER_NAME),
+    ) -> JSONResponse:
+        context = _resolve_authenticated_context(
+            authorization=authorization,
+            context_resolver=runtime.context_resolver,
+        )
+        _require_authenticated_session(context)
+        _require_csrf(request=http_request, csrf_header=csrf_header)
+        identity, source_ip = _mfa_rate_limit_identity(
+            runtime=runtime, context=context, request=http_request, namespace="mfa"
+        )
+        decision = runtime.rate_limiter.check(
+            namespace="mfa", identity=identity, source_ip=source_ip
+        )
+        if not decision.allowed:
+            _record_mfa_rate_limit_denial(
+                runtime=runtime, context=context, action="auth.mfa.enrollment.confirm"
+            )
+            raise _rate_limited(decision.retry_after_seconds)
+        service = _require_totp_service(runtime)
+        try:
+            service.confirm_enrollment(
+                identity_id=context.identity_id,
+                factor_id=request.factor_id,
+                code=request.code,
+                now=runtime.clock.now(),
+                session_id=context.session_id,
+            )
+        except TotpVerificationError as error:
+            runtime.rate_limiter.record_failure(
+                namespace="mfa", identity=identity, source_ip=source_ip
+            )
+            _record_mfa_event(
+                runtime=runtime,
+                context=context,
+                event_type=AuditEventType.AUTH_MFA_VERIFICATION_DENIED,
+                outcome=AuditOutcome.DENIED,
+                severity=AuditSeverity.WARNING,
+                action="auth.mfa.enrollment.confirm",
+                reason_code=str(error),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(error),
+            ) from error
+        runtime.rate_limiter.record_success(
+            namespace="mfa", identity=identity, source_ip=source_ip
+        )
+        _record_mfa_event(
+            runtime=runtime,
+            context=context,
+            event_type=AuditEventType.AUTH_MFA_ENROLLMENT_CONFIRMED,
+            outcome=AuditOutcome.SUCCEEDED,
+            severity=AuditSeverity.INFO,
+            action="auth.mfa.enrollment.confirm",
+            reason_code="MFA_ENROLLMENT_CONFIRMED",
+        )
+        return _issue_access_token_response(runtime=runtime, context=context, auth_strength="MFA")
+
+    @router.post("/mfa/totp/step-up", response_model=TotpStepUpResponse)
+    def verify_totp_step_up(
+        request: TotpCodeRequest,
+        http_request: Request,
+        authorization: str | None = Header(default=None),
+        csrf_header: str | None = Header(default=None, alias=_CSRF_HEADER_NAME),
+    ) -> JSONResponse:
+        context = _resolve_authenticated_context(
+            authorization=authorization,
+            context_resolver=runtime.context_resolver,
+        )
+        session_id = _require_authenticated_session(context)
+        _require_csrf(request=http_request, csrf_header=csrf_header)
+        source_ip = _source_ip(
+            http_request, trusted_proxy_networks=runtime.trusted_proxy_networks
+        )
+        identity = str(context.identity_id)
+        decision = runtime.rate_limiter.check(
+            namespace="mfa", identity=identity, source_ip=source_ip
+        )
+        if not decision.allowed:
+            raise _rate_limited(decision.retry_after_seconds)
+        service = _require_totp_service(runtime)
+        try:
+            result = service.verify_step_up(
+                session_id=session_id,
+                code=request.code,
+                now=runtime.clock.now(),
+            )
+        except TotpVerificationError as error:
+            runtime.rate_limiter.record_failure(
+                namespace="mfa", identity=identity, source_ip=source_ip
+            )
+            _record_mfa_event(
+                runtime=runtime,
+                context=context,
+                event_type=AuditEventType.AUTH_MFA_VERIFICATION_DENIED,
+                outcome=AuditOutcome.DENIED,
+                severity=AuditSeverity.WARNING,
+                action="auth.mfa.step_up",
+                reason_code=str(error),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(error),
+            ) from error
+        runtime.rate_limiter.record_success(
+            namespace="mfa", identity=identity, source_ip=source_ip
+        )
+        _record_mfa_event(
+            runtime=runtime,
+            context=context,
+            event_type=(
+                AuditEventType.AUTH_MFA_RECOVERY_USED
+                if result.used_recovery_code
+                else AuditEventType.AUTH_MFA_STEP_UP_SUCCEEDED
+            ),
+            outcome=AuditOutcome.SUCCEEDED,
+            severity=AuditSeverity.INFO,
+            action="auth.mfa.step_up",
+            reason_code=(
+                "MFA_RECOVERY_USED"
+                if result.used_recovery_code
+                else "MFA_STEP_UP_SUCCEEDED"
+            ),
+        )
+        return _issue_access_token_response(
+            runtime=runtime,
+            context=context,
+            auth_strength="MFA_STEP_UP",
+            used_recovery_code=result.used_recovery_code,
+        )
+
+    @router.post("/mfa/totp/disable", status_code=status.HTTP_204_NO_CONTENT)
+    def disable_totp(
+        request: TotpCodeRequest,
+        http_request: Request,
+        authorization: str | None = Header(default=None),
+        csrf_header: str | None = Header(default=None, alias=_CSRF_HEADER_NAME),
+    ) -> Response:
+        context = _resolve_authenticated_context(
+            authorization=authorization,
+            context_resolver=runtime.context_resolver,
+        )
+        _require_authenticated_session(context)
+        _require_csrf(request=http_request, csrf_header=csrf_header)
+        identity, source_ip = _mfa_rate_limit_identity(
+            runtime=runtime, context=context, request=http_request, namespace="mfa"
+        )
+        decision = runtime.rate_limiter.check(
+            namespace="mfa", identity=identity, source_ip=source_ip
+        )
+        if not decision.allowed:
+            _record_mfa_rate_limit_denial(
+                runtime=runtime, context=context, action="auth.mfa.disable"
+            )
+            raise _rate_limited(decision.retry_after_seconds)
+        service = _require_totp_service(runtime)
+        try:
+            service.disable(
+                identity_id=context.identity_id,
+                code=request.code,
+                now=runtime.clock.now(),
+            )
+        except TotpVerificationError as error:
+            runtime.rate_limiter.record_failure(
+                namespace="mfa", identity=identity, source_ip=source_ip
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(error),
+            ) from error
+        runtime.rate_limiter.record_success(
+            namespace="mfa", identity=identity, source_ip=source_ip
+        )
+        _record_mfa_event(
+            runtime=runtime,
+            context=context,
+            event_type=AuditEventType.AUTH_MFA_DISABLED,
+            outcome=AuditOutcome.SUCCEEDED,
+            severity=AuditSeverity.WARNING,
+            action="auth.mfa.disable",
+            reason_code="MFA_DISABLED",
+        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
     @router.get("/me", response_model=CurrentActorResponse)
     def current_actor(authorization: str | None = Header(default=None)) -> CurrentActorResponse:
         context = _resolve_authenticated_context(
@@ -298,6 +576,124 @@ def build_authentication_router(*, runtime: AuthenticationHttpRuntime) -> APIRou
         return response
 
     return router
+
+
+def _require_authenticated_session(context: ActorContext) -> UUID:
+    if context.session_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="UNAUTHENTICATED")
+    return context.session_id
+
+
+def _mfa_rate_limit_identity(
+    *,
+    runtime: AuthenticationHttpRuntime,
+    context: ActorContext,
+    request: Request,
+    namespace: str,
+) -> tuple[str, str]:
+    del namespace
+    return (
+        str(context.identity_id),
+        _source_ip(request, trusted_proxy_networks=runtime.trusted_proxy_networks),
+    )
+
+
+def _record_mfa_rate_limit_denial(
+    *, runtime: AuthenticationHttpRuntime, context: ActorContext, action: str
+) -> None:
+    _record_mfa_event(
+        runtime=runtime,
+        context=context,
+        event_type=AuditEventType.AUTH_MFA_VERIFICATION_DENIED,
+        outcome=AuditOutcome.DENIED,
+        severity=AuditSeverity.WARNING,
+        action=action,
+        reason_code="RATE_LIMITED",
+    )
+
+
+def _require_totp_service(runtime: AuthenticationHttpRuntime) -> TotpService:
+    if runtime.totp_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MFA_NOT_CONFIGURED",
+        )
+    return runtime.totp_service
+
+
+def _issue_access_token_response(
+    *,
+    runtime: AuthenticationHttpRuntime,
+    context: ActorContext,
+    auth_strength: str,
+    used_recovery_code: bool = False,
+) -> JSONResponse:
+    if context.session_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="UNAUTHENTICATED")
+    with runtime.session_factory() as session:
+        auth_session = session.get(AuthSessionRecord, context.session_id)
+        if auth_session is None or auth_session.state != "ACTIVE":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="UNAUTHENTICATED")
+        access_token = runtime.access_tokens.issue(
+            identity_id=context.identity_id,
+            session_id=context.session_id,
+            token_version=auth_session.token_version,
+        )
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=TotpStepUpResponse(
+            access_token=access_token,
+            used_recovery_code=used_recovery_code,
+        ).model_dump(mode="json"),
+    )
+
+
+def _record_mfa_event(
+    *,
+    runtime: AuthenticationHttpRuntime,
+    context,
+    event_type: AuditEventType,
+    outcome: AuditOutcome,
+    severity: AuditSeverity,
+    action: str,
+    reason_code: str,
+) -> None:
+    with runtime.session_factory.begin() as session:
+        SecurityAuditWriter().record(
+            session=session,
+            entry=SecurityAuditEntry(
+                occurred_at=runtime.clock.now(),
+                tenant_id=context.tenant_id,
+                actor_id=context.actor_id,
+                identity_id=context.identity_id,
+                session_id=context.session_id,
+                actor_kind=context.actor_kind.value,
+                auth_strength=auth_strength_for_event(event_type),
+                event_type=event_type,
+                outcome=outcome,
+                severity=severity,
+                action=action,
+                resource_type="AUTH_MFA",
+                resource_id=None,
+                case_id=None,
+                correlation_id=context.correlation_id,
+                command_id=None,
+                request_id=None,
+                source_ip_hash=None,
+                user_agent_family=None,
+                reason_code=reason_code,
+                metadata={"channel": "http", "reason_class": "totp"},
+            ),
+        )
+
+
+def auth_strength_for_event(event_type: AuditEventType) -> str | None:
+    if event_type in {
+        AuditEventType.AUTH_MFA_STEP_UP_SUCCEEDED,
+        AuditEventType.AUTH_MFA_RECOVERY_USED,
+    }:
+        return "MFA_STEP_UP"
+    return "MFA"
 
 
 def _source_ip(

@@ -75,3 +75,39 @@ def test_required_does_not_accept_placeholder_with_surrounding_whitespace(
 
     with pytest.raises(RuntimeError, match="required production setting"):
         production_module._required("SMART_AO_TEST_SETTING")
+
+
+
+def test_totp_service_is_disabled_by_default(monkeypatch, production_module) -> None:
+    monkeypatch.setenv("SMART_AO_MFA_ENABLED", "0")
+    monkeypatch.delenv("SMART_AO_TOTP_ENCRYPTION_KEY", raising=False)
+
+    assert production_module._totp_service_if_enabled(
+        session_factory=production_module.sessionmaker()
+    ) is None
+
+
+def test_totp_service_requires_key_when_mfa_is_enabled(monkeypatch, production_module) -> None:
+    monkeypatch.setenv("SMART_AO_MFA_ENABLED", "1")
+    monkeypatch.delenv("SMART_AO_TOTP_ENCRYPTION_KEY", raising=False)
+
+    with pytest.raises(RuntimeError, match="SMART_AO_TOTP_ENCRYPTION_KEY"):
+        production_module._totp_service_if_enabled(
+            session_factory=production_module.sessionmaker()
+        )
+
+
+def test_totp_service_is_constructed_from_out_of_band_key(monkeypatch, production_module) -> None:
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv("SMART_AO_MFA_ENABLED", "1")
+    monkeypatch.setenv(
+        "SMART_AO_TOTP_ENCRYPTION_KEY", Fernet.generate_key().decode("ascii")
+    )
+    monkeypatch.setenv("SMART_AO_TOTP_ISSUER", "SMART_AO_PREPROD")
+
+    service = production_module._totp_service_if_enabled(
+        session_factory=production_module.sessionmaker()
+    )
+
+    assert isinstance(service, production_module.TotpService)
