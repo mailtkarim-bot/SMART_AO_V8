@@ -16,6 +16,11 @@ from app.modules.enterprise.infrastructure.models import (
     EnterpriseCapabilityVersionRecord,
     EnterpriseDocumentRecord,
 )
+from app.modules.membership.infrastructure.records import (
+    CaseAssignmentRecord,
+    CollaboratorTaskRecord,
+    CollaboratorTaskResultRecord,
+)
 from app.modules.membership.public.text_safety import contains_forbidden_text
 from app.modules.preparation.application.commands import (
     EvaluatePreparationReadinessCommand,
@@ -46,11 +51,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    CaseAssignmentRecord,
-    CollaboratorTaskRecord,
-    CollaboratorTaskResultRecord,
-)
 from app.platform.storage.ports import GeneratedDocumentStorage
 
 _PREPARATION_COMMANDS = frozenset({"EvaluatePreparationReadiness", "GenerateTechnicalDocument"})
@@ -438,12 +438,15 @@ class PreparationHandler:
             "tasks": sorted(str(item.id) for item in tasks),
             "capability_assessments": proposal_proof_manifest,
             "gaps": sorted(
-                {
-                    "gap_id": str(gap.id),
-                    "gap_kind": gap.gap_kind,
-                    "severity": gap.severity,
-                }
-                for gap in gaps
+                (
+                    {
+                        "gap_id": str(gap.id),
+                        "gap_kind": gap.gap_kind,
+                        "severity": gap.severity,
+                    }
+                    for gap in gaps
+                ),
+                key=lambda item: str(item["gap_id"]),
             ),
             "blockers": sorted(blocker_codes),
             "warnings": sorted(warning_codes),

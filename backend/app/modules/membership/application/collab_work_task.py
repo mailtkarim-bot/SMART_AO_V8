@@ -11,6 +11,11 @@ from app.modules.dce.infrastructure.models.dce_requirements import DceRequiremen
 from app.modules.membership.application.collab_work_task_commands import (
     CreateTaskFromRequirementCommand,
 )
+from app.modules.membership.infrastructure.records import (
+    CaseAssignmentRecord,
+    CollaboratorTaskRecord,
+    CollaboratorTaskResultRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -33,11 +38,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    CaseAssignmentRecord,
-    CollaboratorTaskRecord,
-    CollaboratorTaskResultRecord,
-)
 
 _TASK_WRITE_COMMANDS = frozenset(
     {

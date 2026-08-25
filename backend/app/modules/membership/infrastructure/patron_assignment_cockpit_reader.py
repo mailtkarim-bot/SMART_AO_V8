@@ -15,7 +15,7 @@ from app.modules.membership.application.queries import (
     PatronAssignmentJournalItemProjection,
     PatronAssignmentJournalLookup,
 )
-from app.platform.security.models import (
+from app.modules.membership.infrastructure.records import (
     AssignmentClarificationRequestRecord,
     CaseAssignmentAcknowledgementRecord,
     CaseAssignmentChangeEventRecord,

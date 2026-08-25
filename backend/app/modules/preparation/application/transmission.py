@@ -8,6 +8,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.modules.membership.infrastructure.records import CaseAssignmentRecord
 from app.modules.patron_action.public.ports import PatronActionWriter
 from app.modules.preparation.application.transmission_commands import (
     CreatePreparationSnapshotCommand,
@@ -36,7 +37,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import CaseAssignmentRecord
 
 
 class PreparationTransmissionService:

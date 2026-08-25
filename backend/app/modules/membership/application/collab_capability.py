@@ -18,6 +18,10 @@ from app.modules.membership.application.collab_capability_commands import (
     ProposeCapabilityForCaseCommand,
     ReportCapabilityGapCommand,
 )
+from app.modules.membership.infrastructure.records import (
+    CaseAssignmentRecord,
+    CollaboratorTaskRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -33,10 +37,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    CaseAssignmentRecord,
-    CollaboratorTaskRecord,
-)
 
 
 @dataclass(frozen=True, slots=True)

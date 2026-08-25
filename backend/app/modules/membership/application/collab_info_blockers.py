@@ -9,6 +9,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.modules.membership.application.collab_info_blockers_commands import (
     CreateInformationRequestCommand,
 )
+from app.modules.membership.infrastructure.records import (
+    CaseAssignmentRecord,
+    CollaboratorInformationRequestRecord,
+    CollaboratorInformationResponseRecord,
+    CollaboratorTaskBlockerRecord,
+    CollaboratorTaskRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -31,13 +38,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    CaseAssignmentRecord,
-    CollaboratorInformationRequestRecord,
-    CollaboratorInformationResponseRecord,
-    CollaboratorTaskBlockerRecord,
-    CollaboratorTaskRecord,
-)
 
 _INFO_BLOCKER_COMMANDS = frozenset(
     {
