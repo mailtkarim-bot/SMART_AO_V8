@@ -271,6 +271,7 @@ from app.modules.preparation.infrastructure.document_storage import (
     GeneratedDocumentStorage,
     LocalGeneratedDocumentStorage,
 )
+from app.modules.pricing.application.file_security import LibmagicClamdPricingFileSecurity
 from app.modules.pricing.application.import_creation import (
     PricingImportCreationService,
     pricing_import_creation_handlers,
@@ -872,6 +873,11 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        pricing_file_security = LibmagicClamdPricingFileSecurity(
+            host=os.getenv("SMART_AO_CLAMD_HOST", "clamav"),
+            port=int(os.getenv("SMART_AO_CLAMD_PORT", "3310")),
+            timeout_seconds=float(os.getenv("SMART_AO_CLAMD_TIMEOUT_SECONDS", "30")),
+        )
         pricing_import_preview_service = PricingImportPreviewService(policy=security_policy)
         pricing_import_creation_service = PricingImportCreationService(
             session_factory=runtime.session_factory,
@@ -1119,6 +1125,7 @@ def create_app(
                 commit_service=pricing_import_service,
                 creation_service=pricing_import_creation_service,
                 read_service=pricing_import_read_service,
+                file_security=pricing_file_security,
                 security_runtime=security_runtime,
             )
         )

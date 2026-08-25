@@ -7,6 +7,7 @@ from fastapi import APIRouter, File, Header, HTTPException, Query, Response, Upl
 
 from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
+from app.modules.pricing.application.file_security import PricingFileSecurityPort
 from app.modules.pricing.application.import_commands import (
     CommitPricingImportCommand,
     CreatePricingImportPreviewCommand,
@@ -50,6 +51,7 @@ def build_patron_pricing_import_router(
     commit_service: PricingImportService | None = None,
     creation_service: PricingImportCreationService | None = None,
     read_service: PricingImportReadService | None = None,
+    file_security: PricingFileSecurityPort | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1/patron", tags=["patron-pricing-import"])
 
@@ -73,6 +75,18 @@ def build_patron_pricing_import_router(
             context_resolver=security_runtime.context_resolver,
         )
         payload = await _read_upload(upload)
+        if file_security is not None:
+            try:
+                await file_security.inspect(
+                    payload=payload,
+                    filename=upload.filename or "upload.xlsx",
+                    content_type=upload.content_type,
+                )
+            except ValueError as error:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=str(error),
+                ) from error
         try:
             preview = service.preview(
                 actor=actor,
