@@ -9,7 +9,7 @@ from app.modules.membership.application.queries import (
     AssignmentManagementCase,
     AssignmentManagementTarget,
 )
-from app.platform.security.models import CaseAssignmentRecord
+from app.modules.membership.infrastructure.records import CaseAssignmentRecord
 
 
 class SqlAlchemyAssignmentManagementReader:

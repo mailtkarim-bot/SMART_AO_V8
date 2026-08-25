@@ -12,7 +12,7 @@ from app.modules.membership.application.queries import (
     AssignmentHistoryItemProjection,
     AssignmentHistoryLookup,
 )
-from app.platform.security.models import (
+from app.modules.membership.infrastructure.records import (
     AssignmentClarificationRequestRecord,
     CaseAssignmentAcknowledgementRecord,
     CaseAssignmentRecord,

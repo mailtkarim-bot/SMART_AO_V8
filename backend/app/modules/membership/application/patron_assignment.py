@@ -25,6 +25,15 @@ from app.modules.membership.application.queries import (
     AssignmentManagementReader,
     AssignmentManagementTarget,
 )
+from app.modules.membership.infrastructure.records import (
+    AssignmentClarificationRequestRecord,
+    AssignmentInteractionPatronValidationRecord,
+    CaseAssignmentAcknowledgementRecord,
+    CaseAssignmentChangeEventRecord,
+    CaseAssignmentRecord,
+    CaseAssignmentUnavailabilityRecord,
+    TenantMembershipRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -47,15 +56,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    AssignmentClarificationRequestRecord,
-    AssignmentInteractionPatronValidationRecord,
-    CaseAssignmentAcknowledgementRecord,
-    CaseAssignmentChangeEventRecord,
-    CaseAssignmentRecord,
-    CaseAssignmentUnavailabilityRecord,
-    TenantMembershipRecord,
-)
 
 
 class PatronAssignmentManagementService:

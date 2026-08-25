@@ -151,3 +151,35 @@ def test_frontend_exposes_feature_boundaries_for_post_slice_workspaces() -> None
     assert (REPOSITORY_ROOT / "web/src/infrastructure").is_dir()
     assert (REPOSITORY_ROOT / "web/src/shared").is_dir()
 
+
+
+@pytest.mark.architecture
+def test_assignment_and_task_records_use_membership_boundary() -> None:
+    modules_root = REPOSITORY_ROOT / "backend/app/modules"
+    source_paths = tuple((modules_root / "membership/application").glob("*.py")) + (
+        modules_root / "preparation/application/review.py",
+        modules_root / "preparation/application/service.py",
+        modules_root / "preparation/application/transmission.py",
+    )
+    for source_path in source_paths:
+        tree = ast.parse(source_path.read_text(encoding="utf-8"))
+        imported_modules = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        assert "app.platform.security.models" not in imported_modules, source_path
+
+    boundary = modules_root / "membership/infrastructure/records.py"
+    boundary_tree = ast.parse(boundary.read_text(encoding="utf-8"))
+    exported_names = {
+        alias.name
+        for node in ast.walk(boundary_tree)
+        if isinstance(node, ast.ImportFrom) and node.module == "app.platform.security.models"
+        for alias in node.names
+    }
+    assert {
+        "CaseAssignmentRecord",
+        "CollaboratorTaskRecord",
+        "TenantMembershipRecord",
+    } <= exported_names

@@ -6,6 +6,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.modules.membership.infrastructure.records import CaseAssignmentRecord
 from app.modules.membership.public.text_safety import contains_forbidden_text
 from app.modules.preparation.application.review_commands import (
     AddPreparationCorrectionCommand,
@@ -35,7 +36,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import CaseAssignmentRecord
 from app.platform.storage.ports import GeneratedDocumentStorage
 
 _REVIEW_COMMANDS = frozenset(

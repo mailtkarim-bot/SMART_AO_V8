@@ -16,6 +16,12 @@ from app.modules.dce.application.commands import (
     ReportAssignmentUnavailabilityCommand,
     RequestAssignmentClarificationCommand,
 )
+from app.modules.membership.infrastructure.records import (
+    AssignmentClarificationRequestRecord,
+    CaseAssignmentAcknowledgementRecord,
+    CaseAssignmentRecord,
+    CaseAssignmentUnavailabilityRecord,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -38,12 +44,6 @@ from app.platform.security.authorization import (
 )
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorContext, ActorKind, DataClassification
-from app.platform.security.models import (
-    AssignmentClarificationRequestRecord,
-    CaseAssignmentAcknowledgementRecord,
-    CaseAssignmentRecord,
-    CaseAssignmentUnavailabilityRecord,
-)
 
 _ACTION_BY_COMMAND = {
     "AcknowledgeAssignment": Capability.ASSIGNMENT_ACKNOWLEDGE,
