@@ -17,7 +17,9 @@ RUN apt-get update \
     && install --directory --owner=smartao --group=smartao --mode=0700 /var/lib/smart_ao/models
 
 COPY pyproject.toml README.md uv.lock ./
-COPY backend ./backend
+COPY backend/app ./backend/app
+COPY backend/alembic ./backend/alembic
+COPY backend/alembic.ini ./backend/alembic.ini
 ARG SMART_AO_INSTALL_RAG=0
 ARG SMART_AO_INSTALL_DOCUMENT_ADVANCED=0
 ARG SMART_AO_INSTALL_OBJECT_STORAGE=0

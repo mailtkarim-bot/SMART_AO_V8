@@ -19,6 +19,7 @@ from app.platform.security.authentication import (
     UtcClock,
 )
 from app.platform.security.tokens import JwtAccessTokenCodec
+from app.platform.security.totp import TotpService
 
 
 def _required(name: str) -> str:
@@ -46,6 +47,21 @@ def _jwt_verification_keys() -> Mapping[str, str] | None:
     ):
         raise RuntimeError("JWT verification key manifest must be an object of strings")
     return manifest
+
+
+def _totp_service_if_enabled(*, session_factory: sessionmaker[Session]) -> TotpService | None:
+    raw_enabled = os.getenv("SMART_AO_MFA_ENABLED", "0").strip()
+    if raw_enabled not in {"0", "1"}:
+        raise RuntimeError("SMART_AO_MFA_ENABLED must be 0 or 1")
+    if raw_enabled == "0":
+        return None
+    encryption_key = _required("SMART_AO_TOTP_ENCRYPTION_KEY")
+    issuer = os.getenv("SMART_AO_TOTP_ISSUER", "SMART_AO").strip() or "SMART_AO"
+    return TotpService(
+        session_factory=session_factory,
+        encryption_key=encryption_key,
+        issuer=issuer,
+    )
 
 
 def _knowledge_service_if_enabled(*, session_factory: sessionmaker[Session]):
@@ -96,6 +112,7 @@ def build_production_app():
         ),
         csrf_token_generator=SecureOpaqueTokenGenerator(),
         clock=clock,
+        totp_service=_totp_service_if_enabled(session_factory=session_factory),
     )
     runtime = AppRuntime.create(session_factory=session_factory)
     return create_app(
