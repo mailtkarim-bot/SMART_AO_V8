@@ -96,21 +96,25 @@ class LinkRiskToRequirementHandler:
     def execute(self, *, session: Any, command, context: CommandContext) -> HandlerOutcome:
         if context.actor_kind != ActorKind.PATRON_ADMIN.value or context.membership_id is None:
             raise CommandExecutionError("PATRON_REQUIRED")
+        tenant_id = UUID(str(context.tenant_id))
+        actor_id = UUID(str(context.actor_id))
+        membership_id = UUID(str(context.membership_id))
+        correlation_id = UUID(str(context.correlation_id)) if context.correlation_id else None
         repository = self._repository_factory(session)
         if not repository.case_exists(
-            session=session, tenant_id=context.tenant_id, case_id=command.case_id
+            session=session, tenant_id=tenant_id, case_id=command.case_id
         ):
             raise CommandExecutionError("NOT_FOUND_OR_FORBIDDEN")
         if not repository.case_uses_dce_version(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             case_id=command.case_id,
             dce_version_id=command.dce_version_id,
         ):
             raise CommandExecutionError("STALE_DCE_CONTEXT")
         if not repository.risk_matches_case_and_version(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             risk_id=command.risk_id,
             case_id=command.case_id,
             dce_version_id=command.dce_version_id,
@@ -118,7 +122,7 @@ class LinkRiskToRequirementHandler:
             raise CommandExecutionError("RISK_NOT_FOUND_OR_FORBIDDEN")
         if not repository.requirement_is_confirmed(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=tenant_id,
             requirement_id=command.requirement_id,
             dce_version_id=command.dce_version_id,
         ):
@@ -141,25 +145,25 @@ class LinkRiskToRequirementHandler:
             )
         )
         if repository.functional_exists(
-            session=session, tenant_id=context.tenant_id, functional_key=functional_key
+            session=session, tenant_id=tenant_id, functional_key=functional_key
         ):
             raise CommandExecutionError("RISK_REQUIREMENT_LINK_ALREADY_EXISTS")
         repository.create(
             session=session,
             draft=DecisionRiskRequirementLinkDraft(
                 id=command.link_id,
-                tenant_id=context.tenant_id,
+                tenant_id=tenant_id,
                 case_id=command.case_id,
                 risk_id=command.risk_id,
                 requirement_id=command.requirement_id,
                 dce_version_id=command.dce_version_id,
                 functional_key=functional_key,
                 link=link,
-                actor_id=context.actor_id,
-                membership_id=context.membership_id,
+                actor_id=actor_id,
+                membership_id=membership_id,
                 command_id=command.command_id,
                 idempotency_key=command.idempotency_key,
-                correlation_id=context.correlation_id,
+                correlation_id=correlation_id,
             ),
         )
         aggregate_refs: list[dict[str, object]] = [
