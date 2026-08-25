@@ -26,6 +26,7 @@ from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
     CommandExecutionError,
+    CommandHandler,
     DispatchResult,
     HandlerOutcome,
     PendingDomainEvent,
@@ -535,7 +536,7 @@ class ReportCapabilityGapHandler:
         )
 
 
-def collaborator_capability_handlers() -> dict[str, object]:
+def collaborator_capability_handlers() -> dict[str, CommandHandler]:
     return {
         "ProposeCapabilityForCase": ProposeCapabilityForCaseHandler(),
         "ReportCapabilityGap": ReportCapabilityGapHandler(),

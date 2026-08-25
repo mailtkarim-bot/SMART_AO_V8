@@ -17,6 +17,7 @@ from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
     CommandExecutionError,
+    CommandHandler,
     DispatchResult,
     HandlerOutcome,
     PendingDomainEvent,
@@ -190,7 +191,7 @@ class RegisterStructuredRiskHandler:
 
 def decision_risk_handlers(
     *, repository_factory: Callable[[Any], DecisionRiskRepository]
-) -> dict[str, object]:
+) -> dict[str, CommandHandler]:
     return {
         RegisterStructuredRiskCommand.command_type: RegisterStructuredRiskHandler(
             repository_factory=repository_factory

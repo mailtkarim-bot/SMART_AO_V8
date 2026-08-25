@@ -25,6 +25,7 @@ from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
     CommandExecutionError,
+    CommandHandler,
     DispatchResult,
     HandlerOutcome,
     PendingDomainEvent,
@@ -536,7 +537,7 @@ class VerifyEnterpriseDocumentHandler:
         )
 
 
-def enterprise_upload_handlers() -> dict[str, object]:
+def enterprise_upload_handlers() -> dict[str, CommandHandler]:
     return {
         "PrepareEnterpriseDocumentUpload": PrepareEnterpriseDocumentUploadHandler(),
         "FinalizeEnterpriseDocumentUpload": FinalizeEnterpriseDocumentUploadHandler(),
