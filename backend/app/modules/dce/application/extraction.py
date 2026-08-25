@@ -39,6 +39,7 @@ MAX_XLSX_TEXT_CELLS = 500_000
 MAX_TEXT_LINES = 500_000
 MAX_FRAGMENT_CHARS = 8_000
 MAX_TOTAL_CHARS = 10_000_000
+MAX_TOTAL_DOCUMENT_CHARS = 20_000_000
 SYSTEM_EXTRACTION_ACTOR_ID = UUID("00000000-0000-0000-0000-000000000013")
 
 
@@ -342,29 +343,29 @@ def _extract_xlsx(*, source_bytes: bytes) -> tuple[ExtractedFragment, ...]:
     try:
         if len(workbook.worksheets) > MAX_XLSX_SHEETS:
             raise ExtractionLimitError
-        cell_count = 0
-        entries: list[tuple[dict[str, object], str]] = []
-        for worksheet in workbook.worksheets:
-            for row in worksheet.iter_rows():
-                for cell in row:
-                    if not isinstance(cell.value, str) or not cell.value.strip():
-                        continue
-                    cell_count += 1
-                    if cell_count > MAX_XLSX_TEXT_CELLS:
-                        raise ExtractionLimitError
-                    entries.append(
-                        (
-                            {
-                                "kind": "xlsx_cell",
-                                "sheet": worksheet.title,
-                                "cell": cell.coordinate,
-                            },
-                            cell.value,
-                        )
-                    )
-        return _fragmentize(entries)
+        return _fragmentize(_iter_xlsx_entries(workbook))
     finally:
         workbook.close()
+
+
+def _iter_xlsx_entries(workbook) -> Iterable[tuple[dict[str, object], str]]:
+    cell_count = 0
+    for worksheet in workbook.worksheets:
+        for row in worksheet.iter_rows():
+            for cell in row:
+                if not isinstance(cell.value, str) or not cell.value.strip():
+                    continue
+                cell_count += 1
+                if cell_count > MAX_XLSX_TEXT_CELLS:
+                    raise ExtractionLimitError
+                yield (
+                    {
+                        "kind": "xlsx_cell",
+                        "sheet": worksheet.title,
+                        "cell": cell.coordinate,
+                    },
+                    cell.value,
+                )
 
 
 def _extract_text(*, source_bytes: bytes) -> tuple[ExtractedFragment, ...]:
@@ -379,8 +380,12 @@ def _extract_text(*, source_bytes: bytes) -> tuple[ExtractedFragment, ...]:
 
 def _fragmentize(entries: Iterable[tuple[dict[str, object], str]]) -> tuple[ExtractedFragment, ...]:
     fragments: list[ExtractedFragment] = []
+    total_chars = 0
     for locator, raw_text in entries:
         if len(raw_text) > MAX_TOTAL_CHARS:
+            raise ExtractionLimitError
+        total_chars += len(raw_text)
+        if total_chars > MAX_TOTAL_DOCUMENT_CHARS:
             raise ExtractionLimitError
         normalized = raw_text.strip()
         if not normalized:

@@ -10,6 +10,7 @@ from uuid import UUID
 @dataclass(frozen=True, slots=True)
 class DecisionDossierDecision:
     id: UUID
+    aggregate_revision: int
     case_id: UUID
     decision_type: str
     lifecycle: str

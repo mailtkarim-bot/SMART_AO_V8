@@ -7,7 +7,14 @@
             roll_keep 5
             roll_keep_for 336h
         }
-        format json
+        format filter {
+            wrap json
+            fields {
+                request>uri query delete
+                request>headers>Authorization delete
+                request>headers>Cookie delete
+            }
+        }
     }
 
     request_body {

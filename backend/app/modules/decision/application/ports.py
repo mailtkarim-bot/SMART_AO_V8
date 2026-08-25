@@ -237,11 +237,115 @@ class DecisionVerifiedContextReader(Protocol):
     ) -> bool: ...
 
 
+@dataclass(frozen=True, slots=True)
+class DecisionDraft:
+    id: UUID
+    tenant_id: UUID
+    decision_type: str
+    subject_type: str
+    subject_id: UUID
+    case_id: UUID
+    scope_fingerprint: str
+    decision_key_hash: str
+    cycle_number: int
+    actor_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionContextDraft:
+    id: UUID
+    tenant_id: UUID
+    decision_id: UUID
+    sequence_number: int
+    context_fingerprint: str
+    canonical_context_json: Mapping[str, object]
+    rationale: str
+    unknowns_json: tuple[str, ...]
+    prepared_at: datetime
+    prepared_by_actor_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionContextReferenceDraft:
+    id: UUID
+    tenant_id: UUID
+    decision_context_id: UUID
+    aggregate_type: str
+    aggregate_id: UUID
+    aggregate_revision: int
+    content_hash: str | None
+    reference_role: str
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionConditionTransitionDraft:
+    id: UUID
+    tenant_id: UUID
+    decision_id: UUID
+    condition_id: UUID
+    from_status: str
+    to_status: str
+    satisfied_evidence_ref_json: Mapping[str, object] | None
+    failure_reason: str | None
+    aggregate_revision: int
+    actor_id: UUID
+    membership_id: UUID
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None
+
+
 class DecisionConditionRepository(Protocol):
-    """Persists immutable initial conditions owned by a Decision."""
+    """Persists immutable initial conditions and append-only transitions."""
 
     def create_many(
         self, *, session: object, drafts: tuple[DecisionConditionDraft, ...]
+    ) -> None: ...
+
+    def transition(self, *, session: object, draft: DecisionConditionTransitionDraft) -> None: ...
+
+
+class DecisionLifecycleRepository(Protocol):
+    """Persists Decision roots and their immutable frozen contexts."""
+
+    def case_exists(self, *, session: object, tenant_id: UUID, case_id: UUID) -> bool: ...
+
+    def case_scope_fingerprint(
+        self, *, session: object, tenant_id: UUID, case_id: UUID
+    ) -> str | None: ...
+
+    def active_decision_exists(
+        self, *, session: object, tenant_id: UUID, decision_key_hash: str
+    ) -> bool: ...
+
+    def next_cycle_number(
+        self, *, session: object, tenant_id: UUID, decision_key_hash: str
+    ) -> int: ...
+
+    def create_root(self, *, session: object, draft: DecisionDraft) -> None: ...
+
+    def case_has_applicable_dce(
+        self, *, session: object, tenant_id: UUID, case_id: UUID
+    ) -> bool: ...
+
+    def context_reference_is_valid(
+        self,
+        *,
+        session: object,
+        tenant_id: UUID,
+        case_id: UUID,
+        aggregate_type: str,
+        aggregate_id: UUID,
+        aggregate_revision: int,
+        content_hash: str | None,
+    ) -> bool: ...
+
+    def create_context(
+        self,
+        *,
+        session: object,
+        context: DecisionContextDraft,
+        references: tuple[DecisionContextReferenceDraft, ...],
     ) -> None: ...
 
 

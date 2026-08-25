@@ -37,6 +37,7 @@ class LoginRateLimiter:
         failure_window_seconds: int = 900,
         base_lockout_seconds: int = 30,
         max_lockout_seconds: int = 900,
+        max_buckets: int = 100_000,
         clock=monotonic,
     ) -> None:
         if min(
@@ -44,6 +45,7 @@ class LoginRateLimiter:
             failure_window_seconds,
             base_lockout_seconds,
             max_lockout_seconds,
+            max_buckets,
         ) <= 0:
             raise ValueError("rate limiter settings must be positive")
         if base_lockout_seconds > max_lockout_seconds:
@@ -52,6 +54,7 @@ class LoginRateLimiter:
         self._failure_window_seconds = failure_window_seconds
         self._base_lockout_seconds = base_lockout_seconds
         self._max_lockout_seconds = max_lockout_seconds
+        self._max_buckets = max_buckets
         self._clock = clock
         self._states: dict[str, _FailureState] = {}
         self._lock = threading.Lock()
@@ -69,6 +72,7 @@ class LoginRateLimiter:
             max_lockout_seconds=_positive_int(
                 "SMART_AO_LOGIN_MAX_LOCKOUT_SECONDS", 900
             ),
+            max_buckets=_positive_int("SMART_AO_LOGIN_MAX_BUCKETS", 100_000),
         )
 
     def check(self, *, namespace: str, identity: str | None, source_ip: str) -> RateLimitDecision:
@@ -95,6 +99,13 @@ class LoginRateLimiter:
         with self._lock:
             state = self._states.get(key)
             if state is None or now - state.last_failure_at > self._failure_window_seconds:
+                self._evict_expired(now)
+                if key not in self._states and len(self._states) >= self._max_buckets:
+                    oldest_key = min(
+                        self._states,
+                        key=lambda candidate: self._states[candidate].last_failure_at,
+                    )
+                    self._states.pop(oldest_key, None)
                 state = _FailureState(
                     first_failure_at=now,
                     last_failure_at=now,
@@ -111,6 +122,15 @@ class LoginRateLimiter:
                     self._base_lockout_seconds * (2**exponent),
                 )
                 state.locked_until = now + lockout
+
+    def _evict_expired(self, now: float) -> None:
+        expired = [
+            key
+            for key, state in self._states.items()
+            if now - state.last_failure_at > self._failure_window_seconds
+        ]
+        for key in expired:
+            self._states.pop(key, None)
 
     def record_success(self, *, namespace: str, identity: str | None, source_ip: str) -> None:
         key = _bucket_key(namespace=namespace, identity=identity, source_ip=source_ip)

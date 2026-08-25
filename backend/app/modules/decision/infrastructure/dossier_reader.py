@@ -48,6 +48,7 @@ class SqlAlchemyDecisionDossierReader:
 
             decision = DecisionDossierDecision(
                 id=record.id,
+                aggregate_revision=record.aggregate_revision,
                 case_id=record.case_id,
                 decision_type=record.decision_type,
                 lifecycle=record.lifecycle,

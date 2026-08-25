@@ -124,8 +124,70 @@ export type PatronAction = {
   aggregate_revision: number;
 };
 
+export type DecisionContextReferenceInput = {
+  aggregate_type: "CASE" | "DCE_VERSION" | "DCE_REQUIREMENT" | "DECISION_RISK" | "PRICING_SCENARIO";
+  aggregate_id: string;
+  aggregate_revision: number;
+  content_hash?: string;
+  reference_role: string;
+};
+
+export type CreateDecisionRequest = {
+  scope_fingerprint?: string;
+  command_id?: string;
+  idempotency_key?: string;
+};
+
+export type FreezeDecisionContextRequest = {
+  context_id: string;
+  expected_revision: number;
+  rationale: string;
+  unknowns?: string[];
+  risks?: string[];
+  references: DecisionContextReferenceInput[];
+  command_id?: string;
+  idempotency_key?: string;
+};
+
+export type ResolveDecisionConditionRequest = {
+  transition_id?: string;
+  expected_revision: number;
+  target_status: "SATISFIED" | "FAILED";
+  evidence_reference?: string;
+  failure_reason?: string;
+  command_id?: string;
+  idempotency_key?: string;
+};
+
+type DecisionCommandReceipt = Omit<CommandReceipt, "result_code"> & {
+  result_code: string;
+};
+
+export type CreateDecisionResponse = DecisionCommandReceipt & {
+  result_code: "DECISION_DRAFT_CREATED";
+  decision_id: string;
+  version: number;
+};
+
+export type FreezeDecisionContextResponse = DecisionCommandReceipt & {
+  result_code: "DECISION_CONTEXT_FROZEN";
+  decision_id: string;
+  context_id: string;
+  fingerprint: string;
+  version: number;
+};
+
+export type ResolveDecisionConditionResponse = DecisionCommandReceipt & {
+  result_code: "DECISION_CONDITION_RESOLVED";
+  decision_id: string;
+  condition_id: string;
+  status: "SATISFIED" | "FAILED";
+  version: number;
+};
+
 export type PatronDecisionDossier = {
   decision_id: string;
+  aggregate_revision: number;
   case_id: string;
   decision_type: string;
   lifecycle: string;
@@ -397,6 +459,7 @@ export type BackendReadiness = {
   service: "smart-ao-v8";
   checks: {
     database: "unknown" | "ok" | "failed";
+    schema: "unknown" | "ok" | "failed";
     clamav: "unknown" | "ok" | "failed";
   };
 };

@@ -181,14 +181,20 @@ def build_default_worker() -> SubmissionExportSmtpWorker:
         recipient = os.getenv("SMART_AO_SMTP_TO", "").strip()
         if not recipient:
             raise RuntimeError("SMART_AO_SMTP_TO is required when SMTP is enabled")
+        use_tls = os.getenv("SMART_AO_SMTP_USE_TLS", "0") == "1"
+        start_tls = _optional_bool(os.getenv("SMART_AO_SMTP_START_TLS"))
+        if not use_tls and start_tls is not True:
+            raise RuntimeError(
+                "SMTP requires SMART_AO_SMTP_USE_TLS=1 or SMART_AO_SMTP_START_TLS=1"
+            )
         notifier = AioSmtpSubmissionExportNotifier(
             hostname=os.environ["SMART_AO_SMTP_HOST"],
             port=int(os.getenv("SMART_AO_SMTP_PORT", "587")),
             sender=os.environ["SMART_AO_SMTP_FROM"],
             username=os.getenv("SMART_AO_SMTP_USERNAME") or None,
             password=os.getenv("SMART_AO_SMTP_PASSWORD") or None,
-            use_tls=os.getenv("SMART_AO_SMTP_USE_TLS", "0") == "1",
-            start_tls=_optional_bool(os.getenv("SMART_AO_SMTP_START_TLS")),
+            use_tls=use_tls,
+            start_tls=start_tls,
             timeout_seconds=float(os.getenv("SMART_AO_SMTP_TIMEOUT_SECONDS", "10")),
         )
     return SubmissionExportSmtpWorker(

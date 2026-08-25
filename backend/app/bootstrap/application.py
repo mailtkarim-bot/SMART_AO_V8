@@ -138,6 +138,10 @@ from app.modules.decision.application.finalize import (
     PatronDecisionFinalizationService,
     decision_finalization_handlers,
 )
+from app.modules.decision.application.lifecycle import (
+    PatronDecisionLifecycleService,
+    decision_lifecycle_handlers,
+)
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
 from app.modules.decision.application.risk import (
     PatronDecisionRiskService,
@@ -154,7 +158,10 @@ from app.modules.decision.infrastructure.condition_repository import (
     SqlAlchemyDecisionConditionRepository,
 )
 from app.modules.decision.infrastructure.dossier_reader import SqlAlchemyDecisionDossierReader
-from app.modules.decision.infrastructure.repositories import SqlAlchemyDecisionRepository
+from app.modules.decision.infrastructure.repositories import (
+    SqlAlchemyDecisionLifecycleRepository,
+    SqlAlchemyDecisionRepository,
+)
 from app.modules.decision.infrastructure.risk_repository import SqlAlchemyDecisionRiskRepository
 from app.modules.decision.infrastructure.risk_requirement_reader import (
     SqlAlchemyDecisionRiskRequirementReader,
@@ -402,6 +409,11 @@ class AppRuntime:
                 **decision_risk_requirement_link_handlers(
                     repository_factory=_decision_risk_requirement_link_repository,
                     action_writer=PatronActionWriter(),
+                ),
+                **decision_lifecycle_handlers(
+                    lifecycle_repository=SqlAlchemyDecisionLifecycleRepository(),
+                    repository_factory=lambda session: SqlAlchemyDecisionRepository(session),
+                    condition_repository=SqlAlchemyDecisionConditionRepository(),
                 ),
                 **decision_finalization_handlers(
                     repository_factory=lambda session: SqlAlchemyDecisionRepository(session),
@@ -730,9 +742,7 @@ def create_app(
         if checks["database"] == "ok":
             try:
                 with runtime.session_factory() as session:
-                    schema_head = session.scalar(
-                        sa.text("SELECT version_num FROM alembic_version")
-                    )
+                    schema_head = session.scalar(sa.text("SELECT version_num FROM alembic_version"))
                 checks["schema"] = "ok" if schema_head == EXPECTED_ALEMBIC_HEAD else "failed"
             except sa.exc.SQLAlchemyError:
                 checks["schema"] = "failed"
@@ -843,6 +853,10 @@ def create_app(
             policy=security_policy,
         )
         patron_decision_finalization_service = PatronDecisionFinalizationService(
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        patron_decision_lifecycle_service = PatronDecisionLifecycleService(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
@@ -1088,6 +1102,7 @@ def create_app(
                 risk_requirement_service=patron_decision_risk_requirement_service,
                 risk_requirement_read_service=patron_decision_risk_requirement_read_service,
                 finalization_service=patron_decision_finalization_service,
+                lifecycle_service=patron_decision_lifecycle_service,
                 security_runtime=security_runtime,
             )
         )

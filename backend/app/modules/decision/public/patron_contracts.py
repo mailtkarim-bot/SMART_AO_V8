@@ -28,6 +28,7 @@ class PatronDecisionDossierResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision_id: UUID
+    aggregate_revision: int
     case_id: UUID
     decision_type: str
     lifecycle: str

@@ -124,7 +124,7 @@ class PricingImportPreviewService:
                 valid_row_count=sum(not item.errors for item in parsed),
                 error_count=errors,
                 total_minor=total_minor,
-                rows=tuple(parsed[:100]),
+                rows=tuple(parsed),
             )
         finally:
             workbook.close()
@@ -169,8 +169,7 @@ def _normalize_header(value: object) -> str:
 def _resolve_headers(values: tuple[object, ...]) -> dict[str, int]:
     resolved: dict[str, int] = {}
     aliases = {
-        key: {_normalize_header(alias) for alias in names}
-        for key, names in _HEADER_ALIASES.items()
+        key: {_normalize_header(alias) for alias in names} for key, names in _HEADER_ALIASES.items()
     }
     for index, value in enumerate(values):
         normalized = _normalize_header(value)
@@ -246,9 +245,7 @@ def _minor(value: object) -> int | None:
 
 def _calculate_total_minor(*, quantity: str, unit_price_minor: int) -> int:
     return int(
-        (Decimal(quantity) * Decimal(unit_price_minor)).to_integral_value(
-            rounding=ROUND_HALF_UP
-        )
+        (Decimal(quantity) * Decimal(unit_price_minor)).to_integral_value(rounding=ROUND_HALF_UP)
     )
 
 

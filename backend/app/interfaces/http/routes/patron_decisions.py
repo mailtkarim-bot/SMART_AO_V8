@@ -1,6 +1,6 @@
 from dataclasses import asdict
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from fastapi import APIRouter, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -11,6 +11,13 @@ from app.modules.decision.application.finalize import PatronDecisionFinalization
 from app.modules.decision.application.finalize_commands import (
     ConditionalGoConditionInput,
     FinalizeGoNoGoDecisionCommand,
+)
+from app.modules.decision.application.lifecycle import PatronDecisionLifecycleService
+from app.modules.decision.application.lifecycle_commands import (
+    CreateDecisionCommand,
+    DecisionContextReferenceInput,
+    FreezeDecisionContextCommand,
+    ResolveDecisionConditionCommand,
 )
 from app.modules.decision.application.link_commands import LinkRiskToRequirementCommand
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
@@ -25,6 +32,14 @@ from app.modules.decision.application.risk_requirement_read import (
 from app.modules.decision.public.finalize_contracts import (
     FinalizeGoNoGoDecisionRequest,
     FinalizeGoNoGoDecisionResponse,
+)
+from app.modules.decision.public.lifecycle_contracts import (
+    CreateDecisionRequest,
+    CreateDecisionResponse,
+    FreezeDecisionContextRequest,
+    FreezeDecisionContextResponse,
+    ResolveDecisionConditionRequest,
+    ResolveDecisionConditionResponse,
 )
 from app.modules.decision.public.patron_contracts import PatronDecisionDossierResponse
 from app.modules.decision.public.risk_contracts import (
@@ -56,8 +71,210 @@ def build_patron_decision_router(
     risk_requirement_service: PatronDecisionRiskRequirementService | None = None,
     finalization_service: PatronDecisionFinalizationService | None = None,
     risk_requirement_read_service: PatronDecisionRiskRequirementReadService | None = None,
+    lifecycle_service: PatronDecisionLifecycleService | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1/patron", tags=["patron-decisions"])
+
+    if lifecycle_service is not None:
+
+        @router.post(
+            "/cases/{case_id}/decisions",
+            response_model=CreateDecisionResponse,
+        )
+        def create_decision(
+            case_id: UUID,
+            request: CreateDecisionRequest,
+            authorization: str | None = Header(default=None),
+        ):
+            actor = _resolve_context(
+                authorization=authorization,
+                context_resolver=security_runtime.context_resolver,
+            )
+            decision_id = uuid5(
+                NAMESPACE_URL,
+                f"smart-ao:decision:{actor.tenant_id}:{case_id}:{request.idempotency_key}",
+            )
+            try:
+                result = lifecycle_service.execute(
+                    actor=actor,
+                    command=CreateDecisionCommand(
+                        command_id=request.command_id,
+                        idempotency_key=request.idempotency_key,
+                        correlation_id=request.correlation_id,
+                        decision_id=decision_id,
+                        case_id=case_id,
+                        scope_fingerprint=request.scope_fingerprint,
+                    ),
+                    now=datetime.now(tz=UTC),
+                )
+            except PermissionError as error:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN"
+                ) from error
+            except (IdempotencyKeyReusedError, CommandInProgressError) as error:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="IDEMPOTENCY_CONFLICT"
+                ) from error
+            except CommandExecutionError as error:
+                detail = str(error)
+                code = (
+                    status.HTTP_409_CONFLICT
+                    if detail in {"DECISION_ALREADY_ACTIVE", "STALE_CASE_SCOPE"}
+                    else status.HTTP_404_NOT_FOUND
+                    if detail == "NOT_FOUND_OR_FORBIDDEN"
+                    else status.HTTP_422_UNPROCESSABLE_CONTENT
+                )
+                raise HTTPException(status_code=code, detail=detail) from error
+            reference = result.aggregate_refs[0]
+            response = CreateDecisionResponse(
+                command_id=UUID(result.command_id),
+                idempotency_key=UUID(result.idempotency_key),
+                result_code="DECISION_DRAFT_CREATED",
+                decision_id=UUID(str(reference["aggregate_id"])),
+                version=int(reference["aggregate_revision"]),
+                event_ids=[UUID(event_id) for event_id in result.event_ids],
+                replayed=result.replayed,
+            )
+            return JSONResponse(
+                status_code=status.HTTP_200_OK if result.replayed else status.HTTP_201_CREATED,
+                content=response.model_dump(mode="json"),
+            )
+
+        @router.post(
+            "/cases/{case_id}/decisions/{decision_id}/context",
+            response_model=FreezeDecisionContextResponse,
+        )
+        def freeze_decision_context(
+            case_id: UUID,
+            decision_id: UUID,
+            request: FreezeDecisionContextRequest,
+            authorization: str | None = Header(default=None),
+        ):
+            actor = _resolve_context(
+                authorization=authorization,
+                context_resolver=security_runtime.context_resolver,
+            )
+            try:
+                result = lifecycle_service.execute(
+                    actor=actor,
+                    command=FreezeDecisionContextCommand(
+                        command_id=request.command_id,
+                        idempotency_key=request.idempotency_key,
+                        correlation_id=request.correlation_id,
+                        decision_id=decision_id,
+                        case_id=case_id,
+                        context_id=request.context_id,
+                        expected_revision=request.expected_revision,
+                        rationale=request.rationale,
+                        unknowns=request.unknowns,
+                        risks=request.risks,
+                        references=tuple(
+                            DecisionContextReferenceInput.model_validate(reference.model_dump())
+                            for reference in request.references
+                        ),
+                    ),
+                    now=datetime.now(tz=UTC),
+                )
+            except PermissionError as error:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN"
+                ) from error
+            except (IdempotencyKeyReusedError, CommandInProgressError) as error:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="IDEMPOTENCY_CONFLICT"
+                ) from error
+            except CommandExecutionError as error:
+                detail = str(error)
+                code = (
+                    status.HTTP_409_CONFLICT
+                    if detail == "STALE_DECISION_REVISION"
+                    else status.HTTP_404_NOT_FOUND
+                    if detail == "NOT_FOUND_OR_FORBIDDEN"
+                    else status.HTTP_422_UNPROCESSABLE_CONTENT
+                )
+                raise HTTPException(status_code=code, detail=detail) from error
+            reference = result.aggregate_refs[0]
+            context_reference = result.aggregate_refs[1]
+            response = FreezeDecisionContextResponse(
+                command_id=UUID(result.command_id),
+                idempotency_key=UUID(result.idempotency_key),
+                result_code="DECISION_CONTEXT_FROZEN",
+                decision_id=decision_id,
+                context_id=request.context_id,
+                fingerprint=str(context_reference["fingerprint"]),
+                version=int(reference["aggregate_revision"]),
+                event_ids=[UUID(event_id) for event_id in result.event_ids],
+                replayed=result.replayed,
+            )
+            return JSONResponse(
+                status_code=status.HTTP_200_OK, content=response.model_dump(mode="json")
+            )
+
+        @router.post(
+            "/cases/{case_id}/decisions/{decision_id}/conditions/{condition_id}/resolve",
+            response_model=ResolveDecisionConditionResponse,
+        )
+        def resolve_decision_condition(
+            case_id: UUID,
+            decision_id: UUID,
+            condition_id: UUID,
+            request: ResolveDecisionConditionRequest,
+            authorization: str | None = Header(default=None),
+        ):
+            actor = _resolve_context(
+                authorization=authorization,
+                context_resolver=security_runtime.context_resolver,
+            )
+            try:
+                result = lifecycle_service.execute(
+                    actor=actor,
+                    command=ResolveDecisionConditionCommand(
+                        command_id=request.command_id,
+                        idempotency_key=request.idempotency_key,
+                        correlation_id=request.correlation_id,
+                        decision_id=decision_id,
+                        case_id=case_id,
+                        condition_id=condition_id,
+                        transition_id=request.transition_id,
+                        expected_revision=request.expected_revision,
+                        target_status=request.target_status,
+                        evidence_reference=request.evidence_reference,
+                        failure_reason=request.failure_reason,
+                    ),
+                    now=datetime.now(tz=UTC),
+                )
+            except PermissionError as error:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN"
+                ) from error
+            except (IdempotencyKeyReusedError, CommandInProgressError) as error:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="IDEMPOTENCY_CONFLICT"
+                ) from error
+            except CommandExecutionError as error:
+                detail = str(error)
+                code = (
+                    status.HTTP_409_CONFLICT
+                    if detail == "STALE_DECISION_REVISION"
+                    else status.HTTP_404_NOT_FOUND
+                    if detail == "NOT_FOUND_OR_FORBIDDEN"
+                    else status.HTTP_422_UNPROCESSABLE_CONTENT
+                )
+                raise HTTPException(status_code=code, detail=detail) from error
+            response = ResolveDecisionConditionResponse(
+                command_id=UUID(result.command_id),
+                idempotency_key=UUID(result.idempotency_key),
+                result_code="DECISION_CONDITION_RESOLVED",
+                decision_id=decision_id,
+                condition_id=condition_id,
+                status=request.target_status,
+                version=int(result.aggregate_refs[0]["aggregate_revision"]),
+                event_ids=[UUID(event_id) for event_id in result.event_ids],
+                replayed=result.replayed,
+            )
+            return JSONResponse(
+                status_code=status.HTTP_200_OK, content=response.model_dump(mode="json")
+            )
 
     @router.get("/cases/{case_id}/decision-dossier", response_model=PatronDecisionDossierResponse)
     def read_dossier(case_id: UUID, authorization: str | None = Header(default=None)):

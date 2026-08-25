@@ -50,8 +50,14 @@ def _runtime(*, resolver_error=None):
 
 
 def _client(
-    *, service=None, risk_service=None, risk_requirement_service=None, finalization_service=None,
-    risk_requirement_read_service=None, resolver_error=None
+    *,
+    service=None,
+    risk_service=None,
+    risk_requirement_service=None,
+    finalization_service=None,
+    risk_requirement_read_service=None,
+    lifecycle_service=None,
+    resolver_error=None,
 ):
     app = FastAPI()
     app.include_router(
@@ -61,6 +67,7 @@ def _client(
             risk_requirement_service=risk_requirement_service,
             finalization_service=finalization_service,
             risk_requirement_read_service=risk_requirement_read_service,
+            lifecycle_service=lifecycle_service,
             security_runtime=_runtime(resolver_error=resolver_error),
         )
     )
@@ -70,6 +77,7 @@ def _client(
 @dataclass(frozen=True)
 class _Dossier:
     decision_id: object
+    aggregate_revision: int
     case_id: object
     decision_type: str
     lifecycle: str
@@ -87,6 +95,7 @@ class _Dossier:
 def _dossier(case_id):
     return _Dossier(
         decision_id=uuid4(),
+        aggregate_revision=1,
         case_id=case_id,
         decision_type="AWARD",
         lifecycle="FINAL",
@@ -258,6 +267,42 @@ class _FinalizeService:
             replayed=False,
         )
         return result
+
+
+class _LifecycleService:
+    def __init__(self, *, error=None):
+        self.error = error
+        self.calls = []
+
+    def execute(self, **kwargs):
+        if self.error is not None:
+            raise self.error
+        self.calls.append(kwargs)
+        command = kwargs["command"]
+        if command.command_type == "CreateDecision":
+            refs = [{"aggregate_id": str(command.decision_id), "aggregate_revision": 0}]
+            result_code = "DECISION_DRAFT_CREATED"
+        elif command.command_type == "FreezeDecisionContext":
+            refs = [
+                {"aggregate_id": str(command.decision_id), "aggregate_revision": 1},
+                {
+                    "aggregate_id": str(command.context_id),
+                    "aggregate_revision": 1,
+                    "fingerprint": "b" * 64,
+                },
+            ]
+            result_code = "DECISION_CONTEXT_FROZEN"
+        else:
+            refs = [{"aggregate_id": str(command.decision_id), "aggregate_revision": 4}]
+            result_code = "DECISION_CONDITION_RESOLVED"
+        return SimpleNamespace(
+            command_id=str(command.command_id),
+            idempotency_key=str(command.idempotency_key),
+            result_code=result_code,
+            aggregate_refs=refs,
+            event_ids=[str(uuid4())],
+            replayed=False,
+        )
 
 
 class _DecisionService:
@@ -535,3 +580,74 @@ def test_read_decision_dossier_maps_service_errors(error, status_code, detail):
 
     assert response.status_code == status_code
     assert response.json() == {"detail": detail}
+
+
+def test_create_decision_returns_server_derived_reference():
+    lifecycle_service = _LifecycleService()
+    case_id = uuid4()
+    response = _client(lifecycle_service=lifecycle_service).post(
+        f"/api/v1/patron/cases/{case_id}/decisions",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "scope_fingerprint": "a" * 64,
+        },
+        headers=_headers(),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["result_code"] == "DECISION_DRAFT_CREATED"
+    assert lifecycle_service.calls[0]["command"].case_id == case_id
+
+
+def test_freeze_decision_context_returns_computed_fingerprint():
+    lifecycle_service = _LifecycleService()
+    case_id = uuid4()
+    decision_id = uuid4()
+    context_id = uuid4()
+    response = _client(lifecycle_service=lifecycle_service).post(
+        f"/api/v1/patron/cases/{case_id}/decisions/{decision_id}/context",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "context_id": str(context_id),
+            "expected_revision": 0,
+            "rationale": "Contexte contrôlé par le patron.",
+            "references": [
+                {
+                    "aggregate_type": "CASE",
+                    "aggregate_id": str(case_id),
+                    "aggregate_revision": 1,
+                    "reference_role": "SUBJECT",
+                }
+            ],
+        },
+        headers=_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["fingerprint"] == "b" * 64
+    assert lifecycle_service.calls[0]["command"].decision_id == decision_id
+
+
+def test_resolve_decision_condition_returns_resolution_status():
+    lifecycle_service = _LifecycleService()
+    case_id = uuid4()
+    decision_id = uuid4()
+    condition_id = uuid4()
+    response = _client(lifecycle_service=lifecycle_service).post(
+        f"/api/v1/patron/cases/{case_id}/decisions/{decision_id}/conditions/{condition_id}/resolve",
+        json={
+            "command_id": str(uuid4()),
+            "idempotency_key": str(uuid4()),
+            "transition_id": str(uuid4()),
+            "expected_revision": 3,
+            "target_status": "SATISFIED",
+            "evidence_reference": "proof:2026-08-25",
+        },
+        headers=_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "SATISFIED"
+    assert lifecycle_service.calls[0]["command"].condition_id == condition_id

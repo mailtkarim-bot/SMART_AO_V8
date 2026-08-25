@@ -99,6 +99,41 @@ describe("BOAMP transport", () => {
   });
 });
 
+describe("Decision lifecycle transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("posts create, freeze and resolve commands with encoded paths", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "DECISION_DRAFT_CREATED" }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "DECISION_CONTEXT_FROZEN" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "DECISION_CONDITION_RESOLVED" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiClient("https://app.example.test", "access-1");
+
+    await client.createDecision("case/1", {});
+    await client.freezeDecisionContext("case/1", "decision/1", {
+      context_id: "context-1",
+      expected_revision: 0,
+      rationale: "Contexte contrôlé",
+      references: [{ aggregate_type: "CASE", aggregate_id: "case-1", aggregate_revision: 1, reference_role: "CASE" }],
+    });
+    await client.resolveDecisionCondition("case/1", "decision/1", "condition/1", {
+      expected_revision: 2,
+      target_status: "SATISFIED",
+      evidence_reference: "proof-1",
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://app.example.test/api/v1/patron/cases/case%2F1/decisions");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://app.example.test/api/v1/patron/cases/case%2F1/decisions/decision%2F1/context");
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("https://app.example.test/api/v1/patron/cases/case%2F1/decisions/decision%2F1/conditions/condition%2F1/resolve");
+    const createBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)) as Record<string, unknown>;
+    expect(createBody).toMatchObject({ command_id: expect.any(String), idempotency_key: expect.any(String) });
+  });
+});
+
+
 describe("browser authentication transport", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

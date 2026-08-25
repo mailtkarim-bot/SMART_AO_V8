@@ -39,6 +39,7 @@ class Capability(StrEnum):
     PREPARATION_REVIEW_DECIDE = "preparation.review.decide"
     MEMBERSHIP_MANAGE = "membership.manage"
     TENANT_MANAGE = "tenant.manage"
+    DECISION_MANAGE = "decision.manage"
     DECISION_FINALIZE = "decision.finalize"
     DECISION_RISK_WRITE = "decision.risk.write"
     DECISION_RISK_LINK_WRITE = "decision.risk.link.write"
@@ -84,6 +85,7 @@ _PATRON_ADMIN_CAPABILITIES = frozenset(
         Capability.PREPARATION_DOCUMENT_WRITE,
         Capability.MEMBERSHIP_MANAGE,
         Capability.TENANT_MANAGE,
+        Capability.DECISION_MANAGE,
         Capability.DECISION_FINALIZE,
         Capability.DECISION_RISK_WRITE,
         Capability.DECISION_RISK_LINK_WRITE,

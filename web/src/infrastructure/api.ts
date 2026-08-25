@@ -36,6 +36,12 @@ import type {
   BoampQualificationReceipt,
   CaseDceReading,
   KnowledgeSearchResponse,
+  CreateDecisionRequest,
+  CreateDecisionResponse,
+  FreezeDecisionContextRequest,
+  FreezeDecisionContextResponse,
+  ResolveDecisionConditionRequest,
+  ResolveDecisionConditionResponse,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -297,6 +303,60 @@ export function createApiClient(
     getDecisionDossier: (caseId: string) =>
       request<PatronDecisionDossier>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decision-dossier`,
+      ),
+    createDecision: (caseId: string, input: CreateDecisionRequest) =>
+      request<CreateDecisionResponse>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decisions`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: input.command_id ?? makeId(),
+            idempotency_key: input.idempotency_key ?? makeId(),
+            scope_fingerprint: input.scope_fingerprint,
+          }),
+        },
+      ),
+    freezeDecisionContext: (
+      caseId: string,
+      decisionId: string,
+      input: FreezeDecisionContextRequest,
+    ) =>
+      request<FreezeDecisionContextResponse>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decisions/${encodeURIComponent(decisionId)}/context`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: input.command_id ?? makeId(),
+            idempotency_key: input.idempotency_key ?? makeId(),
+            context_id: input.context_id,
+            expected_revision: input.expected_revision,
+            rationale: input.rationale,
+            unknowns: input.unknowns ?? [],
+            risks: input.risks ?? [],
+            references: input.references,
+          }),
+        },
+      ),
+    resolveDecisionCondition: (
+      caseId: string,
+      decisionId: string,
+      conditionId: string,
+      input: ResolveDecisionConditionRequest,
+    ) =>
+      request<ResolveDecisionConditionResponse>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decisions/${encodeURIComponent(decisionId)}/conditions/${encodeURIComponent(conditionId)}/resolve`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: input.command_id ?? makeId(),
+            idempotency_key: input.idempotency_key ?? makeId(),
+            transition_id: input.transition_id ?? makeId(),
+            expected_revision: input.expected_revision,
+            target_status: input.target_status,
+            evidence_reference: input.evidence_reference,
+            failure_reason: input.failure_reason,
+          }),
+        },
       ),
     listPricingScenarios: (caseId: string) =>
       request<PricingScenario[]>(

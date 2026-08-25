@@ -181,6 +181,22 @@ def test_smtp_worker_skips_missing_or_published_messages() -> None:
     assert worker._publish(published.id, NOW).skipped == 1
 
 
+def test_build_default_worker_rejects_smtp_without_tls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SMART_AO_DATABASE_URL", "postgresql://test")
+    monkeypatch.setenv("SMART_AO_SMTP_ENABLED", "1")
+    monkeypatch.setenv("SMART_AO_SMTP_TO", "patron@example.test")
+    monkeypatch.setenv("SMART_AO_SMTP_HOST", "smtp.example.test")
+    monkeypatch.setenv("SMART_AO_SMTP_FROM", "robot@example.test")
+    monkeypatch.setenv("SMART_AO_SMTP_USE_TLS", "0")
+    monkeypatch.setenv("SMART_AO_SMTP_START_TLS", "0")
+    monkeypatch.setattr(smtp_worker_module.sa, "create_engine", lambda url: object())
+
+    with pytest.raises(RuntimeError, match="requires .*TLS"):
+        smtp_worker_module.build_default_worker()
+
+
 def test_build_default_worker_keeps_smtp_disabled_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

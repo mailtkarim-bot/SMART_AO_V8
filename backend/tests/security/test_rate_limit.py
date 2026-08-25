@@ -130,6 +130,19 @@ def test_buckets_are_isolated_and_success_clears_only_one_bucket() -> None:
     ).allowed
 
 
+def test_bucket_count_is_bounded_by_eviction() -> None:
+    limiter = LoginRateLimiter(
+        max_failures=1,
+        base_lockout_seconds=60,
+        max_lockout_seconds=60,
+        max_buckets=2,
+    )
+    for identity in ("a@example.test", "b@example.test", "c@example.test"):
+        limiter.record_failure(namespace="login", identity=identity, source_ip="10.0.0.1")
+
+    assert len(limiter._states) == 2
+
+
 def test_failure_window_expires_stale_state() -> None:
     clock = FakeMonotonicClock()
     limiter = LoginRateLimiter(
@@ -150,6 +163,7 @@ def test_failure_window_expires_stale_state() -> None:
     "SMART_AO_LOGIN_FAILURE_WINDOW_SECONDS",
     "SMART_AO_LOGIN_BASE_LOCKOUT_SECONDS",
     "SMART_AO_LOGIN_MAX_LOCKOUT_SECONDS",
+    "SMART_AO_LOGIN_MAX_BUCKETS",
 ])
 def test_environment_values_must_be_positive_integers(
     monkeypatch: pytest.MonkeyPatch, name: str

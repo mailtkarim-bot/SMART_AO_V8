@@ -32,7 +32,7 @@ class CreatePricingImportPreviewCommand(ApplicationCommand):
     case_id: UUID
     document_kind: Literal["DPGF", "BPU", "EXCEL"]
     source_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
-    rows: list[CreatePricingImportRowCommand] = Field(max_length=100)
+    rows: list[CreatePricingImportRowCommand] = Field(max_length=10_000)
 
 
 class CommitPricingImportCommand(ApplicationCommand):

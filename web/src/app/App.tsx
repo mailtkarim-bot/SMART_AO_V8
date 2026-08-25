@@ -27,6 +27,8 @@ import type {
   FinancialCategory,
   PatronAction,
   PatronDecisionDossier,
+  FreezeDecisionContextRequest,
+  ResolveDecisionConditionRequest,
   PricingScenario,
 } from "../shared/types";
 import "./styles.css";
@@ -199,6 +201,9 @@ function App() {
       void refreshEnterpriseCompany();
       void boamp.refreshObservations();
     }
+  // These effects are keyed to authenticated session, role and selected case. The hook APIs are
+  // imperative callbacks recreated by feature hooks and must not trigger a fetch on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, isPatron]);
 
   useEffect(() => {
@@ -208,6 +213,8 @@ function App() {
       void refreshDecisionDossier(selectedCaseId);
     }
     if (isPatron || isCollaborator) void dceKnowledge.loadReading(selectedCaseId);
+  // See the session/case keying rationale above; feature-hook commands are intentionally omitted.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCaseId, accessToken, isCollaborator, isPatron]);
 
   async function refreshCases() {
@@ -247,6 +254,59 @@ function App() {
           error instanceof Error
             ? error.message
             : "Impossible de charger les scénarios de chiffrage.",
+      });
+    }
+  }
+
+  async function createDecision() {
+    if (!selectedCaseId || currentActor?.actor_kind !== "PATRON_ADMIN") {
+      setMessage({ tone: "warning", text: "Sélectionnez une affaire avec un compte patron administrateur." });
+      return;
+    }
+    try {
+      await api.createDecision(selectedCaseId, {});
+      await refreshDecisionDossier(selectedCaseId);
+      setMessage({ tone: "success", text: "Brouillon de décision créé." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de créer la décision.",
+      });
+    }
+  }
+
+  async function freezeDecisionContext(input: FreezeDecisionContextRequest) {
+    if (!selectedCaseId || !decisionDossier || currentActor?.actor_kind !== "PATRON_ADMIN") return;
+    try {
+      await api.freezeDecisionContext(selectedCaseId, decisionDossier.decision_id, input);
+      await refreshDecisionDossier(selectedCaseId);
+      setMessage({ tone: "success", text: "Contexte de décision gelé." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de geler le contexte.",
+      });
+    }
+  }
+
+  async function resolveDecisionCondition(
+    conditionId: string,
+    input: ResolveDecisionConditionRequest,
+  ) {
+    if (!selectedCaseId || !decisionDossier || currentActor?.actor_kind !== "PATRON_ADMIN") return;
+    try {
+      await api.resolveDecisionCondition(
+        selectedCaseId,
+        decisionDossier.decision_id,
+        conditionId,
+        input,
+      );
+      await refreshDecisionDossier(selectedCaseId);
+      setMessage({ tone: "success", text: "Condition de décision mise à jour." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de résoudre la condition.",
       });
     }
   }
@@ -476,7 +536,18 @@ function App() {
           />
         )}
 
-        {isPatron && <PatronDecisionPanel decisionDossier={decisionDossier} formatDate={formatDate} />}
+        {isPatron && (
+          <PatronDecisionPanel
+            decisionDossier={decisionDossier}
+            formatDate={formatDate}
+            canManage={currentActor?.actor_kind === "PATRON_ADMIN"}
+            onCreateDecision={() => void createDecision()}
+            onFreezeContext={(input) => void freezeDecisionContext(input)}
+            onResolveCondition={(conditionId, input) =>
+              void resolveDecisionCondition(conditionId, input)
+            }
+          />
+        )}
 
         {isPatron && (
           <SubmissionPanel

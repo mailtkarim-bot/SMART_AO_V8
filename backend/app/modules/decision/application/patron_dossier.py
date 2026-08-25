@@ -14,6 +14,7 @@ from app.platform.security.context import ActorContext, ActorKind, DataClassific
 @dataclass(frozen=True, slots=True)
 class PatronDecisionDossier:
     decision_id: UUID
+    aggregate_revision: int
     case_id: UUID
     decision_type: str
     lifecycle: str
@@ -61,11 +62,27 @@ class PatronDecisionDossierService:
         if lookup.decision is None:
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
         if lookup.context is None:
-            raise PermissionError("DECISION_CONTEXT_NOT_FOUND")
+            return PatronDecisionDossier(
+                decision_id=lookup.decision.id,
+                aggregate_revision=lookup.decision.aggregate_revision,
+                case_id=lookup.decision.case_id,
+                decision_type=lookup.decision.decision_type,
+                lifecycle=lookup.decision.lifecycle,
+                outcome=lookup.decision.outcome,
+                validity=lookup.decision.validity,
+                context_status=lookup.decision.context_status,
+                final_justification=lookup.decision.final_justification,
+                known=(),
+                unknowns=(),
+                risks=(),
+                conditions=(),
+                sources=(),
+            )
 
         canonical = lookup.context.canonical_context_json
         return PatronDecisionDossier(
             decision_id=lookup.decision.id,
+            aggregate_revision=lookup.decision.aggregate_revision,
             case_id=lookup.decision.case_id,
             decision_type=lookup.decision.decision_type,
             lifecycle=lookup.decision.lifecycle,
