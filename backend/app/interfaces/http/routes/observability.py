@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
 
 from app.platform.observability.http import HTTP_METRICS
+from app.platform.observability.outbox import COCKPIT_PROJECTION_METRICS
 
 
 def build_observability_router() -> APIRouter:
@@ -12,7 +13,7 @@ def build_observability_router() -> APIRouter:
     @router.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> PlainTextResponse:
         return PlainTextResponse(
-            HTTP_METRICS.render_prometheus(),
+            HTTP_METRICS.render_prometheus() + COCKPIT_PROJECTION_METRICS.render_prometheus(),
             media_type="text/plain; version=0.0.4; charset=utf-8",
         )
 

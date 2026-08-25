@@ -395,3 +395,18 @@ def test_signature_http_configuration_is_backend_only_and_fail_closed() -> None:
     for unrelated_service in (retention, webhook, smtp):
         assert "SMART_AO_SIGNATURE_CALLBACK_SECRET" not in unrelated_service
         assert "SMART_AO_SIGNATURE_PROVIDER" not in unrelated_service
+
+
+def test_cockpit_projection_worker_is_explicitly_profiled_and_internal() -> None:
+    compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
+    worker = compose.split("  cockpit-projection-worker:", maxsplit=1)[1].split(
+        "\n  postgres:", maxsplit=1
+    )[0]
+    assert 'profiles: ["cockpit-projection"]' in worker
+    assert "command: python -m app.workers.cockpit_projection" in worker
+    assert (
+        "SMART_AO_COCKPIT_PROJECTION_ENABLED: "
+        "${SMART_AO_COCKPIT_PROJECTION_ENABLED:-0}"
+    ) in worker
+    assert "      - internal" in worker
+    assert "      - edge" not in worker
