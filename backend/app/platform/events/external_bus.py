@@ -84,7 +84,9 @@ class HttpExternalEventBus:
         )
         try:
             with open_public_https(request, timeout=self.timeout_seconds) as response:
-                status = int(response.status)
+                if response.status is None:
+                    raise ValueError("external event bus response has no status")
+                status = response.status
         except (HTTPError, URLError, TimeoutError, OSError, ValueError) as error:
             raise ExternalEventBusDeliveryError("external event bus delivery failed") from error
         if status < 200 or status >= 300:
