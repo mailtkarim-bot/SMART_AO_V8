@@ -318,10 +318,21 @@ La simulation Docker éphémère n’a pas été exécutée : `docker` est absen
 - [x] **R-03 (preuve locale)** — PostgreSQL 16 réel : migrations online jusqu'à `0061`, cycle base↔head, contrainte 5 statuts et index partiel Decision vérifiés en base, **461 tests DB passés**.
 - [x] Gates : 997 non-DB, Ruff, mypy 101 fichiers, detect-secrets, diff-check, frontend typecheck/build/lint/100 Vitest.
 
-### Reste ouvert (bloquants restants)
+### Situation réconciliée après les lots post-fusion — 25 août 2026
 
-- [ ] **R-04** — remonter la couverture hors DB de 69,80 % vers 85,50 % par tests utiles (handlers DCE, préparation, pricing import, contexte authentifié, workers).
-- [ ] **R-12** — run CI GitHub avec runner attribué, étapes exécutées et artifacts avant toute fusion de PR #50.
-- [ ] Recettes VPS réelles : Docker préprod, ClamAV/EICAR, HTTPS public, backup/restauration opérée avec le script renforcé.
-- [ ] **R-11** — Golden Corpus DCE anonymisé avec précision/rappel mesurés avant toute promesse d'intelligence documentaire.
-- [ ] **R-14** — profilage N+1 readers submission/préparation sous PostgreSQL après mesure.
+- [x] **R-04** — gate de couverture désormais franchi dans le run main `32865071807` : **88,92 %**, seuil 85,50 %, **1 487 tests passés** ; artifact coverage disponible dans GitHub Actions.
+- [x] **R-12** — CI GitHub avec runner attribué, jobs backend/frontend/image-security exécutés et artifacts produits ; run main `32865071807` vert.
+- [x] Lot MFA/TOTP : lifecycle, anti-rejeu, recovery codes, CSRF, rate limits, audit, migration `0062`, composition production explicite ; PR #51 et run main `32856034458` verts.
+- [x] Lot CreateCase : formulaire cockpit, contrats TypeScript/API, navigation et tests ; PR #52 et run main `32858361854`/validation PR associée.
+- [x] Lot cockpit_projection : contrat fermé, leases/retry borné, `NOT_CONFIGURED`, métriques et Compose profilé ; PR #53 et run main `32860218599` verts.
+- [x] Lot pricing sécurité fichier : libmagic, scan clamd INSTREAM et refus fail-closed ; PR #54 et run main `32861846821` verts.
+- [x] Lot BOAMP→Case : conversion seulement après qualification humaine `QUALIFIED`, tenant-scoped et idempotente ; PR #55 et run main `32863425564` verts.
+- [x] Lot Golden Corpus/BTP : manifeste fermé, validateur, cross-match enterprise et enveloppes DC1/DC2/DC4 non contractuelles ; PR #56 et run main `32865071807` verts.
+
+### Validations d’environnement encore requises
+
+- [ ] Recette VPS réelle : Docker préproduction, ClamAV/EICAR, HTTPS public, backup/restauration opérée et mesure sur réseau réel.
+- [ ] **R-11** — fournir un Golden Corpus DCE anonymisé autorisé, puis mesurer précision/rappel OCR et extraction ; le dépôt ne fabrique ni ne prétend posséder ce corpus.
+- [ ] **R-14** — profiler les readers submission/préparation sous PostgreSQL de préproduction après collecte de mesures N+1.
+- [ ] Tester les adaptateurs fournisseur réels (S3, SMTP, bus, signature, OCR avancé) avec secrets et comptes de recette ; les contrats locaux restent fail-closed.
+- [ ] Décider avec les responsables métier la validation finale des textes DC1/DC2/DC4 et des droits `PATRON_DELEGATE` avant usage opérationnel.
