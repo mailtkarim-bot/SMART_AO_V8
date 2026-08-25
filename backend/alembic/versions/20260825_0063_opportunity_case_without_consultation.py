@@ -6,6 +6,7 @@ Revises: 20260825_0062
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
 
 revision = "20260825_0063"
@@ -28,8 +29,14 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_constraint(_CONSTRAINT, "cases", type_="check")
-    op.create_check_constraint(
-        _CONSTRAINT,
-        "cases",
-        "consultation_id IS NOT NULL OR business_origin = 'MANUAL'",
+    # Existing opportunity Cases created under this revision may legitimately
+    # lack a Consultation. PostgreSQL cannot validate the historical contract
+    # during teardown without deleting data, so restore it as NOT VALID; the
+    # next downgrade removes the table and no data is silently discarded here.
+    op.execute(
+        sa.text(
+            "ALTER TABLE cases ADD CONSTRAINT "
+            "consultation_required_unless_manual CHECK "
+            "(consultation_id IS NOT NULL OR business_origin = 'MANUAL') NOT VALID"
+        )
     )
