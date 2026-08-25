@@ -247,3 +247,57 @@ describe("browser authentication transport", () => {
     expect(new Headers(request.headers).get("X-CSRF-Token")).toBe("csrf-logout");
   });
 });
+
+
+describe("Case creation transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("posts a complete idempotent case command", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: "SUCCEEDED",
+          result_code: "CASE_CREATED",
+          command_id: "command-1",
+          idempotency_key: "idempotency-1",
+          case_id: "case-1",
+          version: 1,
+          event_ids: ["event-1"],
+          navigation: "CASE_OVERVIEW",
+          replayed: false,
+        }),
+        { status: 201 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiClient("https://app.example.test", "access-1");
+
+    await expect(
+      client.createCase({
+        title: "Réhabilitation énergétique",
+        object_description: "Travaux sur le groupe scolaire.",
+        scope_kind: "MULTI_LOT",
+        lot_numbers: ["01", "02A"],
+        scope_justification: "Périmètre initial à confirmer après lecture DCE.",
+        origin_kind: "MANUAL",
+      }),
+    ).resolves.toMatchObject({ case_id: "case-1", navigation: "CASE_OVERVIEW" });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://app.example.test/api/v1/cases");
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(request.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      title: "Réhabilitation énergétique",
+      object_description: "Travaux sur le groupe scolaire.",
+      scope_kind: "MULTI_LOT",
+      lot_numbers: ["01", "02A"],
+      origin_kind: "MANUAL",
+    });
+    expect(body.command_id).toEqual(expect.any(String));
+    expect(body.idempotency_key).toEqual(expect.any(String));
+    expect(body.correlation_id).toEqual(expect.any(String));
+    expect(new Headers(request.headers).get("Authorization")).toBe("Bearer access-1");
+  });
+});

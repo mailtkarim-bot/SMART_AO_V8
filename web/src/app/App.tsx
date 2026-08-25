@@ -15,6 +15,7 @@ import { useBoampOpportunities } from "../features/opportunities/useBoampOpportu
 import { FinancialDraftPanel } from "../features/draft/FinancialDraftPanel";
 import { useFinancialDraft } from "../features/draft/useFinancialDraft";
 import { DceKnowledgePanel } from "../features/dce/DceKnowledgePanel";
+import { CreateCasePanel } from "../features/cases/CreateCasePanel";
 import { useDceKnowledge } from "../features/dce/useDceKnowledge";
 import { useAuthentication } from "../features/auth/useAuthentication";
 import { useBackendReadiness } from "../features/connection/useBackendReadiness";
@@ -30,6 +31,7 @@ import type {
   FreezeDecisionContextRequest,
   ResolveDecisionConditionRequest,
   PricingScenario,
+  CreateCaseInput,
 } from "../shared/types";
 import "./styles.css";
 
@@ -232,6 +234,28 @@ function App() {
     }
   }
 
+  async function createCase(input: CreateCaseInput) {
+    if (!isPatron) {
+      setMessage({ tone: "warning", text: "Seul un espace patron peut créer une affaire." });
+      return;
+    }
+    try {
+      const result = await api.createCase(input);
+      setSelectedCaseId(result.case_id);
+      setActiveNav("review");
+      await refreshCases();
+      setMessage({
+        tone: "success",
+        text: `Affaire créée. Révision ${result.version} · ${result.case_id}`,
+      });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de créer l’affaire.",
+      });
+    }
+  }
+
   async function refreshActions() {
     try {
       const result = await api.listPatronActions();
@@ -378,6 +402,7 @@ function App() {
         <div className="workspace-label">{isCollaborator ? "ESPACE COLLABORATEUR" : "ESPACE PATRON"}</div>
         <nav className="nav-list" aria-label="Navigation principale">
           {isPatron && <button className={`nav-item ${activeNav === "overview" ? "active" : ""}`} onClick={() => navigateTo("overview-section", "overview")}><span className="nav-icon">▦</span>Vue d’ensemble</button>}
+          {isPatron && <button className={`nav-item ${activeNav === "create-case" ? "active" : ""}`} onClick={() => navigateTo("create-case-section", "create-case")}><span className="nav-icon">＋</span>Nouvelle affaire</button>}
           <button className={`nav-item ${activeNav === "preparation" ? "active" : ""}`} onClick={() => navigateTo("preparation-section", "preparation")}><span className="nav-icon">◇</span>Préparation</button>
           <button className={`nav-item ${activeNav === "review" ? "active" : ""}`} onClick={() => navigateTo("review-section", "review")}><span className="nav-icon">◌</span>Revue</button>
           {isPatron && <button className={`nav-item ${activeNav === "opportunities" ? "active" : ""}`} onClick={() => navigateTo("boamp-section", "opportunities")}><span className="nav-icon">◎</span>Opportunités BOAMP</button>}
@@ -408,6 +433,8 @@ function App() {
             {actions.length === 0 ? <div className="empty-card"><strong>Aucune action patronale ouverte</strong><p>Les transmissions et contrôles autorisés alimenteront cette file tenant-scopée.</p></div> : <div className="action-grid">{actions.slice(0, 6).map((action) => <article className="action-card" key={action.action_id}><div className="case-top"><span className={`state-badge state-${action.severity.toLowerCase()}`}>{action.severity}</span><span className="rule-tag">{action.state}</span></div><h3>{action.title}</h3><p>{action.why_now}</p><small>{action.recommended_action}</small></article>)}</div>}
           </section>
         )}
+
+        {isPatron && <CreateCasePanel onCreate={createCase} disabled={!isAuthenticated} />}
 
         {isPatron && (
           <EnterpriseLibraryPanel

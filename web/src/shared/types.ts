@@ -6,6 +6,29 @@ export type AssignedCase = {
   dce_availability: string;
 };
 
+export type CreateCaseInput = {
+  title: string;
+  object_description: string;
+  scope_kind: "SINGLE_LOT" | "MULTI_LOT" | "TRANCHE" | "VARIANT" | "CUSTOM";
+  lot_numbers: string[];
+  tranche_reference?: string;
+  variant_reference?: string;
+  scope_justification?: string;
+  origin_kind?: "MANUAL" | "OPPORTUNITY" | "IMPORT" | "CLIENT_REQUEST";
+};
+
+export type CreateCaseResponse = {
+  status: "SUCCEEDED";
+  command_id: string;
+  idempotency_key: string;
+  result_code: "CASE_CREATED";
+  case_id: string;
+  version: number;
+  event_ids: string[];
+  navigation: "CASE_OVERVIEW";
+  replayed: boolean;
+};
+
 export type FinancialCategory =
   | "SALES"
   | "DIRECT_COST"
