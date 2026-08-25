@@ -224,3 +224,15 @@ def test_route_payload_is_closed() -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_case_conversion_is_explicitly_not_configured_without_service() -> None:
+    client = _client()
+
+    response = client.post(
+        f"/api/v1/patron/boamp-opportunities/{OBSERVATION_ID}/case",
+        json={"command_id": str(uuid4()), "idempotency_key": str(uuid4())},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "BOAMP_CASE_CONVERSION_NOT_CONFIGURED"
