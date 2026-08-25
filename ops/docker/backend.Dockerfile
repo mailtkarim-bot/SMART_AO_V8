@@ -24,7 +24,8 @@ ARG SMART_AO_INSTALL_OBJECT_STORAGE=0
 ARG SMART_AO_INSTALL_CONNECTORS=0
 ARG SMART_AO_INSTALL_NOTIFICATIONS=0
 ARG SMART_AO_INSTALL_CALENDAR=0
-RUN pip install --no-cache-dir uv==0.12.1 \
+RUN python -m pip install --no-cache-dir --upgrade pip==26.1.2 \
+    && python -m pip install --no-cache-dir uv==0.12.1 \
     && uv sync --frozen --no-dev --no-editable \
     && if [ "$SMART_AO_INSTALL_RAG" = "1" ]; then \
         uv sync --frozen --no-dev --no-editable --extra rag; \
