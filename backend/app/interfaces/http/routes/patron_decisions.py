@@ -5,6 +5,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from fastapi import APIRouter, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
+from app.interfaces.http.aggregate_refs import require_aggregate_revision
 from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.modules.decision.application.finalize import PatronDecisionFinalizationService
@@ -131,7 +132,7 @@ def build_patron_decision_router(
                 idempotency_key=UUID(result.idempotency_key),
                 result_code="DECISION_DRAFT_CREATED",
                 decision_id=UUID(str(reference["aggregate_id"])),
-                version=int(reference["aggregate_revision"]),
+                version=require_aggregate_revision(reference["aggregate_revision"]),
                 event_ids=[UUID(event_id) for event_id in result.event_ids],
                 replayed=result.replayed,
             )
@@ -202,7 +203,7 @@ def build_patron_decision_router(
                 decision_id=decision_id,
                 context_id=request.context_id,
                 fingerprint=str(context_reference["fingerprint"]),
-                version=int(reference["aggregate_revision"]),
+                version=require_aggregate_revision(reference["aggregate_revision"]),
                 event_ids=[UUID(event_id) for event_id in result.event_ids],
                 replayed=result.replayed,
             )
@@ -268,7 +269,7 @@ def build_patron_decision_router(
                 decision_id=decision_id,
                 condition_id=condition_id,
                 status=request.target_status,
-                version=int(result.aggregate_refs[0]["aggregate_revision"]),
+                version=require_aggregate_revision(result.aggregate_refs[0]["aggregate_revision"]),
                 event_ids=[UUID(event_id) for event_id in result.event_ids],
                 replayed=result.replayed,
             )
@@ -359,7 +360,7 @@ def build_patron_decision_router(
                 idempotency_key=result.idempotency_key,
                 result_code=result.result_code,
                 risk_id=UUID(str(reference["aggregate_id"])),
-                version=int(reference["aggregate_revision"]),
+                version=require_aggregate_revision(reference["aggregate_revision"]),
                 event_ids=[UUID(event_id) for event_id in result.event_ids],
                 replayed=result.replayed,
             )
@@ -423,7 +424,7 @@ def build_patron_decision_router(
                 idempotency_key=result.idempotency_key,
                 result_code=result.result_code,
                 link_id=UUID(str(reference["aggregate_id"])),
-                version=int(reference["aggregate_revision"]),
+                version=require_aggregate_revision(reference["aggregate_revision"]),
                 event_ids=[UUID(event_id) for event_id in result.event_ids],
                 replayed=result.replayed,
             )
@@ -493,7 +494,7 @@ def build_patron_decision_router(
                 decision_id=UUID(str(reference["aggregate_id"])),
                 outcome=request.outcome,
                 condition_count=len(request.conditions),
-                version=int(reference["aggregate_revision"]),
+                version=require_aggregate_revision(reference["aggregate_revision"]),
                 event_ids=[UUID(event_id) for event_id in result.event_ids],
                 replayed=result.replayed,
             )

@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
+from app.interfaces.http.aggregate_refs import require_aggregate_revision
 from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.modules.patron_action.application.commands import CreatePatronActionCommand
@@ -103,7 +104,9 @@ def build_patron_action_router(
             idempotency_key=result.idempotency_key,
             result_code=result.result_code,
             aggregate_id=UUID(str(result.aggregate_refs[0]["aggregate_id"])),
-            aggregate_revision=int(result.aggregate_refs[0]["aggregate_revision"]),
+            aggregate_revision=require_aggregate_revision(
+                result.aggregate_refs[0]["aggregate_revision"]
+            ),
             event_ids=[UUID(event_id) for event_id in result.event_ids],
             replayed=result.replayed,
         )
@@ -170,7 +173,9 @@ def build_patron_action_router(
             idempotency_key=result.idempotency_key,
             result_code=result.result_code,
             aggregate_id=UUID(str(result.aggregate_refs[0]["aggregate_id"])),
-            aggregate_revision=int(result.aggregate_refs[0]["aggregate_revision"]),
+            aggregate_revision=require_aggregate_revision(
+                result.aggregate_refs[0]["aggregate_revision"]
+            ),
             event_ids=[UUID(event_id) for event_id in result.event_ids],
             replayed=result.replayed,
         )
