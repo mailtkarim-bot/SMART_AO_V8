@@ -1,8 +1,20 @@
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from app.modules.enterprise.application.enterprise_commands import (
+        CreateEnterpriseCompanyCommand,
+        RegisterEnterpriseDocumentCommand,
+    )
+    from app.modules.enterprise.application.enterprise_upload_commands import (
+        PrepareEnterpriseDocumentUploadCommand,
+        VerifyEnterpriseDocumentCommand,
+    )
 
 
 class EnterprisePublicRequest(BaseModel):
@@ -27,7 +39,7 @@ class CreateEnterpriseCompanyRequest(EnterprisePublicRequest):
     city: str = Field(min_length=1, max_length=120)
     country_code: str = Field(pattern=r"^[A-Z]{2}$")
 
-    def to_command(self) -> object:
+    def to_command(self) -> CreateEnterpriseCompanyCommand:
         from app.modules.enterprise.application.enterprise_commands import (
             CreateEnterpriseCompanyCommand,
         )
@@ -48,7 +60,9 @@ class PrepareEnterpriseDocumentUploadRequest(EnterprisePublicRequest):
     expected_byte_size: int = Field(gt=0, le=2_000_000_000)
     expires_at: datetime
 
-    def to_command(self, *, company_id: UUID) -> object:
+    def to_command(
+        self, *, company_id: UUID
+    ) -> PrepareEnterpriseDocumentUploadCommand:
         from app.modules.enterprise.application.enterprise_upload_commands import (
             PrepareEnterpriseDocumentUploadCommand,
         )
@@ -78,7 +92,7 @@ class RegisterEnterpriseDocumentRequest(EnterprisePublicRequest):
     expires_at: datetime | None = None
     verification_status: Literal["PENDING"] = "PENDING"
 
-    def to_command(self, *, company_id: UUID) -> object:
+    def to_command(self, *, company_id: UUID) -> RegisterEnterpriseDocumentCommand:
         from app.modules.enterprise.application.enterprise_commands import (
             RegisterEnterpriseDocumentCommand,
         )
@@ -105,7 +119,9 @@ class VerifyEnterpriseDocumentRequest(EnterprisePublicRequest):
         "DOCUMENT_DUPLICATE",
     ]
 
-    def to_command(self, *, company_id: UUID, document_id: UUID) -> object:
+    def to_command(
+        self, *, company_id: UUID, document_id: UUID
+    ) -> VerifyEnterpriseDocumentCommand:
         from app.modules.enterprise.application.enterprise_upload_commands import (
             VerifyEnterpriseDocumentCommand,
         )

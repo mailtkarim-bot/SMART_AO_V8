@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from app.modules.enterprise.application.enterprise_capability_commands import (
+        AddEnterpriseCapabilityVersionCommand,
+        CreateEnterpriseCapabilityCommand,
+    )
 
 
 class EnterpriseCapabilityPublicModel(BaseModel):
@@ -20,7 +26,7 @@ class CreateEnterpriseCapabilityRequest(EnterpriseCapabilityPublicModel):
     summary: str = Field(min_length=1, max_length=1000)
     state: Literal["ACTIVE", "SUSPENDED", "RETIRED"] = "ACTIVE"
 
-    def to_command(self, *, company_id: UUID) -> object:
+    def to_command(self, *, company_id: UUID) -> CreateEnterpriseCapabilityCommand:
         from app.modules.enterprise.application.enterprise_capability_commands import (
             CreateEnterpriseCapabilityCommand,
         )
@@ -44,7 +50,9 @@ class AddEnterpriseCapabilityVersionRequest(EnterpriseCapabilityPublicModel):
     usage_scope: str = Field(min_length=1, max_length=500)
     proof_document_ids: list[UUID] = Field(default_factory=list, max_length=20)
 
-    def to_command(self, *, capability_id: UUID) -> object:
+    def to_command(
+        self, *, capability_id: UUID
+    ) -> AddEnterpriseCapabilityVersionCommand:
         from app.modules.enterprise.application.enterprise_capability_commands import (
             AddEnterpriseCapabilityVersionCommand,
         )
