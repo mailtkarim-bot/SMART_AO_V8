@@ -103,7 +103,7 @@ class CreateConsultationHandler:
     ) -> HandlerOutcome:
         consultation = Consultation.create(
             consultation_id=command.consultation_id,
-            tenant_id=context.tenant_id,
+            tenant_id=UUID(str(context.tenant_id)),
             buyer=BuyerIdentity(
                 legal_name=command.buyer_legal_name,
                 normalized_identifier=command.buyer_normalized_id,
@@ -832,7 +832,7 @@ class RecordDceDocumentClassificationRunHandler:
         session.flush()
 
         for result in command.results:
-            classification = classifications_by_document.get(result.dce_document_id)
+            classification_record = classifications_by_document.get(result.dce_document_id)
             result_record = DceDocumentClassificationResultRecord(
                 id=uuid4(),
                 tenant_id=context.tenant_id,
@@ -842,7 +842,9 @@ class RecordDceDocumentClassificationRunHandler:
                 status=result.status,
                 classification=result.classification,
                 rule_match_count=result.rule_match_count,
-                classification_id=classification.id if classification is not None else None,
+                classification_id=(
+                    classification_record.id if classification_record is not None else None
+                ),
             )
             session.add(result_record)
             session.flush()
@@ -1146,7 +1148,7 @@ class RegisterDceVersionHandler:
         )
         version = DceVersion.register(
             dce_version_id=command.dce_version_id,
-            tenant_id=UUID(context.tenant_id),
+            tenant_id=UUID(str(context.tenant_id)),
             consultation_id=command.consultation_id,
             corpus_hash=command.corpus_hash,
             documents=domain_documents,
@@ -1611,12 +1613,12 @@ class RecordCaseDceImpactRunHandler:
 
         previous_requirements = load_impact_requirements(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=UUID(str(context.tenant_id)),
             dce_version_id=predecessor.id,
         )
         successor_requirements = load_impact_requirements(
             session=session,
-            tenant_id=context.tenant_id,
+            tenant_id=UUID(str(context.tenant_id)),
             dce_version_id=successor.id,
         )
         manifest = impact_manifest_sha256(
@@ -1800,10 +1802,18 @@ class RecordDceRequirementConfirmationHandler:
                 session=session,
                 entry=SecurityAuditEntry(
                     occurred_at=context.received_at,
-                    tenant_id=context.tenant_id,
-                    actor_id=context.actor_id,
-                    identity_id=context.identity_id,
-                    session_id=context.session_id,
+                    tenant_id=UUID(str(context.tenant_id)),
+                    actor_id=UUID(str(context.actor_id)),
+                    identity_id=(
+                        UUID(str(context.identity_id))
+                        if context.identity_id is not None
+                        else None
+                    ),
+                    session_id=(
+                        UUID(str(context.session_id))
+                        if context.session_id is not None
+                        else None
+                    ),
                     actor_kind=context.actor_kind,
                     auth_strength=None,
                     event_type=AuditEventType.AUTHZ_SUCCEEDED,
@@ -1812,7 +1822,7 @@ class RecordDceRequirementConfirmationHandler:
                     action="dce.requirement.confirm",
                     resource_type="DCE_REQUIREMENT",
                     resource_id=requirement.id,
-                    case_id=context.case_id,
+                    case_id=UUID(str(context.case_id)),
                     correlation_id=command.correlation_id,
                     command_id=command.command_id,
                     request_id=None,
