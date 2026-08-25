@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, File, Header, HTTPException, Query, Response, UploadFile, status
 
+from app.interfaces.http.aggregate_refs import require_aggregate_revision
 from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.modules.pricing.application.file_security import PricingFileSecurityPort
@@ -204,7 +205,9 @@ def build_patron_pricing_import_router(
             update={
                 "batch_id": UUID(str(batch_reference["aggregate_id"])),
                 "state": "PREVIEWED",
-                "aggregate_revision": int(batch_reference["aggregate_revision"]),
+                "aggregate_revision": require_aggregate_revision(
+                    batch_reference["aggregate_revision"]
+                ),
                 "result_code": receipt.result_code,
                 "command_id": UUID(receipt.command_id),
                 "idempotency_key": UUID(receipt.idempotency_key),

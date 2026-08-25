@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
+from app.interfaces.http.aggregate_refs import require_aggregate_revision
 from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.modules.pricing.application.commands import CreatePricingScenarioCommand
@@ -111,7 +112,7 @@ def build_patron_pricing_router(
             idempotency_key=result.idempotency_key,
             result_code=result.result_code,
             scenario_id=UUID(str(reference["aggregate_id"])),
-            version=int(reference["aggregate_revision"]),
+            version=require_aggregate_revision(reference["aggregate_revision"]),
             event_ids=[UUID(event_id) for event_id in result.event_ids],
             replayed=result.replayed,
         )
@@ -210,7 +211,7 @@ def build_patron_pricing_router(
             idempotency_key=result.idempotency_key,
             result_code=result.result_code,
             scenario_id=UUID(str(reference["aggregate_id"])),
-            version=int(reference["aggregate_revision"]),
+            version=require_aggregate_revision(reference["aggregate_revision"]),
             event_ids=[UUID(event_id) for event_id in result.event_ids],
             replayed=result.replayed,
         )

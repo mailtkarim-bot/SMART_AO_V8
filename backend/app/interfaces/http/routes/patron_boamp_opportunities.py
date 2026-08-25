@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
+from app.interfaces.http.aggregate_refs import require_aggregate_revision
 from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
 from app.modules.opportunity.application.boamp_case_creation import (
@@ -231,7 +232,7 @@ def build_patron_boamp_opportunity_router(
             command_id=UUID(result.command_id),
             idempotency_key=UUID(result.idempotency_key),
             case_id=UUID(str(reference["aggregate_id"])),
-            version=int(reference["aggregate_revision"]),
+            version=require_aggregate_revision(reference["aggregate_revision"]),
             event_ids=[UUID(event_id) for event_id in result.event_ids],
             replayed=result.replayed,
         )
