@@ -239,6 +239,7 @@ from app.modules.membership.infrastructure.assignment_management_reader import (
 from app.modules.membership.infrastructure.patron_assignment_cockpit_reader import (
     SqlAlchemyPatronAssignmentCockpitReader,
 )
+from app.modules.opportunity.application.boamp_case_creation import BoampCaseCreationService
 from app.modules.opportunity.application.patron_watch_profile import (
     PatronWatchProfileService,
     opportunity_watch_profile_handlers,
@@ -1007,6 +1008,10 @@ def create_app(
                 build_patron_boamp_opportunity_router(
                     runtime=runtime,
                     security_runtime=security_runtime,
+                    case_creation_service=BoampCaseCreationService(
+                        session_factory=runtime.session_factory,
+                        dispatcher=runtime.dispatcher,
+                    ),
                 )
             )
         if company_registry is not None:

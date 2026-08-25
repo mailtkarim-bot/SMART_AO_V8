@@ -8,6 +8,10 @@ from fastapi.responses import JSONResponse
 
 from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
+from app.modules.opportunity.application.boamp_case_creation import (
+    BoampCaseCreationCommand,
+    BoampCaseCreationService,
+)
 from app.modules.opportunity.application.boamp_qualification import (
     BoampQualificationCommand,
     PatronBoampObservationService,
@@ -18,19 +22,29 @@ from app.modules.opportunity.application.boamp_qualification_errors import (
     BoampQualificationIdempotencyConflict,
 )
 from app.modules.opportunity.public.boamp_qualification_contracts import (
+    BoampCaseCreationResponse,
+    BoampObservationCreateCaseRequest,
     BoampObservationListResponse,
     BoampObservationQualificationRequest,
     BoampObservationResponse,
     BoampQualificationReceiptResponse,
 )
-from app.platform.events.dispatcher import CommandContext
+from app.platform.events.dispatcher import (
+    CommandContext,
+    CommandExecutionError,
+    CommandInProgressError,
+    IdempotencyKeyReusedError,
+)
 from app.platform.security.authorization import AuthorizationRequest, AuthorizationResource
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import DataClassification
 
 
 def build_patron_boamp_opportunity_router(
-    *, runtime, security_runtime: ConsultationSecurityRuntime
+    *,
+    runtime,
+    security_runtime: ConsultationSecurityRuntime,
+    case_creation_service: BoampCaseCreationService | None = None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/api/v1/patron/boamp-opportunities",
@@ -136,6 +150,89 @@ def build_patron_boamp_opportunity_router(
         response = BoampQualificationReceiptResponse(
             qualification_id=result.qualification_id,
             event_id=result.event_id,
+            replayed=result.replayed,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_200_OK if result.replayed else status.HTTP_201_CREATED,
+            content=response.model_dump(mode="json"),
+        )
+
+    @router.post(
+        "/{observation_id}/case",
+        response_model=BoampCaseCreationResponse,
+        status_code=status.HTTP_201_CREATED,
+        responses={
+            401: {"description": "Bearer absent, invalide ou expiré."},
+            403: {"description": "Capability réservée au patron."},
+            404: {"description": "Observation absente ou hors tenant."},
+            409: {"description": "Conflit d’idempotence ou d’affaire existante."},
+            422: {"description": "Qualification préalable ou commande invalide."},
+            503: {"description": "Conversion non configurée."},
+        },
+    )
+    def create_case_from_observation(
+        observation_id: UUID,
+        request: BoampObservationCreateCaseRequest,
+        authorization: str | None = Header(default=None),
+    ) -> BoampCaseCreationResponse:
+        if case_creation_service is None:
+            raise HTTPException(status_code=503, detail="BOAMP_CASE_CONVERSION_NOT_CONFIGURED")
+        context = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        _authorize(
+            context=context,
+            security_runtime=security_runtime,
+            action=Capability.CASE_CREATE,
+            resource_id=observation_id,
+        )
+        command_context = CommandContext(
+            tenant_id=context.tenant_id,
+            actor_id=context.actor_id,
+            actor_kind=context.actor_kind.value,
+            received_at=datetime.now(tz=UTC),
+            identity_id=context.identity_id,
+            membership_id=context.membership_id,
+            session_id=context.session_id,
+            correlation_id=context.correlation_id,
+        )
+        try:
+            result = case_creation_service.create(
+                context=command_context,
+                command=BoampCaseCreationCommand(
+                    observation_id=observation_id,
+                    command_id=request.command_id,
+                    idempotency_key=request.idempotency_key,
+                    correlation_id=request.correlation_id,
+                ),
+                now=datetime.now(tz=UTC),
+            )
+        except PermissionError as error:
+            if str(error) == "NOT_FOUND_OR_FORBIDDEN":
+                raise HTTPException(status_code=404, detail="NOT_FOUND_OR_FORBIDDEN") from error
+            raise HTTPException(status_code=403, detail="FORBIDDEN") from error
+        except (IdempotencyKeyReusedError, CommandInProgressError) as error:
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_CONFLICT") from error
+        except CommandExecutionError as error:
+            code = str(error.__cause__) if isinstance(error.__cause__, ValueError) else str(error)
+            http_status = (
+                409
+                if code in {"DUPLICATE_FUNCTIONAL_IDENTITY", "VERSION_CONFLICT"}
+                else 422
+            )
+            raise HTTPException(status_code=http_status, detail=code) from error
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        reference = next(
+            item for item in result.aggregate_refs if item["aggregate_type"] == "AFF"
+        )
+        response = BoampCaseCreationResponse(
+            command_id=UUID(result.command_id),
+            idempotency_key=UUID(result.idempotency_key),
+            case_id=UUID(str(reference["aggregate_id"])),
+            version=int(reference["aggregate_revision"]),
+            event_ids=[UUID(event_id) for event_id in result.event_ids],
             replayed=result.replayed,
         )
         return JSONResponse(

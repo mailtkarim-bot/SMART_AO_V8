@@ -48,3 +48,24 @@ class BoampQualificationReceiptResponse(BaseModel):
     qualification_id: UUID
     event_id: UUID
     replayed: bool
+
+
+class BoampObservationCreateCaseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None = None
+
+
+class BoampCaseCreationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str = "SUCCEEDED"
+    command_id: UUID
+    idempotency_key: UUID
+    result_code: str = "CASE_CREATED"
+    case_id: UUID
+    version: int = Field(ge=0)
+    event_ids: list[UUID]
+    replayed: bool
