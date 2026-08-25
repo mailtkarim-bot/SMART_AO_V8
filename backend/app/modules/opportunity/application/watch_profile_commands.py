@@ -31,12 +31,12 @@ class CreateOpportunityWatchProfileCommand(ApplicationCommand):
     def criteria(self) -> WatchProfileCriteria:
         return WatchProfileCriteria(
             keywords=self.keywords,
-            project_types=self.project_types,
-            buyer_types=self.buyer_types,
+            project_types=tuple(ProjectType(value) for value in self.project_types),
+            buyer_types=tuple(BuyerType(value) for value in self.buyer_types),
             included_departments=self.included_departments,
             excluded_departments=self.excluded_departments,
             max_radius_km=self.max_radius_km,
-            response_modes=self.response_modes,
+            response_modes=tuple(ResponseMode(value) for value in self.response_modes),
             require_qualification=self.require_qualification,
             visit_preference=self.visit_preference,
         )
@@ -62,12 +62,12 @@ class AddOpportunityWatchProfileVersionCommand(ApplicationCommand):
     def criteria(self) -> WatchProfileCriteria:
         return WatchProfileCriteria(
             keywords=self.keywords,
-            project_types=self.project_types,
-            buyer_types=self.buyer_types,
+            project_types=tuple(ProjectType(value) for value in self.project_types),
+            buyer_types=tuple(BuyerType(value) for value in self.buyer_types),
             included_departments=self.included_departments,
             excluded_departments=self.excluded_departments,
             max_radius_km=self.max_radius_km,
-            response_modes=self.response_modes,
+            response_modes=tuple(ResponseMode(value) for value in self.response_modes),
             require_qualification=self.require_qualification,
             visit_preference=self.visit_preference,
         )
