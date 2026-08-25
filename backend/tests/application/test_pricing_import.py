@@ -54,6 +54,53 @@ def test_pricing_import_preview_parses_dpgf_rows_without_persisting_raw_file(ses
     assert preview.error_count == 0
     assert preview.total_minor == 32_500
     assert preview.rows[0].total_minor == 12_500
+    assert preview.truncated is False
+    assert preview.limit_reason is None
+
+
+def test_pricing_import_preview_reports_row_limit_truncation(session_factory, monkeypatch):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    monkeypatch.setattr(import_preview_module, "MAX_ROWS", 3)
+    payload = _xlsx(
+        [["Code", "Désignation", "Unité", "Quantité", "Prix unitaire"]]
+        + [[f"A-{index:02d}", "Terrassement", "m2", 1, 10] for index in range(1, 6)]
+    )
+    preview = PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+        actor=actor,
+        case_id=case_id,
+        document_kind="DPGF",
+        filename="bordereau.xlsx",
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        payload=payload,
+    )
+    assert preview.truncated is True
+    assert preview.limit_reason == "ROW_LIMIT"
+    assert preview.row_count < 5
+    assert all(row.errors == () for row in preview.rows)
+
+
+def test_pricing_import_preview_reports_error_limit_truncation(session_factory, monkeypatch):
+    actor, case_id, _, _ = _seed_draft(session_factory)
+    monkeypatch.setattr(import_preview_module, "MAX_ERRORS", 1)
+    payload = _xlsx(
+        [
+            ["Code", "Désignation", "Unité", "Quantité", "Prix unitaire"],
+            ["A-01", "Lot un", "m2", -5, 10],
+            ["A-02", "Lot deux", "m3", 2, 20],
+            ["A-03", "Lot trois", "m2", 3, 30],
+        ]
+    )
+    preview = PricingImportPreviewService(policy=AuthorizationPolicy()).preview(
+        actor=actor,
+        case_id=case_id,
+        document_kind="DPGF",
+        filename="bordereau.xlsx",
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        payload=payload,
+    )
+    assert preview.error_count >= 1
+    assert preview.truncated is True
+    assert preview.limit_reason == "ERROR_LIMIT"
 
 
 def test_pricing_import_preview_reports_missing_designation_and_refuses_non_xlsx(session_factory):

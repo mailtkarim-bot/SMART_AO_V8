@@ -349,6 +349,8 @@ export type PricingImportBatchRead = {
 
 export type PricingImportPreview = PricingImportBatchRead & {
   filename: string;
+  truncated: boolean;
+  limit_reason: "ROW_LIMIT" | "ERROR_LIMIT" | null;
   result_code: "PRICING_IMPORT_PREVIEWED";
   command_id: string;
   idempotency_key: string;

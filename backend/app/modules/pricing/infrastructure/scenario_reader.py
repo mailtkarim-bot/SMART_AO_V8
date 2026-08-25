@@ -6,11 +6,19 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.modules.pricing.application.queries import PricingScenarioProjection
-from app.modules.pricing.infrastructure.models import PricingScenarioRecord
+from app.modules.pricing.infrastructure.models import (
+    PricingScenarioRecord,
+    PricingScenarioTransitionRecord,
+)
 
 
 class SqlAlchemyPricingScenarioReader:
-    """Read patron pricing projections without leaking ORM into application services."""
+    """Read patron pricing projections without leaking ORM into application services.
+
+    The append-only transitions table owns the current ``state`` and ``version``;
+    the scenario row keeps its immutable creation snapshot. Projections merge the
+    two so a patron always sees the transitioned state.
+    """
 
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
@@ -19,8 +27,35 @@ class SqlAlchemyPricingScenarioReader:
         self, *, tenant_id: UUID, case_id: UUID
     ) -> tuple[PricingScenarioProjection, ...]:
         with self._session_factory() as session:
-            records = session.scalars(
+            latest_version = (
+                sa.select(sa.func.max(PricingScenarioTransitionRecord.version))
+                .where(
+                    PricingScenarioTransitionRecord.tenant_id == tenant_id,
+                    PricingScenarioTransitionRecord.scenario_id == PricingScenarioRecord.id,
+                )
+                .correlate(PricingScenarioRecord)
+                .scalar_subquery()
+            )
+            latest_state = (
+                sa.select(PricingScenarioTransitionRecord.to_state)
+                .where(
+                    PricingScenarioTransitionRecord.tenant_id == tenant_id,
+                    PricingScenarioTransitionRecord.scenario_id == PricingScenarioRecord.id,
+                    PricingScenarioTransitionRecord.version == latest_version,
+                )
+                .correlate(PricingScenarioRecord)
+                .scalar_subquery()
+            )
+            rows = session.execute(
                 sa.select(PricingScenarioRecord)
+                .add_columns(
+                    sa.func.coalesce(latest_version, PricingScenarioRecord.version).label(
+                        "current_version"
+                    ),
+                    sa.func.coalesce(latest_state, PricingScenarioRecord.state).label(
+                        "current_state"
+                    ),
+                )
                 .where(
                     PricingScenarioRecord.tenant_id == tenant_id,
                     PricingScenarioRecord.case_id == case_id,
@@ -33,8 +68,8 @@ class SqlAlchemyPricingScenarioReader:
                 case_id=record.case_id,
                 scenario_key=record.scenario_key,
                 scenario_type=record.scenario_type,
-                version=record.version,
-                state=record.state,
+                version=current_version,
+                state=current_state,
                 assumptions=record.assumptions_json,
                 sales_total_minor=record.sales_total_minor,
                 total_cost_minor=record.total_cost_minor,
@@ -50,5 +85,5 @@ class SqlAlchemyPricingScenarioReader:
                 target_sales_minor=record.target_sales_minor,
                 source_snapshot_revision=record.source_snapshot_revision,
             )
-            for record in records
+            for record, current_version, current_state in rows
         )

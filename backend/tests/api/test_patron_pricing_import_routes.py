@@ -84,7 +84,7 @@ class _PreviewService:
         return SimpleNamespace(
             case_id=kwargs["case_id"], document_kind=kwargs["document_kind"],
             filename=kwargs["filename"], row_count=2, valid_row_count=1, error_count=1,
-            total_minor=125000,
+            total_minor=125000, truncated=False, limit_reason=None,
             rows=[
                 _Row(1, "A-1", "Ouvrage", "U", "10", 12500, 125000, []),
                 _Row(2, None, "Ligne invalide", None, None, None, None, ["CODE_REQUIRED"]),

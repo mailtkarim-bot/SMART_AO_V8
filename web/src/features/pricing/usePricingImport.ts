@@ -66,10 +66,14 @@ export function usePricingImport(
       setPricingImportBatchRevision(String(preview.aggregate_revision));
       setPricingImportState("PREVIEWED");
       setMessage({
-        tone: "success",
-        text: preview.replayed
-          ? "Preview déjà enregistrée : rejeu idempotent."
-          : "Preview validée et enregistrée dans un batch patronal.",
+        tone: preview.truncated ? "warning" : "success",
+        text: preview.truncated
+          ? `Preview incomplète : le fichier dépasse la limite ${
+              preview.limit_reason === "ROW_LIMIT" ? "de lignes (10 000)" : "d’erreurs (100)"
+            }. Seules les lignes listées sont importables — fractionnez le fichier.`
+          : preview.replayed
+            ? "Preview déjà enregistrée : rejeu idempotent."
+            : "Preview validée et enregistrée dans un batch patronal.",
       });
     } catch (error) {
       setMessage({

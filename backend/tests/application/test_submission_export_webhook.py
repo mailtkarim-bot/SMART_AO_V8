@@ -89,9 +89,10 @@ def test_webhook_worker_skips_without_configured_endpoint_and_publishes() -> Non
 
     result = asyncio.run(worker._process_message(message.id, NOW))
 
-    assert result.skipped == 1
-    assert message.status == "PUBLISHED"
-    assert message.last_error_code is None
+    assert result.not_configured == 1
+    assert message.status == "NOT_CONFIGURED"
+    assert message.published_at is None
+    assert message.last_error_code == "WEBHOOK_NOT_CONFIGURED"
 
 
 def test_webhook_url_rejects_non_http_scheme() -> None:

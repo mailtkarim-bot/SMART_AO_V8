@@ -16,7 +16,7 @@ type PricingApi = Partial<Pick<
   "commitPricingImport" | "createPricingImportPreview" | "getPricingImport"
 >>;
 
-const preview = (): PricingImportPreview => ({
+const preview = (overrides: Partial<PricingImportPreview> = {}): PricingImportPreview => ({
   batch_id: "batch-2",
   case_id: "case-1",
   document_kind: "EXCEL",
@@ -28,11 +28,14 @@ const preview = (): PricingImportPreview => ({
   total_minor: 32500,
   rows: [],
   filename: "pricing.xlsx",
+  truncated: false,
+  limit_reason: null,
   result_code: "PRICING_IMPORT_PREVIEWED",
   command_id: "command-preview",
   idempotency_key: "idempotency-preview",
   event_ids: ["event-preview"],
   replayed: false,
+  ...overrides,
 });
 
 const receipt = (replayed = false): PricingImportCommitReceipt => ({
@@ -96,6 +99,27 @@ describe("usePricingImport", () => {
     expect(result.current.pricingImportBatchRevision).toBe("1");
     expect(result.current.pricingImportState).toBe("PREVIEWED");
     expect(result.current.pricingImportPreview?.total_minor).toBe(32500);
+  });
+
+  it("warns the patron when the preview hit a safety budget and was truncated", async () => {
+    const api = {
+      createPricingImportPreview: vi.fn().mockResolvedValue(
+        preview({ truncated: true, limit_reason: "ROW_LIMIT" }),
+      ),
+    } satisfies PricingApi;
+    const setMessage = vi.fn() as unknown as Dispatch<SetStateAction<HookMessage | null>>;
+    const { result } = renderPricingHook(api, setMessage);
+    const file = new File(["xlsx"], "pricing.xlsx");
+
+    await act(async () => {
+      await result.current.previewPricingImport(file);
+    });
+
+    expect(result.current.pricingImportState).toBe("PREVIEWED");
+    const mockSetMessage = setMessage as unknown as { mock: { calls: [HookMessage][] } };
+    const message = mockSetMessage.mock.calls.at(-1)?.[0] ?? null;
+    expect(message?.tone).toBe("warning");
+    expect(message?.text).toContain("limite de lignes");
   });
 
   it("reloads a persisted batch and reflects its committed state", async () => {

@@ -307,3 +307,21 @@ La simulation Docker éphémère n’a pas été exécutée : `docker` est absen
 - [ ] Exécuter le reader et les requêtes de comptage contre PostgreSQL réel, notamment la jointure `concat(UUID)` et les transitions PatronAction.
 - [ ] Tester online les cas inter-tenant, Decision obsolète, condition satisfaite/échouée, action abandonnée/terminée, rollback transactionnel et concurrence préparation/export.
 - [ ] Décider explicitement si `PATRON_DELEGATE` peut préparer/exporter avec un accès séparé au snapshot Decision; le code actuel continue de réserver Submission au `PATRON_ADMIN`.
+
+## Lot remédiation audit profond — 25 août 2026 (au-dessus de `673a8dc`)
+
+### Livré et prouvé
+
+- [x] **R-13** — flags `truncated`/`limit_reason` sur la preview pricing + avertissement patron frontend ; tests application/route/hook.
+- [x] **R-16** — statut outbox `NOT_CONFIGURED` (migration `0061`) ; workers SMTP/webhook ne masquent plus l'absence de configuration par un faux `PUBLISHED`.
+- [x] Bug réel corrigé : projection lecture scénarios pricing dérivée des transitions append-only (état/version exacts côté patron).
+- [x] **R-03 (preuve locale)** — PostgreSQL 16 réel : migrations online jusqu'à `0061`, cycle base↔head, contrainte 5 statuts et index partiel Decision vérifiés en base, **461 tests DB passés**.
+- [x] Gates : 997 non-DB, Ruff, mypy 101 fichiers, detect-secrets, diff-check, frontend typecheck/build/lint/100 Vitest.
+
+### Reste ouvert (bloquants restants)
+
+- [ ] **R-04** — remonter la couverture hors DB de 69,80 % vers 85,50 % par tests utiles (handlers DCE, préparation, pricing import, contexte authentifié, workers).
+- [ ] **R-12** — run CI GitHub avec runner attribué, étapes exécutées et artifacts avant toute fusion de PR #50.
+- [ ] Recettes VPS réelles : Docker préprod, ClamAV/EICAR, HTTPS public, backup/restauration opérée avec le script renforcé.
+- [ ] **R-11** — Golden Corpus DCE anonymisé avec précision/rappel mesurés avant toute promesse d'intelligence documentaire.
+- [ ] **R-14** — profilage N+1 readers submission/préparation sous PostgreSQL après mesure.

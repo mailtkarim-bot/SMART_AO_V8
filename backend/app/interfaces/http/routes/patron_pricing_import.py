@@ -163,6 +163,8 @@ def build_patron_pricing_import_router(
             valid_row_count=preview.valid_row_count,
             error_count=preview.error_count,
             total_minor=preview.total_minor,
+            truncated=preview.truncated,
+            limit_reason=preview.limit_reason,
             rows=[
                 PricingImportRowResponse(
                     row_number=row.row_number,

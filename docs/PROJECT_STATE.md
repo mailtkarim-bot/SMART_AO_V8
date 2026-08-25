@@ -368,3 +368,27 @@ Le port applicatif `SubmissionDecisionGateReader` et l’adaptateur `SqlAlchemyS
 La composition root injecte l’adaptateur dans les handlers et le service Submission. Le contrat HTTP conserve le refus neutre `422 COMMAND_REJECTED` pour `DECISION_SUBMISSION_BLOCKED`. Des tests couvrent le blocage avant manifeste, le blocage avant lecture storage, l’absence de configuration, la compilation PostgreSQL offline du reader et l’absence de colonnes financières.
 
 Validation locale du lot : **986 tests hors DB passés**, 458 désélectionnés, 4 warnings tiers préexistants; Ruff, mypy ciblé sur 74 fichiers, lock UV, syntaxe shell, detect-secrets, `git diff --check` et Alembic offline jusqu’à `20260824_0059` passent. PostgreSQL online et CI avec runner exécutant restent non validés.
+
+## Remédiation audit profond du 25 août 2026 — branche `remediation/audit-p0-hardening-20260825`
+
+Cette section fait suite à l'audit profond externe (`rapports/Audit profond de SMART_AO V8.md`) et au lot `673a8dc`. Elle documente les correctifs additionnels appliqués au-dessus de ce commit, avec les preuves obtenues dans un environnement PostgreSQL 16 réel.
+
+### Correctifs livrés dans ce lot
+
+- **R-13 (troncature silencieuse pricing)** : la preview expose désormais `truncated` et `limit_reason` (`ROW_LIMIT`|`ERROR_LIMIT`) lorsque le budget de sécurité (10 000 lignes / 100 erreurs) interrompt le parsing ; l'avertissement est affiché au patron côté frontend. Tests application + route + hook Vitest ajoutés.
+- **R-16 (succès factice hors configuration)** : nouveau statut outbox terminal `NOT_CONFIGURED` (migration `20260825_0061`, contrainte `ck_outbox_messages__status` élargie). Les workers SMTP et webhook marquent désormais `NOT_CONFIGURED` avec code dédié au lieu d'un faux `PUBLISHED` ; compteurs `not_configured` ajoutés aux résultats de run. Le downgrade convertit ces lignes en `FAILED/INTEGRATION_NOT_CONFIGURED`.
+- **Bug réel découvert par la première exécution DB en ligne** : la lecture des scénarios pricing projetait les colonnes gelées par le trigger append-only `0055` (`state=DRAFT`, `version=1`) au lieu de l'état issu des transitions. `SqlAlchemyPricingScenarioReader.list_for_case` dérive maintenant état et version depuis la dernière transition (source de vérité), sans assouplir l'immutabilité.
+- **Test d'index partiel Decision** normalisé pour correspondre à la forme SQL réelle générée par PostgreSQL (sémantique inchangée).
+
+### Preuves PostgreSQL online obtenues (R-03)
+
+- Migrations appliquées en ligne jusqu'à `20260825_0061` sur PostgreSQL 16 digest-pinné ; cycle complet `downgrade base` → `upgrade head` rejoué proprement.
+- Contrainte `ck_outbox_messages__status` (5 statuts) et index partiel `ux_decisions__tenant_active_key` vérifiés dans `pg_constraint`/`pg_indexes`.
+- **Suite DB complète : 461 tests passés** (`pytest -m db`) contre PostgreSQL réel, incluant triggers append-only, FKs composites, concurrence, outbox, transitions de conditions Decision et garde de soumission.
+- Gate local hors DB : **997 passed / 461 désélectionnés** ; Ruff, mypy ciblé (101 fichiers), detect-secrets, `git diff --check` passent. Frontend : typecheck, build, ESLint et **100 tests Vitest** passent.
+
+### Reste explicitement ouvert
+
+- **R-04** : couverture hors DB mesurée à **69,80 %**, sous le seuil strict 85,50 % — aucun contournement.
+- **R-12** : aucune CI GitHub avec runner exécutant ; ne pas fusionner PR #50 avant un run complet avec étapes et artifacts.
+- Recettes VPS/Docker préproduction (ClamAV/EICAR, HTTPS, backup/restauration opérée) non exécutées dans cet environnement ; le script de restauration vérifie désormais head Alembic, table de transitions et trigger append-only.

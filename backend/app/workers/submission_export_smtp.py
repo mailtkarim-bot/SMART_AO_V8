@@ -33,6 +33,7 @@ class SmtpRunResult:
     skipped: int = 0
     retried: int = 0
     failed: int = 0
+    not_configured: int = 0
 
 
 class SubmissionExportSmtpWorker:
@@ -98,7 +99,7 @@ class SubmissionExportSmtpWorker:
             if package_id is None:
                 return self._retry(message_id, now, "INVALID_EXPORT_EMAIL_PAYLOAD")
             if self._notifier is None or self._recipient is None:
-                return self._publish(message_id, now, skipped=True)
+                return self._mark_not_configured(message_id, now, "SMTP_NOT_CONFIGURED")
         try:
             await self._notifier.send_export_ready(
                 recipient=self._recipient,
@@ -120,6 +121,20 @@ class SubmissionExportSmtpWorker:
             message.next_attempt_at = None
             message.last_error_code = None
         return SmtpRunResult(skipped=1) if skipped else SmtpRunResult(delivered=1)
+
+    def _mark_not_configured(
+        self, message_id: UUID, now: datetime, error_code: str
+    ) -> SmtpRunResult:
+        """Record an honest terminal state instead of a fake PUBLISHED success."""
+        with self._session_factory.begin() as session:
+            message = session.get(OutboxMessageRecord, message_id, with_for_update=True)
+            if message is None or message.status not in ("PENDING", "RETRY"):
+                return SmtpRunResult(skipped=1)
+            message.status = "NOT_CONFIGURED"
+            message.published_at = None
+            message.next_attempt_at = None
+            message.last_error_code = error_code
+        return SmtpRunResult(not_configured=1)
 
     def _retry(self, message_id: UUID, now: datetime, error_code: str) -> SmtpRunResult:
         with self._session_factory.begin() as session:
@@ -163,6 +178,7 @@ def _merge(first: SmtpRunResult, second: SmtpRunResult) -> SmtpRunResult:
         skipped=first.skipped + second.skipped,
         retried=first.retried + second.retried,
         failed=first.failed + second.failed,
+        not_configured=first.not_configured + second.not_configured,
     )
 
 

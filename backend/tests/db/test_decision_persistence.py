@@ -162,7 +162,11 @@ def test_active_decision_key_has_a_database_unique_index(database_engine: sa.Eng
     normalized = " ".join(str(index_definition).lower().split())
     assert "unique index" in normalized
     assert "(tenant_id, decision_key_hash)" in normalized
-    assert "validity = 'current'" in normalized
+    where_clause = normalized.split(" where ", 1)[1] if " where " in normalized else ""
+    assert "validity" in where_clause
+    assert "current" in where_clause
+    assert "superseded" in where_clause
+    assert "cancelled" in where_clause
 
 
 @pytest.mark.db

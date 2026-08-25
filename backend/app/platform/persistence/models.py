@@ -142,7 +142,7 @@ class OutboxMessageRecord(TenantScopedRecord, Base):
         ),
         sa.UniqueConstraint("event_id", "topic", name="uq_outbox_messages__event_topic"),
         sa.CheckConstraint(
-            "status IN ('PENDING', 'PUBLISHED', 'RETRY', 'FAILED')",
+            "status IN ('PENDING', 'PUBLISHED', 'RETRY', 'FAILED', 'NOT_CONFIGURED')",
             name="status",
         ),
         sa.Index(

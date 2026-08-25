@@ -51,6 +51,8 @@ class PricingImportPreview:
     valid_row_count: int
     error_count: int
     total_minor: int
+    truncated: bool
+    limit_reason: str | None
     rows: tuple[PricingImportRow, ...]
 
 
@@ -104,8 +106,11 @@ class PricingImportPreviewService:
             parsed: list[PricingImportRow] = []
             total_minor = 0
             errors = 0
+            rows_budget_reached = False
+            errors_budget_reached = False
             for row_number, values in enumerate(rows, start=2):
                 if row_number > MAX_ROWS + 1:
+                    rows_budget_reached = True
                     break
                 if not any(value not in (None, "") for value in values):
                     continue
@@ -115,7 +120,14 @@ class PricingImportPreviewService:
                 if not item.errors and item.total_minor is not None:
                     total_minor += item.total_minor
                 if errors >= MAX_ERRORS:
+                    errors_budget_reached = True
                     break
+            truncated = (rows_budget_reached or errors_budget_reached) and _has_remaining_rows(
+                rows
+            )
+            limit_reason: str | None = None
+            if truncated:
+                limit_reason = "ROW_LIMIT" if rows_budget_reached else "ERROR_LIMIT"
             return PricingImportPreview(
                 case_id=case_id,
                 document_kind=document_kind,
@@ -124,6 +136,8 @@ class PricingImportPreviewService:
                 valid_row_count=sum(not item.errors for item in parsed),
                 error_count=errors,
                 total_minor=total_minor,
+                truncated=truncated,
+                limit_reason=limit_reason,
                 rows=tuple(parsed),
             )
         finally:
@@ -160,6 +174,12 @@ def _check_archive_uncompressed_size(archive: ZipFile) -> None:
                 total_bytes += len(chunk)
                 if total_bytes > MAX_UNCOMPRESSED_BYTES:
                     raise ValueError("IMPORT_ARCHIVE_TOO_LARGE")
+
+
+def _has_remaining_rows(rows) -> bool:
+    return any(
+        any(value not in (None, "") for value in values) for values in rows
+    )
 
 
 def _normalize_header(value: object) -> str:

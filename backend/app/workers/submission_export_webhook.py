@@ -36,6 +36,7 @@ class WebhookRunResult:
     skipped: int = 0
     retried: int = 0
     failed: int = 0
+    not_configured: int = 0
 
 
 class SubmissionExportWebhookWorker:
@@ -103,7 +104,7 @@ class SubmissionExportWebhookWorker:
             if payload is None:
                 return self._retry(message_id, now, "INVALID_EXPORT_PAYLOAD")
             if self._webhook_url is None:
-                return self._publish(message_id, now, skipped=True)
+                return self._mark_not_configured(message_id, now, "WEBHOOK_NOT_CONFIGURED")
             if not self._webhook_secret:
                 return self._retry(message_id, now, "EXPORT_WEBHOOK_CONFIGURATION_INVALID")
         try:
@@ -132,6 +133,20 @@ class SubmissionExportWebhookWorker:
             message.next_attempt_at = None
             message.last_error_code = None
         return WebhookRunResult(skipped=1) if skipped else WebhookRunResult(delivered=1)
+
+    def _mark_not_configured(
+        self, message_id: UUID, now: datetime, error_code: str
+    ) -> WebhookRunResult:
+        """Record an honest terminal state instead of a fake PUBLISHED success."""
+        with self._session_factory.begin() as session:
+            message = session.get(OutboxMessageRecord, message_id, with_for_update=True)
+            if message is None or message.status not in ("PENDING", "RETRY"):
+                return WebhookRunResult(skipped=1)
+            message.status = "NOT_CONFIGURED"
+            message.published_at = None
+            message.next_attempt_at = None
+            message.last_error_code = error_code
+        return WebhookRunResult(not_configured=1)
 
     def _retry(self, message_id: UUID, now: datetime, error_code: str) -> WebhookRunResult:
         with self._session_factory.begin() as session:
@@ -214,6 +229,7 @@ def _merge(first: WebhookRunResult, second: WebhookRunResult) -> WebhookRunResul
         skipped=first.skipped + second.skipped,
         retried=first.retried + second.retried,
         failed=first.failed + second.failed,
+        not_configured=first.not_configured + second.not_configured,
     )
 
 

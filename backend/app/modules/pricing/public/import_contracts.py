@@ -81,6 +81,8 @@ class PricingImportPreviewResponse(BaseModel):
     valid_row_count: int = Field(ge=0)
     error_count: int = Field(ge=0)
     total_minor: int = Field(ge=0)
+    truncated: bool = Field(default=False)
+    limit_reason: Literal["ROW_LIMIT", "ERROR_LIMIT"] | None = Field(default=None)
     rows: list[PricingImportRowResponse]
     batch_id: UUID | None = None
     state: Literal["PREVIEWED"] | None = None

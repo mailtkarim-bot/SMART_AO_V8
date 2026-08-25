@@ -74,7 +74,7 @@ def test_smtp_retry_backoff_is_bounded(attempt_count: int) -> None:
     assert _retry_delay(attempt_count).total_seconds() <= 3600
 
 
-def test_disabled_smtp_publishes_without_calling_notifier() -> None:
+def test_disabled_smtp_records_not_configured_without_calling_notifier() -> None:
     message = _message()
     notifier = FakeNotifier()
     worker = SubmissionExportSmtpWorker(
@@ -85,8 +85,10 @@ def test_disabled_smtp_publishes_without_calling_notifier() -> None:
 
     result = asyncio.run(worker._process_message(message.id, NOW))
 
-    assert result.skipped == 1
-    assert message.status == "PUBLISHED"
+    assert result.not_configured == 1
+    assert message.status == "NOT_CONFIGURED"
+    assert message.published_at is None
+    assert message.last_error_code == "SMTP_NOT_CONFIGURED"
     assert notifier.calls == []
 
 
