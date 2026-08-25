@@ -28,14 +28,14 @@ NOW = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
 
 
 def test_totp_matches_rfc6238_sha1_vector() -> None:
-    secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+    secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"  # pragma: allowlist secret
     assert _totp_code(secret, 59 // 30) == "287082"
     assert _matching_counter(secret=secret, code="287082", now=datetime.fromtimestamp(59, UTC)) == 1
 
 
 def test_otpauth_uri_is_standard_and_encodes_account() -> None:
     uri = _otpauth_uri(
-        secret="JBSWY3DPEHPK3PXP",
+        secret="JBSWY3DPEHPK3PXP",  # pragma: allowlist secret
         issuer="SMART_AO",
         account="patron@example.test",
     )
