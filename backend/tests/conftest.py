@@ -31,7 +31,7 @@ def database_engine() -> sa.Engine:
         cleanup_engine = sa.create_engine(DATABASE_URL)
         try:
             with cleanup_engine.begin() as connection:
-                connection.execute(sa.text("DELETE FROM security_audit_events"))
+                connection.execute(sa.text("TRUNCATE TABLE security_audit_events CASCADE"))
         finally:
             cleanup_engine.dispose()
         command.downgrade(config, "base")
