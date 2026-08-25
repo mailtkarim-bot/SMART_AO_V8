@@ -301,7 +301,7 @@ def _new_secret() -> str:
 
 
 def _new_recovery_code() -> str:
-    raw = secrets.token_hex(8).upper()
+    raw = secrets.token_hex(6).upper()
     return f"{raw[:4]}-{raw[4:8]}-{raw[8:]}"
 
 
