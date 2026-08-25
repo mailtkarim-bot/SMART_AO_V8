@@ -341,6 +341,31 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  cockpit-projection-worker:
+    profiles: ["cockpit-projection"]
+    build:
+      context: ..
+      dockerfile: ops/docker/backend.Dockerfile
+    command: python -m app.workers.cockpit_projection
+    restart: unless-stopped
+    logging: *default-logging
+    init: true
+    environment:
+      SMART_AO_ENV: preproduction
+      SMART_AO_DATABASE_URL: ${SMART_AO_DATABASE_URL:?SMART_AO_DATABASE_URL is required}
+      PGPASSWORD: ${PGPASSWORD:?PGPASSWORD is required}
+      SMART_AO_COCKPIT_PROJECTION_ENABLED: ${SMART_AO_COCKPIT_PROJECTION_ENABLED:-0}
+      SMART_AO_COCKPIT_PROJECTION_POLL_SECONDS: ${SMART_AO_COCKPIT_PROJECTION_POLL_SECONDS:-30}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+
   postgres:
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
