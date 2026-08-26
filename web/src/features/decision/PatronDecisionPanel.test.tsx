@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import type { PatronDecisionDossier } from "../../shared/types";
 import { PatronDecisionPanel } from "./PatronDecisionPanel";
@@ -34,6 +34,17 @@ const decisionDossier: PatronDecisionDossier = {
       role: "TECHNICAL_PREPARATION",
     },
   ],
+  context_fingerprint: null,
+};
+
+const frozenDecisionDossier: PatronDecisionDossier = {
+  ...decisionDossier,
+  lifecycle: "PENDING_PATRON",
+  outcome: "UNDECIDED",
+  context_status: "FROZEN",
+  final_justification: null,
+  context_fingerprint: "b".repeat(64),
+  conditions: [],
 };
 
 describe("PatronDecisionPanel", () => {
@@ -55,5 +66,32 @@ describe("PatronDecisionPanel", () => {
     expect(screen.getByText(/Échéance 1 sept\. 2026/)).toBeInTheDocument();
     expect(screen.getByText("PreparationPackage")).toBeInTheDocument();
     expect(screen.queryByText(/montant|marge|prix/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Finaliser et enregistrer" })).not.toBeInTheDocument();
+  });
+
+  it("submits the server fingerprint for a frozen patron decision", () => {
+    const onFinalize = vi.fn();
+    render(
+      <PatronDecisionPanel
+        decisionDossier={frozenDecisionDossier}
+        formatDate={() => ""}
+        canManage
+        onFinalize={onFinalize}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Issue"), { target: { value: "NO_GO" } });
+    fireEvent.change(screen.getByLabelText("Justification finale"), {
+      target: { value: "Décision motivée après revue patronale." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Finaliser et enregistrer" }));
+
+    expect(onFinalize).toHaveBeenCalledWith({
+      expected_revision: 1,
+      displayed_fingerprint: "b".repeat(64),
+      outcome: "NO_GO",
+      justification: "Décision motivée après revue patronale.",
+      conditions: [],
+    });
   });
 });

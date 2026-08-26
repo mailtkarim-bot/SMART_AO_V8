@@ -124,6 +124,7 @@ class SqlAlchemyDecisionDossierReader:
                     id=context.id,
                     canonical_context_json=context.canonical_context_json,
                     unknowns_json=tuple(context.unknowns_json),
+                    context_fingerprint=context.context_fingerprint,
                 ),
                 references=references,
                 conditions=conditions,

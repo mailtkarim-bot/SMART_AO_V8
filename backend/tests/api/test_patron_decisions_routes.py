@@ -94,6 +94,7 @@ class _Dossier:
     risks: tuple[object, ...]
     conditions: tuple[dict[str, object], ...]
     sources: tuple[dict[str, object], ...]
+    context_fingerprint: str | None = None
 
 
 def _dossier(case_id):
@@ -127,6 +128,7 @@ def _dossier(case_id):
                 "role": "PRIMARY",
             },
         ),
+        context_fingerprint="c" * 64,
     )
 
 
@@ -771,6 +773,7 @@ def test_read_decision_dossier_returns_frozen_projection():
     assert body["context_status"] == "FROZEN"
     assert body["conditions"][0]["status"] == "OPEN"
     assert body["sources"][0]["aggregate_type"] == "PREPARATION_SNAPSHOT"
+    assert body["context_fingerprint"] == "c" * 64
     assert "gross_margin_minor" not in body
     assert "total_cost_minor" not in body
 

@@ -3,6 +3,7 @@ import type {
   FreezeDecisionContextRequest,
   PatronDecisionDossier,
   ResolveDecisionConditionRequest,
+  FinalizeGoNoGoDecisionRequest,
 } from "../../shared/types";
 
 type PatronDecisionPanelProps = {
@@ -12,6 +13,7 @@ type PatronDecisionPanelProps = {
   onCreateDecision?: () => void;
   onFreezeContext?: (input: FreezeDecisionContextRequest) => void;
   onResolveCondition?: (conditionId: string, input: ResolveDecisionConditionRequest) => void;
+  onFinalize?: (input: FinalizeGoNoGoDecisionRequest) => void;
 };
 
 const emptyReferences = "[]";
@@ -23,6 +25,7 @@ export function PatronDecisionPanel({
   onCreateDecision,
   onFreezeContext,
   onResolveCondition,
+  onFinalize,
 }: PatronDecisionPanelProps) {
   const [contextId, setContextId] = useState("");
   const [rationale, setRationale] = useState("");
@@ -31,6 +34,10 @@ export function PatronDecisionPanel({
   const [resolutionValues, setResolutionValues] = useState<
     Record<string, { targetStatus: "SATISFIED" | "FAILED"; evidence: string; reason: string }>
   >({});
+  const [finalOutcome, setFinalOutcome] = useState<FinalizeGoNoGoDecisionRequest["outcome"]>("GO");
+  const [finalJustification, setFinalJustification] = useState("");
+  const [conditionsJson, setConditionsJson] = useState("[]");
+  const [finalizationError, setFinalizationError] = useState<string | null>(null);
 
   function submitFreeze() {
     if (!decisionDossier || !onFreezeContext || !contextId.trim() || !rationale.trim()) return;
@@ -60,6 +67,27 @@ export function PatronDecisionPanel({
       evidence_reference: values.targetStatus === "SATISFIED" ? values.evidence.trim() : undefined,
       failure_reason: values.targetStatus === "FAILED" ? values.reason.trim() : undefined,
     });
+  }
+
+  function submitFinalization() {
+    if (!decisionDossier || !onFinalize || !decisionDossier.context_fingerprint || !finalJustification.trim()) return;
+    try {
+      const conditions = JSON.parse(conditionsJson) as FinalizeGoNoGoDecisionRequest["conditions"];
+      if (!Array.isArray(conditions)) throw new Error("Les conditions doivent être un tableau JSON.");
+      if (finalOutcome === "CONDITIONAL_GO" && conditions.length === 0) {
+        throw new Error("Un GO conditionnel exige au moins une condition.");
+      }
+      setFinalizationError(null);
+      onFinalize({
+        expected_revision: decisionDossier.aggregate_revision,
+        displayed_fingerprint: decisionDossier.context_fingerprint,
+        outcome: finalOutcome,
+        justification: finalJustification.trim(),
+        conditions: finalOutcome === "CONDITIONAL_GO" ? conditions : [],
+      });
+    } catch (error) {
+      setFinalizationError(error instanceof Error ? error.message : "Conditions JSON invalides.");
+    }
   }
 
   function updateResolution(
@@ -155,6 +183,42 @@ export function PatronDecisionPanel({
                 </button>
               </div>
             )}
+            {canManage &&
+              decisionDossier.lifecycle === "PENDING_PATRON" &&
+              decisionDossier.context_status === "FROZEN" &&
+              decisionDossier.outcome === "UNDECIDED" &&
+              decisionDossier.context_fingerprint &&
+              onFinalize && (
+                <div className="decision-form finalization-form">
+                  <h4>Finaliser la décision</h4>
+                  <p>
+                    Le fingerprint serveur est injecté automatiquement. Toute modification du contexte
+                    sera refusée côté serveur comme contexte obsolète.
+                  </p>
+                  <label>
+                    Issue
+                    <select value={finalOutcome} onChange={(event) => setFinalOutcome(event.target.value as FinalizeGoNoGoDecisionRequest["outcome"])}>
+                      <option value="GO">GO</option>
+                      <option value="CONDITIONAL_GO">GO conditionnel</option>
+                      <option value="NO_GO">NO-GO</option>
+                    </select>
+                  </label>
+                  <label>
+                    Justification finale
+                    <textarea value={finalJustification} onChange={(event) => setFinalJustification(event.target.value)} rows={4} />
+                  </label>
+                  {finalOutcome === "CONDITIONAL_GO" && (
+                    <label>
+                      Conditions JSON
+                      <textarea value={conditionsJson} onChange={(event) => setConditionsJson(event.target.value)} rows={6} spellCheck={false} />
+                    </label>
+                  )}
+                  {finalizationError && <p className="form-error" role="alert">{finalizationError}</p>}
+                  <button className="primary-button" onClick={submitFinalization} disabled={!finalJustification.trim()}>
+                    Finaliser et enregistrer
+                  </button>
+                </div>
+              )}
             {!canManage && <p className="panel-empty">Lecture seule : la validation Decision est réservée au patron administrateur.</p>}
           </div>
           <div className="detail-panel">

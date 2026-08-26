@@ -27,14 +27,13 @@ class PatronDecisionDossier:
     risks: tuple[object, ...]
     conditions: tuple[dict[str, object], ...]
     sources: tuple[dict[str, object], ...]
+    context_fingerprint: str | None = None
 
 
 class PatronDecisionDossierService:
     """Read-only patron projection of one frozen decision context."""
 
-    def __init__(
-        self, *, reader: DecisionDossierReader, policy: AuthorizationPolicyPort
-    ) -> None:
+    def __init__(self, *, reader: DecisionDossierReader, policy: AuthorizationPolicyPort) -> None:
         self._reader = reader
         self._policy = policy
 
@@ -77,6 +76,7 @@ class PatronDecisionDossierService:
                 risks=(),
                 conditions=(),
                 sources=(),
+                context_fingerprint=None,
             )
 
         canonical = lookup.context.canonical_context_json
@@ -112,6 +112,7 @@ class PatronDecisionDossierService:
                 }
                 for item in lookup.references
             ),
+            context_fingerprint=lookup.context.context_fingerprint,
         )
 
 
