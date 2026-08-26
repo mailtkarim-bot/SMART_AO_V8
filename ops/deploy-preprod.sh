@@ -54,10 +54,35 @@ compose() {
   docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "$@"
 }
 
+validate_ocr_configuration() {
+  case "${SMART_AO_OCR_ENABLED:-0}:${SMART_AO_INSTALL_DOCUMENT_OCR:-0}" in
+    0:0|0:1)
+      return 0
+      ;;
+    1:1)
+      ;;
+    1:0)
+      fail "SMART_AO_OCR_ENABLED=1 requires SMART_AO_INSTALL_DOCUMENT_OCR=1"
+      ;;
+    *)
+      fail "SMART_AO_OCR_ENABLED and SMART_AO_INSTALL_DOCUMENT_OCR must be 0 or 1"
+      ;;
+  esac
+  for variable in SMART_AO_OCR_DET_MODEL_PATH SMART_AO_OCR_CLS_MODEL_PATH SMART_AO_OCR_REC_MODEL_PATH SMART_AO_OCR_REC_KEYS_PATH; do
+    [[ -n "${!variable:-}" ]] || fail "${variable} is required when OCR is enabled"
+  done
+}
+
+validate_ocr_runtime() {
+  [[ "${SMART_AO_OCR_ENABLED:-0}" == "1" ]] || return 0
+  compose run --rm --no-deps backend python -c 'import os,sys; paths={name:os.environ.get(name,"") for name in ("SMART_AO_OCR_DET_MODEL_PATH","SMART_AO_OCR_CLS_MODEL_PATH","SMART_AO_OCR_REC_MODEL_PATH","SMART_AO_OCR_REC_KEYS_PATH")}; missing=[f"{name}={path}" for name,path in paths.items() if not path or not os.path.isfile(path) or not os.access(path,os.R_OK)]; print("ERROR: OCR local model or dictionary is missing/unreadable: " + ", ".join(missing), file=sys.stderr) if missing else print("OCR local model and dictionary preflight passed"); sys.exit(1) if missing else None'
+}
+
 validate() {
   require_command docker
   docker compose version >/dev/null
   load_environment
+  validate_ocr_configuration
   compose config --quiet
   compose config | awk '/^[[:space:]]+image:/{print $2}' | while read -r image; do
     [[ "${image}" == *@sha256:* ]] || fail "unpinned image in resolved Compose: ${image}"
@@ -94,6 +119,7 @@ deploy() {
   flock -n 9 || fail "another deployment is already running: ${LOCK_FILE}"
   compose pull caddy postgres clamav
   compose build --pull backend submission-export-webhook-worker submission-export-smtp-worker frontend
+  validate_ocr_runtime
   compose up -d postgres clamav
   wait_postgres
   if compose exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname = 'public'" | grep -q '^0$'; then

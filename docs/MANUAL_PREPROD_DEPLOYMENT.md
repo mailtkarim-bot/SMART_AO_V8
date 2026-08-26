@@ -74,7 +74,7 @@ docker compose --env-file ops/.env.preprod -f ops/docker-compose.preprod.yml \
   config --images | tee "artifacts/images-$(date -u +%Y%m%dT%H%M%SZ).txt"
 ```
 
-Le contrôle est bloquant si une image n’est pas digest-pinnée, si Caddy est invalide, si un placeholder subsiste, si le fichier de configuration n’est pas en `0600` ou si PostgreSQL/ClamAV disposent d’un port publié.
+Le contrôle est bloquant si une image n’est pas digest-pinnée, si Caddy est invalide, si un placeholder subsiste, si le fichier de configuration n’est pas en `0600` ou si PostgreSQL/ClamAV disposent d’un port publié. Le script vérifie également la cohérence des flags OCR ; lorsque l’OCR est activé, l’installation de l’extra OCR doit l’être aussi et les chemins de modèles/dictionnaire seront revalidés dans le conteneur après construction.
 
 ## 4. Déployer avec backup préalable et migration
 
@@ -86,7 +86,7 @@ ops/deploy-preprod.sh deploy \
   2>&1 | tee "artifacts/deploy-$(date -u +%Y%m%dT%H%M%SZ).log"
 ```
 
-Ne définir `SMART_AO_ALLOW_EMPTY_BACKUP=1` que lors d’une première base staging explicitement approuvée et documentée. En cas d’échec, conserver le log, le backup et l’état des conteneurs. Le script ne lance aucun `alembic downgrade` automatique.
+Ne définir `SMART_AO_ALLOW_EMPTY_BACKUP=1` que lors d’une première base staging explicitement approuvée et documentée. En cas d’échec, conserver le log, le backup et l’état des conteneurs. Le script ne lance aucun `alembic downgrade` automatique. Si `SMART_AO_OCR_ENABLED=1`, le déploiement s’arrête avant le démarrage applicatif si l’un des trois modèles ONNX ou le dictionnaire local est absent ou illisible dans le volume monté.
 
 ## 5. Vérifier conteneurs, migration et réseau
 
