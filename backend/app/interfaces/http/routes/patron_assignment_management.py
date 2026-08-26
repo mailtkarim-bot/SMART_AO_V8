@@ -19,7 +19,7 @@ from app.modules.dce.public.contracts import (
     SuspendPatronCaseAssignmentRequest,
     ValidatePatronAssignmentInteractionRequest,
 )
-from app.modules.membership.application.patron_assignment import PatronAssignmentManagementService
+from app.modules.membership.application.mutation_service import MembershipMutationService
 from app.platform.events.dispatcher import (
     CommandExecutionError,
     CommandInProgressError,
@@ -47,7 +47,7 @@ _PATRON_ASSIGNMENT_EXTRA_RESPONSES = {
 
 def build_patron_assignment_management_router(
     *,
-    service: PatronAssignmentManagementService,
+    service: MembershipMutationService,
     security_runtime: ConsultationSecurityRuntime,
 ) -> APIRouter:
     """Expose only the patron commands implemented in the application layer."""
