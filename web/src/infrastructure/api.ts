@@ -576,6 +576,15 @@ export function createApiClient(
           body: JSON.stringify({ command_id: makeId(), idempotency_key: makeId(), ...input }),
         },
       ),
+    getGeneratedDocumentContent: (
+      packageId: string,
+      documentId: string,
+      download = false,
+    ): Promise<Blob> =>
+      requestBlob(
+        `/api/v1/collaborator/preparation/${encodeURIComponent(packageId)}/documents/${encodeURIComponent(documentId)}/content${download ? "?download=true" : ""}`,
+        { headers: { Accept: "text/markdown" } },
+      ),
     generateTechnicalDocument: (
       packageId: string,
       input: {

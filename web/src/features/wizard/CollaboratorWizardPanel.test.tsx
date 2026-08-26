@@ -58,6 +58,9 @@ function renderPanel(
     wizardOutcome: "RECORDED",
     wizardSnapshotId: "",
     wizardTransmissionId: "",
+    wizardPreviewDocumentId: null,
+    wizardPreviewContent: null,
+    wizardDocumentBusy: false,
     setWizardCaseId: vi.fn(),
     setWizardPackageId: vi.fn(),
     setWizardTaskId: vi.fn(),
@@ -72,6 +75,8 @@ function renderPanel(
     onEvaluateReadiness: vi.fn(),
     onGenerateDocument: vi.fn(),
     onTransmitSnapshot: vi.fn(),
+    onPreviewDocument: vi.fn(),
+    onDownloadDocument: vi.fn(),
     ...overrides,
   };
   return render(<CollaboratorWizardPanel {...props} />);
@@ -100,6 +105,34 @@ describe("CollaboratorWizardPanel", () => {
     expect(screen.getByText("OPTIONAL_REFERENCE_MISSING")).toBeInTheDocument();
     expect(screen.getByText("TECHNICAL_RESPONSE")).toBeInTheDocument();
     expect(screen.getByText("Enregistrer le résultat")).toBeInTheDocument();
+  });
+
+  it("delegates document preview and download actions", () => {
+    const onPreviewDocument = vi.fn();
+    const onDownloadDocument = vi.fn();
+    renderPanel({
+      wizardPackage: packageProjection,
+      onPreviewDocument,
+      onDownloadDocument,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Aperçu" }));
+    fireEvent.click(screen.getByRole("button", { name: "Télécharger" }));
+
+    expect(onPreviewDocument).toHaveBeenCalledWith("document-1");
+    expect(onDownloadDocument).toHaveBeenCalledWith("document-1");
+  });
+
+  it("renders the selected document preview without exposing storage metadata", () => {
+    renderPanel({
+      wizardPackage: packageProjection,
+      wizardPreviewDocumentId: "document-1",
+      wizardPreviewContent: "# Réponse technique\n\nContenu contrôlé",
+    });
+
+    expect(screen.getByRole("heading", { name: "Aperçu du document sélectionné" })).toBeInTheDocument();
+    expect(screen.getByText(/# Réponse technique/)).toBeInTheDocument();
+    expect(screen.queryByText(/storage_key|content_sha256/)).not.toBeInTheDocument();
   });
 
   it("delegates task, readiness and transmission actions without external deposit semantics", () => {

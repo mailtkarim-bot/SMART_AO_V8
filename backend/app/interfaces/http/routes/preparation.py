@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.interfaces.http.dependencies.auth import resolve_bearer_context as _resolve_context
 from app.interfaces.http.routes.consultations import ConsultationSecurityRuntime
@@ -96,6 +96,53 @@ def build_preparation_router(
                 )
                 for document in documents
             ],
+        )
+
+    @router.get(
+        "/preparation/{package_id}/documents/{document_id}/content",
+        responses={
+            200: {"description": "Contenu Markdown privé d’un document généré."},
+            401: {"description": "Bearer absent, invalide ou expiré."},
+            403: {"description": "Document réservé au collaborateur affecté."},
+            404: {"description": "Package ou document absent du tenant."},
+            503: {"description": "Contenu privé temporairement indisponible."},
+        },
+    )
+    def read_generated_document(
+        package_id: UUID,
+        document_id: UUID,
+        download: bool = False,
+        authorization: str | None = Header(default=None),
+    ) -> StreamingResponse:
+        actor = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        try:
+            document, content = service.read_generated_document(
+                actor=actor,
+                package_id=package_id,
+                document_id=document_id,
+                now=datetime.now(tz=UTC),
+            )
+        except PermissionError as error:
+            if str(error) == "NOT_FOUND_OR_FORBIDDEN":
+                raise HTTPException(status_code=404, detail="NOT_FOUND_OR_FORBIDDEN") from error
+            raise HTTPException(status_code=403, detail="FORBIDDEN") from error
+        except RuntimeError as error:
+            if str(error) == "GENERATED_DOCUMENT_UNAVAILABLE":
+                raise HTTPException(status_code=503, detail="DOCUMENT_UNAVAILABLE") from error
+            raise
+        disposition = "attachment" if download else "inline"
+        filename = f"{document.document_kind.lower()}-v{document.version}.md"
+        return StreamingResponse(
+            iter((content,)),
+            media_type="text/markdown",
+            headers={
+                "Content-Disposition": f'{disposition}; filename="{filename}"',
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+            },
         )
 
     @router.post(

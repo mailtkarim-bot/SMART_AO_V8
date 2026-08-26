@@ -186,6 +186,64 @@ class PreparationService:
             )
             return package, readiness, documents
 
+    def read_generated_document(
+        self, *, actor: ActorContext, package_id: UUID, document_id: UUID, now: datetime
+    ) -> tuple[GeneratedTechnicalDocumentRecord, bytes]:
+        """Read one generated document only through its authorized package."""
+        if actor.actor_kind is not ActorKind.COLLABORATEUR or actor.membership_id is None:
+            raise PermissionError("COLLABORATOR_REQUIRED")
+        with self._session_factory() as session:
+            package = session.scalar(
+                sa.select(PreparationPackageRecord).where(
+                    PreparationPackageRecord.tenant_id == actor.tenant_id,
+                    PreparationPackageRecord.id == package_id,
+                )
+            )
+            if package is None:
+                raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+            assignment = session.scalar(
+                sa.select(CaseAssignmentRecord).where(
+                    CaseAssignmentRecord.tenant_id == actor.tenant_id,
+                    CaseAssignmentRecord.id == package.assignment_id,
+                    CaseAssignmentRecord.case_id == package.case_id,
+                    CaseAssignmentRecord.membership_id == actor.membership_id,
+                    CaseAssignmentRecord.state == "ACTIVE",
+                )
+            )
+            if assignment is None:
+                raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+            decision = self._policy.authorize(
+                context=actor,
+                request=AuthorizationRequest(
+                    action=Capability.PREPARATION_READINESS_WRITE,
+                    resource=AuthorizationResource(
+                        resource_type="PREPARATION_PACKAGE",
+                        resource_id=package.id,
+                        tenant_id=actor.tenant_id,
+                        classification=DataClassification.INTERNAL_OPERATIONAL,
+                        case_id=package.case_id,
+                    ),
+                    evaluated_at=now,
+                ),
+            )
+            if not decision.allowed:
+                raise PermissionError(decision.code)
+            document = session.scalar(
+                sa.select(GeneratedTechnicalDocumentRecord).where(
+                    GeneratedTechnicalDocumentRecord.tenant_id == actor.tenant_id,
+                    GeneratedTechnicalDocumentRecord.id == document_id,
+                    GeneratedTechnicalDocumentRecord.package_id == package.id,
+                    GeneratedTechnicalDocumentRecord.state == "GENERATED",
+                )
+            )
+            if document is None:
+                raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+            try:
+                content = self._storage.read(storage_key=document.storage_key)
+            except FileNotFoundError as error:
+                raise RuntimeError("GENERATED_DOCUMENT_UNAVAILABLE") from error
+            return document, content
+
     def _resolve_assignment(self, *, actor: ActorContext, command) -> CaseAssignmentRecord | None:
         with self._session_factory() as session:
             if command.command_type == "GenerateTechnicalDocument":
