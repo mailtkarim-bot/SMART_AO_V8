@@ -225,6 +225,46 @@ export type PatronDecisionDossier = {
   sources: Array<{ aggregate_type: string; aggregate_id: string; aggregate_revision: number; role: string }>;
 };
 
+export type DecisionRiskRequirementLink = {
+  link_id: string;
+  case_id: string;
+  risk_id: string;
+  requirement_id: string;
+  dce_version_id: string;
+  relationship: string;
+  rationale: string;
+  source_refs: string[];
+  created_at: string;
+  action_id: string | null;
+  action_state: string | null;
+  action_severity: string | null;
+  action_revision: number | null;
+};
+
+export type DecisionRiskRequirementPage = {
+  items: DecisionRiskRequirementLink[];
+  next_cursor: string | null;
+};
+
+export type DecisionPricingReconciliationItem = {
+  link_id: string;
+  batch_id: string;
+  document_kind: string;
+  batch_state: string;
+  row_number: number;
+  code: string | null;
+  designation: string | null;
+  unit: string | null;
+  match_basis: string;
+  verification_status: string;
+};
+
+export type DecisionPricingReconciliationResponse = {
+  link_id: string;
+  search: string;
+  items: DecisionPricingReconciliationItem[];
+};
+
 export type PricingScenario = {
   scenario_id: string;
   case_id: string;
