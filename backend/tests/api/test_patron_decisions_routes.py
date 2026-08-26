@@ -190,9 +190,7 @@ class _RiskTreatmentService:
             command_id=str(command.command_id),
             idempotency_key=str(command.idempotency_key),
             result_code="DECISION_RISK_TREATMENT_TRANSITIONED",
-            aggregate_refs=[
-                {"aggregate_id": str(command.risk_id), "aggregate_revision": 2}
-            ],
+            aggregate_refs=[{"aggregate_id": str(command.risk_id), "aggregate_revision": 2}],
             event_ids=[str(uuid4())],
             replayed=False,
         )
@@ -294,6 +292,28 @@ class _ReadService:
                 unit="m3",
                 match_basis="CODE_OR_DESIGNATION",
                 verification_status="COMMITTED_NORMALIZED_IMPORT",
+            ),
+        )
+
+    def cross_cctp_pricing(self, **kwargs):
+        if self.error is not None:
+            raise self.error
+        return (
+            SimpleNamespace(
+                dce_version_id=uuid4(),
+                source_fragment_id=uuid4(),
+                source_locator_label="CCTP · page 4",
+                source_start_byte_offset=0,
+                source_end_byte_offset=68,
+                batch_id=uuid4(),
+                document_kind="BPU",
+                row_number=8,
+                code="VOI-001",
+                designation="Voile béton armé",
+                unit="m2",
+                match_score_bps=8500,
+                match_basis="NORMALIZED_TOKEN_OVERLAP",
+                verification_status="REVIEW_REQUIRED",
             ),
         )
 
@@ -454,9 +474,7 @@ def test_register_risk_returns_closed_patron_receipt_and_forwards_case_from_path
 
 
 def test_register_risk_maps_permission_error_to_403():
-    response = _client(
-        risk_service=_RiskService(error=PermissionError("PATRON_REQUIRED"))
-    ).post(
+    response = _client(risk_service=_RiskService(error=PermissionError("PATRON_REQUIRED"))).post(
         f"/api/v1/patron/cases/{uuid4()}/risks",
         json=_risk_payload(),
         headers=_headers(),
@@ -612,6 +630,23 @@ def test_reconcile_pricing_returns_no_monetary_columns():
     assert response.status_code == 200
     item = response.json()["items"][0]
     assert item["document_kind"] == "DPGF"
+    assert "unit_price_minor" not in item
+    assert "total_minor" not in item
+
+
+def test_cctp_pricing_crossing_returns_provenance_and_review_status_without_money():
+    case_id = uuid4()
+    response = _client(risk_requirement_read_service=_ReadService()).get(
+        f"/api/v1/patron/cases/{case_id}/cctp-pricing-crossing?limit=10",
+        headers=_headers(),
+    )
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["source_locator_label"] == "CCTP · page 4"
+    assert item["verification_status"] == "REVIEW_REQUIRED"
+    assert item["match_score_bps"] == 8500
+    assert "quantity_decimal" not in item
     assert "unit_price_minor" not in item
     assert "total_minor" not in item
 
