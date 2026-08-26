@@ -207,12 +207,37 @@ def test_collaborator_preparation_readiness_generation_and_public_projection(
     assert document.status_code == 201
     assert document.json()["result_code"] == "TECHNICAL_DOCUMENT_GENERATED"
 
+    generated_controlled = []
+    for expected_revision, document_kind in ((3, "DC1"), (4, "DC2"), (5, "DC4")):
+        controlled = client.post(
+            f"/api/v1/collaborator/preparation/{package_id}/documents",
+            json={
+                "command_id": str(uuid4()),
+                "idempotency_key": str(uuid4()),
+                "correlation_id": str(uuid4()),
+                "expected_revision": expected_revision,
+                "readiness_revision": 2,
+                "document_kind": document_kind,
+            },
+            headers=headers,
+        )
+        assert controlled.status_code == 201
+        assert controlled.json()["result_code"] == "CONTROLLED_DRAFT_GENERATED"
+        generated_controlled.append(controlled)
+
+    assert len(generated_controlled) == 3
     projection = client.get(f"/api/v1/collaborator/preparation/{package_id}", headers=headers)
     assert projection.status_code == 200
     body = projection.json()
     assert body["state"] == "GENERATED"
     assert body["latest_readiness"]["state"] == "READY"
-    assert body["generated_documents"][0]["version"] == 1
+    assert [item["document_kind"] for item in body["generated_documents"]] == [
+        "TECHNICAL_RESPONSE",
+        "DC1",
+        "DC2",
+        "DC4",
+    ]
+    assert [item["version"] for item in body["generated_documents"]] == [1, 2, 3, 4]
     assert set(body["generated_documents"][0]) == {
         "document_id",
         "version",

@@ -484,7 +484,7 @@ export type PreparationReadiness = {
 export type GeneratedDocument = {
   document_id: string;
   version: number;
-  document_kind: "TECHNICAL_RESPONSE";
+  document_kind: "TECHNICAL_RESPONSE" | "DC1" | "DC2" | "DC4";
   state: "GENERATED" | "FAILED_SAFE";
   readiness_revision: number;
 };

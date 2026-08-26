@@ -556,7 +556,11 @@ export function createApiClient(
       ),
     generateTechnicalDocument: (
       packageId: string,
-      input: { expected_revision: number; readiness_revision: number },
+      input: {
+        expected_revision: number;
+        readiness_revision: number;
+        document_kind?: "TECHNICAL_RESPONSE" | "DC1" | "DC2" | "DC4";
+      },
     ) =>
       request<CommandReceipt>(
         `/api/v1/collaborator/preparation/${encodeURIComponent(packageId)}/documents`,
@@ -565,7 +569,7 @@ export function createApiClient(
           body: JSON.stringify({
             command_id: makeId(),
             idempotency_key: makeId(),
-            document_kind: "TECHNICAL_RESPONSE",
+            document_kind: input.document_kind ?? "TECHNICAL_RESPONSE",
             ...input,
           }),
         },
