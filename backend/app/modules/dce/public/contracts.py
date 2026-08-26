@@ -81,9 +81,7 @@ class PrepareDceStagingRequest(BaseModel):
     consultation_revision: int = Field(ge=0)
     original_filename: str = Field(min_length=1, max_length=500)
     expected_byte_size: int = Field(gt=0, le=2_000_000_000)
-    source_channel: str = Field(
-        pattern=r"^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$"
-    )
+    source_channel: str = Field(pattern=r"^(BUYER_PLATFORM|EMAIL|MANUAL_UPLOAD|RECTIFICATION)$")
     expires_at: datetime
 
 
@@ -535,3 +533,35 @@ class RecordDceRequirementConfirmationResponse(PublicResponseModel):
 
 CreateConsultationRequest = CreateConsultationCommand
 RegisterDceVersionRequest = RegisterDceVersionCommand
+
+
+class DceContractRiskSignalResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    observation_id: UUID
+    dce_version_id: UUID
+    document_family: Literal["CCAP", "CCTP"]
+    requirement_kind: Literal[
+        "CCAP_PENALTIES",
+        "CCAP_RETENTION_GUARANTEE",
+        "CCAP_GUARANTEE",
+        "CCAP_INSURANCE",
+        "CCTP_VARIANTS",
+        "CCAP_SUBCONTRACTING",
+        "CCAP_QUALIFICATIONS",
+    ]
+    rule_id: str
+    rule_version: str
+    directive: Literal["REQUIRED_SIGNAL", "OPTIONAL_SIGNAL", "UNSPECIFIED"]
+    fragment_id: UUID
+    source_locator_label: str
+    start_byte_offset: int
+    end_byte_offset: int
+    verification_status: Literal["REVIEW_REQUIRED"]
+
+
+class DceContractRiskSignalPageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    items: list[DceContractRiskSignalResponse]

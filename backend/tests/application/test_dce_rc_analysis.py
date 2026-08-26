@@ -29,7 +29,11 @@ from app.modules.dce.infrastructure.models.dce_rc_analysis import (
     DceRcRequirementSourceRecord,
 )
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
-from app.modules.dce.infrastructure.models.dce_version import DceDocumentRecord, DceVersionRecord
+from app.modules.dce.infrastructure.models.dce_version import (
+    DceDocumentClassificationRecord,
+    DceDocumentRecord,
+    DceVersionRecord,
+)
 from app.modules.dce.infrastructure.quarantine import LocalQuarantineStorageAdapter
 from app.platform.events.dispatcher import CommandContext, CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
@@ -316,6 +320,72 @@ def test_rc_analysis_is_sourced_immutable_and_replayed_without_text_leak(
         immutable_run = session.get(DceRcAnalysisRunRecord, run.id)
         assert immutable_run is not None
         immutable_run.status = "FAILED_SAFE"
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_ccap_cctp_taxonomy_is_classification_scoped_and_reproducible(
+    session_factory: sessionmaker[Session],
+    tmp_path: Path,
+) -> None:
+    source_text = (
+        "Les pénalités de retard sont applicables. "
+        "Une retenue de garantie sera prélevée. "
+        "La sous-traitance doit être déclarée par DC4."
+    )
+    storage = LocalQuarantineStorageAdapter(root=tmp_path)
+    tenant_id, document_id, dce_version_id = _seed_admitted_document(
+        session_factory,
+        storage=storage,
+        source_bytes=source_text.encode("utf-8"),
+    )
+    with session_factory.begin() as session:
+        session.add(
+            DceDocumentClassificationRecord(
+                id=uuid4(),
+                tenant_id=tenant_id,
+                dce_document_id=document_id,
+                classification="CCAP",
+                rationale="Fixture classification.",
+                source="TEST",
+                previous_classification_id=None,
+                is_current=True,
+                created_by_actor_id=None,
+            )
+        )
+
+    result = _extract_then_analyze(
+        session_factory=session_factory,
+        storage=storage,
+        tenant_id=tenant_id,
+        document_id=document_id,
+        dce_version_id=dce_version_id,
+    )
+
+    assert result.result_code == "DCE_RC_ANALYSIS_RECORDED"
+    with session_factory() as session:
+        observations = list(
+            session.scalars(
+                sa.select(DceRcRequirementObservationRecord).where(
+                    DceRcRequirementObservationRecord.tenant_id == tenant_id
+                )
+            )
+        )
+    observations_by_kind = {
+        observation.requirement_kind: observation for observation in observations
+    }
+    assert set(observations_by_kind) >= {
+        "CCAP_PENALTIES",
+        "CCAP_RETENTION_GUARANTEE",
+        "CCAP_SUBCONTRACTING",
+    }
+    for observation in observations_by_kind.values():
+        if not observation.requirement_kind.startswith("CCAP_"):
+            continue
+        sourced = source_text.encode("utf-8")[
+            observation.start_byte_offset : observation.end_byte_offset
+        ].decode("utf-8")
+        assert sourced == observation.excerpt
 
 
 @pytest.mark.db

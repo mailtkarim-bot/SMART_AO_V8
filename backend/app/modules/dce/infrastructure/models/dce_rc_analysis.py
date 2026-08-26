@@ -110,7 +110,10 @@ class DceRcRequirementObservationRecord(TenantScopedRecord, Base):
             "requirement_kind IN ("
             "'RC_DOCUMENT_CANDIDATURE', 'RC_CONTENT_OFFER', 'RC_SUBMISSION_DEADLINE', "
             "'RC_RESPONSE_CHANNEL', 'RC_FILE_CONSTRAINT', 'RC_SITE_VISIT', "
-            "'RC_AWARD_CRITERION', 'RC_NEGOTIATION', 'RC_OFFER_VALIDITY'"
+            "'RC_AWARD_CRITERION', 'RC_NEGOTIATION', 'RC_OFFER_VALIDITY', "
+            "'CCAP_PENALTIES', 'CCAP_RETENTION_GUARANTEE', 'CCAP_GUARANTEE', "
+            "'CCAP_INSURANCE', 'CCTP_VARIANTS', 'CCAP_SUBCONTRACTING', "
+            "'CCAP_QUALIFICATIONS'"
             ")",
             name="requirement_kind",
         ),
@@ -161,9 +164,7 @@ class DceRcRequirementSourceRecord(TenantScopedRecord, Base):
             name="fk_dce_rc_req_source__fragment",
             ondelete="RESTRICT",
         ),
-        sa.UniqueConstraint(
-            "tenant_id", "id", name="uq_dce_rc_requirement_sources__tenant_id"
-        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_dce_rc_requirement_sources__tenant_id"),
         sa.UniqueConstraint(
             "tenant_id",
             "observation_id",

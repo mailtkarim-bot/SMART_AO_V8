@@ -61,6 +61,9 @@ from app.interfaces.http.routes.patron_assignment_management import (
 from app.interfaces.http.routes.patron_boamp_opportunities import (
     build_patron_boamp_opportunity_router,
 )
+from app.interfaces.http.routes.patron_dce_contract_risks import (
+    build_patron_dce_contract_risk_router,
+)
 from app.interfaces.http.routes.patron_decisions import build_patron_decision_router
 from app.interfaces.http.routes.patron_enterprise_capabilities import (
     build_patron_enterprise_capability_router,
@@ -96,6 +99,7 @@ from app.interfaces.http.routes.preparation_transmission import (
 from app.modules.case.application.handlers import CreateCaseHandler
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.case.infrastructure.repositories import SqlAlchemyCaseRepository
+from app.modules.dce.application.contract_risk_read import PatronDceContractRiskReadService
 from app.modules.dce.application.handlers import (
     ClaimDceStagedObjectUploadHandler,
     CreateConsultationHandler,
@@ -124,6 +128,9 @@ from app.modules.dce.infrastructure.case_dce_reading_reader import (
 )
 from app.modules.dce.infrastructure.consultation_projection_reader import (
     SqlAlchemyConsultationProjectionReader,
+)
+from app.modules.dce.infrastructure.contract_risk_reader import (
+    SqlAlchemyDceContractRiskSignalReader,
 )
 from app.modules.dce.infrastructure.models.consultation import ConsultationRecord
 from app.modules.dce.infrastructure.models.dce_staging import DceStagedObjectRecord
@@ -998,6 +1005,15 @@ def create_app(
         app.include_router(
             build_case_dce_reading_router(
                 runtime=runtime,
+                security_runtime=security_runtime,
+            )
+        )
+        app.include_router(
+            build_patron_dce_contract_risk_router(
+                service=PatronDceContractRiskReadService(
+                    reader=SqlAlchemyDceContractRiskSignalReader(runtime.session_factory),
+                    policy=security_policy,
+                ),
                 security_runtime=security_runtime,
             )
         )

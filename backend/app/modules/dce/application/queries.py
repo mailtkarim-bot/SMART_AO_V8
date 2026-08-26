@@ -108,6 +108,36 @@ class CaseDceReadingReader(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class DceContractRiskSignalProjection:
+    """Closed provenance metadata for one CCAP/CCTP contract-risk signal."""
+
+    observation_id: UUID
+    dce_version_id: UUID
+    document_family: str
+    requirement_kind: str
+    rule_id: str
+    rule_version: str
+    directive: str
+    fragment_id: UUID
+    source_locator_label: str
+    start_byte_offset: int
+    end_byte_offset: int
+    verification_status: str
+
+
+class DceContractRiskSignalReader(Protocol):
+    """Read-only tenant/case reader for detected CCAP/CCTP contract-risk signals."""
+
+    def list_for_case(
+        self,
+        *,
+        tenant_id: UUID,
+        case_id: UUID,
+        limit: int,
+    ) -> tuple[DceContractRiskSignalProjection, ...]: ...
+
+
+@dataclass(frozen=True, slots=True)
 class AssignedCaseProjection:
     """Closed Case summary candidate; authorization remains a route concern."""
 
