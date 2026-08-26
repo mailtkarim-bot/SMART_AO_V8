@@ -16,7 +16,7 @@ from app.modules.dce.public.contracts import (
     ReportAssignmentUnavailabilityRequest,
     RequestAssignmentClarificationRequest,
 )
-from app.modules.membership.application.assignment import AssignmentInteractionService
+from app.modules.membership.application.mutation_service import MembershipMutationService
 from app.platform.events.dispatcher import (
     CommandExecutionError,
     CommandInProgressError,
@@ -44,7 +44,7 @@ _ASSIGNMENT_COMMAND_EXTRA_RESPONSES = {
 
 def build_assignment_interaction_router(
     *,
-    service: AssignmentInteractionService,
+    service: MembershipMutationService,
     security_runtime: ConsultationSecurityRuntime,
 ) -> APIRouter:
     """Build the bearer-authenticated, audited Assignment command façade."""
