@@ -108,7 +108,7 @@ class DceRequirementRecord(TenantScopedRecord, Base):
             "requirement_type IN ('CANDIDATURE_DOCUMENT', 'OFFER_DOCUMENT', "
             "'SUBMISSION_DEADLINE_SIGNAL', 'SUBMISSION_CHANNEL', 'FILE_CONSTRAINT', "
             "'SITE_VISIT', 'AWARD_CRITERION_SIGNAL', 'NEGOTIATION_SIGNAL', "
-            "'OFFER_VALIDITY_SIGNAL')",
+            "'OFFER_VALIDITY_SIGNAL', 'CONTRACT_RISK_SIGNAL')",
             name="requirement_type",
         ),
         sa.CheckConstraint(

@@ -319,7 +319,7 @@ class DceRequirementInput(BaseModel):
         pattern=(
             r"^(CANDIDATURE_DOCUMENT|OFFER_DOCUMENT|SUBMISSION_DEADLINE_SIGNAL|"
             r"SUBMISSION_CHANNEL|FILE_CONSTRAINT|SITE_VISIT|AWARD_CRITERION_SIGNAL|"
-            r"NEGOTIATION_SIGNAL|OFFER_VALIDITY_SIGNAL)$"
+            r"NEGOTIATION_SIGNAL|OFFER_VALIDITY_SIGNAL|CONTRACT_RISK_SIGNAL)$"
         )
     )
     directive_signal: str = Field(pattern=r"^(REQUIRED_SIGNAL|OPTIONAL_SIGNAL|UNSPECIFIED)$")
@@ -452,8 +452,7 @@ class RecordCaseDceImpactRunCommand(ApplicationCommand):
         if self.failure_code is not None:
             raise ValueError("successful impact run cannot carry failure code")
         if self.status == "NO_SIGNAL" and (
-            self.previous_requirement_count != 0
-            or self.successor_requirement_count != 0
+            self.previous_requirement_count != 0 or self.successor_requirement_count != 0
         ):
             raise ValueError("no-signal impact requires empty requirement counts")
         if self.previous_requirement_count + self.successor_requirement_count == 0:

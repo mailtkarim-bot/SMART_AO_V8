@@ -21,11 +21,15 @@ from app.modules.dce.infrastructure.models.dce_extraction import (
     DceDocumentExtractionFragmentRecord,
     DceDocumentExtractionRecord,
 )
-from app.modules.dce.infrastructure.models.dce_version import DceDocumentRecord, DceVersionRecord
+from app.modules.dce.infrastructure.models.dce_version import (
+    DceDocumentClassificationRecord,
+    DceDocumentRecord,
+    DceVersionRecord,
+)
 from app.platform.events.dispatcher import CommandContext, CommandDispatcher, DispatchResult
 
 ANALYZER_ID: Final = "smart-ao-rc-rules"
-ANALYZER_VERSION: Final = "1"
+ANALYZER_VERSION: Final = "2"
 SYSTEM_RC_ANALYSIS_ACTOR_ID: Final = UUID("00000000-0000-0000-0000-000000000014")
 MAX_SOURCE_FRAGMENTS: Final = 100_000
 MAX_SOURCE_CHARS: Final = 10_000_000
@@ -46,6 +50,7 @@ class RcAnalysisSourceFragment:
     ordinal: int
     text: str
     text_sha256: str
+    document_family: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +83,7 @@ class _RcRule:
     requirement_kind: str
     rule_id: str
     pattern: re.Pattern[str]
+    document_families: frozenset[str] | None = None
 
 
 _RC_RULES: Final = (
@@ -145,6 +151,66 @@ _RC_RULES: Final = (
         "RC_OFFER_VALIDITY",
         "OFFER_VALIDITY_V1",
         re.compile(r"\b(?:délai\s+de\s+validité|validité\s+de\s+l['’]offre)\b", re.IGNORECASE),
+    ),
+    _RcRule(
+        "CCAP_PENALTIES",
+        "CCAP_DELAY_PENALTIES_V1",
+        re.compile(
+            r"\b(?:pénalité(?:s)?\s+(?:de\s+retard|pour\s+retard)|pénalités?)\b",
+            re.IGNORECASE,
+        ),
+        frozenset({"CCAP", "CCTP"}),
+    ),
+    _RcRule(
+        "CCAP_RETENTION_GUARANTEE",
+        "CCAP_RETENUE_GARANTIE_V1",
+        re.compile(
+            r"\b(?:retenue\s+de\s+garantie|retenue\s+pour\s+garantie)\b",
+            re.IGNORECASE,
+        ),
+        frozenset({"CCAP", "CCTP"}),
+    ),
+    _RcRule(
+        "CCAP_GUARANTEE",
+        "CCAP_CAUTIONNEMENT_V1",
+        re.compile(
+            r"\b(?:cautionnement|garantie\s+à\s+première\s+demande|garantie\s+financière)\b",
+            re.IGNORECASE,
+        ),
+        frozenset({"CCAP", "CCTP"}),
+    ),
+    _RcRule(
+        "CCAP_INSURANCE",
+        "CCAP_ASSURANCE_V1",
+        re.compile(
+            r"\b(?:assurance(?:s)?\s+(?:responsabilité|décennale|dommages)|attestation\s+d['’]assurance)\b",
+            re.IGNORECASE,
+        ),
+        frozenset({"CCAP", "CCTP"}),
+    ),
+    _RcRule(
+        "CCTP_VARIANTS",
+        "CCTP_VARIANTES_OPTIONS_V1",
+        re.compile(
+            r"\b(?:variante(?:s)?|option(?:s)?|prestation\s+supplémentaire)\b",
+            re.IGNORECASE,
+        ),
+        frozenset({"CCAP", "CCTP"}),
+    ),
+    _RcRule(
+        "CCAP_SUBCONTRACTING",
+        "CCAP_SOUS_TRAITANCE_V1",
+        re.compile(r"\b(?:sous[- ]trait(?:ance|ant)|acte\s+spécial|DC4)\b", re.IGNORECASE),
+        frozenset({"CCAP", "CCTP"}),
+    ),
+    _RcRule(
+        "CCAP_QUALIFICATIONS",
+        "CCAP_QUALIFICATIONS_V1",
+        re.compile(
+            r"\b(?:qualification(?:s)?\s+professionnelle|certification(?:s)?|qualibat|RGE|habilitation(?:s)?|agrément(?:s)?)\b",
+            re.IGNORECASE,
+        ),
+        frozenset({"CCAP", "CCTP"}),
     ),
 )
 
@@ -214,6 +280,7 @@ class DceRcAnalysisService:
                     DceDocumentRecord.id,
                     DceDocumentExtractionRecord.id,
                     DceDocumentExtractionFragmentRecord,
+                    DceDocumentClassificationRecord.classification,
                 )
                 .join(
                     DceDocumentExtractionRecord,
@@ -229,6 +296,14 @@ class DceRcAnalysisService:
                     and_(
                         DceDocumentRecord.tenant_id == DceDocumentExtractionRecord.tenant_id,
                         DceDocumentRecord.id == DceDocumentExtractionRecord.dce_document_id,
+                    ),
+                )
+                .outerjoin(
+                    DceDocumentClassificationRecord,
+                    and_(
+                        DceDocumentClassificationRecord.tenant_id == tenant_id,
+                        DceDocumentClassificationRecord.dce_document_id == DceDocumentRecord.id,
+                        DceDocumentClassificationRecord.is_current.is_(True),
                     ),
                 )
                 .where(
@@ -253,8 +328,9 @@ class DceRcAnalysisService:
                     ordinal=fragment.ordinal,
                     text=fragment.text,
                     text_sha256=fragment.text_sha256,
+                    document_family=classification,
                 )
-                for document_id, extraction_id, fragment in rows
+                for document_id, extraction_id, fragment, classification in rows
             )
 
 
@@ -294,6 +370,11 @@ def _project_rc_requirements(
     observations: list[RcRequirementMatch] = []
     for source in sources:
         for rule in _RC_RULES:
+            if (
+                rule.document_families is not None
+                and source.document_family not in rule.document_families
+            ):
+                continue
             match = rule.pattern.search(source.text)
             if match is None:
                 continue
@@ -353,8 +434,7 @@ def _recording_command(
         f"{input_manifest_sha256}:{ANALYZER_ID}:{ANALYZER_VERSION}",
     )
     source_order = {
-        source.fragment_id: index
-        for index, source in enumerate(projection.source_fragments)
+        source.fragment_id: index for index, source in enumerate(projection.source_fragments)
     }
     observations = sorted(
         projection.observations,
