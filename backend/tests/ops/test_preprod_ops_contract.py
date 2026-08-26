@@ -413,3 +413,29 @@ def test_cockpit_projection_worker_is_explicitly_profiled_and_internal() -> None
     ) in worker
     assert "      - internal" in worker
     assert "      - edge" not in worker
+
+
+def test_deploy_ocr_opt_in_requires_explicit_install_and_local_runtime_preflight() -> None:
+    deploy_script = (OPS / "deploy-preprod.sh").read_text(encoding="utf-8")
+    assert "validate_ocr_configuration" in deploy_script
+    assert "SMART_AO_OCR_ENABLED=1 requires SMART_AO_INSTALL_DOCUMENT_OCR=1" in deploy_script
+    assert "validate_ocr_runtime" in deploy_script
+    for variable in (
+        "SMART_AO_OCR_DET_MODEL_PATH",
+        "SMART_AO_OCR_CLS_MODEL_PATH",
+        "SMART_AO_OCR_REC_MODEL_PATH",
+        "SMART_AO_OCR_REC_KEYS_PATH",
+    ):
+        assert variable in deploy_script
+    assert "compose build --pull backend" in deploy_script
+    assert "validate_ocr_runtime\n  compose up -d postgres clamav" in deploy_script
+
+
+def test_manual_deployment_guide_matches_current_schema_head_and_ocr_flags() -> None:
+    guide = (ROOT / "docs/MANUAL_PREPROD_DEPLOYMENT.md").read_text(encoding="utf-8")
+    schema = (ROOT / "backend/app/platform/persistence/schema.py").read_text(encoding="utf-8")
+    assert 'EXPECTED_ALEMBIC_HEAD = "20260826_0067"' in schema
+    assert "20260826_0067" in guide
+    assert "SMART_AO_INSTALL_DOCUMENT_OCR=0" in guide
+    assert "SMART_AO_OCR_ENABLED=0" in guide
+    assert "ne télécharge aucun modèle ni dictionnaire" in guide
