@@ -22,8 +22,15 @@ from app.modules.decision.application.lifecycle_commands import (
 )
 from app.modules.decision.application.link_commands import LinkRiskToRequirementCommand
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
-from app.modules.decision.application.risk import PatronDecisionRiskService
-from app.modules.decision.application.risk_commands import RegisterStructuredRiskCommand
+from app.modules.decision.application.risk import (
+    PatronDecisionRiskService,
+    PatronDecisionRiskTreatmentService,
+)
+from app.modules.decision.application.risk_commands import (
+    RegisterStructuredRiskCommand,
+    TransitionStructuredRiskTreatmentCommand,
+)
+from app.modules.decision.application.risk_read import PatronDecisionRiskReadService
 from app.modules.decision.application.risk_requirement import (
     PatronDecisionRiskRequirementService,
 )
@@ -46,6 +53,9 @@ from app.modules.decision.public.patron_contracts import PatronDecisionDossierRe
 from app.modules.decision.public.risk_contracts import (
     RegisterStructuredRiskRequest,
     StructuredRiskCommandResponse,
+    StructuredRiskProjection,
+    TransitionStructuredRiskTreatmentRequest,
+    TransitionStructuredRiskTreatmentResponse,
 )
 from app.modules.decision.public.risk_requirement_contracts import (
     LinkRiskToRequirementRequest,
@@ -69,6 +79,8 @@ def build_patron_decision_router(
     service: PatronDecisionDossierService,
     security_runtime: ConsultationSecurityRuntime,
     risk_service: PatronDecisionRiskService | None = None,
+    risk_treatment_service: PatronDecisionRiskTreatmentService | None = None,
+    risk_read_service: PatronDecisionRiskReadService | None = None,
     risk_requirement_service: PatronDecisionRiskRequirementService | None = None,
     finalization_service: PatronDecisionFinalizationService | None = None,
     risk_requirement_read_service: PatronDecisionRiskRequirementReadService | None = None,
@@ -367,6 +379,123 @@ def build_patron_decision_router(
             return JSONResponse(
                 status_code=200 if result.replayed else 201,
                 content=response.model_dump(mode="json"),
+            )
+
+    if risk_treatment_service is not None:
+
+        @router.post(
+            "/cases/{case_id}/risks/{risk_id}/treatment",
+            response_model=TransitionStructuredRiskTreatmentResponse,
+        )
+        def transition_risk_treatment(
+            case_id: UUID,
+            risk_id: UUID,
+            request: TransitionStructuredRiskTreatmentRequest,
+            authorization: str | None = Header(default=None),
+        ):
+            actor = _resolve_context(
+                authorization=authorization,
+                context_resolver=security_runtime.context_resolver,
+            )
+            try:
+                result = risk_treatment_service.execute(
+                    actor=actor,
+                    command=TransitionStructuredRiskTreatmentCommand(
+                        command_id=request.command_id,
+                        idempotency_key=request.idempotency_key,
+                        correlation_id=request.correlation_id,
+                        risk_id=risk_id,
+                        case_id=case_id,
+                        expected_revision=request.expected_revision,
+                        to_treatment=request.to_treatment,
+                        evidence_excerpt=request.evidence_excerpt,
+                        evidence_locator=request.evidence_locator,
+                        evidence_start_byte_offset=request.evidence_start_byte_offset,
+                        evidence_end_byte_offset=request.evidence_end_byte_offset,
+                        rationale=request.rationale,
+                    ),
+                    now=datetime.now(tz=UTC),
+                )
+            except PermissionError as error:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN"
+                ) from error
+            except (IdempotencyKeyReusedError, CommandInProgressError) as error:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="IDEMPOTENCY_CONFLICT"
+                ) from error
+            except CommandExecutionError as error:
+                detail = str(error)
+                code = (
+                    status.HTTP_409_CONFLICT
+                    if detail in {"RISK_REVISION_CONFLICT", "RISK_TREATMENT_NOT_CURRENT"}
+                    else status.HTTP_422_UNPROCESSABLE_CONTENT
+                )
+                raise HTTPException(status_code=code, detail=detail) from error
+            reference = result.aggregate_refs[0]
+            response = TransitionStructuredRiskTreatmentResponse(
+                command_id=result.command_id,
+                idempotency_key=result.idempotency_key,
+                result_code=result.result_code,
+                risk_id=UUID(str(reference["aggregate_id"])),
+                version=require_aggregate_revision(reference["aggregate_revision"]),
+                treatment=request.to_treatment,
+                event_ids=[UUID(event_id) for event_id in result.event_ids],
+                replayed=result.replayed,
+            )
+            return JSONResponse(
+                status_code=200 if result.replayed else 201,
+                content=response.model_dump(mode="json"),
+            )
+
+    if risk_read_service is not None:
+
+        @router.get(
+            "/cases/{case_id}/risks/{risk_id}",
+            response_model=StructuredRiskProjection,
+        )
+        def read_risk(
+            case_id: UUID,
+            risk_id: UUID,
+            authorization: str | None = Header(default=None),
+        ) -> StructuredRiskProjection:
+            actor = _resolve_context(
+                authorization=authorization,
+                context_resolver=security_runtime.context_resolver,
+            )
+            try:
+                snapshot = risk_read_service.read(
+                    actor=actor,
+                    case_id=case_id,
+                    risk_id=risk_id,
+                    now=datetime.now(tz=UTC),
+                )
+            except PermissionError as error:
+                detail = str(error)
+                if detail == "NOT_FOUND_OR_FORBIDDEN":
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND, detail=detail
+                    ) from error
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN"
+                ) from error
+            return StructuredRiskProjection(
+                risk_id=snapshot.id,
+                case_id=snapshot.case_id,
+                dce_version_id=snapshot.dce_version_id,
+                risk_code=snapshot.risk_code,
+                category=snapshot.category,
+                title=snapshot.title,
+                severity=snapshot.severity,
+                likelihood=snapshot.likelihood,
+                treatment=snapshot.treatment,
+                revision=snapshot.revision,
+                due_at=snapshot.due_at,
+                latest_treatment_evidence=(
+                    dict(snapshot.latest_treatment_evidence)
+                    if snapshot.latest_treatment_evidence is not None
+                    else None
+                ),
             )
 
     if risk_requirement_service is not None:

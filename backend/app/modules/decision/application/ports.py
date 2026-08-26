@@ -121,6 +121,44 @@ class DecisionRiskDraft:
 
 
 @dataclass(frozen=True, slots=True)
+class DecisionRiskSnapshot:
+    id: UUID
+    tenant_id: UUID
+    case_id: UUID
+    dce_version_id: UUID
+    source_fragment_id: UUID
+    risk_code: str
+    category: str
+    title: str
+    severity: str
+    likelihood: str
+    treatment: str
+    revision: int
+    due_at: datetime | None
+    latest_treatment_evidence: Mapping[str, object] | None
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionRiskTreatmentTransitionDraft:
+    id: UUID
+    tenant_id: UUID
+    risk_id: UUID
+    from_treatment: str
+    to_treatment: str
+    evidence_excerpt: str
+    evidence_locator: Mapping[str, object]
+    evidence_start_byte_offset: int
+    evidence_end_byte_offset: int
+    rationale: str
+    aggregate_revision: int
+    actor_id: UUID
+    membership_id: UUID
+    command_id: UUID
+    idempotency_key: UUID
+    correlation_id: UUID | None
+
+
+@dataclass(frozen=True, slots=True)
 class DecisionRiskRequirementLinkDraft:
     id: UUID
     tenant_id: UUID
@@ -227,6 +265,14 @@ class DecisionRiskRepository(Protocol):
     ) -> bool: ...
 
     def create(self, *, session: object, draft: DecisionRiskDraft) -> None: ...
+
+    def get_current(
+        self, *, session: object, tenant_id: UUID, case_id: UUID, risk_id: UUID
+    ) -> DecisionRiskSnapshot | None: ...
+
+    def transition(
+        self, *, session: object, draft: DecisionRiskTreatmentTransitionDraft
+    ) -> None: ...
 
 
 class DecisionVerifiedContextReader(Protocol):

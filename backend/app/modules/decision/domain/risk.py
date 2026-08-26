@@ -35,6 +35,24 @@ class RiskTreatment(StrEnum):
     MITIGATED = "MITIGATED"
 
 
+class RiskTreatmentTransitionError(ValueError):
+    """Raised when a risk treatment transition is not allowed."""
+
+
+def validate_risk_treatment_transition(
+    *, from_treatment: RiskTreatment, to_treatment: RiskTreatment
+) -> None:
+    allowed = {
+        RiskTreatment.OPEN: {RiskTreatment.ACCEPTED, RiskTreatment.MITIGATED},
+        RiskTreatment.ACCEPTED: {RiskTreatment.MITIGATED},
+        RiskTreatment.MITIGATED: set(),
+    }
+    if to_treatment not in allowed[from_treatment]:
+        raise RiskTreatmentTransitionError(
+            f"invalid risk treatment transition: {from_treatment} -> {to_treatment}"
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class StructuredRisk:
     category: RiskCategory
