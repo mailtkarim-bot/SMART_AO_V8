@@ -176,7 +176,11 @@ class _PreparationService:
             raise self.error
         code = "PREPARATION_READINESS_EVALUATED"
         if kwargs["command"].__class__.__name__ == "GenerateTechnicalDocumentCommand":
-            code = "TECHNICAL_DOCUMENT_GENERATED"
+            code = (
+                "CONTROLLED_DRAFT_GENERATED"
+                if kwargs["command"].document_kind in {"DC1", "DC2", "DC4"}
+                else "TECHNICAL_DOCUMENT_GENERATED"
+            )
         return _result(code=code, replayed=self.calls > 1)
 
     def read_package(self, **kwargs):
@@ -300,6 +304,30 @@ def test_readiness_and_document_generation_return_201_then_200_on_replay():
     assert document.status_code == 200
     assert readiness.json()["result_code"] == "PREPARATION_READINESS_EVALUATED"
     assert document.json()["result_code"] == "TECHNICAL_DOCUMENT_GENERATED"
+
+
+@pytest.mark.parametrize("document_kind", ["DC1", "DC2", "DC4"])
+def test_controlled_document_routes_accept_only_supported_kinds(document_kind):
+    payload = {**_document_payload(), "document_kind": document_kind}
+    response = _client(service=_PreparationService()).post(
+        f"/api/v1/collaborator/preparation/{uuid4()}/documents",
+        json=payload,
+        headers=_headers(),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["result_code"] == "CONTROLLED_DRAFT_GENERATED"
+
+
+def test_controlled_document_route_rejects_unknown_kind():
+    payload = {**_document_payload(), "document_kind": "DC3"}
+    response = _client(service=_PreparationService()).post(
+        f"/api/v1/collaborator/preparation/{uuid4()}/documents",
+        json=payload,
+        headers=_headers(),
+    )
+
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize(

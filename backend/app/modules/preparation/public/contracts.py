@@ -24,7 +24,7 @@ class EvaluatePreparationReadinessRequest(PreparationCommandRequest):
 class GenerateTechnicalDocumentRequest(PreparationCommandRequest):
     expected_revision: int = Field(ge=0)
     readiness_revision: int = Field(ge=1)
-    document_kind: Literal["TECHNICAL_RESPONSE"]
+    document_kind: Literal["TECHNICAL_RESPONSE", "DC1", "DC2", "DC4"]
 
 
 class RequestPreparationReviewRequest(PreparationCommandRequest):
@@ -97,6 +97,7 @@ class PreparationCommandResponse(BaseModel):
     result_code: Literal[
         "PREPARATION_READINESS_EVALUATED",
         "TECHNICAL_DOCUMENT_GENERATED",
+        "CONTROLLED_DRAFT_GENERATED",
         "PREPARATION_REVIEW_REQUESTED",
         "PREPARATION_REVIEW_DECIDED",
         "PREPARATION_CORRECTION_ADDED",
@@ -126,7 +127,7 @@ class GeneratedDocumentProjection(BaseModel):
 
     document_id: UUID
     version: int = Field(ge=1)
-    document_kind: Literal["TECHNICAL_RESPONSE"]
+    document_kind: Literal["TECHNICAL_RESPONSE", "DC1", "DC2", "DC4"]
     state: Literal["GENERATED", "FAILED_SAFE"]
     readiness_revision: int = Field(ge=1)
 

@@ -27,7 +27,10 @@ from app.modules.preparation.application.commands import (
     GenerateTechnicalDocumentCommand,
 )
 from app.modules.preparation.application.document_content import (
+    ControlledDocumentKind,
+    ControlledDraftServerFacts,
     TechnicalDocumentFacts,
+    build_controlled_btp_document,
     build_technical_document,
 )
 from app.modules.preparation.application.ports import PreparationDceReader
@@ -552,18 +555,48 @@ class PreparationHandler:
             )
             + 1
         )
-        content = build_technical_document(
-            TechnicalDocumentFacts(
+        blocker_codes = tuple(sorted(readiness.blocker_codes_json))
+        warning_codes = tuple(sorted(readiness.warning_codes_json))
+        if command.document_kind == "TECHNICAL_RESPONSE":
+            content = build_technical_document(
+                TechnicalDocumentFacts(
+                    case_id=package.case_id,
+                    dce_version_id=package.dce_version_id,
+                    readiness_state=readiness.state,
+                    readiness_revision=readiness.revision,
+                    document_version=version,
+                    requirements=requirements,
+                    blocker_codes=blocker_codes,
+                    warning_codes=warning_codes,
+                )
+            ).encode("utf-8")
+            result_code = "TECHNICAL_DOCUMENT_GENERATED"
+            event_type = "TechnicalDocumentGenerated"
+        else:
+            controlled_kind = ControlledDocumentKind(command.document_kind)
+            controlled = build_controlled_btp_document(
+                kind=controlled_kind,
                 case_id=package.case_id,
                 dce_version_id=package.dce_version_id,
-                readiness_state=readiness.state,
-                readiness_revision=readiness.revision,
                 document_version=version,
-                requirements=requirements,
-                blocker_codes=tuple(sorted(readiness.blocker_codes_json)),
-                warning_codes=tuple(sorted(readiness.warning_codes_json)),
+                facts=ControlledDraftServerFacts(
+                    case_id=package.case_id,
+                    dce_version_id=package.dce_version_id,
+                    readiness_state=readiness.state,
+                    readiness_revision=readiness.revision,
+                    confirmed_requirement_ids=tuple(
+                        requirement.requirement_id
+                        for requirement in requirements
+                        if requirement.confirmation_outcome == "CONFIRMED"
+                    ),
+                    blocker_codes=blocker_codes,
+                    warning_codes=warning_codes,
+                ).for_kind(controlled_kind),
+                blockers=blocker_codes,
             )
-        ).encode("utf-8")
+            content = controlled.content.encode("utf-8")
+            result_code = "CONTROLLED_DRAFT_GENERATED"
+            event_type = "ControlledDraftGenerated"
         if contains_forbidden_text(content.decode("utf-8")):
             raise CommandExecutionError("FINANCIAL_DATA_FORBIDDEN")
         storage_key = (
@@ -589,7 +622,7 @@ class PreparationHandler:
         package.aggregate_revision += 1
         package.state = "GENERATED"
         return HandlerOutcome(
-            result_code="TECHNICAL_DOCUMENT_GENERATED",
+            result_code=result_code,
             aggregate_refs=(
                 {
                     "aggregate_type": "GeneratedTechnicalDocument",
@@ -602,7 +635,7 @@ class PreparationHandler:
                     aggregate_type="GeneratedTechnicalDocument",
                     aggregate_id=document.id,
                     aggregate_revision=document.version,
-                    event_type="TechnicalDocumentGenerated",
+                    event_type=event_type,
                     payload={
                         "document_id": str(document.id),
                         "package_id": str(package.id),

@@ -21,7 +21,7 @@ class EvaluatePreparationReadinessCommand(ApplicationCommand):
 
 
 class GenerateTechnicalDocumentCommand(ApplicationCommand):
-    """Generate one immutable technical document from an admissible readiness."""
+    """Generate one immutable controlled document from an admissible readiness."""
 
     command_type = "GenerateTechnicalDocument"
 
@@ -29,4 +29,4 @@ class GenerateTechnicalDocumentCommand(ApplicationCommand):
     document_id: UUID
     expected_revision: int = Field(ge=0)
     readiness_revision: int = Field(ge=1)
-    document_kind: Literal["TECHNICAL_RESPONSE"]
+    document_kind: Literal["TECHNICAL_RESPONSE", "DC1", "DC2", "DC4"]

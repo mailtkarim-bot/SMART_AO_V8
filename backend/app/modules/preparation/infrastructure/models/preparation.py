@@ -175,7 +175,10 @@ class GeneratedTechnicalDocumentRecord(TenantScopedRecord, Base):
         sa.UniqueConstraint("tenant_id", "id", name="uq_generated_docs__tenant_id"),
         sa.UniqueConstraint("tenant_id", "package_id", "version", name="uq_generated_doc_version"),
         sa.CheckConstraint("version > 0", name="version_positive"),
-        sa.CheckConstraint("document_kind IN ('TECHNICAL_RESPONSE')", name="document_kind"),
+        sa.CheckConstraint(
+            "document_kind IN ('TECHNICAL_RESPONSE', 'DC1', 'DC2', 'DC4')",
+            name="document_kind",
+        ),
         sa.CheckConstraint("state IN ('GENERATED', 'FAILED_SAFE')", name="state"),
         sa.Index("ix_generated_docs__tenant_package_version", "tenant_id", "package_id", "version"),
     )

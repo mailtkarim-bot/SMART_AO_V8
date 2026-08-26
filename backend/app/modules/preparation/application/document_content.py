@@ -80,6 +80,49 @@ class ControlledDocumentResult:
     blockers: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class ControlledDraftServerFacts:
+    """Facts resolved by the server and safe to project into controlled drafts."""
+
+    case_id: UUID
+    dce_version_id: UUID
+    readiness_state: str
+    readiness_revision: int
+    confirmed_requirement_ids: tuple[UUID, ...]
+    blocker_codes: tuple[str, ...]
+    warning_codes: tuple[str, ...]
+
+    def for_kind(self, kind: ControlledDocumentKind) -> dict[str, str]:
+        """Return a closed, kind-specific allowlist; never infer legal assertions."""
+        common = {
+            "case_id": str(self.case_id),
+            "dce_version_id": str(self.dce_version_id),
+            "readiness_state": self.readiness_state,
+            "readiness_revision": str(self.readiness_revision),
+            "blocker_codes": ", ".join(self.blocker_codes) or "NONE",
+            "warning_codes": ", ".join(self.warning_codes) or "NONE",
+        }
+        if kind is ControlledDocumentKind.DC1:
+            return {
+                **common,
+                "confirmed_requirement_count": str(len(self.confirmed_requirement_ids)),
+            }
+        if kind is ControlledDocumentKind.DC2:
+            return {
+                **common,
+                "confirmed_requirement_ids": ", ".join(
+                    sorted(str(requirement_id) for requirement_id in self.confirmed_requirement_ids)
+                )
+                or "NONE",
+            }
+        if kind is ControlledDocumentKind.DC4:
+            return {
+                **common,
+                "scope_policy": "DCE_REQUIREMENTS_ONLY",
+            }
+        raise ValueError(f"unsupported controlled document kind: {kind}")
+
+
 def cross_match_enterprise_documents(
     *,
     required_kinds: tuple[str, ...],

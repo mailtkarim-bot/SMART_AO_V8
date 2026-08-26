@@ -117,7 +117,7 @@ def test_readiness_contract_uses_shared_schema_head() -> None:
     schema = (ROOT / "backend/app/platform/persistence/schema.py").read_text(encoding="utf-8")
     assert "from app.platform.persistence.schema import EXPECTED_ALEMBIC_HEAD" in application
     assert "EXPECTED_ALEMBIC_HEAD" in application
-    assert 'EXPECTED_ALEMBIC_HEAD = "20260825_0063"' in schema
+    assert 'EXPECTED_ALEMBIC_HEAD = "20260826_0064"' in schema
 
 
 def test_healthcheck_validates_application_json_payloads() -> None:
