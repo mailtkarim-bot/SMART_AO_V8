@@ -77,6 +77,12 @@ function renderPanel(
     onTransmitSnapshot: vi.fn(),
     onPreviewDocument: vi.fn(),
     onDownloadDocument: vi.fn(),
+    taskWorkflow: null,
+    onLoadTaskWorkflow: vi.fn(),
+    onCreateInformationRequest: vi.fn(),
+    onRecordInformationResponse: vi.fn(),
+    onDeclareTaskBlocker: vi.fn(),
+    onResolveTaskBlocker: vi.fn(),
     ...overrides,
   };
   return render(<CollaboratorWizardPanel {...props} />);
@@ -133,6 +139,49 @@ describe("CollaboratorWizardPanel", () => {
     expect(screen.getByRole("heading", { name: "Aperçu du document sélectionné" })).toBeInTheDocument();
     expect(screen.getByText(/# Réponse technique/)).toBeInTheDocument();
     expect(screen.queryByText(/storage_key|content_sha256/)).not.toBeInTheDocument();
+  });
+
+  it("renders the task workflow requests and blockers", () => {
+    renderPanel({
+      wizardPackage: packageProjection,
+      wizardTaskId: "task-1",
+      taskWorkflow: {
+        task_id: "task-1",
+        state: "BLOCKED",
+        aggregate_revision: 5,
+        information_requests: [{
+          request_id: "request-1",
+          task_id: "task-1",
+          request_kind: "CLARIFICATION",
+          subject: "Préciser le délai",
+          question: "Quel délai faut-il confirmer ?",
+          requested_object: "Délai",
+          reason: "Le DCE est ambigu",
+          priority: "HIGH",
+          state: "OPEN",
+          due_at: null,
+          aggregate_revision: 5,
+          responses: [],
+        }],
+        blockers: [{
+          blocker_id: "blocker-1",
+          task_id: "task-1",
+          task_revision: 5,
+          blocker_kind: "SOURCE_CONFLICT",
+          description: "Contradiction entre deux sources",
+          source_locator: "CCAP:12",
+          resolution_owner: "PATRON_ADMIN",
+          state: "OPEN",
+          resolution_note: null,
+          resolved_at: null,
+        }],
+      },
+    });
+
+    expect(screen.getByText("Préciser le délai")).toBeInTheDocument();
+    expect(screen.getAllByText("SOURCE_CONFLICT")).toHaveLength(2);
+    expect(screen.getByText(/1 demande\(s\)/)).toBeInTheDocument();
+    expect(screen.getByText(/1 bloqueur\(s\) ouvert\(s\)/)).toBeInTheDocument();
   });
 
   it("delegates task, readiness and transmission actions without external deposit semantics", () => {

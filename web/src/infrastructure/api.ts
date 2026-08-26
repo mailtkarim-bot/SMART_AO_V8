@@ -19,6 +19,11 @@ import type {
   SubmissionSignatureProjection,
   SubmissionSignatureReceipt,
   CollaboratorTaskList,
+  CollaboratorTaskWorkflow,
+  CreateInformationRequestInput,
+  RecordInformationResponseInput,
+  DeclareTaskBlockerInput,
+  ResolveTaskBlockerInput,
   PreparationPackage,
   CommitPricingImportRequest,
   PricingImportCommitReceipt,
@@ -551,6 +556,68 @@ export function createApiClient(
       requestBlob(
         `/api/v1/patron/submission-packages/${encodeURIComponent(submissionPackageId)}/export`,
         { headers: { Accept: "application/zip" } },
+      ),
+    getCollaboratorTaskWorkflow: (taskId: string) =>
+      request<CollaboratorTaskWorkflow>(
+        `/api/v1/collaborator/tasks/${encodeURIComponent(taskId)}/workflow`,
+      ),
+    createInformationRequest: (
+      taskId: string,
+      input: CreateInformationRequestInput,
+    ) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/tasks/${encodeURIComponent(taskId)}/information-requests`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            ...input,
+          }),
+        },
+      ),
+    recordInformationResponse: (
+      requestId: string,
+      input: RecordInformationResponseInput,
+    ) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/information-requests/${encodeURIComponent(requestId)}/responses`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            ...input,
+          }),
+        },
+      ),
+    declareTaskBlocker: (taskId: string, input: DeclareTaskBlockerInput) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/tasks/${encodeURIComponent(taskId)}/blockers`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            ...input,
+          }),
+        },
+      ),
+    resolveTaskBlocker: (
+      taskId: string,
+      blockerId: string,
+      input: ResolveTaskBlockerInput,
+    ) =>
+      request<CommandReceipt>(
+        `/api/v1/collaborator/tasks/${encodeURIComponent(taskId)}/blockers/${encodeURIComponent(blockerId)}/resolve`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            ...input,
+          }),
+        },
       ),
     getCollaboratorPreparation: (packageId: string) =>
       request<PreparationPackage>(
