@@ -64,6 +64,8 @@ from app.modules.decision.public.risk_requirement_contracts import (
 from app.modules.decision.public.risk_requirement_read_contracts import (
     DecisionCctpPricingCrossingItem,
     DecisionCctpPricingCrossingResponse,
+    DecisionDocumentContradictionItem,
+    DecisionDocumentContradictionsResponse,
     DecisionPricingReconciliationItem,
     DecisionPricingReconciliationResponse,
     DecisionRiskRequirementLinkItem,
@@ -789,6 +791,58 @@ def build_patron_decision_router(
                         unit=item.unit,
                         match_score_bps=item.match_score_bps,
                         match_basis=item.match_basis,
+                        verification_status=item.verification_status,
+                    )
+                    for item in items
+                ],
+            )
+
+        @router.get(
+            "/cases/{case_id}/document-contradictions",
+            response_model=DecisionDocumentContradictionsResponse,
+        )
+        def detect_document_contradictions(
+            case_id: UUID,
+            limit: int = Query(default=25, ge=1, le=100),
+            authorization: str | None = Header(default=None),
+        ):
+            actor = _resolve_context(
+                authorization=authorization,
+                context_resolver=security_runtime.context_resolver,
+            )
+            try:
+                items = risk_requirement_read_service.detect_document_contradictions(
+                    actor=actor,
+                    case_id=case_id,
+                    limit=limit,
+                    now=datetime.now(tz=UTC),
+                )
+            except PermissionError as error:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN"
+                ) from error
+            except ValueError as error:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="INVALID_LIMIT"
+                ) from error
+            return DecisionDocumentContradictionsResponse(
+                case_id=case_id,
+                items=[
+                    DecisionDocumentContradictionItem(
+                        contradiction_id=item.contradiction_id,
+                        dce_version_id=item.dce_version_id,
+                        contradiction_type=item.contradiction_type,
+                        source_fragment_id=item.source_fragment_id,
+                        source_locator_label=item.source_locator_label,
+                        source_start_byte_offset=item.source_start_byte_offset,
+                        source_end_byte_offset=item.source_end_byte_offset,
+                        related_batch_id=item.related_batch_id,
+                        related_document_kind=item.related_document_kind,
+                        related_row_number=item.related_row_number,
+                        related_code=item.related_code,
+                        related_designation=item.related_designation,
+                        related_unit=item.related_unit,
+                        comparison_basis=item.comparison_basis,
                         verification_status=item.verification_status,
                     )
                     for item in items

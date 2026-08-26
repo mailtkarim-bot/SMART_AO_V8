@@ -7,6 +7,8 @@ from app.modules.decision.application.pagination import decode_cursor
 from app.modules.decision.application.queries import (
     DecisionCctpPricingCrossingProjection,
     DecisionCctpPricingCrossingReader,
+    DecisionDocumentContradictionProjection,
+    DecisionDocumentContradictionReader,
     DecisionPricingReconciliationProjection,
     DecisionPricingReconciliationReader,
     DecisionRiskRequirementPage,
@@ -31,10 +33,12 @@ class PatronDecisionRiskRequirementReadService:
         pricing_reader: DecisionPricingReconciliationReader,
         policy: AuthorizationPolicyPort,
         crossing_reader: DecisionCctpPricingCrossingReader | None = None,
+        contradiction_reader: DecisionDocumentContradictionReader | None = None,
     ) -> None:
         self._reader = reader
         self._pricing_reader = pricing_reader
         self._crossing_reader = crossing_reader
+        self._contradiction_reader = contradiction_reader
         self._policy = policy
 
     def list_links(
@@ -102,6 +106,25 @@ class PatronDecisionRiskRequirementReadService:
         if not 1 <= limit <= 100:
             raise ValueError("limit must be between 1 and 100")
         return self._crossing_reader.cross(
+            tenant_id=actor.tenant_id,
+            case_id=case_id,
+            limit=limit,
+        )
+
+    def detect_document_contradictions(
+        self,
+        *,
+        actor: ActorContext,
+        case_id: UUID,
+        limit: int,
+        now: datetime,
+    ) -> tuple[DecisionDocumentContradictionProjection, ...]:
+        self._authorize(actor=actor, case_id=case_id, now=now)
+        if self._contradiction_reader is None:
+            raise RuntimeError("DOCUMENT_CONTRADICTION_READER_NOT_CONFIGURED")
+        if not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+        return self._contradiction_reader.detect(
             tenant_id=actor.tenant_id,
             case_id=case_id,
             limit=limit,

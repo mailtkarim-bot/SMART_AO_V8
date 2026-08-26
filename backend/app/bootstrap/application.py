@@ -163,6 +163,9 @@ from app.modules.decision.application.risk_requirement import (
 from app.modules.decision.application.risk_requirement_read import (
     PatronDecisionRiskRequirementReadService,
 )
+from app.modules.decision.infrastructure.cctp_pricing_contradiction_reader import (
+    SqlAlchemyDecisionCctpPricingContradictionReader,
+)
 from app.modules.decision.infrastructure.cctp_pricing_reader import (
     SqlAlchemyDecisionCctpPricingCrossingReader,
 )
@@ -874,10 +877,14 @@ def create_app(
         decision_cctp_pricing_crossing_reader = SqlAlchemyDecisionCctpPricingCrossingReader(
             runtime.session_factory
         )
+        decision_document_contradiction_reader = SqlAlchemyDecisionCctpPricingContradictionReader(
+            runtime.session_factory
+        )
         patron_decision_risk_requirement_read_service = PatronDecisionRiskRequirementReadService(
             reader=decision_risk_requirement_reader,
             pricing_reader=decision_risk_requirement_reader,
             crossing_reader=decision_cctp_pricing_crossing_reader,
+            contradiction_reader=decision_document_contradiction_reader,
             policy=security_policy,
         )
         patron_decision_finalization_service = PatronDecisionFinalizationService(

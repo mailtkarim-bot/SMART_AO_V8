@@ -76,3 +76,30 @@ class DecisionCctpPricingCrossingResponse(BaseModel):
 
     case_id: UUID
     items: list[DecisionCctpPricingCrossingItem]
+
+
+class DecisionDocumentContradictionItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contradiction_id: UUID
+    dce_version_id: UUID
+    contradiction_type: str
+    source_fragment_id: UUID
+    source_locator_label: str
+    source_start_byte_offset: int
+    source_end_byte_offset: int
+    related_batch_id: UUID
+    related_document_kind: str
+    related_row_number: int
+    related_code: str | None
+    related_designation: str | None
+    related_unit: str | None
+    comparison_basis: str
+    verification_status: str
+
+
+class DecisionDocumentContradictionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    items: list[DecisionDocumentContradictionItem]

@@ -149,6 +149,39 @@ class DecisionCctpPricingCrossingReader(Protocol):
     ) -> tuple[DecisionCctpPricingCrossingProjection, ...]: ...
 
 
+@dataclass(frozen=True, slots=True)
+class DecisionDocumentContradictionProjection:
+    """Closed read model for one explicit contradiction requiring review."""
+
+    contradiction_id: UUID
+    dce_version_id: UUID
+    contradiction_type: str
+    source_fragment_id: UUID
+    source_locator_label: str
+    source_start_byte_offset: int
+    source_end_byte_offset: int
+    related_batch_id: UUID
+    related_document_kind: str
+    related_row_number: int
+    related_code: str | None
+    related_designation: str | None
+    related_unit: str | None
+    comparison_basis: str
+    verification_status: str
+
+
+class DecisionDocumentContradictionReader(Protocol):
+    """Finds deterministic contradictions across the applicable DCE and pricing imports."""
+
+    def detect(
+        self,
+        *,
+        tenant_id: UUID,
+        case_id: UUID,
+        limit: int,
+    ) -> tuple[DecisionDocumentContradictionProjection, ...]: ...
+
+
 class DecisionDossierReader(Protocol):
     """Reads one tenant-scoped patron dossier without exposing ORM records."""
 
