@@ -134,6 +134,40 @@ describe("Decision lifecycle transport", () => {
 });
 
 
+describe("Decision risk requirement transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lists paginated links and searches pricing reconciliation candidates", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [], next_cursor: "cursor-1" }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ link_id: "link-1", search: "protection", items: [] }), { status: 200 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiClient("https://app.example.test", "access-1");
+
+    await expect(client.listDecisionRiskRequirementLinks("case/1", 20, "cursor/1")).resolves.toMatchObject({
+      next_cursor: "cursor-1",
+    });
+    await expect(
+      client.reconcileDecisionPricing("case/1", "link/1", "protection collective", 10),
+    ).resolves.toMatchObject({ link_id: "link-1" });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://app.example.test/api/v1/patron/cases/case%2F1/risk-requirement-links?limit=20&cursor=cursor%2F1",
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "https://app.example.test/api/v1/patron/cases/case%2F1/risk-requirement-links/link%2F1/pricing-reconciliation?search=protection+collective&limit=10",
+    );
+  });
+});
+
+
 describe("browser authentication transport", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

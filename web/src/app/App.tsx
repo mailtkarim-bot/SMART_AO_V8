@@ -9,6 +9,8 @@ import { CollaboratorWizardPanel } from "../features/wizard/CollaboratorWizardPa
 import { useCollaboratorWizard } from "../features/wizard/useCollaboratorWizard";
 import { PatronCockpitPanel } from "../features/cockpit/PatronCockpitPanel";
 import { PatronDecisionPanel } from "../features/decision/PatronDecisionPanel";
+import { DecisionRiskRequirementsPanel } from "../features/decision/DecisionRiskRequirementsPanel";
+import { useDecisionRiskRequirements } from "../features/decision/useDecisionRiskRequirements";
 import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
 import { BoampOpportunityPanel } from "../features/opportunities/BoampOpportunityPanel";
 import { useBoampOpportunities } from "../features/opportunities/useBoampOpportunities";
@@ -158,6 +160,11 @@ function App() {
   });
   const boamp = useBoampOpportunities(api, setMessage);
   const dceKnowledge = useDceKnowledge(api, setMessage, selectedCaseId);
+  const decisionRiskRequirements = useDecisionRiskRequirements(
+    api,
+    setMessage,
+    isPatron ? selectedCaseId : "",
+  );
   const {
     assignments,
     selectedAssignmentId,
@@ -573,6 +580,25 @@ function App() {
             onResolveCondition={(conditionId, input) =>
               void resolveDecisionCondition(conditionId, input)
             }
+          />
+        )}
+
+        {isPatron && (
+          <DecisionRiskRequirementsPanel
+            caseId={selectedCaseId}
+            links={decisionRiskRequirements.links}
+            nextCursor={decisionRiskRequirements.nextCursor}
+            selectedLinkId={decisionRiskRequirements.selectedLinkId}
+            pricingItems={decisionRiskRequirements.pricingItems}
+            search={decisionRiskRequirements.search}
+            loading={decisionRiskRequirements.loading}
+            searching={decisionRiskRequirements.searching}
+            formatDate={formatDate}
+            onRefresh={() => void decisionRiskRequirements.refresh()}
+            onLoadMore={() => void decisionRiskRequirements.loadMore()}
+            onSelectLink={decisionRiskRequirements.setSelectedLinkId}
+            onSearchChange={decisionRiskRequirements.setSearch}
+            onReconcilePricing={() => void decisionRiskRequirements.reconcilePricing()}
           />
         )}
 

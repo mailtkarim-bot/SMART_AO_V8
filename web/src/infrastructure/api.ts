@@ -44,6 +44,8 @@ import type {
   FreezeDecisionContextResponse,
   ResolveDecisionConditionRequest,
   ResolveDecisionConditionResponse,
+  DecisionRiskRequirementPage,
+  DecisionPricingReconciliationResponse,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -316,6 +318,28 @@ export function createApiClient(
       request<PatronDecisionDossier>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decision-dossier`,
       ),
+    listDecisionRiskRequirementLinks: (
+      caseId: string,
+      limit = 20,
+      cursor?: string,
+    ) => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (cursor) params.set("cursor", cursor);
+      return request<DecisionRiskRequirementPage>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/risk-requirement-links?${params.toString()}`,
+      );
+    },
+    reconcileDecisionPricing: (
+      caseId: string,
+      linkId: string,
+      search: string,
+      limit = 20,
+    ) => {
+      const params = new URLSearchParams({ search, limit: String(limit) });
+      return request<DecisionPricingReconciliationResponse>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/risk-requirement-links/${encodeURIComponent(linkId)}/pricing-reconciliation?${params.toString()}`,
+      );
+    },
     createDecision: (caseId: string, input: CreateDecisionRequest) =>
       request<CreateDecisionResponse>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decisions`,
