@@ -150,6 +150,32 @@ describe("Decision lifecycle transport", () => {
 });
 
 
+describe("Preparation generated document transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads preview and download content with encoded package/document ids", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("# Document contrôlé", { status: 200, headers: { "Content-Type": "text/markdown" } }))
+      .mockResolvedValueOnce(new Response("# Document contrôlé", { status: 200, headers: { "Content-Type": "text/markdown" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiClient("https://app.example.test", "access-1");
+
+    await expect(client.getGeneratedDocumentContent("package/1", "document/1").then((blob) => blob.text())).resolves.toBe("# Document contrôlé");
+    await expect(client.getGeneratedDocumentContent("package/1", "document/1", true).then((blob) => blob.text())).resolves.toBe("# Document contrôlé");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://app.example.test/api/v1/collaborator/preparation/package%2F1/documents/document%2F1/content",
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "https://app.example.test/api/v1/collaborator/preparation/package%2F1/documents/document%2F1/content?download=true",
+    );
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).credentials).toBe("include");
+    expect(((fetchMock.mock.calls[0]?.[1] as RequestInit).headers as Headers).get("Accept")).toBe("text/markdown");
+  });
+});
+
 describe("Decision risk requirement transport", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

@@ -14,6 +14,9 @@ type CollaboratorWizardPanelProps = {
   wizardOutcome: WizardOutcome;
   wizardSnapshotId: string;
   wizardTransmissionId: string;
+  wizardPreviewDocumentId: string | null;
+  wizardPreviewContent: string | null;
+  wizardDocumentBusy: boolean;
   setWizardCaseId: Dispatch<SetStateAction<string>>;
   setWizardPackageId: Dispatch<SetStateAction<string>>;
   setWizardTaskId: Dispatch<SetStateAction<string>>;
@@ -28,6 +31,8 @@ type CollaboratorWizardPanelProps = {
   onEvaluateReadiness: () => void;
   onGenerateDocument: () => void;
   onTransmitSnapshot: () => void;
+  onPreviewDocument: (documentId: string) => void;
+  onDownloadDocument: (documentId: string) => void;
 };
 
 export function CollaboratorWizardPanel({
@@ -47,6 +52,9 @@ export function CollaboratorWizardPanel({
   setWizardOutcome,
   setWizardSnapshotId,
   setWizardTransmissionId,
+  wizardPreviewDocumentId,
+  wizardPreviewContent,
+  wizardDocumentBusy,
   onLoad,
   onClaimTask,
   onRecordResult,
@@ -54,6 +62,8 @@ export function CollaboratorWizardPanel({
   onEvaluateReadiness,
   onGenerateDocument,
   onTransmitSnapshot,
+  onPreviewDocument,
+  onDownloadDocument,
 }: CollaboratorWizardPanelProps) {
   return (
     <section className="section-block wizard-section" id="collaborator-wizard-section">
@@ -252,12 +262,43 @@ export function CollaboratorWizardPanel({
                 <div className="document-list">
                   {wizardPackage.generated_documents.map((document) => (
                     <div className="document-row" key={document.document_id}>
-                      <strong>{document.document_kind}</strong>
-                      <span>
-                        v{document.version} · {document.state}
-                      </span>
+                      <div>
+                        <strong>{document.document_kind}</strong>
+                        <span>
+                          v{document.version} · {document.state}
+                        </span>
+                      </div>
+                      <div className="wizard-action-row">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={wizardDocumentBusy}
+                          onClick={() => onPreviewDocument(document.document_id)}
+                        >
+                          {wizardPreviewDocumentId === document.document_id ? "Actualiser l’aperçu" : "Aperçu"}
+                        </button>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          disabled={wizardDocumentBusy}
+                          onClick={() => onDownloadDocument(document.document_id)}
+                        >
+                          Télécharger
+                        </button>
+                      </div>
                     </div>
                   ))}
+                </div>
+              )}
+              {wizardPreviewContent !== null && (
+                <div className="document-preview" aria-live="polite">
+                  <div className="panel-heading">
+                    <div>
+                      <h3>Aperçu du document sélectionné</h3>
+                      <p>Contenu relu depuis le stockage privé ; aucun lien public n’est créé.</p>
+                    </div>
+                  </div>
+                  <pre>{wizardPreviewContent}</pre>
                 </div>
               )}
             </div>

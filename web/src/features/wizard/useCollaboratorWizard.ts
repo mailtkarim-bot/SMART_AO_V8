@@ -21,6 +21,9 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
   const [wizardOutcome, setWizardOutcome] = useState<WizardOutcome>("RECORDED");
   const [wizardSnapshotId, setWizardSnapshotId] = useState("");
   const [wizardTransmissionId, setWizardTransmissionId] = useState("");
+  const [wizardPreviewDocumentId, setWizardPreviewDocumentId] = useState<string | null>(null);
+  const [wizardPreviewContent, setWizardPreviewContent] = useState<string | null>(null);
+  const [wizardDocumentBusy, setWizardDocumentBusy] = useState(false);
 
   async function loadCollaboratorWizard(notify = true) {
     if (!wizardPackageId.trim() || !wizardCaseId.trim()) {
@@ -87,6 +90,45 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
         tone: "error",
         text: error instanceof Error ? error.message : "La génération documentaire a échoué.",
       });
+    }
+  }
+
+  async function previewWizardDocument(documentId: string) {
+    if (!wizardPackage) return;
+    setWizardDocumentBusy(true);
+    try {
+      const blob = await api.getGeneratedDocumentContent(wizardPackage.package_id, documentId);
+      setWizardPreviewDocumentId(documentId);
+      setWizardPreviewContent(await blob.text());
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de prévisualiser le document.",
+      });
+    } finally {
+      setWizardDocumentBusy(false);
+    }
+  }
+
+  async function downloadWizardDocument(documentId: string) {
+    if (!wizardPackage) return;
+    setWizardDocumentBusy(true);
+    try {
+      const blob = await api.getGeneratedDocumentContent(wizardPackage.package_id, documentId, true);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "document-genere.md";
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setMessage({ tone: "success", text: "Document généré téléchargé." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de télécharger le document.",
+      });
+    } finally {
+      setWizardDocumentBusy(false);
     }
   }
 
@@ -168,6 +210,9 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
     wizardOutcome,
     wizardSnapshotId,
     wizardTransmissionId,
+    wizardPreviewDocumentId,
+    wizardPreviewContent,
+    wizardDocumentBusy,
     setWizardCaseId,
     setWizardPackageId,
     setWizardTaskId,
@@ -175,6 +220,8 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
     setWizardOutcome,
     setWizardSnapshotId,
     setWizardTransmissionId,
+    previewWizardDocument,
+    downloadWizardDocument,
     loadCollaboratorWizard,
     refreshCollaboratorWizard,
     evaluateWizardReadiness,

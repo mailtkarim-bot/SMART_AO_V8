@@ -248,6 +248,32 @@ def test_collaborator_preparation_readiness_generation_and_public_projection(
     assert "storage_key" not in str(body)
     assert "content_sha256" not in str(body)
 
+    document_id = body["generated_documents"][0]["document_id"]
+    preview = client.get(
+        f"/api/v1/collaborator/preparation/{package_id}/documents/{document_id}/content",
+        headers=headers,
+    )
+    assert preview.status_code == 200
+    assert preview.headers["content-type"].startswith("text/markdown")
+    assert preview.headers["content-disposition"].startswith("inline;")
+    assert preview.headers["cache-control"] == "no-store"
+    assert preview.headers["x-content-type-options"] == "nosniff"
+    assert "Réponse technique" in preview.text
+
+    download = client.get(
+        f"/api/v1/collaborator/preparation/{package_id}/documents/{document_id}/content?download=true",
+        headers=headers,
+    )
+    assert download.status_code == 200
+    assert download.headers["content-disposition"].startswith("attachment;")
+    assert download.content == preview.content
+
+    missing_document = client.get(
+        f"/api/v1/collaborator/preparation/{package_id}/documents/{uuid4()}/content",
+        headers=headers,
+    )
+    assert missing_document.status_code == 404
+
 
 def _dce_version_id(session_factory, tenant_id):
     from app.modules.dce.infrastructure.models.dce_version import DceVersionRecord
