@@ -61,6 +61,7 @@ function renderPanel(
     wizardPreviewDocumentId: null,
     wizardPreviewContent: null,
     wizardDocumentBusy: false,
+    wizardDocumentKind: "TECHNICAL_RESPONSE",
     setWizardCaseId: vi.fn(),
     setWizardPackageId: vi.fn(),
     setWizardTaskId: vi.fn(),
@@ -68,6 +69,7 @@ function renderPanel(
     setWizardOutcome: vi.fn(),
     setWizardSnapshotId: vi.fn(),
     setWizardTransmissionId: vi.fn(),
+    setWizardDocumentKind: vi.fn(),
     onLoad: vi.fn(),
     onClaimTask: vi.fn(),
     onRecordResult: vi.fn(),
@@ -111,6 +113,7 @@ describe("CollaboratorWizardPanel", () => {
     expect(screen.getByText("OPTIONAL_REFERENCE_MISSING")).toBeInTheDocument();
     expect(screen.getByText("TECHNICAL_RESPONSE")).toBeInTheDocument();
     expect(screen.getByText("Enregistrer le résultat")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "DC4" })).toBeInTheDocument();
   });
 
   it("delegates document preview and download actions", () => {
