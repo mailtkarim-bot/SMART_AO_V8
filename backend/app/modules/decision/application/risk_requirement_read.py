@@ -5,6 +5,8 @@ from uuid import UUID
 
 from app.modules.decision.application.pagination import decode_cursor
 from app.modules.decision.application.queries import (
+    DecisionCctpPricingCrossingProjection,
+    DecisionCctpPricingCrossingReader,
     DecisionPricingReconciliationProjection,
     DecisionPricingReconciliationReader,
     DecisionRiskRequirementPage,
@@ -28,9 +30,11 @@ class PatronDecisionRiskRequirementReadService:
         reader: DecisionRiskRequirementReader,
         pricing_reader: DecisionPricingReconciliationReader,
         policy: AuthorizationPolicyPort,
+        crossing_reader: DecisionCctpPricingCrossingReader | None = None,
     ) -> None:
         self._reader = reader
         self._pricing_reader = pricing_reader
+        self._crossing_reader = crossing_reader
         self._policy = policy
 
     def list_links(
@@ -83,6 +87,25 @@ class PatronDecisionRiskRequirementReadService:
         if result is None:
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
         return result
+
+    def cross_cctp_pricing(
+        self,
+        *,
+        actor: ActorContext,
+        case_id: UUID,
+        limit: int,
+        now: datetime,
+    ) -> tuple[DecisionCctpPricingCrossingProjection, ...]:
+        self._authorize(actor=actor, case_id=case_id, now=now)
+        if self._crossing_reader is None:
+            raise RuntimeError("CCTP_PRICING_CROSSING_NOT_CONFIGURED")
+        if not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+        return self._crossing_reader.cross(
+            tenant_id=actor.tenant_id,
+            case_id=case_id,
+            limit=limit,
+        )
 
     def _authorize(self, *, actor: ActorContext, case_id: UUID, now: datetime) -> None:
         if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:

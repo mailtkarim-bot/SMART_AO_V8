@@ -117,6 +117,38 @@ class DecisionPricingReconciliationReader(Protocol):
     ) -> tuple[DecisionPricingReconciliationProjection, ...] | None: ...
 
 
+@dataclass(frozen=True, slots=True)
+class DecisionCctpPricingCrossingProjection:
+    """Closed read model for one deterministic CCTP-to-pricing candidate."""
+
+    dce_version_id: UUID
+    source_fragment_id: UUID
+    source_locator_label: str
+    source_start_byte_offset: int
+    source_end_byte_offset: int
+    batch_id: UUID
+    document_kind: str
+    row_number: int
+    code: str | None
+    designation: str | None
+    unit: str | None
+    match_score_bps: int
+    match_basis: str
+    verification_status: str
+
+
+class DecisionCctpPricingCrossingReader(Protocol):
+    """Finds deterministic CCTP-to-DPGF/BPU candidates for one applicable DCE."""
+
+    def cross(
+        self,
+        *,
+        tenant_id: UUID,
+        case_id: UUID,
+        limit: int,
+    ) -> tuple[DecisionCctpPricingCrossingProjection, ...]: ...
+
+
 class DecisionDossierReader(Protocol):
     """Reads one tenant-scoped patron dossier without exposing ORM records."""
 

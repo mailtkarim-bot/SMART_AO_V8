@@ -50,3 +50,29 @@ class DecisionPricingReconciliationResponse(BaseModel):
     link_id: UUID
     search: str
     items: list[DecisionPricingReconciliationItem]
+
+
+class DecisionCctpPricingCrossingItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dce_version_id: UUID
+    source_fragment_id: UUID
+    source_locator_label: str
+    source_start_byte_offset: int
+    source_end_byte_offset: int
+    batch_id: UUID
+    document_kind: str
+    row_number: int
+    code: str | None
+    designation: str | None
+    unit: str | None
+    match_score_bps: int
+    match_basis: str
+    verification_status: str
+
+
+class DecisionCctpPricingCrossingResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: UUID
+    items: list[DecisionCctpPricingCrossingItem]
