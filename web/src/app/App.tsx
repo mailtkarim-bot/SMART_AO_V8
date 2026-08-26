@@ -32,6 +32,7 @@ import type {
   PatronDecisionDossier,
   FreezeDecisionContextRequest,
   ResolveDecisionConditionRequest,
+  FinalizeGoNoGoDecisionRequest,
   PricingScenario,
   CreateCaseInput,
 } from "../shared/types";
@@ -342,6 +343,20 @@ function App() {
     }
   }
 
+  async function finalizeDecision(input: FinalizeGoNoGoDecisionRequest) {
+    if (!selectedCaseId || !decisionDossier || currentActor?.actor_kind !== "PATRON_ADMIN") return;
+    try {
+      await api.finalizeDecision(selectedCaseId, decisionDossier.decision_id, input);
+      await refreshDecisionDossier(selectedCaseId);
+      setMessage({ tone: "success", text: `Décision ${input.outcome} finalisée.` });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Impossible de finaliser la décision.",
+      });
+    }
+  }
+
   async function refreshDecisionDossier(caseId: string) {
     try {
       setDecisionDossier(await api.getDecisionDossier(caseId));
@@ -580,6 +595,7 @@ function App() {
             onResolveCondition={(conditionId, input) =>
               void resolveDecisionCondition(conditionId, input)
             }
+            onFinalize={(input) => void finalizeDecision(input)}
           />
         )}
 

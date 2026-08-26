@@ -208,6 +208,33 @@ export type ResolveDecisionConditionResponse = DecisionCommandReceipt & {
   version: number;
 };
 
+export type ConditionalGoConditionRequest = {
+  condition_id: string;
+  label: string;
+  owner_actor_id: string;
+  due_at?: string;
+  due_date_absence_reason?: string;
+  failure_consequence: string;
+};
+
+export type FinalizeGoNoGoDecisionRequest = {
+  expected_revision: number;
+  displayed_fingerprint: string;
+  outcome: "GO" | "CONDITIONAL_GO" | "NO_GO";
+  justification: string;
+  conditions?: ConditionalGoConditionRequest[];
+  command_id?: string;
+  idempotency_key?: string;
+};
+
+export type FinalizeGoNoGoDecisionResponse = DecisionCommandReceipt & {
+  result_code: "DECISION_FINALIZED";
+  decision_id: string;
+  outcome: "GO" | "CONDITIONAL_GO" | "NO_GO";
+  condition_count: number;
+  version: number;
+};
+
 export type PatronDecisionDossier = {
   decision_id: string;
   aggregate_revision: number;
@@ -223,6 +250,7 @@ export type PatronDecisionDossier = {
   risks: unknown[];
   conditions: Array<{ condition_id: string; label: string; status: string; due_at: string | null; failure_consequence: string }>;
   sources: Array<{ aggregate_type: string; aggregate_id: string; aggregate_revision: number; role: string }>;
+  context_fingerprint: string | null;
 };
 
 export type DecisionRiskRequirementLink = {

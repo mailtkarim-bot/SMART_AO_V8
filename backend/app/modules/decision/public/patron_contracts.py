@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DecisionConditionResponse(BaseModel):
@@ -41,3 +41,9 @@ class PatronDecisionDossierResponse(BaseModel):
     risks: list[object]
     conditions: list[DecisionConditionResponse]
     sources: list[DecisionSourceResponse]
+    context_fingerprint: str | None = Field(
+        default=None,
+        min_length=64,
+        max_length=64,
+        pattern=r"^[a-fA-F0-9]{64}$",
+    )

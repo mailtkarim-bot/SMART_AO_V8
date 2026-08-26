@@ -44,6 +44,8 @@ import type {
   FreezeDecisionContextResponse,
   ResolveDecisionConditionRequest,
   ResolveDecisionConditionResponse,
+  FinalizeGoNoGoDecisionRequest,
+  FinalizeGoNoGoDecisionResponse,
   DecisionRiskRequirementPage,
   DecisionPricingReconciliationResponse,
 } from "../shared/types";
@@ -391,6 +393,26 @@ export function createApiClient(
             target_status: input.target_status,
             evidence_reference: input.evidence_reference,
             failure_reason: input.failure_reason,
+          }),
+        },
+      ),
+    finalizeDecision: (
+      caseId: string,
+      decisionId: string,
+      input: FinalizeGoNoGoDecisionRequest,
+    ) =>
+      request<FinalizeGoNoGoDecisionResponse>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decisions/${encodeURIComponent(decisionId)}/go-no-go`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: input.command_id ?? makeId(),
+            idempotency_key: input.idempotency_key ?? makeId(),
+            expected_revision: input.expected_revision,
+            displayed_fingerprint: input.displayed_fingerprint,
+            outcome: input.outcome,
+            justification: input.justification,
+            conditions: input.conditions ?? [],
           }),
         },
       ),

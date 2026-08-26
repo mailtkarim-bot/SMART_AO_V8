@@ -56,6 +56,7 @@ def test_patron_decision_dossier_projects_selected_context_and_conditions(sessio
         id=context_id,
         canonical_context_json={"known": ["RC"], "risks": ["DEADLINE"]},
         unknowns_json=["VISIT_DATE"],
+        context_fingerprint="a" * 64,
     )
     reference = SimpleNamespace(
         aggregate_type="DceVersion",
@@ -87,6 +88,7 @@ def test_patron_decision_dossier_projects_selected_context_and_conditions(sessio
     assert result.risks == ("DEADLINE",)
     assert result.sources[0]["role"] == "SOURCE"
     assert result.conditions[0]["status"] == "OPEN"
+    assert result.context_fingerprint == "a" * 64
 
 
 def test_patron_decision_dossier_falls_back_to_latest_context(session_factory):
@@ -103,7 +105,10 @@ def test_patron_decision_dossier_falls_back_to_latest_context(session_factory):
         final_justification=None,
     )
     context = SimpleNamespace(
-        id=uuid4(), canonical_context_json={"references": [], "risks": []}, unknowns_json=[]
+        id=uuid4(),
+        canonical_context_json={"references": [], "risks": []},
+        unknowns_json=[],
+        context_fingerprint="b" * 64,
     )
     session = MagicMock()
     session.scalar.side_effect = [record, None, context]
@@ -115,6 +120,7 @@ def test_patron_decision_dossier_falls_back_to_latest_context(session_factory):
     )
     assert result.decision_id == record.id
     assert result.sources == ()
+    assert result.context_fingerprint == "b" * 64
 
 
 def test_patron_decision_dossier_refuses_missing_record_and_context(session_factory):
@@ -137,9 +143,7 @@ def test_patron_decision_dossier_refuses_missing_record_and_context(session_fact
     )
     missing_context = MagicMock()
     missing_context.scalar.side_effect = [record, None, None]
-    result = _service(missing_context).read(
-        actor=actor, case_id=case_id, now=datetime.now(tz=UTC)
-    )
+    result = _service(missing_context).read(actor=actor, case_id=case_id, now=datetime.now(tz=UTC))
     assert result.context_status == "INCOMPLETE"
     assert result.sources == ()
 
@@ -155,9 +159,7 @@ def test_patron_decision_dossier_refuses_non_patron_and_denied_policy(session_fa
         capabilities=capabilities_for(ActorKind.COLLABORATEUR),
     )
     with pytest.raises(PermissionError, match="PATRON_REQUIRED"):
-        _service(MagicMock()).read(
-            actor=collaborator, case_id=case_id, now=datetime.now(tz=UTC)
-        )
+        _service(MagicMock()).read(actor=collaborator, case_id=case_id, now=datetime.now(tz=UTC))
     denied = PatronDecisionDossierService(
         reader=SqlAlchemyDecisionDossierReader(lambda: _SessionContext(MagicMock())),
         policy=_DenyPolicy(),

@@ -25,6 +25,7 @@ class DecisionDossierContext:
     id: UUID
     canonical_context_json: Mapping[str, object]
     unknowns_json: tuple[object, ...]
+    context_fingerprint: str
 
 
 @dataclass(frozen=True, slots=True)
