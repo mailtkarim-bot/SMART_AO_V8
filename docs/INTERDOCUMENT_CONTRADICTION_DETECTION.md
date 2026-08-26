@@ -11,6 +11,7 @@ GET /api/v1/patron/cases/{case_id}/document-contradictions?limit=25
 ```
 
 La lecture est tenant-scoped et case-scoped. Les résultats sont calculés à partir de données persistées et reçoivent toujours le statut `REVIEW_REQUIRED`.
+La projection est en lecture seule : elle ne crée pas de mutation métier et ne confirme aucune contradiction sans validation patronale.
 
 ## Taxonomie fermée v1
 
