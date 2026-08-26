@@ -16,9 +16,6 @@ from app.modules.membership.application.assignment import (
     AssignmentInteractionService,
     assignment_handlers,
 )
-from app.modules.membership.infrastructure.assignment_management_reader import (
-    SqlAlchemyAssignmentManagementReader,
-)
 from app.platform.events.dispatcher import CommandDispatcher
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
@@ -168,7 +165,6 @@ def _seed_assignment(session_factory: sessionmaker[Session]) -> tuple[ActorConte
 def _service(session_factory: sessionmaker[Session]) -> AssignmentInteractionService:
     return AssignmentInteractionService(
         session_factory=session_factory,
-        reader=SqlAlchemyAssignmentManagementReader(session_factory),
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
             handlers=assignment_handlers(),

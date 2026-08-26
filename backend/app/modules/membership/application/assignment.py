@@ -16,10 +16,6 @@ from app.modules.dce.application.commands import (
     ReportAssignmentUnavailabilityCommand,
     RequestAssignmentClarificationCommand,
 )
-from app.modules.membership.application.queries import (
-    AssignmentManagementReader,
-    AssignmentManagementTarget,
-)
 from app.modules.membership.infrastructure.records import (
     AssignmentClarificationRequestRecord,
     CaseAssignmentAcknowledgementRecord,
@@ -63,13 +59,11 @@ class AssignmentInteractionService:
         self,
         *,
         session_factory: sessionmaker[Session],
-        reader: AssignmentManagementReader,
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
         audit_writer: SecurityAuditWriter | None = None,
     ) -> None:
         self._session_factory = session_factory
-        self._reader = reader
         self._dispatcher = dispatcher
         self._policy = policy
         self._audit_writer = audit_writer or SecurityAuditWriter()
@@ -207,14 +201,15 @@ class AssignmentInteractionService:
         tenant_id: UUID,
         membership_id: UUID,
         assignment_id: UUID,
-    ) -> AssignmentManagementTarget | None:
-        assignment = self._reader.get_assignment(
-            tenant_id=tenant_id,
-            assignment_id=assignment_id,
-        )
-        if assignment is None:
-            return None
-        return assignment if assignment.membership_id == membership_id else None
+    ) -> CaseAssignmentRecord | None:
+        with self._session_factory() as session:
+            return session.scalar(
+                sa.select(CaseAssignmentRecord).where(
+                    CaseAssignmentRecord.tenant_id == tenant_id,
+                    CaseAssignmentRecord.membership_id == membership_id,
+                    CaseAssignmentRecord.id == assignment_id,
+                )
+            )
 
 
 class AssignmentInteractionHandler:
