@@ -42,8 +42,4 @@ class SqlAlchemyAssignmentManagementReader:
             )
         if record is None:
             return None
-        return AssignmentManagementTarget(
-            id=record.id,
-            case_id=record.case_id,
-            membership_id=record.membership_id,
-        )
+        return AssignmentManagementTarget(id=record.id, case_id=record.case_id)

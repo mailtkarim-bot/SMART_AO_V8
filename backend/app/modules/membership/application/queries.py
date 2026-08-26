@@ -45,7 +45,6 @@ class AssignmentManagementCase:
 class AssignmentManagementTarget:
     id: UUID
     case_id: UUID
-    membership_id: UUID
 
 
 class AssignmentManagementReader(Protocol):
