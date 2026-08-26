@@ -130,7 +130,9 @@ class RecordDceDocumentExtractionCommand(ApplicationCommand):
     input_sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
     extractor_id: str = Field(min_length=1, max_length=100)
     extractor_version: str = Field(min_length=1, max_length=64)
-    status: str = Field(pattern=r"^(COMPLETED|UNSUPPORTED|REJECTED_LIMIT|FAILED_SAFE)$")
+    status: str = Field(
+        pattern=r"^(COMPLETED|REVIEW_REQUIRED|UNSUPPORTED|REJECTED_LIMIT|FAILED_SAFE)$"
+    )
     extracted_char_count: int = Field(ge=0, le=10_000_000)
     failure_code: str | None = Field(default=None, max_length=120)
     fragments: list[DceExtractionFragmentInput] = Field(default_factory=list, max_length=500_000)
@@ -142,6 +144,11 @@ class RecordDceDocumentExtractionCommand(ApplicationCommand):
                 raise ValueError("completed extraction requires fragments and no failure code")
             if sum(len(fragment.text) for fragment in self.fragments) != self.extracted_char_count:
                 raise ValueError("completed extraction character count mismatch")
+        elif self.status == "REVIEW_REQUIRED":
+            if self.failure_code is None or not self.fragments:
+                raise ValueError("review-required extraction requires fragments and a reason")
+            if sum(len(fragment.text) for fragment in self.fragments) != self.extracted_char_count:
+                raise ValueError("review-required extraction character count mismatch")
         elif self.failure_code is None or self.fragments or self.extracted_char_count != 0:
             raise ValueError("failed extraction requires a code and no fragments")
         return self

@@ -67,6 +67,8 @@ class ExtractionProjection:
     status: str
     failure_code: str | None
     fragments: tuple[ExtractedFragment, ...]
+    extractor_id: str = EXTRACTOR_ID
+    extractor_version: str = EXTRACTOR_VERSION
 
 
 class ExtractionLimitError(ValueError):
@@ -197,7 +199,7 @@ def _recording_command(
 ) -> RecordDceDocumentExtractionCommand:
     extraction_identity = uuid5(
         document.id,
-        f"{document.sha256.lower()}:{EXTRACTOR_ID}:{EXTRACTOR_VERSION}",
+        f"{document.sha256.lower()}:{projection.extractor_id}:{projection.extractor_version}",
     )
     return RecordDceDocumentExtractionCommand(
         command_id=extraction_identity,
@@ -206,8 +208,8 @@ def _recording_command(
         extraction_id=extraction_identity,
         dce_document_id=document.id,
         input_sha256=document.sha256.lower(),
-        extractor_id=EXTRACTOR_ID,
-        extractor_version=EXTRACTOR_VERSION,
+        extractor_id=projection.extractor_id,
+        extractor_version=projection.extractor_version,
         status=projection.status,
         extracted_char_count=sum(len(fragment.text) for fragment in projection.fragments),
         failure_code=projection.failure_code,
@@ -230,6 +232,20 @@ def _project_document(
     advanced_extractor: AdvancedDocumentExtractionPort | None = None,
 ) -> ExtractionProjection:
     try:
+        native_unsupported = False
+        try:
+            fragments = tuple(_extract_fragments(media_type=media_type, source_bytes=source_bytes))
+        except ValueError as error:
+            if str(error) != "MEDIA_TYPE_UNSUPPORTED":
+                raise
+            native_unsupported = True
+            fragments = ()
+        if fragments:
+            return ExtractionProjection(
+                status="COMPLETED",
+                failure_code=None,
+                fragments=fragments,
+            )
         if advanced_extractor is not None:
             advanced_projection = advanced_extractor.extract(
                 media_type=media_type,
@@ -237,17 +253,16 @@ def _project_document(
             )
             if advanced_projection.status != "UNSUPPORTED":
                 return advanced_projection
-        fragments = tuple(_extract_fragments(media_type=media_type, source_bytes=source_bytes))
-        if not fragments:
+        if native_unsupported:
             return ExtractionProjection(
-                status="FAILED_SAFE",
-                failure_code="EMPTY_EXTRACTED_TEXT",
+                status="UNSUPPORTED",
+                failure_code="MEDIA_TYPE_UNSUPPORTED",
                 fragments=(),
             )
         return ExtractionProjection(
-            status="COMPLETED",
-            failure_code=None,
-            fragments=fragments,
+            status="FAILED_SAFE",
+            failure_code="EMPTY_EXTRACTED_TEXT",
+            fragments=(),
         )
     except ExtractionLimitError:
         return ExtractionProjection(
@@ -302,8 +317,10 @@ def _extract_pdf(*, source_bytes: bytes) -> tuple[ExtractedFragment, ...]:
     if len(reader.pages) > MAX_PDF_PAGES:
         raise ExtractionLimitError
     return _fragmentize(
-        (({"kind": "pdf_page", "page": page_number}, page.extract_text() or "")
-         for page_number, page in enumerate(reader.pages, start=1))
+        (
+            ({"kind": "pdf_page", "page": page_number}, page.extract_text() or "")
+            for page_number, page in enumerate(reader.pages, start=1)
+        )
     )
 
 
@@ -328,8 +345,10 @@ def _extract_docx(*, source_bytes: bytes) -> tuple[ExtractedFragment, ...]:
     if len(document.paragraphs) > MAX_DOCX_PARAGRAPHS:
         raise ExtractionLimitError
     return _fragmentize(
-        (({"kind": "docx_paragraph", "paragraph": index}, paragraph.text)
-         for index, paragraph in enumerate(document.paragraphs, start=1))
+        (
+            ({"kind": "docx_paragraph", "paragraph": index}, paragraph.text)
+            for index, paragraph in enumerate(document.paragraphs, start=1)
+        )
     )
 
 

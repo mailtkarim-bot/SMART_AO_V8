@@ -44,7 +44,8 @@ class DceDocumentExtractionRecord(TenantScopedRecord, Base):
             name="uq_dce_extract__document_input_extractor",
         ),
         sa.CheckConstraint(
-            "status IN ('COMPLETED', 'UNSUPPORTED', 'REJECTED_LIMIT', 'FAILED_SAFE')",
+            "status IN ('COMPLETED', 'REVIEW_REQUIRED', 'UNSUPPORTED', "
+            "'REJECTED_LIMIT', 'FAILED_SAFE')",
             name="status",
         ),
         sa.CheckConstraint("fragment_count >= 0", name="fragment_count_nonnegative"),
