@@ -145,8 +145,10 @@ from app.modules.decision.application.lifecycle import (
 from app.modules.decision.application.patron_dossier import PatronDecisionDossierService
 from app.modules.decision.application.risk import (
     PatronDecisionRiskService,
+    PatronDecisionRiskTreatmentService,
     decision_risk_handlers,
 )
+from app.modules.decision.application.risk_read import PatronDecisionRiskReadService
 from app.modules.decision.application.risk_requirement import (
     PatronDecisionRiskRequirementService,
     decision_risk_requirement_link_handlers,
@@ -843,6 +845,15 @@ def create_app(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
+        patron_decision_risk_treatment_service = PatronDecisionRiskTreatmentService(
+            dispatcher=runtime.dispatcher,
+            policy=security_policy,
+        )
+        patron_decision_risk_read_service = PatronDecisionRiskReadService(
+            session_factory=runtime.session_factory,
+            reader=SqlAlchemyDecisionRiskRepository(),
+            policy=security_policy,
+        )
         patron_decision_risk_requirement_service = PatronDecisionRiskRequirementService(
             dispatcher=runtime.dispatcher,
             policy=security_policy,
@@ -1111,6 +1122,8 @@ def create_app(
             build_patron_decision_router(
                 service=patron_decision_dossier_service,
                 risk_service=patron_decision_risk_service,
+                risk_treatment_service=patron_decision_risk_treatment_service,
+                risk_read_service=patron_decision_risk_read_service,
                 risk_requirement_service=patron_decision_risk_requirement_service,
                 risk_requirement_read_service=patron_decision_risk_requirement_read_service,
                 finalization_service=patron_decision_finalization_service,

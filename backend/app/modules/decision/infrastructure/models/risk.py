@@ -83,3 +83,71 @@ class DecisionRiskRecord(TenantScopedRecord, Base):
     idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     due_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+
+class DecisionRiskTreatmentTransitionRecord(TenantScopedRecord, Base):
+    """Immutable treatment transition with patron evidence."""
+
+    __tablename__ = "decision_risk_treatment_transitions"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["tenant_id"],
+            ["tenants.id"],
+            name="fk_decision_risk_transitions__tenant",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id", "risk_id"],
+            ["decision_risks.tenant_id", "decision_risks.id"],
+            name="fk_decision_risk_transitions__risk",
+            ondelete="RESTRICT",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_decision_risk_transitions__tenant_id"),
+        sa.UniqueConstraint(
+            "tenant_id", "command_id", name="uq_decision_risk_transitions__command"
+        ),
+        sa.UniqueConstraint(
+            "tenant_id", "idempotency_key", name="uq_decision_risk_transitions__idempotency"
+        ),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "risk_id",
+            "aggregate_revision",
+            name="uq_decision_risk_transitions__revision",
+        ),
+        sa.CheckConstraint(
+            "(from_treatment = 'OPEN' AND to_treatment IN ('ACCEPTED', 'MITIGATED')) OR "
+            "(from_treatment = 'ACCEPTED' AND to_treatment = 'MITIGATED')",
+            name="valid_transition",
+        ),
+        sa.CheckConstraint("aggregate_revision > 1", name="positive_transition_revision"),
+        sa.CheckConstraint("char_length(btrim(evidence_excerpt)) > 0", name="evidence_nonempty"),
+        sa.CheckConstraint("char_length(btrim(rationale)) > 0", name="rationale_nonempty"),
+        sa.CheckConstraint(
+            "evidence_start_byte_offset >= 0 AND "
+            "evidence_end_byte_offset > evidence_start_byte_offset",
+            name="evidence_offsets_ordered",
+        ),
+        sa.Index(
+            "ix_decision_risk_transitions__tenant_risk_revision",
+            "tenant_id",
+            "risk_id",
+            "aggregate_revision",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    risk_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    from_treatment: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    to_treatment: Mapped[str] = mapped_column(sa.String(16), nullable=False)
+    evidence_excerpt: Mapped[str] = mapped_column(sa.String(2_000), nullable=False)
+    evidence_locator_json: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    evidence_start_byte_offset: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    evidence_end_byte_offset: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    rationale: Mapped[str] = mapped_column(sa.String(2_000), nullable=False)
+    aggregate_revision: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    actor_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    membership_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    command_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    idempotency_key: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)

@@ -11,8 +11,15 @@ from app.modules.dce.infrastructure.models.dce_extraction import (
     DceDocumentExtractionFragmentRecord,
     DceDocumentExtractionRecord,
 )
-from app.modules.decision.application.ports import DecisionRiskDraft
-from app.modules.decision.infrastructure.models.risk import DecisionRiskRecord
+from app.modules.decision.application.ports import (
+    DecisionRiskDraft,
+    DecisionRiskSnapshot,
+    DecisionRiskTreatmentTransitionDraft,
+)
+from app.modules.decision.infrastructure.models.risk import (
+    DecisionRiskRecord,
+    DecisionRiskTreatmentTransitionRecord,
+)
 
 
 class SqlAlchemyDecisionRiskRepository:
@@ -159,5 +166,103 @@ class SqlAlchemyDecisionRiskRepository:
                 idempotency_key=draft.idempotency_key,
                 correlation_id=draft.correlation_id,
                 due_at=draft.due_at,
+            )
+        )
+
+    def get_current(
+        self, *, session: object, tenant_id: UUID, case_id: UUID, risk_id: UUID
+    ) -> DecisionRiskSnapshot | None:
+        db_session = cast(Session, session)
+        risk = db_session.scalar(
+            sa.select(DecisionRiskRecord).where(
+                DecisionRiskRecord.tenant_id == tenant_id,
+                DecisionRiskRecord.case_id == case_id,
+                DecisionRiskRecord.id == risk_id,
+            )
+        )
+        if risk is None:
+            return None
+        latest = db_session.scalar(
+            sa.select(DecisionRiskTreatmentTransitionRecord)
+            .where(
+                DecisionRiskTreatmentTransitionRecord.tenant_id == tenant_id,
+                DecisionRiskTreatmentTransitionRecord.risk_id == risk_id,
+            )
+            .order_by(DecisionRiskTreatmentTransitionRecord.aggregate_revision.desc())
+            .limit(1)
+        )
+        evidence = None
+        if latest is not None:
+            evidence = {
+                "excerpt": latest.evidence_excerpt,
+                "locator": dict(latest.evidence_locator_json),
+                "start_byte_offset": latest.evidence_start_byte_offset,
+                "end_byte_offset": latest.evidence_end_byte_offset,
+                "rationale": latest.rationale,
+            }
+        return DecisionRiskSnapshot(
+            id=risk.id,
+            tenant_id=risk.tenant_id,
+            case_id=risk.case_id,
+            dce_version_id=risk.dce_version_id,
+            source_fragment_id=risk.source_fragment_id,
+            risk_code=risk.risk_code,
+            category=risk.category,
+            title=risk.title,
+            severity=risk.severity,
+            likelihood=risk.likelihood,
+            treatment=latest.to_treatment if latest is not None else risk.treatment,
+            revision=latest.aggregate_revision if latest is not None else 1,
+            due_at=risk.due_at,
+            latest_treatment_evidence=evidence,
+        )
+
+    def transition(
+        self, *, session: object, draft: DecisionRiskTreatmentTransitionDraft
+    ) -> None:
+        db_session = cast(Session, session)
+        risk = db_session.scalar(
+            sa.select(DecisionRiskRecord)
+            .where(
+                DecisionRiskRecord.tenant_id == draft.tenant_id,
+                DecisionRiskRecord.id == draft.risk_id,
+            )
+            .with_for_update()
+        )
+        if risk is None:
+            raise ValueError("RISK_NOT_FOUND_OR_FORBIDDEN")
+        latest = db_session.scalar(
+            sa.select(DecisionRiskTreatmentTransitionRecord)
+            .where(
+                DecisionRiskTreatmentTransitionRecord.tenant_id == draft.tenant_id,
+                DecisionRiskTreatmentTransitionRecord.risk_id == draft.risk_id,
+            )
+            .order_by(DecisionRiskTreatmentTransitionRecord.aggregate_revision.desc())
+            .limit(1)
+        )
+        current_treatment = latest.to_treatment if latest is not None else risk.treatment
+        current_revision = latest.aggregate_revision if latest is not None else 1
+        if current_treatment != draft.from_treatment:
+            raise ValueError("RISK_TREATMENT_NOT_CURRENT")
+        if current_revision + 1 != draft.aggregate_revision:
+            raise ValueError("RISK_REVISION_CONFLICT")
+        db_session.add(
+            DecisionRiskTreatmentTransitionRecord(
+                id=draft.id,
+                tenant_id=draft.tenant_id,
+                risk_id=draft.risk_id,
+                from_treatment=draft.from_treatment,
+                to_treatment=draft.to_treatment,
+                evidence_excerpt=draft.evidence_excerpt,
+                evidence_locator_json=dict(draft.evidence_locator),
+                evidence_start_byte_offset=draft.evidence_start_byte_offset,
+                evidence_end_byte_offset=draft.evidence_end_byte_offset,
+                rationale=draft.rationale,
+                aggregate_revision=draft.aggregate_revision,
+                actor_id=draft.actor_id,
+                membership_id=draft.membership_id,
+                command_id=draft.command_id,
+                idempotency_key=draft.idempotency_key,
+                correlation_id=draft.correlation_id,
             )
         )

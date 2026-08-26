@@ -53,6 +53,8 @@ def _client(
     *,
     service=None,
     risk_service=None,
+    risk_treatment_service=None,
+    risk_read_service=None,
     risk_requirement_service=None,
     finalization_service=None,
     risk_requirement_read_service=None,
@@ -64,6 +66,8 @@ def _client(
         build_patron_decision_router(
             service=service or _DecisionService(),
             risk_service=risk_service,
+            risk_treatment_service=risk_treatment_service,
+            risk_read_service=risk_read_service,
             risk_requirement_service=risk_requirement_service,
             finalization_service=finalization_service,
             risk_requirement_read_service=risk_requirement_read_service,
@@ -170,6 +174,56 @@ class _RiskService:
             replayed=False,
         )
         return result
+
+
+class _RiskTreatmentService:
+    def __init__(self, *, error=None):
+        self.error = error
+        self.calls = []
+
+    def execute(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        command = kwargs["command"]
+        return SimpleNamespace(
+            command_id=str(command.command_id),
+            idempotency_key=str(command.idempotency_key),
+            result_code="DECISION_RISK_TREATMENT_TRANSITIONED",
+            aggregate_refs=[
+                {"aggregate_id": str(command.risk_id), "aggregate_revision": 2}
+            ],
+            event_ids=[str(uuid4())],
+            replayed=False,
+        )
+
+
+class _RiskReadService:
+    def __init__(self, *, error=None):
+        self.error = error
+
+    def read(self, **kwargs):
+        if self.error is not None:
+            raise self.error
+        return SimpleNamespace(
+            id=kwargs["risk_id"],
+            case_id=kwargs["case_id"],
+            dce_version_id=uuid4(),
+            risk_code="CCAP-DELAI-001",
+            category="CCAP",
+            title="Délai contractuel critique",
+            severity="HIGH",
+            likelihood="LIKELY",
+            treatment="ACCEPTED",
+            revision=2,
+            due_at=None,
+            latest_treatment_evidence={
+                "locator": {"page": 14},
+                "start_byte_offset": 50,
+                "end_byte_offset": 90,
+                "rationale": "Plan validé.",
+            },
+        )
 
 
 class _RiskRequirementService:
@@ -315,6 +369,22 @@ class _DecisionService:
         return _dossier(kwargs["case_id"])
 
 
+def _risk_treatment_payload():
+    return {
+        "command_id": str(uuid4()),
+        "idempotency_key": str(uuid4()),
+        "correlation_id": str(uuid4()),
+        "risk_id": str(uuid4()),
+        "expected_revision": 1,
+        "to_treatment": "ACCEPTED",
+        "evidence_excerpt": "Le plan d'action est confirmé.",
+        "evidence_locator": {"page": 14, "section": "mesures"},
+        "evidence_start_byte_offset": 50,
+        "evidence_end_byte_offset": 90,
+        "rationale": "Le plan est validé par le patron.",
+    }
+
+
 def _link_payload():
     return {
         "command_id": str(uuid4()),
@@ -404,6 +474,72 @@ def test_register_risk_rejects_forbidden_extra_fields():
     )
 
     assert response.status_code == 422
+
+
+def test_transition_risk_treatment_returns_closed_receipt_and_forwards_path_ids():
+    risk_service = _RiskTreatmentService()
+    case_id = uuid4()
+    risk_id = uuid4()
+
+    response = _client(risk_treatment_service=risk_service).post(
+        f"/api/v1/patron/cases/{case_id}/risks/{risk_id}/treatment",
+        json={**_risk_treatment_payload(), "risk_id": str(uuid4())},
+        headers=_headers(),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["result_code"] == "DECISION_RISK_TREATMENT_TRANSITIONED"
+    assert response.json()["treatment"] == "ACCEPTED"
+    command = risk_service.calls[0]["command"]
+    assert command.case_id == case_id
+    assert command.risk_id == risk_id
+    assert "evidence_excerpt" not in response.json()
+
+
+def test_transition_risk_treatment_maps_revision_conflict_to_409():
+    response = _client(
+        risk_treatment_service=_RiskTreatmentService(
+            error=CommandExecutionError("RISK_REVISION_CONFLICT")
+        )
+    ).post(
+        f"/api/v1/patron/cases/{uuid4()}/risks/{uuid4()}/treatment",
+        json=_risk_treatment_payload(),
+        headers=_headers(),
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "RISK_REVISION_CONFLICT"}
+
+
+def test_read_risk_returns_current_treatment_projection():
+    case_id = uuid4()
+    risk_id = uuid4()
+    response = _client(risk_read_service=_RiskReadService()).get(
+        f"/api/v1/patron/cases/{case_id}/risks/{risk_id}",
+        headers=_headers(),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["risk_id"] == str(risk_id)
+    assert body["case_id"] == str(case_id)
+    assert body["treatment"] == "ACCEPTED"
+    assert body["revision"] == 2
+    assert body["latest_treatment_evidence"]["rationale"] == "Plan validé."
+    assert "statement" not in body
+    assert "source_excerpt" not in body
+
+
+def test_read_risk_maps_not_found_to_404():
+    response = _client(
+        risk_read_service=_RiskReadService(error=PermissionError("NOT_FOUND_OR_FORBIDDEN"))
+    ).get(
+        f"/api/v1/patron/cases/{uuid4()}/risks/{uuid4()}",
+        headers=_headers(),
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "NOT_FOUND_OR_FORBIDDEN"}
 
 
 def test_link_risk_requirement_returns_closed_receipt_and_forwards_path_ids():

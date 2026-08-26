@@ -7,6 +7,22 @@ from pydantic import Field
 from app.platform.events.command_contracts import ApplicationCommand
 
 
+class TransitionStructuredRiskTreatmentCommand(ApplicationCommand):
+    """Append one patron decision for a registered risk treatment."""
+
+    command_type = "TransitionStructuredRiskTreatment"
+
+    risk_id: UUID
+    case_id: UUID
+    expected_revision: int = Field(ge=1)
+    to_treatment: Literal["ACCEPTED", "MITIGATED"]
+    evidence_excerpt: str = Field(min_length=1, max_length=2_000)
+    evidence_locator: dict[str, object]
+    evidence_start_byte_offset: int = Field(ge=0)
+    evidence_end_byte_offset: int = Field(gt=0)
+    rationale: str = Field(min_length=1, max_length=2_000)
+
+
 class RegisterStructuredRiskCommand(ApplicationCommand):
     """Register one immutable patron risk sourced from a DCE extraction fragment."""
 
