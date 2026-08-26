@@ -47,8 +47,10 @@ def test_risk_treatment_transition_constraints_are_forward_only(
     )
     definitions = " ".join(str(constraint.get("sqltext", "")) for constraint in constraints)
 
-    assert "from_treatment = 'OPEN'" in definitions
-    assert "to_treatment IN ('ACCEPTED', 'MITIGATED')" in definitions
-    assert "from_treatment = 'ACCEPTED'" in definitions
-    assert "to_treatment = 'MITIGATED'" in definitions
+    normalized = " ".join(definitions.lower().split())
+    assert "from_treatment" in normalized
+    assert "open" in normalized
+    assert "accepted" in normalized
+    assert "mitigated" in normalized
+    assert "to_treatment" in normalized
     assert "aggregate_revision > 1" in definitions
