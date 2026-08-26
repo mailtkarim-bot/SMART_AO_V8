@@ -317,6 +317,29 @@ class _ReadService:
             ),
         )
 
+    def detect_document_contradictions(self, **kwargs):
+        if self.error is not None:
+            raise self.error
+        return (
+            SimpleNamespace(
+                contradiction_id=uuid4(),
+                dce_version_id=uuid4(),
+                contradiction_type="PRICING_UNIT_MISMATCH",
+                source_fragment_id=uuid4(),
+                source_locator_label="CCTP · page 9",
+                source_start_byte_offset=0,
+                source_end_byte_offset=82,
+                related_batch_id=uuid4(),
+                related_document_kind="DPGF",
+                related_row_number=14,
+                related_code="02.04",
+                related_designation="Pose de garde-corps",
+                related_unit="ml",
+                comparison_basis="CCTP_EXPLICIT_UNIT_V1",
+                verification_status="REVIEW_REQUIRED",
+            ),
+        )
+
 
 class _FinalizeService:
     def __init__(self, *, error=None):
@@ -646,6 +669,23 @@ def test_cctp_pricing_crossing_returns_provenance_and_review_status_without_mone
     assert item["source_locator_label"] == "CCTP · page 4"
     assert item["verification_status"] == "REVIEW_REQUIRED"
     assert item["match_score_bps"] == 8500
+    assert "quantity_decimal" not in item
+    assert "unit_price_minor" not in item
+    assert "total_minor" not in item
+
+
+def test_document_contradictions_returns_reviewable_non_monetary_findings():
+    case_id = uuid4()
+    response = _client(risk_requirement_read_service=_ReadService()).get(
+        f"/api/v1/patron/cases/{case_id}/document-contradictions?limit=10",
+        headers=_headers(),
+    )
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["contradiction_type"] == "PRICING_UNIT_MISMATCH"
+    assert item["verification_status"] == "REVIEW_REQUIRED"
+    assert item["comparison_basis"] == "CCTP_EXPLICIT_UNIT_V1"
+    assert "excerpt" not in item
     assert "quantity_decimal" not in item
     assert "unit_price_minor" not in item
     assert "total_minor" not in item
