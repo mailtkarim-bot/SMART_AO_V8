@@ -1,6 +1,15 @@
 import type { Dispatch, SetStateAction } from "react";
 
-import type { CollaboratorTask, PreparationPackage } from "../../shared/types";
+import type {
+  CollaboratorTask,
+  CollaboratorTaskWorkflow,
+  CreateInformationRequestInput,
+  DeclareTaskBlockerInput,
+  PreparationPackage,
+  RecordInformationResponseInput,
+  ResolveTaskBlockerInput,
+} from "../../shared/types";
+import { TaskWorkflowPanel } from "./TaskWorkflowPanel";
 
 type WizardOutcome = "RECORDED" | "NOT_APPLICABLE" | "UNABLE_TO_COMPLETE";
 
@@ -33,6 +42,12 @@ type CollaboratorWizardPanelProps = {
   onTransmitSnapshot: () => void;
   onPreviewDocument: (documentId: string) => void;
   onDownloadDocument: (documentId: string) => void;
+  taskWorkflow: CollaboratorTaskWorkflow | null;
+  onLoadTaskWorkflow: () => void;
+  onCreateInformationRequest: (input: CreateInformationRequestInput) => void;
+  onRecordInformationResponse: (requestId: string, input: RecordInformationResponseInput) => void;
+  onDeclareTaskBlocker: (input: DeclareTaskBlockerInput) => void;
+  onResolveTaskBlocker: (blockerId: string, input: ResolveTaskBlockerInput) => void;
 };
 
 export function CollaboratorWizardPanel({
@@ -64,6 +79,12 @@ export function CollaboratorWizardPanel({
   onTransmitSnapshot,
   onPreviewDocument,
   onDownloadDocument,
+  taskWorkflow,
+  onLoadTaskWorkflow,
+  onCreateInformationRequest,
+  onRecordInformationResponse,
+  onDeclareTaskBlocker,
+  onResolveTaskBlocker,
 }: CollaboratorWizardPanelProps) {
   return (
     <section className="section-block wizard-section" id="collaborator-wizard-section">
@@ -333,6 +354,15 @@ export function CollaboratorWizardPanel({
               </small>
             </div>
           </div>
+          <TaskWorkflowPanel
+            taskId={wizardTaskId}
+            workflow={taskWorkflow}
+            onLoad={onLoadTaskWorkflow}
+            onCreateRequest={onCreateInformationRequest}
+            onRecordResponse={onRecordInformationResponse}
+            onDeclareBlocker={onDeclareTaskBlocker}
+            onResolveBlocker={onResolveTaskBlocker}
+          />
         </div>
       )}
     </section>

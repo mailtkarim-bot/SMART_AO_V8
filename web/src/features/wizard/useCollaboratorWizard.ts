@@ -4,6 +4,11 @@ import type { Dispatch, SetStateAction } from "react";
 import type { ApiClient } from "../../infrastructure/api";
 import type {
   CollaboratorTask,
+  CollaboratorTaskWorkflow,
+  CreateInformationRequestInput,
+  DeclareTaskBlockerInput,
+  RecordInformationResponseInput,
+  ResolveTaskBlockerInput,
   PreparationPackage,
 } from "../../shared/types";
 
@@ -24,6 +29,7 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
   const [wizardPreviewDocumentId, setWizardPreviewDocumentId] = useState<string | null>(null);
   const [wizardPreviewContent, setWizardPreviewContent] = useState<string | null>(null);
   const [wizardDocumentBusy, setWizardDocumentBusy] = useState(false);
+  const [wizardTaskWorkflow, setWizardTaskWorkflow] = useState<CollaboratorTaskWorkflow | null>(null);
 
   async function loadCollaboratorWizard(notify = true) {
     if (!wizardPackageId.trim() || !wizardCaseId.trim()) {
@@ -90,6 +96,60 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
         tone: "error",
         text: error instanceof Error ? error.message : "La génération documentaire a échoué.",
       });
+    }
+  }
+
+  async function loadWizardTaskWorkflow(taskId = wizardTaskId) {
+    if (!taskId) return;
+    try {
+      setWizardTaskWorkflow(await api.getCollaboratorTaskWorkflow(taskId));
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de charger le workflow." });
+    }
+  }
+
+  async function createWizardInformationRequest(input: CreateInformationRequestInput) {
+    if (!wizardTaskId) return;
+    try {
+      await api.createInformationRequest(wizardTaskId, input);
+      await loadWizardTaskWorkflow();
+      setMessage({ tone: "success", text: "Demande d’information créée." });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de créer la demande." });
+    }
+  }
+
+  async function recordWizardInformationResponse(requestId: string, input: RecordInformationResponseInput) {
+    try {
+      await api.recordInformationResponse(requestId, input);
+      await loadWizardTaskWorkflow();
+      setMessage({ tone: "success", text: "Réponse à la demande enregistrée." });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible d’enregistrer la réponse." });
+    }
+  }
+
+  async function declareWizardTaskBlocker(input: DeclareTaskBlockerInput) {
+    if (!wizardTaskId) return;
+    try {
+      await api.declareTaskBlocker(wizardTaskId, input);
+      await loadWizardTaskWorkflow();
+      await refreshCollaboratorWizard();
+      setMessage({ tone: "success", text: "Bloqueur déclaré et opposable." });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de déclarer le bloqueur." });
+    }
+  }
+
+  async function resolveWizardTaskBlocker(blockerId: string, input: ResolveTaskBlockerInput) {
+    if (!wizardTaskId) return;
+    try {
+      await api.resolveTaskBlocker(wizardTaskId, blockerId, input);
+      await loadWizardTaskWorkflow();
+      await refreshCollaboratorWizard();
+      setMessage({ tone: "success", text: "Bloqueur résolu." });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de résoudre le bloqueur." });
     }
   }
 
@@ -213,6 +273,7 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
     wizardPreviewDocumentId,
     wizardPreviewContent,
     wizardDocumentBusy,
+    wizardTaskWorkflow,
     setWizardCaseId,
     setWizardPackageId,
     setWizardTaskId,
@@ -222,6 +283,11 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
     setWizardTransmissionId,
     previewWizardDocument,
     downloadWizardDocument,
+    loadWizardTaskWorkflow,
+    createWizardInformationRequest,
+    recordWizardInformationResponse,
+    declareWizardTaskBlocker,
+    resolveWizardTaskBlocker,
     loadCollaboratorWizard,
     refreshCollaboratorWizard,
     evaluateWizardReadiness,

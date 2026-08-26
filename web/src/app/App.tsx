@@ -142,6 +142,7 @@ function App() {
     wizardPreviewDocumentId,
     wizardPreviewContent,
     wizardDocumentBusy,
+    wizardTaskWorkflow,
     setWizardCaseId,
     setWizardPackageId,
     setWizardTaskId,
@@ -158,6 +159,11 @@ function App() {
     transmitWizardSnapshot,
     previewWizardDocument,
     downloadWizardDocument,
+    loadWizardTaskWorkflow,
+    createWizardInformationRequest,
+    recordWizardInformationResponse,
+    declareWizardTaskBlocker,
+    resolveWizardTaskBlocker,
   } = useCollaboratorWizard(api, setMessage);
   const financialDraft = useFinancialDraft(api, setMessage, selectedCaseId);
   const cockpit = usePatronCockpit(api, setMessage, async (caseId) => {
@@ -567,6 +573,7 @@ function App() {
           wizardPreviewDocumentId={wizardPreviewDocumentId}
           wizardPreviewContent={wizardPreviewContent}
           wizardDocumentBusy={wizardDocumentBusy}
+          taskWorkflow={wizardTaskWorkflow}
           setWizardCaseId={setWizardCaseId}
           setWizardPackageId={setWizardPackageId}
           setWizardTaskId={setWizardTaskId}
@@ -583,6 +590,11 @@ function App() {
           onTransmitSnapshot={() => void transmitWizardSnapshot()}
           onPreviewDocument={(documentId) => void previewWizardDocument(documentId)}
           onDownloadDocument={(documentId) => void downloadWizardDocument(documentId)}
+          onLoadTaskWorkflow={() => void loadWizardTaskWorkflow()}
+          onCreateInformationRequest={(input) => void createWizardInformationRequest(input)}
+          onRecordInformationResponse={(requestId, input) => void recordWizardInformationResponse(requestId, input)}
+          onDeclareTaskBlocker={(input) => void declareWizardTaskBlocker(input)}
+          onResolveTaskBlocker={(blockerId, input) => void resolveWizardTaskBlocker(blockerId, input)}
         />
 
         {isPatron && (

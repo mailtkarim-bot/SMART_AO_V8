@@ -150,6 +150,59 @@ describe("Decision lifecycle transport", () => {
 });
 
 
+describe("Collaborator task workflow transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads and mutates information requests and blockers with encoded ids", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ task_id: "task-1", state: "OPEN", aggregate_revision: 2, information_requests: [], blockers: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "INFORMATION_REQUEST_CREATED" }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "INFORMATION_REQUEST_ANSWERED" }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "TASK_BLOCKED" }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "TASK_UNBLOCKED" }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiClient("https://app.example.test", "access-1");
+
+    await client.getCollaboratorTaskWorkflow("task/1");
+    await client.createInformationRequest("task/1", {
+      expected_task_revision: 2,
+      request_kind: "CLARIFICATION",
+      subject: "Objet",
+      question: "Question",
+      requested_object: "Pièce",
+      reason: "Motif",
+      priority: "HIGH",
+    });
+    await client.recordInformationResponse("request/1", {
+      expected_revision: 1,
+      response_text: "Réponse",
+      outcome: "ANSWERED",
+    });
+    await client.declareTaskBlocker("task/1", {
+      expected_revision: 2,
+      blocker_kind: "MISSING_INFORMATION",
+      description: "Il manque une preuve",
+      resolution_owner: "COLLABORATEUR",
+    });
+    await client.resolveTaskBlocker("task/1", "blocker/1", {
+      expected_revision: 3,
+      resolution_note: "Preuve ajoutée",
+    });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://app.example.test/api/v1/collaborator/tasks/task%2F1/workflow",
+      "https://app.example.test/api/v1/collaborator/tasks/task%2F1/information-requests",
+      "https://app.example.test/api/v1/collaborator/information-requests/request%2F1/responses",
+      "https://app.example.test/api/v1/collaborator/tasks/task%2F1/blockers",
+      "https://app.example.test/api/v1/collaborator/tasks/task%2F1/blockers/blocker%2F1/resolve",
+    ]);
+    const createBody = JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit).body)) as Record<string, unknown>;
+    expect(createBody).toMatchObject({ expected_task_revision: 2, command_id: expect.any(String), idempotency_key: expect.any(String) });
+  });
+});
+
 describe("Preparation generated document transport", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

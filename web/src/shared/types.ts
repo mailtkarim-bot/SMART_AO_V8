@@ -547,6 +547,82 @@ export type CollaboratorTaskList = {
   tasks: CollaboratorTask[];
 };
 
+export type InformationResponse = {
+  response_id: string;
+  request_revision: number;
+  outcome: "ANSWERED" | "NOT_AVAILABLE" | "NEEDS_CLARIFICATION";
+  response_text: string;
+  source_locator: string | null;
+  created_at: string;
+};
+
+export type InformationRequest = {
+  request_id: string;
+  task_id: string;
+  request_kind: "MISSING_SOURCE" | "CLARIFICATION" | "OWNER_CONFIRMATION" | "DEADLINE_CONFIRMATION";
+  subject: string;
+  question: string;
+  requested_object: string;
+  reason: string;
+  priority: "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
+  state: "OPEN" | "ANSWERED" | "CLOSED" | "CANCELLED";
+  due_at: string | null;
+  aggregate_revision: number;
+  responses: InformationResponse[];
+};
+
+export type TaskBlocker = {
+  blocker_id: string;
+  task_id: string;
+  task_revision: number;
+  blocker_kind: "MISSING_INFORMATION" | "EXTERNAL_DEPENDENCY" | "SOURCE_CONFLICT" | "REVIEW_REQUIRED";
+  description: string;
+  source_locator: string | null;
+  resolution_owner: "COLLABORATEUR" | "PATRON_ADMIN" | "EXTERNAL_PARTY";
+  state: "OPEN" | "RESOLVED";
+  resolution_note: string | null;
+  resolved_at: string | null;
+};
+
+export type CollaboratorTaskWorkflow = {
+  task_id: string;
+  state: CollaboratorTask["state"];
+  aggregate_revision: number;
+  information_requests: InformationRequest[];
+  blockers: TaskBlocker[];
+};
+
+export type CreateInformationRequestInput = {
+  expected_task_revision: number;
+  request_kind: InformationRequest["request_kind"];
+  subject: string;
+  question: string;
+  requested_object: string;
+  reason: string;
+  priority: InformationRequest["priority"];
+  due_at?: string | null;
+};
+
+export type RecordInformationResponseInput = {
+  expected_revision: number;
+  response_text: string;
+  source_locator?: string | null;
+  outcome: InformationResponse["outcome"];
+};
+
+export type DeclareTaskBlockerInput = {
+  expected_revision: number;
+  blocker_kind: TaskBlocker["blocker_kind"];
+  description: string;
+  source_locator?: string | null;
+  resolution_owner: TaskBlocker["resolution_owner"];
+};
+
+export type ResolveTaskBlockerInput = {
+  expected_revision: number;
+  resolution_note: string;
+};
+
 export type BackendReadiness = {
   status: "ok" | "not_ready";
   service: "smart-ao-v8";
