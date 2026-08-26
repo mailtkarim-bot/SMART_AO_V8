@@ -45,10 +45,18 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("DROP TRIGGER trg_dce_extract_append_only ON dce_document_extractions")
     op.execute(
         "UPDATE dce_document_extractions "
         "SET status = 'FAILED_SAFE', failure_code = 'OCR_REVIEW_STATUS_REMOVED' "
         "WHERE status = 'REVIEW_REQUIRED'"
+    )
+    op.execute(
+        """
+        CREATE TRIGGER trg_dce_extract_append_only
+        BEFORE UPDATE OR DELETE ON dce_document_extractions
+        FOR EACH ROW EXECUTE FUNCTION prevent_dce_extraction_mutation();
+        """
     )
     op.drop_constraint("status", "dce_document_extractions", type_="check")
     op.create_check_constraint("status", "dce_document_extractions", _OLD_STATUS_CONSTRAINT)
