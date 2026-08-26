@@ -23,6 +23,25 @@ _NEW_STATUS_CONSTRAINT = (
 def upgrade() -> None:
     op.drop_constraint("status", "dce_document_extractions", type_="check")
     op.create_check_constraint("status", "dce_document_extractions", _NEW_STATUS_CONSTRAINT)
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION validate_dce_extraction_fragment_parent()
+        RETURNS trigger AS $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM dce_document_extractions extraction
+                WHERE extraction.id = NEW.extraction_id
+                  AND extraction.tenant_id = NEW.tenant_id
+                  AND extraction.status IN ('COMPLETED', 'REVIEW_REQUIRED')
+            ) THEN
+                RAISE EXCEPTION 'DCE_DOCUMENT_EXTRACTION_FRAGMENT_PARENT_INVALID';
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    )
 
 
 def downgrade() -> None:
@@ -33,3 +52,22 @@ def downgrade() -> None:
     )
     op.drop_constraint("status", "dce_document_extractions", type_="check")
     op.create_check_constraint("status", "dce_document_extractions", _OLD_STATUS_CONSTRAINT)
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION validate_dce_extraction_fragment_parent()
+        RETURNS trigger AS $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM dce_document_extractions extraction
+                WHERE extraction.id = NEW.extraction_id
+                  AND extraction.tenant_id = NEW.tenant_id
+                  AND extraction.status = 'COMPLETED'
+            ) THEN
+                RAISE EXCEPTION 'DCE_DOCUMENT_EXTRACTION_FRAGMENT_PARENT_INVALID';
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    )

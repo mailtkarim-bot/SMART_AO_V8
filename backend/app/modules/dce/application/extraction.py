@@ -232,11 +232,13 @@ def _project_document(
     advanced_extractor: AdvancedDocumentExtractionPort | None = None,
 ) -> ExtractionProjection:
     try:
+        native_unsupported = False
         try:
             fragments = tuple(_extract_fragments(media_type=media_type, source_bytes=source_bytes))
         except ValueError as error:
             if str(error) != "MEDIA_TYPE_UNSUPPORTED":
                 raise
+            native_unsupported = True
             fragments = ()
         if fragments:
             return ExtractionProjection(
@@ -251,6 +253,12 @@ def _project_document(
             )
             if advanced_projection.status != "UNSUPPORTED":
                 return advanced_projection
+        if native_unsupported:
+            return ExtractionProjection(
+                status="UNSUPPORTED",
+                failure_code="MEDIA_TYPE_UNSUPPORTED",
+                fragments=(),
+            )
         return ExtractionProjection(
             status="FAILED_SAFE",
             failure_code="EMPTY_EXTRACTED_TEXT",
