@@ -336,3 +336,25 @@ La simulation Docker éphémère n’a pas été exécutée : `docker` est absen
 - [ ] **R-14** — profiler les readers submission/préparation sous PostgreSQL de préproduction après collecte de mesures N+1.
 - [ ] Tester les adaptateurs fournisseur réels (S3, SMTP, bus, signature, OCR avancé) avec secrets et comptes de recette ; les contrats locaux restent fail-closed.
 - [ ] Décider avec les responsables métier la validation finale des textes DC1/DC2/DC4 et des droits `PATRON_DELEGATE` avant usage opérationnel.
+
+
+## Réconciliation post-fusion — 26 août 2026
+
+Cette section est la référence la plus récente pour la tranche exécutée après les lots historiques. Elle ne requalifie pas les recettes externes non opérées.
+
+### Lots clôturés
+
+- [x] **DCE context identifiers** — PR #74, squash merge dans `main` (`f7e4617`). La CI `32910860728` est verte sur les quatre checks ; la correction inclut le rattachement obligatoire des evidences à la classification courante et le refus explicite d’une evidence sans classification.
+- [x] **Membership patron assignment typing** — PR #75, squash merge dans `main` (`6c2c5bb`). La CI `32912209432` est verte sur les quatre checks ; les cinq dernières erreurs mypy du module membership sont supprimées.
+- [x] **Mypy global** — `uv run mypy backend/app` retourne `Success: no issues found in 354 source files` sur `main`.
+- [x] **Validations locales ciblées** — Ruff et 17 tests DCE non-DB passent pour #74 ; Ruff, mypy et 36 tests membership non-DB passent pour #75.
+
+### Frontières restant externes
+
+- [ ] Opérer la recette Docker/VPS/Caddy avec PostgreSQL, ClamAV/EICAR, HTTPS public, health/readiness, sauvegarde hors hôte, restauration isolée et supervision.
+- [ ] Fournir et recetter un corpus DCE anonymisé et autorisé, le modèle/cache BGE et les métriques OCR/RAG autorisées.
+- [ ] Recetter les fournisseurs et secrets réels : S3, SMTP, bus, signature, OCR avancé et BOAMP/INSEE, hors Git.
+- [ ] Profiler les readers sous PostgreSQL de préproduction pour traiter les N+1 guidés par mesures.
+- [ ] Obtenir la validation juridique et métier des textes DC1/DC2/DC4, des droits `PATRON_DELEGATE`, de la conservation et de l’usage opérationnel.
+
+Les éléments ci-dessus restent volontairement non cochés tant qu’une preuve d’exécution opérée n’est pas archivée. Le détail de la réconciliation se trouve dans `docs/REMEDIATION_STATUS_2026-08-26.md`.
