@@ -172,10 +172,7 @@ class PrepareDceStagingHandler:
                 ConsultationRecord.id == command.consultation_id,
             )
         )
-        if (
-            consultation is None
-            or consultation.aggregate_revision != command.consultation_revision
-        ):
+        if consultation is None or consultation.aggregate_revision != command.consultation_revision:
             raise ValueError("CONSULTATION_REQUIRED_OR_STALE")
         if command.expires_at <= context.received_at:
             raise ValueError("DCE_STAGING_EXPIRY_REQUIRED")
@@ -577,7 +574,7 @@ class RecordDceDocumentExtractionHandler:
             raise ValueError("DOCUMENT_STORAGE_NOT_CONSUMED")
         if command.input_sha256.lower() != document.sha256.lower():
             raise ValueError("DOCUMENT_INPUT_HASH_REQUIRED")
-        if command.status == "COMPLETED":
+        if command.status in {"COMPLETED", "REVIEW_REQUIRED"}:
             _validate_extraction_fragments(command=command)
 
         extraction = DceDocumentExtractionRecord(
@@ -725,9 +722,7 @@ class RecordDceDocumentClassificationRunHandler:
             )
             for document_id in document_ids
         )
-        expected_manifest = classification_input_manifest_sha256(
-            documents=classification_documents
-        )
+        expected_manifest = classification_input_manifest_sha256(documents=classification_documents)
         if command.input_manifest_sha256.lower() != expected_manifest:
             raise ValueError("DCE_CLASSIFICATION_INPUT_MANIFEST_REQUIRED")
         source_fragment_count = sum(
@@ -1088,10 +1083,7 @@ class RegisterDceVersionHandler:
                 ConsultationRecord.id == command.consultation_id,
             )
         )
-        if (
-            consultation is None
-            or consultation.aggregate_revision != command.consultation_revision
-        ):
+        if consultation is None or consultation.aggregate_revision != command.consultation_revision:
             raise ValueError("CONSULTATION_REQUIRED_OR_STALE")
 
         document_ids = [document.document_id for document in command.documents]
@@ -1633,17 +1625,15 @@ class RecordCaseDceImpactRunHandler:
         )
         expected_run_id = uuid5(
             command.case_id,
-            f"{predecessor.id}:{successor.id}:{manifest}:"
-            "smart-ao-case-dce-impact:1",
+            f"{predecessor.id}:{successor.id}:{manifest}:smart-ao-case-dce-impact:1",
         )
         if command.impact_run_id != expected_run_id or (
             command.input_manifest_sha256.lower() != manifest
         ):
             raise ValueError("CASE_DCE_IMPACT_INPUT_MANIFEST_REQUIRED")
-        if (
-            command.previous_requirement_count != len(previous_requirements)
-            or command.successor_requirement_count != len(successor_requirements)
-        ):
+        if command.previous_requirement_count != len(
+            previous_requirements
+        ) or command.successor_requirement_count != len(successor_requirements):
             raise ValueError("CASE_DCE_IMPACT_SOURCE_COUNT_REQUIRED")
         expected_items = expected_impact_items(
             impact_run_id=command.impact_run_id,
@@ -1808,14 +1798,10 @@ class RecordDceRequirementConfirmationHandler:
                     tenant_id=UUID(str(context.tenant_id)),
                     actor_id=UUID(str(context.actor_id)),
                     identity_id=(
-                        UUID(str(context.identity_id))
-                        if context.identity_id is not None
-                        else None
+                        UUID(str(context.identity_id)) if context.identity_id is not None else None
                     ),
                     session_id=(
-                        UUID(str(context.session_id))
-                        if context.session_id is not None
-                        else None
+                        UUID(str(context.session_id)) if context.session_id is not None else None
                     ),
                     actor_kind=context.actor_kind,
                     auth_strength=None,

@@ -22,6 +22,7 @@ COPY backend/alembic ./backend/alembic
 COPY backend/alembic.ini ./backend/alembic.ini
 ARG SMART_AO_INSTALL_RAG=0
 ARG SMART_AO_INSTALL_DOCUMENT_ADVANCED=0
+ARG SMART_AO_INSTALL_DOCUMENT_OCR=0
 ARG SMART_AO_INSTALL_OBJECT_STORAGE=0
 ARG SMART_AO_INSTALL_CONNECTORS=0
 ARG SMART_AO_INSTALL_NOTIFICATIONS=0
@@ -34,6 +35,9 @@ RUN python -m pip install --no-cache-dir --upgrade pip==26.1.2 \
     fi \
     && if [ "$SMART_AO_INSTALL_DOCUMENT_ADVANCED" = "1" ]; then \
         uv sync --frozen --no-dev --no-editable --extra document-advanced; \
+    fi \
+    && if [ "$SMART_AO_INSTALL_DOCUMENT_OCR" = "1" ]; then \
+        uv sync --frozen --no-dev --no-editable --extra document-ocr; \
     fi \
     && if [ "$SMART_AO_INSTALL_OBJECT_STORAGE" = "1" ]; then \
         uv sync --frozen --no-dev --no-editable --extra object-storage; \

@@ -13,6 +13,8 @@ import sqlalchemy as sa
 from app.modules.dce.application.commands import RecordDceDocumentExtractionCommand
 from app.modules.dce.application.extraction import (
     DceDocumentExtractionService,
+    ExtractedFragment,
+    ExtractionProjection,
     _project_document,
 )
 from app.modules.dce.application.handlers import (
@@ -40,10 +42,6 @@ from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from sqlalchemy.orm import Session, sessionmaker
 
 NOW = datetime(2026, 8, 13, 18, 0, tzinfo=UTC)
-
-
-
-
 
 
 @pytest.fixture(autouse=True)
@@ -187,11 +185,13 @@ def _service(
     *,
     session_factory: sessionmaker[Session],
     storage: LocalQuarantineStorageAdapter,
+    advanced_extractor=None,
 ) -> DceDocumentExtractionService:
     return DceDocumentExtractionService(
         session_factory=session_factory,
         dispatcher=_handler_dispatcher(session_factory),
         storage=storage,
+        advanced_extractor=advanced_extractor,
     )
 
 
@@ -257,9 +257,7 @@ def test_extraction_fragment_validator_rejects_ordinal_locator_and_hash() -> Non
         _validate_extraction_fragments(
             command=command.model_copy(
                 update={
-                    "fragments": [
-                        command.fragments[0].model_copy(update={"text_sha256": "0" * 64})
-                    ]
+                    "fragments": [command.fragments[0].model_copy(update={"text_sha256": "0" * 64})]
                 }
             )
         )
@@ -558,11 +556,7 @@ def test_pdf_projection_preserves_page_provenance() -> None:
         }
     )
     page[NameObject("/Resources")] = DictionaryObject(
-        {
-            NameObject("/Font"): DictionaryObject(
-                {NameObject("/F1"): writer._add_object(font)}
-            )
-        }
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
     )
     content = DecodedStreamObject()
     content.set_data(b"BT /F1 12 Tf 72 720 Td (Reglement de consultation) Tj ET")
@@ -616,3 +610,57 @@ def test_docx_projection_rejects_archive_over_decompressed_limit(monkeypatch) ->
     assert projection.status == "REJECTED_LIMIT"
     assert projection.failure_code == "EXTRACTION_LIMIT"
     assert projection.fragments == ()
+
+
+@pytest.mark.db
+@pytest.mark.integration
+def test_ocr_projection_is_persisted_under_review_and_replayed(
+    session_factory: sessionmaker[Session],
+    tmp_path: Path,
+) -> None:
+    class ReviewRequiredOcrFixture:
+        def extract(self, *, media_type: str, source_bytes: bytes) -> ExtractionProjection:
+            assert media_type == "image/png"
+            assert source_bytes
+            return ExtractionProjection(
+                status="REVIEW_REQUIRED",
+                failure_code="OCR_HUMAN_REVIEW_REQUIRED",
+                extractor_id="smart-ao-rapidocr",
+                extractor_version="1",
+                fragments=(
+                    ExtractedFragment(
+                        ordinal=1,
+                        locator_json={"kind": "ocr_page", "page": 1, "order": 1},
+                        text="Clause scannée",
+                    ),
+                ),
+            )
+
+    storage = LocalQuarantineStorageAdapter(root=tmp_path)
+    tenant_id, document_id, _ = _seed_admitted_document(
+        session_factory,
+        storage=storage,
+        source_bytes=b"synthetic-image-bytes",
+        media_type="image/png",
+    )
+    service = _service(
+        session_factory=session_factory,
+        storage=storage,
+        advanced_extractor=ReviewRequiredOcrFixture(),
+    )
+
+    first = asyncio.run(service.extract(tenant_id=tenant_id, dce_document_id=document_id, now=NOW))
+    replay = asyncio.run(service.extract(tenant_id=tenant_id, dce_document_id=document_id, now=NOW))
+
+    assert first.result_code == "DCE_DOCUMENT_EXTRACTION_RECORDED"
+    assert replay.replayed
+    with session_factory() as session:
+        extraction = session.scalar(sa.select(DceDocumentExtractionRecord))
+        fragment = session.scalar(sa.select(DceDocumentExtractionFragmentRecord))
+    assert extraction is not None
+    assert extraction.status == "REVIEW_REQUIRED"
+    assert extraction.failure_code == "OCR_HUMAN_REVIEW_REQUIRED"
+    assert extraction.extractor_id == "smart-ao-rapidocr"
+    assert fragment is not None
+    assert fragment.locator_json == {"kind": "ocr_page", "page": 1, "order": 1}
+    assert fragment.text == "Clause scannée"

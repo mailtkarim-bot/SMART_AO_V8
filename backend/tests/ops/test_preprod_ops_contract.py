@@ -117,7 +117,7 @@ def test_readiness_contract_uses_shared_schema_head() -> None:
     schema = (ROOT / "backend/app/platform/persistence/schema.py").read_text(encoding="utf-8")
     assert "from app.platform.persistence.schema import EXPECTED_ALEMBIC_HEAD" in application
     assert "EXPECTED_ALEMBIC_HEAD" in application
-    assert 'EXPECTED_ALEMBIC_HEAD = "20260826_0066"' in schema
+    assert 'EXPECTED_ALEMBIC_HEAD = "20260826_0067"' in schema
 
 
 def test_healthcheck_validates_application_json_payloads() -> None:
@@ -204,12 +204,15 @@ def test_optional_dependency_build_flags_are_explicit() -> None:
     dockerfile = (OPS / "docker/backend.Dockerfile").read_text(encoding="utf-8")
     compose = (OPS / "docker-compose.preprod.yml").read_text(encoding="utf-8")
     assert "ARG SMART_AO_INSTALL_CONNECTORS=0" in dockerfile
+    assert "ARG SMART_AO_INSTALL_DOCUMENT_OCR=0" in dockerfile
+    assert "uv sync --frozen --no-dev --no-editable --extra document-ocr" in dockerfile
     assert "ARG SMART_AO_INSTALL_OBJECT_STORAGE=0" in dockerfile
     assert "uv sync --frozen --no-dev --no-editable --extra object-storage" in dockerfile
     assert "uv sync --frozen --no-dev --no-editable --extra connectors" in dockerfile
     assert "SMART_AO_INSTALL_CONNECTORS" in compose
     assert "SMART_AO_INSTALL_RAG" in compose
     assert "SMART_AO_INSTALL_DOCUMENT_ADVANCED" in compose
+    assert "SMART_AO_INSTALL_DOCUMENT_OCR" in compose
     assert "SMART_AO_INSTALL_OBJECT_STORAGE" in compose
 
 
