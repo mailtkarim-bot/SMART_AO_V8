@@ -114,6 +114,7 @@ def test_signature_service_authorizes_and_dispatches_with_server_actor_scope():
     assert dispatcher.calls[0][1].tenant_id == actor.tenant_id
     assert dispatcher.calls[0][1].actor_id == actor.actor_id
     assert policy.calls[0][1].action.value == "submission.signature.write"
+    assert policy.calls[0][1].mfa_required is True
 
 
 def test_signature_service_rejects_non_patron_or_inactive_actor():

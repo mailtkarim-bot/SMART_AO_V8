@@ -7,3 +7,5 @@ Le cockpit frontend est disponible dans la section sécurité de session pour le
 La finalisation humaine GO/NO-GO d’une Decision exige désormais un **step-up MFA récent** au niveau de la policy d’autorisation. Cette garde s’applique avant le dispatch de la commande ; elle ne remplace ni la vérification du contexte Decision gelé, ni le contrôle de révision, ni la revue humaine. Les lectures et les actions qui ne sont pas explicitement marquées `mfa_required` ne sont pas modifiées par ce lot.
 
 La configuration de production du service TOTP (`SMART_AO_TOTP_ENCRYPTION_KEY` et `SMART_AO_TOTP_ISSUER`) doit être fournie hors Git et validée sur l’environnement cible. Ce document ne prétend pas avoir opéré cette configuration sur un VPS ou un fournisseur réel.
+
+La demande de signature de soumission patronale est également marquée comme action sensible nécessitant un step-up MFA récent. Cette garde protège l’intention de signature ; elle ne prétend pas avoir appelé un fournisseur eIDAS ni réalisé une signature externe.

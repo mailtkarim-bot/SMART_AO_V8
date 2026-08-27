@@ -64,6 +64,7 @@ class SubmissionSignatureService:
                     classification=DataClassification.SECURITY_RESTRICTED,
                 ),
                 evaluated_at=now,
+                mfa_required=True,
             ),
         )
         if not decision.allowed:
