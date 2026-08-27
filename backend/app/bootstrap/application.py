@@ -254,6 +254,9 @@ from app.modules.membership.infrastructure.assignment_history_reader import (
 from app.modules.membership.infrastructure.assignment_management_reader import (
     SqlAlchemyAssignmentManagementReader,
 )
+from app.modules.membership.infrastructure.collab_info_blockers_reader import (
+    SqlAlchemyCollaboratorInfoBlockerReader,
+)
 from app.modules.membership.infrastructure.financial_draft_case_reader import (
     SqlAlchemyFinancialDraftCaseReader,
 )
@@ -828,7 +831,7 @@ def create_app(
             policy=security_policy,
         )
         collaborator_info_blocker_service = CollaboratorInfoBlockerService(
-            session_factory=runtime.session_factory,
+            reader=SqlAlchemyCollaboratorInfoBlockerReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )

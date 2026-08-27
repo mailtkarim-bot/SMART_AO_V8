@@ -21,6 +21,9 @@ from app.modules.membership.application.collab_work_task import (
     CollaboratorWorkTaskService,
     collaborator_work_task_handlers,
 )
+from app.modules.membership.infrastructure.collab_info_blockers_reader import (
+    SqlAlchemyCollaboratorInfoBlockerReader,
+)
 from app.platform.events.dispatcher import (
     CommandDispatcher,
     CommandExecutionError,
@@ -59,7 +62,7 @@ def _task_service(factory):
 
 def _info_service(factory, *, policy=None):
     return CollaboratorInfoBlockerService(
-        session_factory=factory,
+        reader=SqlAlchemyCollaboratorInfoBlockerReader(factory),
         dispatcher=CommandDispatcher(
             session_factory=factory, handlers=collaborator_info_blocker_handlers()
         ),
