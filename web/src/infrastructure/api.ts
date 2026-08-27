@@ -59,6 +59,9 @@ import type {
   FinalizeGoNoGoDecisionResponse,
   DecisionRiskRequirementPage,
   DecisionPricingReconciliationResponse,
+  StructuredRiskProjection,
+  StructuredRiskCommandResponse,
+  TransitionStructuredRiskTreatmentInput,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -358,6 +361,27 @@ export function createApiClient(
     getDecisionDossier: (caseId: string) =>
       request<PatronDecisionDossier>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/decision-dossier`,
+      ),
+    getDecisionRisk: (caseId: string, riskId: string) =>
+      request<StructuredRiskProjection>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/risks/${encodeURIComponent(riskId)}`,
+      ),
+    transitionDecisionRiskTreatment: (
+      caseId: string,
+      riskId: string,
+      input: TransitionStructuredRiskTreatmentInput,
+    ) =>
+      request<StructuredRiskCommandResponse>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/risks/${encodeURIComponent(riskId)}/treatment`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            risk_id: riskId,
+            ...input,
+          }),
+        },
       ),
     listDecisionRiskRequirementLinks: (
       caseId: string,

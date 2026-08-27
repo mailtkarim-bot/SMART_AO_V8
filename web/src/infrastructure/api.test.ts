@@ -109,7 +109,9 @@ describe("Decision lifecycle transport", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "DECISION_DRAFT_CREATED" }), { status: 201 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "DECISION_CONTEXT_FROZEN" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "DECISION_CONDITION_RESOLVED" }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "DECISION_FINALIZED" }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "DECISION_FINALIZED" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ risk_id: "risk/1", treatment: "OPEN", revision: 1 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "DECISION_RISK_TREATMENT_TRANSITIONED", treatment: "MITIGATED" }), { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
     const client = createApiClient("https://app.example.test", "access-1");
 
@@ -131,11 +133,23 @@ describe("Decision lifecycle transport", () => {
       outcome: "GO",
       justification: "Décision patronale motivée",
     });
+    await client.getDecisionRisk("case/1", "risk/1");
+    await client.transitionDecisionRiskTreatment("case/1", "risk/1", {
+      expected_revision: 1,
+      to_treatment: "MITIGATED",
+      evidence_excerpt: "CCAP page 8",
+      evidence_locator: { page: 8 },
+      evidence_start_byte_offset: 100,
+      evidence_end_byte_offset: 120,
+      rationale: "Mesure de réduction validée",
+    });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://app.example.test/api/v1/patron/cases/case%2F1/decisions");
     expect(fetchMock.mock.calls[1]?.[0]).toBe("https://app.example.test/api/v1/patron/cases/case%2F1/decisions/decision%2F1/context");
     expect(fetchMock.mock.calls[2]?.[0]).toBe("https://app.example.test/api/v1/patron/cases/case%2F1/decisions/decision%2F1/conditions/condition%2F1/resolve");
     expect(fetchMock.mock.calls[3]?.[0]).toBe("https://app.example.test/api/v1/patron/cases/case%2F1/decisions/decision%2F1/go-no-go");
+    expect(fetchMock.mock.calls[4]?.[0]).toBe("https://app.example.test/api/v1/patron/cases/case%2F1/risks/risk%2F1");
+    expect(fetchMock.mock.calls[5]?.[0]).toBe("https://app.example.test/api/v1/patron/cases/case%2F1/risks/risk%2F1/treatment");
     const finalizeBody = JSON.parse(String((fetchMock.mock.calls[3]?.[1] as RequestInit).body)) as Record<string, unknown>;
     expect(finalizeBody).toMatchObject({
       displayed_fingerprint: "a".repeat(64),
@@ -146,6 +160,15 @@ describe("Decision lifecycle transport", () => {
     });
     const createBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)) as Record<string, unknown>;
     expect(createBody).toMatchObject({ command_id: expect.any(String), idempotency_key: expect.any(String) });
+    const transitionBody = JSON.parse(String((fetchMock.mock.calls[5]?.[1] as RequestInit).body)) as Record<string, unknown>;
+    expect(transitionBody).toMatchObject({
+      risk_id: "risk/1",
+      expected_revision: 1,
+      to_treatment: "MITIGATED",
+      evidence_locator: { page: 8 },
+      command_id: expect.any(String),
+      idempotency_key: expect.any(String),
+    });
   });
 });
 
