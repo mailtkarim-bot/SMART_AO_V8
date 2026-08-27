@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from app.modules.membership.application.financial_report import FinancialReportProjection
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +49,14 @@ class AssignmentManagementTarget:
     id: UUID
     case_id: UUID
     membership_id: UUID
+
+
+class FinancialReportReader(Protocol):
+    """Read tenant-scoped financial report projections before authorization."""
+
+    def get(
+        self, *, tenant_id: UUID, case_id: UUID, report_id: UUID, state: str
+    ) -> FinancialReportProjection | None: ...
 
 
 class AssignmentManagementReader(Protocol):

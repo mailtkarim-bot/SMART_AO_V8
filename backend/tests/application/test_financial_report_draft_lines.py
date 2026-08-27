@@ -11,6 +11,9 @@ from app.modules.membership.application.financial_report_lines import (
     PatronFinancialReportLineService,
     financial_report_line_handlers,
 )
+from app.modules.membership.infrastructure.financial_report_reader import (
+    SqlAlchemyFinancialReportReader,
+)
 from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
@@ -396,7 +399,7 @@ def test_patron_reads_current_financial_draft_projection_after_line_write(
     )
 
     projection = PatronFinancialReportService(
-        session_factory=session_factory,
+        reader=SqlAlchemyFinancialReportReader(session_factory),
         policy=AuthorizationPolicy(),
     ).get_draft(
         actor=actor,
