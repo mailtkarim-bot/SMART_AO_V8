@@ -11,6 +11,7 @@ from app.modules.enterprise.application.enterprise_library import (
     EnterpriseLibraryService,
     enterprise_library_handlers,
 )
+from app.modules.enterprise.infrastructure.library_reader import SqlAlchemyEnterpriseLibraryReader
 from app.modules.enterprise.infrastructure.models import (
     EnterpriseCompanyRecord,
     EnterpriseDocumentRecord,
@@ -89,6 +90,7 @@ def _service(session_factory: sessionmaker[Session]) -> EnterpriseLibraryService
             handlers=enterprise_library_handlers(),
         ),
         policy=AuthorizationPolicy(),
+        reader=SqlAlchemyEnterpriseLibraryReader(session_factory),
     )
 
 

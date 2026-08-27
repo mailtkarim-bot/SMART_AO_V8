@@ -20,6 +20,7 @@ from app.modules.enterprise.application.enterprise_upload import (
 from app.modules.enterprise.application.enterprise_upload_commands import (
     VerifyEnterpriseDocumentCommand,
 )
+from app.modules.enterprise.infrastructure.library_reader import SqlAlchemyEnterpriseLibraryReader
 from app.modules.enterprise.infrastructure.models import (
     EnterpriseCompanyRecord,
     EnterpriseDocumentRecord,
@@ -252,6 +253,7 @@ def test_clean_upload_materializes_then_human_verification_updates_projection(
         session_factory=session_factory,
         dispatcher=service._dispatcher,  # noqa: SLF001
         policy=AuthorizationPolicy(),
+        reader=SqlAlchemyEnterpriseLibraryReader(session_factory),
     ).read_company(actor=actor, now=NOW)
     with session_factory() as session:
         verification_count = session.scalar(
