@@ -260,6 +260,9 @@ from app.modules.membership.infrastructure.collab_capability_reader import (
 from app.modules.membership.infrastructure.collab_info_blockers_reader import (
     SqlAlchemyCollaboratorInfoBlockerReader,
 )
+from app.modules.membership.infrastructure.collab_work_task_reader import (
+    SqlAlchemyCollaboratorWorkTaskReader,
+)
 from app.modules.membership.infrastructure.financial_draft_case_reader import (
     SqlAlchemyFinancialDraftCaseReader,
 )
@@ -829,7 +832,7 @@ def create_app(
             policy=security_policy,
         )
         collaborator_work_task_service = CollaboratorWorkTaskService(
-            session_factory=runtime.session_factory,
+            reader=SqlAlchemyCollaboratorWorkTaskReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )

@@ -24,6 +24,9 @@ from app.modules.membership.application.collab_work_task import (
 from app.modules.membership.infrastructure.collab_info_blockers_reader import (
     SqlAlchemyCollaboratorInfoBlockerReader,
 )
+from app.modules.membership.infrastructure.collab_work_task_reader import (
+    SqlAlchemyCollaboratorWorkTaskReader,
+)
 from app.platform.events.dispatcher import (
     CommandDispatcher,
     CommandExecutionError,
@@ -52,7 +55,7 @@ NOW = datetime(2026, 8, 17, 12, 0, tzinfo=UTC)
 
 def _task_service(factory):
     return CollaboratorWorkTaskService(
-        session_factory=factory,
+        reader=SqlAlchemyCollaboratorWorkTaskReader(factory),
         dispatcher=CommandDispatcher(
             session_factory=factory, handlers=collaborator_work_task_handlers()
         ),
