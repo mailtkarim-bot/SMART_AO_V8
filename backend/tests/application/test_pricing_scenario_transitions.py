@@ -40,7 +40,6 @@ def services(session_factory: sessionmaker[Session]):
     reader = SqlAlchemyPricingScenarioReader(session_factory)
     return (
         PricingScenarioService(
-            session_factory=session_factory,
             reader=reader,
             dispatcher=dispatcher,
             policy=policy,
@@ -56,9 +55,12 @@ def services(session_factory: sessionmaker[Session]):
 
 def _published_snapshot(session_factory, snapshot_id):
     with session_factory.begin() as session:
-        snapshot = session.get(__import__(
-            "app.platform.security.models", fromlist=["FinancialReportSnapshotRecord"]
-        ).FinancialReportSnapshotRecord, snapshot_id)
+        snapshot = session.get(
+            __import__(
+                "app.platform.security.models", fromlist=["FinancialReportSnapshotRecord"]
+            ).FinancialReportSnapshotRecord,
+            snapshot_id,
+        )
         snapshot.state = "PUBLISHED"
         snapshot.published_at = NOW
         snapshot.sales_total_minor = 100_000
