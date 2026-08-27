@@ -12,9 +12,11 @@ import { PatronDecisionPanel } from "../features/decision/PatronDecisionPanel";
 import { DecisionRiskRequirementsPanel } from "../features/decision/DecisionRiskRequirementsPanel";
 import { DecisionRisksPanel } from "../features/decision/DecisionRisksPanel";
 import { DceContractRiskSignalsPanel } from "../features/decision/DceContractRiskSignalsPanel";
+import { DecisionCrossChecksPanel } from "../features/decision/DecisionCrossChecksPanel";
 import { useDecisionRiskRequirements } from "../features/decision/useDecisionRiskRequirements";
 import { useDecisionRisks } from "../features/decision/useDecisionRisks";
 import { useDceContractRiskSignals } from "../features/decision/useDceContractRiskSignals";
+import { useDecisionCrossChecks } from "../features/decision/useDecisionCrossChecks";
 import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
 import { BoampOpportunityPanel } from "../features/opportunities/BoampOpportunityPanel";
 import { useBoampOpportunities } from "../features/opportunities/useBoampOpportunities";
@@ -196,6 +198,11 @@ function App() {
     decisionDossier?.sources ?? [],
   );
   const dceContractRiskSignals = useDceContractRiskSignals(
+    api,
+    setMessage,
+    isPatron ? selectedCaseId : "",
+  );
+  const decisionCrossChecks = useDecisionCrossChecks(
     api,
     setMessage,
     isPatron ? selectedCaseId : "",
@@ -662,6 +669,16 @@ function App() {
               void resolveDecisionCondition(conditionId, input)
             }
             onFinalize={(input) => void finalizeDecision(input)}
+          />
+        )}
+
+        {isPatron && (
+          <DecisionCrossChecksPanel
+            caseId={selectedCaseId}
+            crossings={decisionCrossChecks.crossings}
+            contradictions={decisionCrossChecks.contradictions}
+            loading={decisionCrossChecks.loading}
+            onRefresh={() => void decisionCrossChecks.refresh()}
           />
         )}
 

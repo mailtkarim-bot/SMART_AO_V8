@@ -353,6 +353,51 @@ export type StructuredRiskRegistrationResponse = {
   replayed: boolean;
 };
 
+export type DecisionCctpPricingCrossingItem = {
+  dce_version_id: string;
+  source_fragment_id: string;
+  source_locator_label: string;
+  source_start_byte_offset: number;
+  source_end_byte_offset: number;
+  batch_id: string;
+  document_kind: string;
+  row_number: number;
+  code: string | null;
+  designation: string | null;
+  unit: string | null;
+  match_score_bps: number;
+  match_basis: string;
+  verification_status: string;
+};
+
+export type DecisionCctpPricingCrossingResponse = {
+  case_id: string;
+  items: DecisionCctpPricingCrossingItem[];
+};
+
+export type DecisionDocumentContradictionItem = {
+  contradiction_id: string;
+  dce_version_id: string;
+  contradiction_type: string;
+  source_fragment_id: string;
+  source_locator_label: string;
+  source_start_byte_offset: number;
+  source_end_byte_offset: number;
+  related_batch_id: string;
+  related_document_kind: string;
+  related_row_number: number;
+  related_code: string | null;
+  related_designation: string | null;
+  related_unit: string | null;
+  comparison_basis: string;
+  verification_status: string;
+};
+
+export type DecisionDocumentContradictionsResponse = {
+  case_id: string;
+  items: DecisionDocumentContradictionItem[];
+};
+
 export type DecisionRiskRequirementLink = {
   link_id: string;
   case_id: string;
