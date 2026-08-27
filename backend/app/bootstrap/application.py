@@ -980,7 +980,7 @@ def create_app(
             policy=security_policy,
         )
         patron_financial_report_publication_service = PatronFinancialReportPublicationService(
-            session_factory=runtime.session_factory,
+            reader=SqlAlchemyFinancialReportSnapshotReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
