@@ -14,6 +14,9 @@ from app.modules.membership.application.financial_report_lines import (
 from app.modules.membership.infrastructure.financial_report_reader import (
     SqlAlchemyFinancialReportReader,
 )
+from app.modules.membership.infrastructure.financial_report_snapshot_reader import (
+    SqlAlchemyFinancialReportSnapshotReader,
+)
 from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
@@ -148,7 +151,7 @@ def _seed_draft(
 
 def _service(session_factory: sessionmaker[Session]) -> PatronFinancialReportLineService:
     return PatronFinancialReportLineService(
-        session_factory=session_factory,
+        reader=SqlAlchemyFinancialReportSnapshotReader(session_factory),
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
             handlers=financial_report_line_handlers(),

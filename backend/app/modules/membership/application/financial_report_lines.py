@@ -6,9 +6,10 @@ from datetime import datetime
 from uuid import uuid4
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.modules.dce.application.commands import AddFinancialReportLineCommand
+from app.modules.membership.application.queries import FinancialReportSnapshotExistenceReader
 from app.modules.pricing.infrastructure.models import (
     FinancialReportLineRecord,
     FinancialReportSnapshotRecord,
@@ -46,11 +47,11 @@ class PatronFinancialReportLineService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
+        reader: FinancialReportSnapshotExistenceReader,
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
     ) -> None:
-        self._session_factory = session_factory
+        self._reader = reader
         self._dispatcher = dispatcher
         self._policy = policy
 
@@ -80,15 +81,11 @@ class PatronFinancialReportLineService:
         )
         if not decision.allowed:
             raise PermissionError(decision.code)
-        with self._session_factory() as session:
-            exists = session.scalar(
-                sa.select(FinancialReportSnapshotRecord.id).where(
-                    FinancialReportSnapshotRecord.tenant_id == actor.tenant_id,
-                    FinancialReportSnapshotRecord.case_id == command.case_id,
-                    FinancialReportSnapshotRecord.id == command.report_id,
-                )
-            )
-        if exists is None:
+        if not self._reader.exists(
+            tenant_id=actor.tenant_id,
+            case_id=command.case_id,
+            report_id=command.report_id,
+        ):
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
         return self._dispatcher.dispatch(
             command=command,
