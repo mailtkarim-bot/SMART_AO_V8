@@ -10,21 +10,15 @@ from app.modules.membership.application.financial_report_draft import (
 from app.platform.security.capabilities import Capability
 from app.platform.security.context import ActorKind
 
+from tests.support.actors import make_actor_context
+
 NOW = datetime(2026, 8, 27, 12, 0, tzinfo=UTC)
 
 
 def test_financial_draft_service_checks_case_through_application_port() -> None:
     tenant_id = uuid4()
     case_id = uuid4()
-    actor = SimpleNamespace(
-        actor_kind=ActorKind.PATRON_ADMIN,
-        membership_id=uuid4(),
-        tenant_id=tenant_id,
-        actor_id=uuid4(),
-        identity_id=uuid4(),
-        session_id=uuid4(),
-        correlation_id=uuid4(),
-    )
+    actor = make_actor_context(tenant_id=tenant_id)
     command = CreateFinancialReportDraftCommand(
         command_id=uuid4(),
         idempotency_key=uuid4(),
@@ -64,7 +58,7 @@ def _draft_command(case_id):
 
 def test_financial_draft_service_rejects_non_patron_before_reader() -> None:
     reader = Mock()
-    actor = SimpleNamespace(actor_kind=ActorKind.COLLABORATEUR, membership_id=None)
+    actor = make_actor_context(actor_kind=ActorKind.COLLABORATEUR)
 
     try:
         PatronFinancialReportDraftCreationService(
@@ -87,11 +81,7 @@ def test_financial_draft_service_rejects_unknown_case_before_dispatch() -> None:
     reader.exists.return_value = False
     policy = Mock()
     policy.authorize.return_value = SimpleNamespace(allowed=True)
-    actor = SimpleNamespace(
-        actor_kind=ActorKind.PATRON_ADMIN,
-        membership_id=uuid4(),
-        tenant_id=tenant_id,
-    )
+    actor = make_actor_context(tenant_id=tenant_id)
     dispatcher = Mock()
 
     try:
@@ -111,11 +101,7 @@ def test_financial_draft_service_rejects_unknown_case_before_dispatch() -> None:
 
 def test_financial_draft_service_rejects_denied_policy_before_reader() -> None:
     tenant_id = uuid4()
-    actor = SimpleNamespace(
-        actor_kind=ActorKind.PATRON_ADMIN,
-        membership_id=uuid4(),
-        tenant_id=tenant_id,
-    )
+    actor = make_actor_context(tenant_id=tenant_id)
     reader = Mock()
     policy = Mock()
     policy.authorize.return_value = SimpleNamespace(allowed=False, code="DENIED")
