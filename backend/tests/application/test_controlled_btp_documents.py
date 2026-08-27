@@ -62,17 +62,25 @@ def test_controlled_server_facts_use_closed_kind_specific_allowlists() -> None:
 def test_controlled_document_is_deterministic_and_explicitly_non_binding() -> None:
     case_id = uuid4()
     dce_version_id = uuid4()
-    kwargs = {
-        "kind": ControlledDocumentKind.DC2,
-        "case_id": case_id,
-        "dce_version_id": dce_version_id,
-        "document_version": 1,
-        "facts": {"legal_name": "Entreprise Exemple", "turnover": ""},
-        "blockers": ("ENTERPRISE_DOCUMENT_KBIS_NOT_VALIDATED",),
-    }
+    facts = {"legal_name": "Entreprise Exemple", "turnover": ""}
+    blockers = ("ENTERPRISE_DOCUMENT_KBIS_NOT_VALIDATED",)
 
-    first = build_controlled_btp_document(**kwargs)
-    second = build_controlled_btp_document(**kwargs)
+    first = build_controlled_btp_document(
+        kind=ControlledDocumentKind.DC2,
+        case_id=case_id,
+        dce_version_id=dce_version_id,
+        document_version=1,
+        facts=facts,
+        blockers=blockers,
+    )
+    second = build_controlled_btp_document(
+        kind=ControlledDocumentKind.DC2,
+        case_id=case_id,
+        dce_version_id=dce_version_id,
+        document_version=1,
+        facts=facts,
+        blockers=blockers,
+    )
 
     assert first == second
     assert first.kind is ControlledDocumentKind.DC2
