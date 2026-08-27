@@ -65,6 +65,7 @@ class PatronDecisionFinalizationService:
                     case_id=command.case_id,
                 ),
                 evaluated_at=now,
+                mfa_required=True,
             ),
         )
         if not decision.allowed:

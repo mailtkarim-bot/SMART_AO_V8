@@ -4,13 +4,17 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from app.modules.decision.application.finalize import FinalizeGoNoGoDecisionHandler
+from app.modules.decision.application.finalize import (
+    FinalizeGoNoGoDecisionHandler,
+    PatronDecisionFinalizationService,
+)
 from app.modules.decision.application.finalize_commands import (
     ConditionalGoConditionInput,
     FinalizeGoNoGoDecisionCommand,
 )
 from app.platform.events.dispatcher import CommandContext, CommandExecutionError
 from app.platform.persistence.repository import OptimisticRevisionConflictError
+from app.platform.security.context import ActorKind
 
 NOW = datetime(2026, 8, 24, 12, 0, tzinfo=UTC)
 TENANT_ID = uuid4()
@@ -78,6 +82,31 @@ def _snapshot(*, fingerprint: str = FINGERPRINT, references: tuple = ("verified-
         ),
         context_references=tuple(SimpleNamespace(id=ref) for ref in references),
     )
+
+
+def test_finalization_service_requires_mfa_step_up_at_authorization_boundary() -> None:
+    policy = MagicMock()
+    policy.authorize.return_value = SimpleNamespace(allowed=True, code="ALLOWED")
+    dispatcher = MagicMock()
+    actor = SimpleNamespace(
+        actor_kind=ActorKind.PATRON_ADMIN,
+        membership_id=MEMBERSHIP_ID,
+        tenant_id=TENANT_ID,
+        actor_id=ACTOR_ID,
+        identity_id=uuid4(),
+        session_id=uuid4(),
+        correlation_id=uuid4(),
+    )
+
+    PatronDecisionFinalizationService(dispatcher=dispatcher, policy=policy).execute(
+        actor=actor,
+        command=_command(),
+        now=NOW,
+    )
+
+    authorization_request = policy.authorize.call_args.kwargs["request"]
+    assert authorization_request.mfa_required is True
+    dispatcher.dispatch.assert_called_once()
 
 
 def test_finalize_go_updates_only_after_frozen_context_and_revision_check() -> None:
