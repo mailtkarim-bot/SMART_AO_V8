@@ -167,7 +167,6 @@ def _seed_assignment(session_factory: sessionmaker[Session]) -> tuple[ActorConte
 
 def _service(session_factory: sessionmaker[Session]) -> AssignmentInteractionService:
     return AssignmentInteractionService(
-        session_factory=session_factory,
         reader=SqlAlchemyAssignmentManagementReader(session_factory),
         dispatcher=CommandDispatcher(
             session_factory=session_factory,

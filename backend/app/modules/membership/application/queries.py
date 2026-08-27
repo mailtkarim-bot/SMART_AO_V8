@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
 if TYPE_CHECKING:
     from app.modules.membership.application.financial_report import FinancialReportProjection
+    from app.platform.security.context import ActorContext
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +80,10 @@ class AssignmentManagementReader(Protocol):
     def get_assignment(
         self, *, tenant_id: UUID, assignment_id: UUID
     ) -> AssignmentManagementTarget | None: ...
+
+    def record_denial(
+        self, *, actor: ActorContext, command: Any, now: datetime, reason: str
+    ) -> None: ...
 
 
 class AssignmentHistoryReader(Protocol):

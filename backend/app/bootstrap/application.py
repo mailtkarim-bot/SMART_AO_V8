@@ -826,7 +826,6 @@ def create_app(
             policy=security_policy,
         )
         assignment_interaction_service = AssignmentInteractionService(
-            session_factory=runtime.session_factory,
             reader=SqlAlchemyAssignmentManagementReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
