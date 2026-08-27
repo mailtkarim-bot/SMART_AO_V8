@@ -150,6 +150,51 @@ describe("Decision lifecycle transport", () => {
 });
 
 
+describe("Preparation review transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads reviews and sends revision-checked patron decisions", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ package_id: "package-1", reviews: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "PREPARATION_REVIEW_REQUESTED" }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "PREPARATION_REVIEW_DECIDED" }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ result_code: "PREPARATION_CORRECTION_ADDED" }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiClient("https://app.example.test", "access-1");
+
+    await client.listPreparationReviews("package/1");
+    await client.requestPreparationReview("package/1", {
+      expected_package_revision: 3,
+      target_document_id: "document-1",
+      target_version: 2,
+    });
+    await client.decidePreparationReview("package/1", {
+      expected_review_revision: 1,
+      review_id: "review/1",
+      target_document_id: "document-1",
+      decision_code: "ACCEPTED",
+      decision_note: "Validé.",
+    });
+    await client.addPreparationCorrection("package/1", {
+      review_id: "review/1",
+      target_document_id: "document-1",
+      correction_code: "WORDING_UNCLEAR",
+      instruction: "Préciser la source.",
+    });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://app.example.test/api/v1/preparation/package%2F1/reviews",
+      "https://app.example.test/api/v1/preparation/package%2F1/reviews",
+      "https://app.example.test/api/v1/preparation/package%2F1/reviews/review%2F1/decision",
+      "https://app.example.test/api/v1/preparation/package%2F1/reviews/review%2F1/corrections",
+    ]);
+    const decisionBody = JSON.parse(String((fetchMock.mock.calls[2]?.[1] as RequestInit).body)) as Record<string, unknown>;
+    expect(decisionBody).toMatchObject({ expected_review_revision: 1, decision_code: "ACCEPTED", command_id: expect.any(String) });
+  });
+});
+
 describe("MFA TOTP transport", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

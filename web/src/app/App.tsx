@@ -21,6 +21,7 @@ import { CreateCasePanel } from "../features/cases/CreateCasePanel";
 import { useDceKnowledge } from "../features/dce/useDceKnowledge";
 import { useAuthentication } from "../features/auth/useAuthentication";
 import { MfaPanel } from "../features/auth/MfaPanel";
+import { PreparationReviewPanel } from "../features/wizard/PreparationReviewPanel";
 import { useBackendReadiness } from "../features/connection/useBackendReadiness";
 import {
   assertRuntimeApiUrl,
@@ -564,6 +565,7 @@ function App() {
         />
 
         {isAuthenticated && <MfaPanel api={api} setMessage={setMessage} />}
+        {isPatron && <PreparationReviewPanel api={api} setMessage={setMessage} />}
 
         <CollaboratorWizardPanel
           wizardCaseId={wizardCaseId}
