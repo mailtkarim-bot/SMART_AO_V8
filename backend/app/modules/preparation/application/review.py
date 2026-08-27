@@ -121,6 +121,69 @@ class PreparationReviewService:
             ),
         )
 
+    def read_reviews(
+        self, *, actor: ActorContext, package_id: UUID, now: datetime
+    ) -> tuple[tuple[PreparationReviewRecord, tuple[PreparationReviewCorrectionRecord, ...]], ...]:
+        """Read latest review revisions for a patron-owned preparation package."""
+        if actor.actor_kind not in {ActorKind.PATRON_ADMIN, ActorKind.PATRON_DELEGATE}:
+            raise PermissionError("PATRON_REQUIRED")
+        with self._session_factory() as session:
+            package = session.scalar(
+                sa.select(PreparationPackageRecord).where(
+                    PreparationPackageRecord.tenant_id == actor.tenant_id,
+                    PreparationPackageRecord.id == package_id,
+                )
+            )
+            if package is None:
+                raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+            decision = self._policy.authorize(
+                context=actor,
+                request=AuthorizationRequest(
+                    action=Capability.PREPARATION_REVIEW_DECIDE,
+                    resource=AuthorizationResource(
+                        resource_type="PREPARATION_PACKAGE",
+                        resource_id=package.id,
+                        tenant_id=actor.tenant_id,
+                        classification=DataClassification.INTERNAL_OPERATIONAL,
+                        case_id=package.case_id,
+                    ),
+                    evaluated_at=now,
+                ),
+            )
+            if not decision.allowed:
+                raise PermissionError(decision.code)
+            records = list(
+                session.scalars(
+                    sa.select(PreparationReviewRecord)
+                    .where(
+                        PreparationReviewRecord.tenant_id == actor.tenant_id,
+                        PreparationReviewRecord.package_id == package.id,
+                    )
+                    .order_by(PreparationReviewRecord.review_id, PreparationReviewRecord.revision)
+                ).all()
+            )
+            latest: dict[UUID, PreparationReviewRecord] = {}
+            for record in records:
+                latest[record.review_id] = record
+            if not latest:
+                return ()
+            corrections = list(
+                session.scalars(
+                    sa.select(PreparationReviewCorrectionRecord).where(
+                        PreparationReviewCorrectionRecord.tenant_id == actor.tenant_id,
+                        PreparationReviewCorrectionRecord.review_id.in_(latest),
+                    )
+                ).all()
+            )
+            corrections_by_review: dict[UUID, list[PreparationReviewCorrectionRecord]] = {}
+            for correction in corrections:
+                if correction.review_id in latest:
+                    corrections_by_review.setdefault(correction.review_id, []).append(correction)
+            return tuple(
+                (record, tuple(corrections_by_review.get(review_id, [])))
+                for review_id, record in latest.items()
+            )
+
     def _resolve_package(self, *, actor: ActorContext, command) -> PreparationPackageRecord | None:
         with self._session_factory() as session:
             package = session.scalar(

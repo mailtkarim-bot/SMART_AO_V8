@@ -26,6 +26,10 @@ import type {
   ResolveTaskBlockerInput,
   TotpEnrollment,
   TotpStepUpResponse,
+  PreparationReviewList,
+  RequestPreparationReviewInput,
+  DecidePreparationReviewInput,
+  AddPreparationCorrectionInput,
   PreparationPackage,
   CommitPricingImportRequest,
   PricingImportCommitReceipt,
@@ -586,6 +590,47 @@ export function createApiClient(
       requestBlob(
         `/api/v1/patron/submission-packages/${encodeURIComponent(submissionPackageId)}/export`,
         { headers: { Accept: "application/zip" } },
+      ),
+    listPreparationReviews: (packageId: string) =>
+      request<PreparationReviewList>(
+        `/api/v1/preparation/${encodeURIComponent(packageId)}/reviews`,
+      ),
+    requestPreparationReview: (packageId: string, input: RequestPreparationReviewInput) =>
+      request<CommandReceipt>(
+        `/api/v1/preparation/${encodeURIComponent(packageId)}/reviews`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            review_id: makeId(),
+            ...input,
+          }),
+        },
+      ),
+    decidePreparationReview: (packageId: string, input: DecidePreparationReviewInput) =>
+      request<CommandReceipt>(
+        `/api/v1/preparation/${encodeURIComponent(packageId)}/reviews/${encodeURIComponent(input.review_id)}/decision`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            ...input,
+          }),
+        },
+      ),
+    addPreparationCorrection: (packageId: string, input: AddPreparationCorrectionInput) =>
+      request<CommandReceipt>(
+        `/api/v1/preparation/${encodeURIComponent(packageId)}/reviews/${encodeURIComponent(input.review_id)}/corrections`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            ...input,
+          }),
+        },
       ),
     getCollaboratorTaskWorkflow: (taskId: string) =>
       request<CollaboratorTaskWorkflow>(

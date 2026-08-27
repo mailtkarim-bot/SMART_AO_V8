@@ -110,6 +110,41 @@ class PreparationCommandResponse(BaseModel):
     replayed: bool = False
 
 
+class PreparationReviewCorrectionProjection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    correction_id: UUID
+    review_revision: int = Field(ge=1)
+    revision: int = Field(ge=1)
+    target_document_id: UUID
+    correction_code: Literal[
+        "SOURCE_MISSING", "SOURCE_WRONG", "SECTION_INCOMPLETE", "WORDING_UNCLEAR"
+    ]
+    instruction: str
+    source_locator: str | None
+
+
+class PreparationReviewProjection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    review_id: UUID
+    package_id: UUID
+    target_document_id: UUID
+    target_version: int = Field(gt=0)
+    revision: int = Field(ge=1)
+    state: Literal["REQUESTED", "ACCEPTED", "RETURNED_WITH_CORRECTIONS", "REJECTED"]
+    decision_code: Literal["ACCEPTED", "CORRECTIONS_REQUIRED", "REJECTED"] | None
+    decision_note: str | None
+    corrections: list[PreparationReviewCorrectionProjection]
+
+
+class PreparationReviewListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    package_id: UUID
+    reviews: list[PreparationReviewProjection]
+
+
 class PreparationReadinessProjection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

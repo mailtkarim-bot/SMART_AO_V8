@@ -296,6 +296,14 @@ def test_review_is_versioned_idempotent_and_corrections_are_append_only(
     with pytest.raises(ProgrammingError), session_factory.begin() as session:
         session.execute(sa.delete(PreparationReviewCorrectionRecord))
 
+    projected = review.read_reviews(actor=patron, package_id=package_id, now=NOW)
+    assert len(projected) == 1
+    latest_review, projected_corrections = projected[0]
+    assert latest_review.state == "ACCEPTED"
+    assert latest_review.revision == 3
+    assert len(projected_corrections) == 1
+    assert projected_corrections[0].review_revision == 2
+
 
 @pytest.mark.db
 @pytest.mark.security

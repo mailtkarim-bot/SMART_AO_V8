@@ -623,6 +623,55 @@ export type ResolveTaskBlockerInput = {
   resolution_note: string;
 };
 
+export type PreparationReviewCorrection = {
+  correction_id: string;
+  review_revision: number;
+  revision: number;
+  target_document_id: string;
+  correction_code: "SOURCE_MISSING" | "SOURCE_WRONG" | "SECTION_INCOMPLETE" | "WORDING_UNCLEAR";
+  instruction: string;
+  source_locator: string | null;
+};
+
+export type PreparationReview = {
+  review_id: string;
+  package_id: string;
+  target_document_id: string;
+  target_version: number;
+  revision: number;
+  state: "REQUESTED" | "ACCEPTED" | "RETURNED_WITH_CORRECTIONS" | "REJECTED";
+  decision_code: "ACCEPTED" | "CORRECTIONS_REQUIRED" | "REJECTED" | null;
+  decision_note: string | null;
+  corrections: PreparationReviewCorrection[];
+};
+
+export type PreparationReviewList = {
+  package_id: string;
+  reviews: PreparationReview[];
+};
+
+export type RequestPreparationReviewInput = {
+  expected_package_revision: number;
+  target_document_id: string;
+  target_version: number;
+};
+
+export type DecidePreparationReviewInput = {
+  expected_review_revision: number;
+  review_id: string;
+  target_document_id: string;
+  decision_code: PreparationReview["decision_code"] & string;
+  decision_note?: string | null;
+};
+
+export type AddPreparationCorrectionInput = {
+  review_id: string;
+  target_document_id: string;
+  correction_code: PreparationReviewCorrection["correction_code"];
+  instruction: string;
+  source_locator?: string | null;
+};
+
 export type TotpEnrollment = {
   factor_id: string;
   otpauth_uri: string;

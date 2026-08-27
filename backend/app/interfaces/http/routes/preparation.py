@@ -31,6 +31,9 @@ from app.modules.preparation.public.contracts import (
     PreparationCommandResponse,
     PreparationPackageProjection,
     PreparationReadinessProjection,
+    PreparationReviewCorrectionProjection,
+    PreparationReviewListResponse,
+    PreparationReviewProjection,
     RequestPreparationReviewRequest,
 )
 from app.platform.events.dispatcher import (
@@ -210,6 +213,59 @@ def build_preparation_review_router(
     *, service: PreparationReviewService, security_runtime: ConsultationSecurityRuntime
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1/preparation", tags=["preparation-review"])
+
+    @router.get(
+        "/{package_id}/reviews",
+        response_model=PreparationReviewListResponse,
+    )
+    def read_reviews(
+        package_id: UUID,
+        authorization: str | None = Header(default=None),
+    ) -> PreparationReviewListResponse:
+        actor = _resolve_context(
+            authorization=authorization,
+            context_resolver=security_runtime.context_resolver,
+        )
+        try:
+            reviews = service.read_reviews(
+                actor=actor, package_id=package_id, now=datetime.now(tz=UTC)
+            )
+        except PermissionError as error:
+            if str(error) == "NOT_FOUND_OR_FORBIDDEN":
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="NOT_FOUND_OR_FORBIDDEN"
+                ) from error
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="FORBIDDEN"
+            ) from error
+        return PreparationReviewListResponse(
+            package_id=package_id,
+            reviews=[
+                PreparationReviewProjection(
+                    review_id=review.review_id,
+                    package_id=review.package_id,
+                    target_document_id=review.target_document_id,
+                    target_version=review.target_version,
+                    revision=review.revision,
+                    state=review.state,
+                    decision_code=review.decision_code,
+                    decision_note=review.decision_note,
+                    corrections=[
+                        PreparationReviewCorrectionProjection(
+                            correction_id=correction.id,
+                            review_revision=correction.review_revision,
+                            revision=correction.revision,
+                            target_document_id=correction.target_document_id,
+                            correction_code=correction.correction_code,
+                            instruction=correction.instruction,
+                            source_locator=correction.source_locator,
+                        )
+                        for correction in corrections
+                    ],
+                )
+                for review, corrections in reviews
+            ],
+        )
 
     @router.post("/{package_id}/reviews", response_model=PreparationCommandResponse)
     def request_review(
