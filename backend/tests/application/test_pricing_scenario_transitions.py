@@ -45,7 +45,6 @@ def services(session_factory: sessionmaker[Session]):
             policy=policy,
         ),
         PricingScenarioTransitionService(
-            session_factory=session_factory,
             reader=reader,
             dispatcher=dispatcher,
             policy=policy,

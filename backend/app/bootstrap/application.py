@@ -915,7 +915,6 @@ def create_app(
             policy=security_policy,
         )
         pricing_scenario_transition_service = PricingScenarioTransitionService(
-            session_factory=runtime.session_factory,
             reader=SqlAlchemyPricingScenarioReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,

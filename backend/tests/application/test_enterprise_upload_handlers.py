@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -7,6 +8,11 @@ from app.modules.enterprise.application.enterprise_upload import (
     FinalizeEnterpriseDocumentUploadHandler,
     PrepareEnterpriseDocumentUploadHandler,
     VerifyEnterpriseDocumentHandler,
+)
+from app.modules.enterprise.application.enterprise_upload_commands import (
+    FinalizeEnterpriseDocumentUploadCommand,
+    PrepareEnterpriseDocumentUploadCommand,
+    VerifyEnterpriseDocumentCommand,
 )
 from app.platform.events.dispatcher import CommandContext, CommandExecutionError
 from app.platform.security.context import ActorKind
@@ -17,7 +23,7 @@ NOW = datetime(2026, 8, 19, 12, 0, tzinfo=UTC)
 class SessionDouble:
     def __init__(self, values: list[object]) -> None:
         self._values = iter(values)
-        self.added: list[object] = []
+        self.added: list[Any] = []
 
     def scalar(self, *_args, **_kwargs) -> object:
         return next(self._values)
@@ -36,15 +42,18 @@ def _context(actor_kind: str = ActorKind.PATRON_ADMIN.value) -> CommandContext:
     )
 
 
-def _prepare_command() -> SimpleNamespace:
-    return SimpleNamespace(
-        upload_id=uuid4(),
-        company_id=uuid4(),
-        document_id=uuid4(),
+def _prepare_command() -> PrepareEnterpriseDocumentUploadCommand:
+    upload_id = uuid4()
+    company_id = uuid4()
+    document_id = uuid4()
+    return PrepareEnterpriseDocumentUploadCommand(
+        upload_id=upload_id,
+        company_id=company_id,
+        document_id=document_id,
         document_kind="KBIS",
         document_label="Kbis",
         original_filename="kbis.pdf",
-        storage_key="private/kbis",
+        storage_key=f"{upload_id}/{company_id}/{document_id}.bin",
         expected_byte_size=12,
         expires_at=NOW + timedelta(days=1),
         command_id=uuid4(),
@@ -53,8 +62,8 @@ def _prepare_command() -> SimpleNamespace:
     )
 
 
-def _finalize_command() -> SimpleNamespace:
-    return SimpleNamespace(
+def _finalize_command() -> FinalizeEnterpriseDocumentUploadCommand:
+    return FinalizeEnterpriseDocumentUploadCommand(
         upload_id=uuid4(),
         company_id=uuid4(),
         document_id=uuid4(),
@@ -64,8 +73,8 @@ def _finalize_command() -> SimpleNamespace:
     )
 
 
-def _verify_command() -> SimpleNamespace:
-    return SimpleNamespace(
+def _verify_command() -> VerifyEnterpriseDocumentCommand:
+    return VerifyEnterpriseDocumentCommand(
         company_id=uuid4(),
         document_id=uuid4(),
         expected_verification_revision=0,
