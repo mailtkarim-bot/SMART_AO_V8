@@ -6,7 +6,14 @@ from uuid import uuid4
 import pytest
 from app.modules.decision.application.risk import RegisterStructuredRiskHandler
 from app.modules.decision.application.risk_commands import RegisterStructuredRiskCommand
-from app.modules.decision.domain.risk import RiskValidationError, StructuredRisk
+from app.modules.decision.domain.risk import (
+    RiskCategory,
+    RiskLikelihood,
+    RiskSeverity,
+    RiskTreatment,
+    RiskValidationError,
+    StructuredRisk,
+)
 from app.platform.events.dispatcher import CommandContext, CommandExecutionError
 
 NOW = datetime(2026, 8, 24, 12, 0, tzinfo=UTC)
@@ -64,9 +71,9 @@ def test_register_risk_validates_source_and_emits_sparse_event() -> None:
     repository.functional_exists.return_value = False
     command = _command()
 
-    outcome = RegisterStructuredRiskHandler(
-        repository_factory=lambda _session: repository
-    ).execute(session=SimpleNamespace(), command=command, context=_context())
+    outcome = RegisterStructuredRiskHandler(repository_factory=lambda _session: repository).execute(
+        session=SimpleNamespace(), command=command, context=_context()
+    )
 
     draft = repository.create.call_args.kwargs["draft"]
     assert draft.tenant_id == TENANT_ID
@@ -102,9 +109,9 @@ def test_register_risk_fails_closed_when_source_is_not_in_tenant_version() -> No
     repository.source_supports.return_value = False
 
     with pytest.raises(CommandExecutionError, match="SOURCE_FRAGMENT_NOT_FOUND_OR_FORBIDDEN"):
-        RegisterStructuredRiskHandler(
-            repository_factory=lambda _session: repository
-        ).execute(session=MagicMock(), command=_command(), context=_context())
+        RegisterStructuredRiskHandler(repository_factory=lambda _session: repository).execute(
+            session=MagicMock(), command=_command(), context=_context()
+        )
 
     repository.create.assert_not_called()
 
@@ -116,9 +123,9 @@ def test_register_risk_rejects_stale_dce_context() -> None:
     repository.case_uses_dce_version.return_value = False
 
     with pytest.raises(CommandExecutionError, match="STALE_DCE_CONTEXT"):
-        RegisterStructuredRiskHandler(
-            repository_factory=lambda _session: repository
-        ).execute(session=MagicMock(), command=_command(), context=_context())
+        RegisterStructuredRiskHandler(repository_factory=lambda _session: repository).execute(
+            session=MagicMock(), command=_command(), context=_context()
+        )
 
     repository.create.assert_not_called()
 
@@ -133,9 +140,9 @@ def test_register_risk_rejects_functional_duplicate() -> None:
     repository.functional_exists.return_value = True
 
     with pytest.raises(CommandExecutionError, match="RISK_ALREADY_REGISTERED"):
-        RegisterStructuredRiskHandler(
-            repository_factory=lambda _session: repository
-        ).execute(session=MagicMock(), command=_command(), context=_context())
+        RegisterStructuredRiskHandler(repository_factory=lambda _session: repository).execute(
+            session=MagicMock(), command=_command(), context=_context()
+        )
 
     repository.create.assert_not_called()
 
@@ -143,13 +150,13 @@ def test_register_risk_rejects_functional_duplicate() -> None:
 @pytest.mark.domain
 def test_structured_risk_rejects_unordered_source_offsets() -> None:
     risk = StructuredRisk(
-        category="CCAP",
+        category=RiskCategory.CCAP,
         risk_code="RISK-1",
         title="Risque",
         statement="Énoncé",
-        severity="LOW",
-        likelihood="RARE",
-        treatment="OPEN",
+        severity=RiskSeverity.LOW,
+        likelihood=RiskLikelihood.RARE,
+        treatment=RiskTreatment.OPEN,
         source_excerpt="Extrait",
         start_byte_offset=10,
         end_byte_offset=10,
