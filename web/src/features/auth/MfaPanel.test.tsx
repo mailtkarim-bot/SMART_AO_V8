@@ -19,6 +19,11 @@ function renderPanel() {
       used_recovery_code: false,
     }),
     disableTotp: vi.fn().mockResolvedValue(undefined),
+    stepUpTotp: vi.fn().mockResolvedValue({
+      session_id: "session-1",
+      used_recovery_code: false,
+      verified_at: "2026-08-27T00:00:00Z",
+    }),
   } as unknown as ApiClient;
   const setMessage = vi.fn();
   render(<MfaPanel api={api} setMessage={setMessage} />);
@@ -37,6 +42,15 @@ describe("MfaPanel", () => {
 
     await waitFor(() => expect(api.confirmTotpEnrollment).toHaveBeenCalledWith("factor-1", "123456"));
     expect(setMessage).toHaveBeenCalledWith({ tone: "success", text: "MFA TOTP activée pour cette identité." });
+  });
+
+  it("validates a recent step-up code for sensitive actions", async () => {
+    const { api, setMessage } = renderPanel();
+    fireEvent.change(screen.getByLabelText("Code TOTP de step-up"), { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: "Valider le step-up" }));
+
+    await waitFor(() => expect(api.stepUpTotp).toHaveBeenCalledWith("123456"));
+    expect(setMessage).toHaveBeenCalledWith({ tone: "success", text: "Step-up MFA validé pour les actions sensibles pendant la fenêtre de session." });
   });
 
   it("requires a code to request TOTP disablement", async () => {
