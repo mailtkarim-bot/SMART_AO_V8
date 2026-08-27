@@ -200,6 +200,9 @@ from app.modules.enterprise.application.enterprise_upload import (
     enterprise_upload_handlers,
 )
 from app.modules.enterprise.application.registry_lookup import EnterpriseRegistryLookupService
+from app.modules.enterprise.infrastructure.capability_context_reader import (
+    SqlAlchemyEnterpriseCapabilityContextReader,
+)
 from app.modules.enterprise.infrastructure.insee_registry import (
     CompanyRegistryPort,
     InseeSireneRegistry,
@@ -980,6 +983,9 @@ def create_app(
         )
         enterprise_capability_service = EnterpriseCapabilityService(
             session_factory=runtime.session_factory,
+            capability_context_reader=SqlAlchemyEnterpriseCapabilityContextReader(
+                runtime.session_factory
+            ),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
