@@ -623,6 +623,20 @@ export type ResolveTaskBlockerInput = {
   resolution_note: string;
 };
 
+export type TotpEnrollment = {
+  factor_id: string;
+  otpauth_uri: string;
+  recovery_codes: string[];
+  expires_at: string;
+};
+
+export type TotpStepUpResponse = {
+  access_token: string;
+  token_type: "Bearer";
+  expires_in: number;
+  used_recovery_code: boolean;
+};
+
 export type BackendReadiness = {
   status: "ok" | "not_ready";
   service: "smart-ao-v8";

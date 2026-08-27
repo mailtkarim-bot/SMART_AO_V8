@@ -20,6 +20,7 @@ import { DceKnowledgePanel } from "../features/dce/DceKnowledgePanel";
 import { CreateCasePanel } from "../features/cases/CreateCasePanel";
 import { useDceKnowledge } from "../features/dce/useDceKnowledge";
 import { useAuthentication } from "../features/auth/useAuthentication";
+import { MfaPanel } from "../features/auth/MfaPanel";
 import { useBackendReadiness } from "../features/connection/useBackendReadiness";
 import {
   assertRuntimeApiUrl,
@@ -561,6 +562,8 @@ function App() {
           onSearch={() => void dceKnowledge.searchKnowledge()}
           onResetSearch={dceKnowledge.resetSearch}
         />
+
+        {isAuthenticated && <MfaPanel api={api} setMessage={setMessage} />}
 
         <CollaboratorWizardPanel
           wizardCaseId={wizardCaseId}

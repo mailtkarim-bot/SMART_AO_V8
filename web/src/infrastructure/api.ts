@@ -24,6 +24,8 @@ import type {
   RecordInformationResponseInput,
   DeclareTaskBlockerInput,
   ResolveTaskBlockerInput,
+  TotpEnrollment,
+  TotpStepUpResponse,
   PreparationPackage,
   CommitPricingImportRequest,
   PricingImportCommitReceipt,
@@ -151,6 +153,11 @@ export function createApiClient(
   let currentToken = token;
   let refreshPromise: Promise<AuthSession | null> | null = null;
 
+  function csrfHeaders(): Record<string, string> | undefined {
+    const csrfToken = readCookie("smart_ao_csrf");
+    return csrfToken ? { "X-CSRF-Token": csrfToken } : undefined;
+  }
+
   async function refreshSession(): Promise<AuthSession | null> {
     if (refreshPromise) return refreshPromise;
     refreshPromise = (async () => {
@@ -265,6 +272,29 @@ export function createApiClient(
 
   return {
     login,
+    beginTotpEnrollment: () =>
+      request<TotpEnrollment>("/api/v1/auth/mfa/totp/enroll", {
+        method: "POST",
+        headers: csrfHeaders(),
+      }),
+    confirmTotpEnrollment: (factorId: string, code: string) =>
+      request<TotpStepUpResponse>("/api/v1/auth/mfa/totp/confirm", {
+        method: "POST",
+        headers: csrfHeaders(),
+        body: JSON.stringify({ factor_id: factorId, code }),
+      }),
+    stepUpTotp: (code: string) =>
+      request<TotpStepUpResponse>("/api/v1/auth/mfa/totp/step-up", {
+        method: "POST",
+        headers: csrfHeaders(),
+        body: JSON.stringify({ code }),
+      }),
+    disableTotp: (code: string) =>
+      request<void>("/api/v1/auth/mfa/totp/disable", {
+        method: "POST",
+        headers: csrfHeaders(),
+        body: JSON.stringify({ code }),
+      }),
     refresh: refreshSession,
     getCurrentActor: () => request<CurrentActor>("/api/v1/auth/me"),
     logout,
