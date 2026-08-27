@@ -11,6 +11,7 @@ from app.modules.enterprise.application.enterprise_capability_commands import (
     AddEnterpriseCapabilityVersionCommand,
     CreateEnterpriseCapabilityCommand,
 )
+from app.modules.enterprise.application.ports import EnterpriseCapabilityContextReader
 from app.modules.enterprise.infrastructure.models import (
     EnterpriseCapabilityProofLinkRecord,
     EnterpriseCapabilityRecord,
@@ -67,10 +68,12 @@ class EnterpriseCapabilityService:
         self,
         *,
         session_factory: sessionmaker[Session],
+        capability_context_reader: EnterpriseCapabilityContextReader,
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
     ) -> None:
         self._session_factory = session_factory
+        self._capability_context_reader = capability_context_reader
         self._dispatcher = dispatcher
         self._policy = policy
 
@@ -93,16 +96,13 @@ class EnterpriseCapabilityService:
         command: AddEnterpriseCapabilityVersionCommand,
         now: datetime,
     ) -> DispatchResult:
-        with self._session_factory() as session:
-            capability = session.scalar(
-                sa.select(EnterpriseCapabilityRecord).where(
-                    EnterpriseCapabilityRecord.tenant_id == actor.tenant_id,
-                    EnterpriseCapabilityRecord.id == command.capability_id,
-                )
-            )
-        if capability is None:
+        company_id = self._capability_context_reader.company_id_for_capability(
+            tenant_id=actor.tenant_id,
+            capability_id=command.capability_id,
+        )
+        if company_id is None:
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
-        self._authorize(actor=actor, resource_id=capability.company_id, now=now, write=True)
+        self._authorize(actor=actor, resource_id=company_id, now=now, write=True)
         return self._dispatcher.dispatch(
             command=command, context=self._context(actor=actor, now=now)
         )

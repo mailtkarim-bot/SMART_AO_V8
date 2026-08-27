@@ -21,8 +21,14 @@ from app.modules.enterprise.application.enterprise_library import (
     EnterpriseLibraryService,
     enterprise_library_handlers,
 )
+from app.modules.enterprise.infrastructure.capability_context_reader import (
+    SqlAlchemyEnterpriseCapabilityContextReader,
+)
 from app.modules.enterprise.infrastructure.models import EnterpriseDocumentUploadRecord
-from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
+from app.platform.events.dispatcher import (
+    CommandDispatcher,
+    CommandExecutionError,
+)
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
 from app.platform.security.capabilities import capabilities_for
@@ -180,7 +186,12 @@ def _services(
             session_factory=session_factory, dispatcher=dispatcher, policy=policy
         ),
         EnterpriseCapabilityService(
-            session_factory=session_factory, dispatcher=dispatcher, policy=policy
+            session_factory=session_factory,
+            capability_context_reader=SqlAlchemyEnterpriseCapabilityContextReader(
+                session_factory
+            ),
+            dispatcher=dispatcher,
+            policy=policy,
         ),
     )
 
