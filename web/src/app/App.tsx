@@ -48,6 +48,7 @@ import type {
   RegisterStructuredRiskInput,
   CreateCaseInput,
 } from "../shared/types";
+import { buildDeepLink, readDeepLink, type NavKey } from "./deepLink";
 import "./styles.css";
 
 const CATEGORIES: Array<{ value: FinancialCategory; label: string }> = [
@@ -91,11 +92,12 @@ function App() {
   const [actions, setActions] = useState<PatronAction[]>([]);
   const [scenarios, setScenarios] = useState<PricingScenario[]>([]);
   const [decisionDossier, setDecisionDossier] = useState<PatronDecisionDossier | null>(null);
-  const [selectedCaseId, setSelectedCaseId] = useState("");
+  const initialDeepLink = readDeepLink(window.location.hash);
+  const [selectedCaseId, setSelectedCaseId] = useState(initialDeepLink.caseId);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error" | "warning"; text: string } | null>(null);
   const [showConnection, setShowConnection] = useState(false);
-  const [activeNav, setActiveNav] = useState("overview");
+  const [activeNav, setActiveNav] = useState<NavKey>(initialDeepLink.section);
   const {
     accessToken,
     currentActor,
@@ -244,6 +246,20 @@ function App() {
     : [];
 
   useEffect(() => {
+    function handleHashChange() {
+      const link = readDeepLink(window.location.hash);
+      setActiveNav(link.section);
+      if (link.caseId) setSelectedCaseId(link.caseId);
+    }
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    window.history.replaceState(null, "", buildDeepLink({ caseId: selectedCaseId, section: activeNav }));
+  }, [selectedCaseId, activeNav]);
+
+  useEffect(() => {
     if (!accessToken.trim()) return;
     void refreshCases();
     if (isPatron) {
@@ -274,7 +290,10 @@ function App() {
     try {
       const result = await api.listAssignedCases();
       setCases(result);
-      if (!selectedCaseId && result[0]) setSelectedCaseId(result[0].case_id);
+      const requestedCase = result.find((item) => item.case_id === selectedCaseId);
+      if (requestedCase) setSelectedCaseId(requestedCase.case_id);
+      else if (!selectedCaseId && result[0]) setSelectedCaseId(result[0].case_id);
+      else if (selectedCaseId && !requestedCase) setSelectedCaseId(result[0]?.case_id ?? "");
       setMessage({ tone: "success", text: `${result.length} affaire${result.length > 1 ? "s" : ""} chargée${result.length > 1 ? "s" : ""}.` });
     } catch (error) {
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Impossible de charger les affaires." });
@@ -431,7 +450,7 @@ function App() {
     }
   }
 
-  function navigateTo(sectionId: string, navKey: string) {
+  function navigateTo(sectionId: string, navKey: NavKey) {
     setActiveNav(navKey);
     document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
