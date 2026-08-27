@@ -6,10 +6,11 @@ from datetime import datetime
 from uuid import uuid4
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.dce.application.commands import CreateFinancialReportDraftCommand
+from app.modules.membership.application.queries import FinancialDraftCaseReader
 from app.modules.pricing.infrastructure.models import FinancialReportSnapshotRecord
 from app.platform.events.dispatcher import (
     CommandContext,
@@ -34,11 +35,11 @@ class PatronFinancialReportDraftCreationService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
+        reader: FinancialDraftCaseReader,
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
     ) -> None:
-        self._session_factory = session_factory
+        self._reader = reader
         self._dispatcher = dispatcher
         self._policy = policy
 
@@ -68,14 +69,10 @@ class PatronFinancialReportDraftCreationService:
         )
         if not decision.allowed:
             raise PermissionError(decision.code)
-        with self._session_factory() as session:
-            exists = session.scalar(
-                sa.select(CaseRecord.id).where(
-                    CaseRecord.tenant_id == actor.tenant_id,
-                    CaseRecord.id == command.case_id,
-                )
-            )
-        if exists is None:
+        if not self._reader.exists(
+            tenant_id=actor.tenant_id,
+            case_id=command.case_id,
+        ):
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
         return self._dispatcher.dispatch(
             command=command,

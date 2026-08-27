@@ -59,6 +59,12 @@ class FinancialReportReader(Protocol):
     ) -> FinancialReportProjection | None: ...
 
 
+class FinancialDraftCaseReader(Protocol):
+    """Check the tenant-scoped Case before creating a financial draft."""
+
+    def exists(self, *, tenant_id: UUID, case_id: UUID) -> bool: ...
+
+
 class FinancialReportSnapshotExistenceReader(Protocol):
     """Check a tenant-scoped financial snapshot before patron mutations."""
 
