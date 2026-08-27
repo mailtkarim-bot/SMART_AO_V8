@@ -13,6 +13,7 @@ from app.modules.pricing.application.import_creation import (
     _validate_rows,
     pricing_import_creation_handlers,
 )
+from app.modules.pricing.infrastructure.case_reader import SqlAlchemyCaseExistenceReader
 from app.platform.events.dispatcher import (
     CommandDispatcher,
     CommandExecutionError,
@@ -82,7 +83,7 @@ class _RecordingPolicy:
 
 def _service(session_factory, *, policy=None):
     return PricingImportCreationService(
-        session_factory=session_factory,
+        case_reader=SqlAlchemyCaseExistenceReader(session_factory),
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
             handlers=pricing_import_creation_handlers(),

@@ -4,13 +4,14 @@ from datetime import datetime
 from uuid import uuid4
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.modules.case.infrastructure.models.case import CaseRecord
 from app.modules.pricing.application.import_commands import (
     CreatePricingImportPreviewCommand,
     CreatePricingImportRowCommand,
 )
+from app.modules.pricing.application.ports import CaseExistenceReader
 from app.modules.pricing.infrastructure.models import (
     PricingImportBatchRecord,
     PricingImportRowRecord,
@@ -38,11 +39,11 @@ class PricingImportCreationService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
+        case_reader: CaseExistenceReader,
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
     ) -> None:
-        self._session_factory = session_factory
+        self._case_reader = case_reader
         self._dispatcher = dispatcher
         self._policy = policy
 
@@ -72,14 +73,10 @@ class PricingImportCreationService:
         )
         if not decision.allowed:
             raise PermissionError(decision.code)
-        with self._session_factory() as session:
-            case_exists = session.scalar(
-                sa.select(CaseRecord.id).where(
-                    CaseRecord.tenant_id == actor.tenant_id,
-                    CaseRecord.id == command.case_id,
-                )
-            )
-        if case_exists is None:
+        if not self._case_reader.exists(
+            tenant_id=actor.tenant_id,
+            case_id=command.case_id,
+        ):
             raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
         return self._dispatcher.dispatch(
             command=command,
