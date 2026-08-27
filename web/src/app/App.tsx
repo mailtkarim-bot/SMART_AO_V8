@@ -143,6 +143,7 @@ function App() {
     wizardPreviewContent,
     wizardDocumentBusy,
     wizardTaskWorkflow,
+    wizardDocumentKind,
     setWizardCaseId,
     setWizardPackageId,
     setWizardTaskId,
@@ -150,6 +151,7 @@ function App() {
     setWizardOutcome,
     setWizardSnapshotId,
     setWizardTransmissionId,
+    setWizardDocumentKind,
     loadCollaboratorWizard,
     evaluateWizardReadiness,
     generateWizardDocument,
@@ -574,6 +576,8 @@ function App() {
           wizardPreviewContent={wizardPreviewContent}
           wizardDocumentBusy={wizardDocumentBusy}
           taskWorkflow={wizardTaskWorkflow}
+          wizardDocumentKind={wizardDocumentKind}
+          setWizardDocumentKind={setWizardDocumentKind}
           setWizardCaseId={setWizardCaseId}
           setWizardPackageId={setWizardPackageId}
           setWizardTaskId={setWizardTaskId}

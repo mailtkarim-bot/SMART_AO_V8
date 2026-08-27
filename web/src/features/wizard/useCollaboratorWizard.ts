@@ -29,6 +29,7 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
   const [wizardPreviewDocumentId, setWizardPreviewDocumentId] = useState<string | null>(null);
   const [wizardPreviewContent, setWizardPreviewContent] = useState<string | null>(null);
   const [wizardDocumentBusy, setWizardDocumentBusy] = useState(false);
+  const [wizardDocumentKind, setWizardDocumentKind] = useState<"TECHNICAL_RESPONSE" | "DC1" | "DC2" | "DC4">("TECHNICAL_RESPONSE");
   const [wizardTaskWorkflow, setWizardTaskWorkflow] = useState<CollaboratorTaskWorkflow | null>(null);
 
   async function loadCollaboratorWizard(notify = true) {
@@ -88,6 +89,7 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
       await api.generateTechnicalDocument(wizardPackage.package_id, {
         expected_revision: wizardPackage.aggregate_revision,
         readiness_revision: wizardPackage.latest_readiness.revision,
+        document_kind: wizardDocumentKind,
       });
       setMessage({ tone: "success", text: "Génération documentaire demandée avec contrôle de complétude." });
       await refreshCollaboratorWizard();
@@ -274,6 +276,7 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
     wizardPreviewContent,
     wizardDocumentBusy,
     wizardTaskWorkflow,
+    wizardDocumentKind,
     setWizardCaseId,
     setWizardPackageId,
     setWizardTaskId,
@@ -281,6 +284,7 @@ export function useCollaboratorWizard(api: ApiClient, setMessage: SetMessage) {
     setWizardOutcome,
     setWizardSnapshotId,
     setWizardTransmissionId,
+    setWizardDocumentKind,
     previewWizardDocument,
     downloadWizardDocument,
     loadWizardTaskWorkflow,

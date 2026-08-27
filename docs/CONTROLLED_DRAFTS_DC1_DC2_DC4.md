@@ -79,3 +79,7 @@ La surface est branchée dans `App.tsx` uniquement pour les acteurs patronaux et
 ## Limites de validation
 
 Les tests unitaires, les tests API et la CI peuvent vérifier le contrat, la migration et les invariants locaux. Ils ne remplacent pas la validation juridique, le corpus DCE autorisé, la recette des secrets/fournisseurs, l’opération HTTPS/VPS, ni la signature ou transmission réelles.
+
+## Parcours frontend livré
+
+Le wizard collaborateur propose désormais un sélecteur fermé `TECHNICAL_RESPONSE`, `DC1`, `DC2` ou `DC4` avant l’action de génération. Le type choisi est transmis au serveur avec la révision du package et la révision de readiness ; le serveur reste l’autorité pour accepter ou refuser la génération. Les documents produits apparaissent ensuite dans la projection versionnée et peuvent être relus ou téléchargés via le parcours d’accès documentaire contrôlé décrit dans `docs/PREPARATION_GENERATED_DOCUMENT_ACCESS.md`.

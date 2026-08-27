@@ -26,6 +26,7 @@ type CollaboratorWizardPanelProps = {
   wizardPreviewDocumentId: string | null;
   wizardPreviewContent: string | null;
   wizardDocumentBusy: boolean;
+  wizardDocumentKind: "TECHNICAL_RESPONSE" | "DC1" | "DC2" | "DC4";
   setWizardCaseId: Dispatch<SetStateAction<string>>;
   setWizardPackageId: Dispatch<SetStateAction<string>>;
   setWizardTaskId: Dispatch<SetStateAction<string>>;
@@ -33,6 +34,7 @@ type CollaboratorWizardPanelProps = {
   setWizardOutcome: Dispatch<SetStateAction<WizardOutcome>>;
   setWizardSnapshotId: Dispatch<SetStateAction<string>>;
   setWizardTransmissionId: Dispatch<SetStateAction<string>>;
+  setWizardDocumentKind: Dispatch<SetStateAction<"TECHNICAL_RESPONSE" | "DC1" | "DC2" | "DC4">>;
   onLoad: () => void;
   onClaimTask: () => void;
   onRecordResult: () => void;
@@ -67,9 +69,11 @@ export function CollaboratorWizardPanel({
   setWizardOutcome,
   setWizardSnapshotId,
   setWizardTransmissionId,
+  setWizardDocumentKind,
   wizardPreviewDocumentId,
   wizardPreviewContent,
   wizardDocumentBusy,
+  wizardDocumentKind,
   onLoad,
   onClaimTask,
   onRecordResult,
@@ -235,6 +239,15 @@ export function CollaboratorWizardPanel({
                   <p>La readiness est recalculée côté serveur avant toute génération.</p>
                 </div>
               </div>
+              <label className="document-kind-selector">
+                <span>Type à générer</span>
+                <select value={wizardDocumentKind} onChange={(event) => setWizardDocumentKind(event.target.value as "TECHNICAL_RESPONSE" | "DC1" | "DC2" | "DC4")}>
+                  <option value="TECHNICAL_RESPONSE">Réponse technique</option>
+                  <option value="DC1">DC1</option>
+                  <option value="DC2">DC2</option>
+                  <option value="DC4">DC4</option>
+                </select>
+              </label>
               <div className="wizard-action-row">
                 <button className="primary-button" type="button" onClick={onEvaluateReadiness}>
                   Vérifier la complétude
