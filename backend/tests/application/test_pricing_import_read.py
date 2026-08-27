@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 import sqlalchemy as sa
 from app.modules.pricing.application.import_read import PricingImportReadService
+from app.modules.pricing.infrastructure.import_reader import SqlAlchemyImportPreviewReader
 from app.platform.security.audit import AuditedAuthorizationPolicy, SecurityAuditWriter
 from app.platform.security.authorization import AuthorizationDecision, AuthorizationPolicy
 from app.platform.security.capabilities import Capability
@@ -36,7 +37,7 @@ class _RecordingPolicy:
 
 def _service(session_factory, *, policy=None):
     return PricingImportReadService(
-        session_factory=session_factory,
+        reader=SqlAlchemyImportPreviewReader(session_factory),
         policy=policy or AuthorizationPolicy(),
     )
 
@@ -53,7 +54,7 @@ def test_persisted_reader_denial_is_audited_without_business_payload(session_fac
     actor, case_id, _, _ = _seed_draft(session_factory)
     batch = _persist_batch(session_factory, actor, case_id)
     service = PricingImportReadService(
-        session_factory=session_factory,
+        reader=SqlAlchemyImportPreviewReader(session_factory),
         policy=AuditedAuthorizationPolicy(
             policy=_DenyPolicy(),
             session_factory=session_factory,
