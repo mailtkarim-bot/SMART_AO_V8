@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from app.modules.enterprise.application.enterprise_library import EnterpriseCompanyProjection
 
 
 class EnterpriseCapabilityContextReader(Protocol):
@@ -28,3 +31,9 @@ class CompanyRegistryPort(Protocol):
     """Read-only application port for bounded company registry lookup."""
 
     def find_by_siren(self, *, siren: str) -> RegisteredCompany | None: ...
+
+
+class EnterpriseLibraryReader(Protocol):
+    """Read-only application port for the tenant enterprise library projection."""
+
+    def read_company(self, *, tenant_id: UUID) -> EnterpriseCompanyProjection | None: ...

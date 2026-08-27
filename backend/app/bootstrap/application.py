@@ -205,6 +205,7 @@ from app.modules.enterprise.infrastructure.capability_context_reader import (
     SqlAlchemyEnterpriseCapabilityContextReader,
 )
 from app.modules.enterprise.infrastructure.insee_registry import InseeSireneRegistry
+from app.modules.enterprise.infrastructure.library_reader import SqlAlchemyEnterpriseLibraryReader
 from app.modules.knowledge.application.service import KnowledgeRetrievalService
 from app.modules.market_watch.application.ports import PublicNoticeSearchPort
 from app.modules.market_watch.application.service import PublicNoticeSearchService
@@ -978,6 +979,7 @@ def create_app(
             session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
             policy=security_policy,
+            reader=SqlAlchemyEnterpriseLibraryReader(runtime.session_factory),
         )
         enterprise_capability_service = EnterpriseCapabilityService(
             session_factory=runtime.session_factory,
