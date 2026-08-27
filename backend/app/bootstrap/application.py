@@ -936,7 +936,6 @@ def create_app(
             policy=security_policy,
         )
         pricing_import_service = PricingImportService(
-            session_factory=runtime.session_factory,
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )
