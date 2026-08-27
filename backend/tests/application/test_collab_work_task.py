@@ -27,6 +27,9 @@ from app.modules.membership.application.collab_work_task_commands import (
     CreateTaskFromRequirementCommand,
     RecordTaskResultCommand,
 )
+from app.modules.membership.infrastructure.collab_work_task_reader import (
+    SqlAlchemyCollaboratorWorkTaskReader,
+)
 from app.platform.events.dispatcher import (
     CommandContext,
     CommandDispatcher,
@@ -269,7 +272,7 @@ def _service(factory, *, policy=None):
         session_factory=factory, handlers=collaborator_work_task_handlers()
     )
     return CollaboratorWorkTaskService(
-        session_factory=factory,
+        reader=SqlAlchemyCollaboratorWorkTaskReader(factory),
         dispatcher=dispatcher,
         policy=policy or AuthorizationPolicy(),
     )
