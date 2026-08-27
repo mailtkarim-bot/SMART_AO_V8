@@ -34,12 +34,10 @@ class PricingScenarioTransitionService:
     def __init__(
         self,
         *,
-        session_factory,
         reader: PricingScenarioReader,
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
     ) -> None:
-        self._session_factory = session_factory
         self._reader = reader
         self._dispatcher = dispatcher
         self._policy = policy
