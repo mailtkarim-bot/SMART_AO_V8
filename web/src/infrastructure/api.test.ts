@@ -150,6 +150,39 @@ describe("Decision lifecycle transport", () => {
 });
 
 
+describe("MFA TOTP transport", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.cookie = "smart_ao_csrf=; Max-Age=0; path=/";
+  });
+
+  it("sends CSRF-protected enrollment, confirmation, step-up and disable requests", async () => {
+    document.cookie = "smart_ao_csrf=csrf-1; path=/";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ factor_id: "factor-1", otpauth_uri: "otpauth://totp/x", recovery_codes: ["r1"], expires_at: "2026-08-27T00:00:00Z" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token-2", token_type: "Bearer", expires_in: 900, used_recovery_code: false }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "token-3", token_type: "Bearer", expires_in: 900, used_recovery_code: false }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiClient("https://app.example.test", "access-1");
+
+    await client.beginTotpEnrollment();
+    await client.confirmTotpEnrollment("factor-1", "123456");
+    await client.stepUpTotp("654321");
+    await client.disableTotp("111111");
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://app.example.test/api/v1/auth/mfa/totp/enroll",
+      "https://app.example.test/api/v1/auth/mfa/totp/confirm",
+      "https://app.example.test/api/v1/auth/mfa/totp/step-up",
+      "https://app.example.test/api/v1/auth/mfa/totp/disable",
+    ]);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(((init as RequestInit).headers as Headers).get("X-CSRF-Token")).toBe("csrf-1");
+    }
+  });
+});
+
 describe("Collaborator task workflow transport", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
