@@ -13,6 +13,7 @@ from app.modules.pricing.application.import_service import (
     PricingImportService,
     pricing_import_handlers,
 )
+from app.modules.pricing.infrastructure.import_reader import SqlAlchemyImportPreviewReader
 from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord
 from app.platform.security.authorization import AuthorizationPolicy
@@ -324,7 +325,7 @@ def test_pricing_import_read_http_contract_is_tenant_scoped(session_factory):
             build_patron_pricing_import_router(
                 service=PricingImportPreviewService(policy=AuthorizationPolicy()),
                 read_service=PricingImportReadService(
-                    session_factory=session_factory,
+                    reader=SqlAlchemyImportPreviewReader(session_factory),
                     policy=AuthorizationPolicy(),
                 ),
                 security_runtime=ConsultationSecurityRuntime(

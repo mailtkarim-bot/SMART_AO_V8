@@ -4,14 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-import sqlalchemy as sa
-from sqlalchemy.orm import Session, sessionmaker
-
-from app.modules.pricing.infrastructure.models import (
-    PricingImportBatchRecord,
-    PricingImportRowRecord,
-    PricingImportTransitionRecord,
-)
+from app.modules.pricing.application.ports import ImportPreviewReader
 from app.platform.security.authorization import (
     AuthorizationPolicyPort,
     AuthorizationRequest,
@@ -53,10 +46,10 @@ class PricingImportReadService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
+        reader: ImportPreviewReader,
         policy: AuthorizationPolicyPort,
     ) -> None:
-        self._session_factory = session_factory
+        self._reader = reader
         self._policy = policy
 
     def get(
@@ -70,78 +63,28 @@ class PricingImportReadService:
         if actor.actor_kind is not ActorKind.PATRON_ADMIN or actor.membership_id is None:
             raise PermissionError("FORBIDDEN")
 
-        with self._session_factory() as session:
-            batch = session.scalar(
-                sa.select(PricingImportBatchRecord).where(
-                    PricingImportBatchRecord.tenant_id == actor.tenant_id,
-                    PricingImportBatchRecord.case_id == case_id,
-                    PricingImportBatchRecord.id == batch_id,
-                )
-            )
-            if batch is None:
-                raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
+        projection = self._reader.get(
+            tenant_id=actor.tenant_id,
+            case_id=case_id,
+            batch_id=batch_id,
+        )
+        if projection is None:
+            raise PermissionError("NOT_FOUND_OR_FORBIDDEN")
 
-            decision = self._policy.authorize(
-                context=actor,
-                request=AuthorizationRequest(
-                    action=Capability.FINANCIAL_REPORT_LINE_WRITE,
-                    resource=AuthorizationResource(
-                        resource_type="PRICING_IMPORT",
-                        resource_id=batch.id,
-                        tenant_id=batch.tenant_id,
-                        classification=DataClassification.FINANCIAL_PRIVATE,
-                        case_id=batch.case_id,
-                    ),
-                    evaluated_at=now,
+        decision = self._policy.authorize(
+            context=actor,
+            request=AuthorizationRequest(
+                action=Capability.FINANCIAL_REPORT_LINE_WRITE,
+                resource=AuthorizationResource(
+                    resource_type="PRICING_IMPORT",
+                    resource_id=projection.batch_id,
+                    tenant_id=actor.tenant_id,
+                    classification=DataClassification.FINANCIAL_PRIVATE,
+                    case_id=projection.case_id,
                 ),
-            )
-            if not decision.allowed:
-                raise PermissionError("FORBIDDEN")
-
-            latest_transition = session.scalar(
-                sa.select(PricingImportTransitionRecord)
-                .where(
-                    PricingImportTransitionRecord.tenant_id == actor.tenant_id,
-                    PricingImportTransitionRecord.batch_id == batch.id,
-                )
-                .order_by(PricingImportTransitionRecord.version.desc())
-                .limit(1)
-            )
-            current_state = latest_transition.to_state if latest_transition else batch.state
-            current_revision = (
-                latest_transition.version
-                if latest_transition
-                else batch.aggregate_revision
-            )
-            rows = session.scalars(
-                sa.select(PricingImportRowRecord)
-                .where(
-                    PricingImportRowRecord.tenant_id == actor.tenant_id,
-                    PricingImportRowRecord.batch_id == batch.id,
-                )
-                .order_by(PricingImportRowRecord.row_number)
-            ).all()
-            return PricingImportBatchProjection(
-                batch_id=batch.id,
-                case_id=batch.case_id,
-                document_kind=batch.document_kind,
-                state=current_state,
-                aggregate_revision=current_revision,
-                row_count=batch.row_count,
-                valid_row_count=batch.valid_row_count,
-                error_count=batch.error_count,
-                total_minor=batch.total_minor,
-                rows=tuple(
-                    PricingImportRowProjection(
-                        row_number=row.row_number,
-                        code=row.code,
-                        designation=row.designation,
-                        unit=row.unit,
-                        quantity_decimal=row.quantity_decimal,
-                        unit_price_minor=row.unit_price_minor,
-                        total_minor=row.total_minor,
-                        errors=tuple(row.error_codes_json or []),
-                    )
-                    for row in rows
-                ),
-            )
+                evaluated_at=now,
+            ),
+        )
+        if not decision.allowed:
+            raise PermissionError("FORBIDDEN")
+        return projection

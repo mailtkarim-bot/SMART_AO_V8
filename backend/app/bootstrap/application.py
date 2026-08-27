@@ -313,6 +313,7 @@ from app.modules.pricing.application.transition_service import (
     pricing_scenario_transition_handlers,
 )
 from app.modules.pricing.infrastructure.case_reader import SqlAlchemyCaseExistenceReader
+from app.modules.pricing.infrastructure.import_reader import SqlAlchemyImportPreviewReader
 from app.modules.pricing.infrastructure.scenario_reader import SqlAlchemyPricingScenarioReader
 from app.modules.submission.application.calendar import SubmissionDeadlineCalendarPort
 from app.modules.submission.application.evidence_service import (
@@ -926,7 +927,7 @@ def create_app(
             policy=security_policy,
         )
         pricing_import_read_service = PricingImportReadService(
-            session_factory=runtime.session_factory,
+            reader=SqlAlchemyImportPreviewReader(runtime.session_factory),
             policy=security_policy,
         )
         pricing_import_service = PricingImportService(
