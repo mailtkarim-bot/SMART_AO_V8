@@ -254,6 +254,9 @@ from app.modules.membership.infrastructure.assignment_history_reader import (
 from app.modules.membership.infrastructure.assignment_management_reader import (
     SqlAlchemyAssignmentManagementReader,
 )
+from app.modules.membership.infrastructure.financial_report_reader import (
+    SqlAlchemyFinancialReportReader,
+)
 from app.modules.membership.infrastructure.patron_assignment_cockpit_reader import (
     SqlAlchemyPatronAssignmentCockpitReader,
 )
@@ -957,7 +960,7 @@ def create_app(
             policy=security_policy,
         )
         patron_financial_report_service = PatronFinancialReportService(
-            session_factory=runtime.session_factory,
+            reader=SqlAlchemyFinancialReportReader(runtime.session_factory),
             policy=security_policy,
         )
         patron_financial_report_line_service = PatronFinancialReportLineService(
