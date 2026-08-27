@@ -254,6 +254,9 @@ from app.modules.membership.infrastructure.assignment_history_reader import (
 from app.modules.membership.infrastructure.assignment_management_reader import (
     SqlAlchemyAssignmentManagementReader,
 )
+from app.modules.membership.infrastructure.collab_capability_reader import (
+    SqlAlchemyCollaboratorCapabilityReader,
+)
 from app.modules.membership.infrastructure.collab_info_blockers_reader import (
     SqlAlchemyCollaboratorInfoBlockerReader,
 )
@@ -836,7 +839,7 @@ def create_app(
             policy=security_policy,
         )
         collaborator_capability_service = CollaboratorCapabilityAssessmentService(
-            session_factory=runtime.session_factory,
+            reader=SqlAlchemyCollaboratorCapabilityReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
         )

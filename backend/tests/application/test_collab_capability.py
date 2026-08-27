@@ -25,6 +25,9 @@ from app.modules.membership.application.collab_capability_commands import (
     ProposeCapabilityForCaseCommand,
     ReportCapabilityGapCommand,
 )
+from app.modules.membership.infrastructure.collab_capability_reader import (
+    SqlAlchemyCollaboratorCapabilityReader,
+)
 from app.platform.events.dispatcher import CommandDispatcher, CommandExecutionError
 from app.platform.persistence.models import DomainEventRecord, OutboxMessageRecord, TenantRecord
 from app.platform.security.authorization import AuthorizationPolicy
@@ -322,7 +325,7 @@ def _seed(session_factory: sessionmaker[Session], *, include_scope: bool = True)
 
 def _service(factory: sessionmaker[Session]) -> CollaboratorCapabilityAssessmentService:
     return CollaboratorCapabilityAssessmentService(
-        session_factory=factory,
+        reader=SqlAlchemyCollaboratorCapabilityReader(factory),
         dispatcher=CommandDispatcher(
             session_factory=factory,
             handlers=collaborator_capability_handlers(),
