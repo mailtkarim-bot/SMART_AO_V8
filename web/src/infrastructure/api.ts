@@ -60,8 +60,11 @@ import type {
   DecisionRiskRequirementPage,
   DecisionPricingReconciliationResponse,
   StructuredRiskProjection,
-  StructuredRiskCommandResponse,
+  StructuredRiskTreatmentResponse,
   TransitionStructuredRiskTreatmentInput,
+  DceContractRiskSignalPage,
+  RegisterStructuredRiskInput,
+  StructuredRiskRegistrationResponse,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -366,12 +369,29 @@ export function createApiClient(
       request<StructuredRiskProjection>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/risks/${encodeURIComponent(riskId)}`,
       ),
+    listDceContractRiskSignals: (caseId: string, limit = 50) =>
+      request<DceContractRiskSignalPage>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/dce-contract-risk-signals?limit=${limit}`,
+      ),
+    registerStructuredRisk: (caseId: string, input: RegisterStructuredRiskInput) =>
+      request<StructuredRiskRegistrationResponse>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/risks`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            command_id: makeId(),
+            idempotency_key: makeId(),
+            correlation_id: makeId(),
+            ...input,
+          }),
+        },
+      ),
     transitionDecisionRiskTreatment: (
       caseId: string,
       riskId: string,
       input: TransitionStructuredRiskTreatmentInput,
     ) =>
-      request<StructuredRiskCommandResponse>(
+      request<StructuredRiskTreatmentResponse>(
         `/api/v1/patron/cases/${encodeURIComponent(caseId)}/risks/${encodeURIComponent(riskId)}/treatment`,
         {
           method: "POST",

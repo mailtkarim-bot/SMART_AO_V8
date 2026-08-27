@@ -11,8 +11,10 @@ import { PatronCockpitPanel } from "../features/cockpit/PatronCockpitPanel";
 import { PatronDecisionPanel } from "../features/decision/PatronDecisionPanel";
 import { DecisionRiskRequirementsPanel } from "../features/decision/DecisionRiskRequirementsPanel";
 import { DecisionRisksPanel } from "../features/decision/DecisionRisksPanel";
+import { DceContractRiskSignalsPanel } from "../features/decision/DceContractRiskSignalsPanel";
 import { useDecisionRiskRequirements } from "../features/decision/useDecisionRiskRequirements";
 import { useDecisionRisks } from "../features/decision/useDecisionRisks";
+import { useDceContractRiskSignals } from "../features/decision/useDceContractRiskSignals";
 import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
 import { BoampOpportunityPanel } from "../features/opportunities/BoampOpportunityPanel";
 import { useBoampOpportunities } from "../features/opportunities/useBoampOpportunities";
@@ -40,6 +42,8 @@ import type {
   PricingScenario,
   StructuredRiskProjection,
   TransitionStructuredRiskTreatmentInput,
+  DceContractRiskSignal,
+  RegisterStructuredRiskInput,
   CreateCaseInput,
 } from "../shared/types";
 import "./styles.css";
@@ -190,6 +194,11 @@ function App() {
     setMessage,
     isPatron ? selectedCaseId : "",
     decisionDossier?.sources ?? [],
+  );
+  const dceContractRiskSignals = useDceContractRiskSignals(
+    api,
+    setMessage,
+    isPatron ? selectedCaseId : "",
   );
   const {
     assignments,
@@ -374,6 +383,14 @@ function App() {
   ) {
     if (currentActor?.actor_kind !== "PATRON_ADMIN") return;
     await decisionRisks.transitionRisk(risk, input);
+  }
+
+  async function registerDceContractRiskSignal(
+    signal: DceContractRiskSignal,
+    input: RegisterStructuredRiskInput,
+  ) {
+    if (currentActor?.actor_kind !== "PATRON_ADMIN") return;
+    await dceContractRiskSignals.registerSignal(signal, input);
   }
 
   async function finalizeDecision(input: FinalizeGoNoGoDecisionRequest) {
@@ -645,6 +662,18 @@ function App() {
               void resolveDecisionCondition(conditionId, input)
             }
             onFinalize={(input) => void finalizeDecision(input)}
+          />
+        )}
+
+        {isPatron && (
+          <DceContractRiskSignalsPanel
+            caseId={selectedCaseId}
+            signals={dceContractRiskSignals.signals}
+            loading={dceContractRiskSignals.loading}
+            registeringObservationId={dceContractRiskSignals.registeringObservationId}
+            canManage={currentActor?.actor_kind === "PATRON_ADMIN"}
+            onRefresh={() => void dceContractRiskSignals.refresh()}
+            onRegister={(signal, input) => void registerDceContractRiskSignal(signal, input)}
           />
         )}
 

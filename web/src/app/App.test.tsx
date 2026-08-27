@@ -41,6 +41,7 @@ vi.mock("../features/auth/useAuthentication", () => ({
         searchCaseKnowledge: () => Promise.resolve({ case_id: "case-1", query: "", results: [] }),
         listPricingScenarios: () => Promise.resolve([]),
         listDecisionRiskRequirementLinks: () => Promise.resolve({ items: [], next_cursor: null }),
+        listDceContractRiskSignals: () => Promise.resolve({ case_id: "case-1", items: [] }),
         reconcileDecisionPricing: () => Promise.resolve({ link_id: "", search: "", items: [] }),
         getDecisionDossier: () => Promise.reject(Object.assign(new Error("missing"), { status: 404 })),
         ...overridesRef.current,
@@ -87,6 +88,7 @@ function baseOverrides(): Record<string, unknown> {
     searchCaseKnowledge: () => Promise.resolve({ case_id: "case-1", query: "", results: [] }),
     listPricingScenarios: () => Promise.resolve([]),
     listDecisionRiskRequirementLinks: () => Promise.resolve({ items: [], next_cursor: null }),
+    listDceContractRiskSignals: () => Promise.resolve({ case_id: "case-1", items: [] }),
     reconcileDecisionPricing: () => Promise.resolve({ link_id: "", search: "", items: [] }),
     getDecisionDossier: () =>
       Promise.reject(Object.assign(new Error("ignored"), { status: 404 })),

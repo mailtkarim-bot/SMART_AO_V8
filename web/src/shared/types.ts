@@ -288,11 +288,69 @@ export type TransitionStructuredRiskTreatmentInput = {
   rationale: string;
 };
 
-export type StructuredRiskCommandResponse = CommandReceipt & {
+export type StructuredRiskTreatmentResponse = {
+  command_id: string;
+  idempotency_key: string;
   result_code: "DECISION_RISK_TREATMENT_TRANSITIONED";
   risk_id: string;
   version: number;
   treatment: Exclude<StructuredRiskTreatment, "OPEN">;
+  event_ids: string[];
+  replayed: boolean;
+};
+
+export type DceContractRiskSignal = {
+  observation_id: string;
+  dce_version_id: string;
+  document_family: "CCAP" | "CCTP";
+  requirement_kind:
+    | "CCAP_PENALTIES"
+    | "CCAP_RETENTION_GUARANTEE"
+    | "CCAP_GUARANTEE"
+    | "CCAP_INSURANCE"
+    | "CCTP_VARIANTS"
+    | "CCAP_SUBCONTRACTING"
+    | "CCAP_QUALIFICATIONS";
+  rule_id: string;
+  rule_version: string;
+  directive: "REQUIRED_SIGNAL" | "OPTIONAL_SIGNAL" | "UNSPECIFIED";
+  fragment_id: string;
+  source_locator_label: string;
+  start_byte_offset: number;
+  end_byte_offset: number;
+  verification_status: "REVIEW_REQUIRED";
+};
+
+export type DceContractRiskSignalPage = {
+  case_id: string;
+  items: DceContractRiskSignal[];
+};
+
+export type RegisterStructuredRiskInput = {
+  risk_id: string;
+  dce_version_id: string;
+  source_fragment_id: string;
+  category: "CCAP" | "CCTP";
+  risk_code: string;
+  title: string;
+  statement: string;
+  severity: StructuredRiskSeverity;
+  likelihood: StructuredRiskLikelihood;
+  source_excerpt: string;
+  source_locator: Record<string, unknown>;
+  start_byte_offset: number;
+  end_byte_offset: number;
+  due_at?: string | null;
+};
+
+export type StructuredRiskRegistrationResponse = {
+  command_id: string;
+  idempotency_key: string;
+  result_code: "DECISION_RISK_REGISTERED";
+  risk_id: string;
+  version: number;
+  event_ids: string[];
+  replayed: boolean;
 };
 
 export type DecisionRiskRequirementLink = {
