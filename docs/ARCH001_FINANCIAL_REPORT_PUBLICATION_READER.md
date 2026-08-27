@@ -32,7 +32,7 @@ Une mesure locale branchée sur les deux tests purs de frontière donne le résu
 
 Cette valeur est volontairement présentée avec son périmètre : le test pur exerce la façade et `exists`, mais pas l’ensemble du handler transactionnel ni la construction complète de projection. Les tests DB existants et la CI PostgreSQL restent nécessaires pour la couverture du chemin de publication et de lecture complet.
 
-Le dernier rapport complet récupéré depuis la CI verte de `main` avant ce micro-lot indique **88,77 %** de couverture globale, soit 17 621 lignes couvertes sur 19 213 et 2 585 branches couvertes sur 3 550. Le gate configuré est de 85,50 %. Le rapport de la branche courante sera confirmé par la CI PR puis par la CI post-merge.
+Le rapport complet récupéré depuis la CI post-merge verte du commit `1c39274` indique **88,77 %** de couverture globale, soit 17 624 lignes couvertes sur 19 216 et 2 585 branches couvertes sur 3 550. Le gate configuré est de 85,50 %. Le run concerné est `33074545327`.
 
 ## Qualité
 

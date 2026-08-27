@@ -8,7 +8,7 @@ La couverture locale indiquée ici correspond à une exécution de la suite back
 
 ## État Git et refactorings récemment livrés
 
-La branche locale est `main`, synchronisée avec `origin/main`, sans modification de travail. Le dernier commit est `7d5db4b`, issu de la PR #106.
+La branche locale est `main`, synchronisée avec `origin/main`, sans modification de travail. Le dernier commit est `1c39274`, issu de la PR #108.
 
 Les micro-lots récemment fusionnés sont :
 
@@ -21,6 +21,7 @@ Les micro-lots récemment fusionnés sont :
 | Pricing Import Reader | #104 | Preview et état dérivé des transitions lus via un port |
 | Financial Line Context Reader | #105 | Existence du snapshot vérifiée via un port avant mutation |
 | Financial Draft Case Reader | #106 | Existence du dossier vérifiée via un port avant création du brouillon |
+| Financial Report Publication Reader | #108 | Existence du snapshot vérifiée via un lecteur avant publication |
 
 Les handlers transactionnels restent responsables des verrous, transitions, révisions, écritures et événements. Les extractions de lecteurs n’ont pas transformé les actions patronales en décisions automatiques et ne constituent pas une validation juridique.
 
@@ -30,12 +31,13 @@ Les handlers transactionnels restent responsables des verrous, transitions, rév
 |---|---:|---|
 | Fichiers de tests backend | 221 | Comptage des `test_*.py` hors cache |
 | Fichiers de tests frontend | 27 | Comptage des fichiers `*.test.*` sous `web/src` |
-| Tests backend hors DB | **1108 passed**, 477 deselected | Exécution locale réussie |
+| Tests backend hors DB | **1110 passed**, 477 deselected | Exécution locale réussie |
 | Couverture backend locale hors DB, branches incluses | **69,27 %** | Rapport partiel, gate global non concluant |
+| Couverture CI PostgreSQL post-merge | **88,77 %** — 17 624/19 216 lignes ; 2 585/3 550 branches | Run `33074545327`, commit `1c39274`, au-dessus du gate 85,50 % |
 | Gate CI de couverture | 85,50 % | Gate complet exécuté en CI avec PostgreSQL |
 | Ruff global | Réussi | Aucun problème de lint détecté |
-| Mypy global `backend` | **228 erreurs dans 76 fichiers** | Principalement des incompatibilités de types dans des tests/fixtures ; le contrôle CI actuellement configuré est plus ciblé |
-| Format Ruff global | **210 fichiers à reformater**, 665 déjà formatés | Dette de formatage préexistante hors périmètre de ce micro-lot |
+| Mypy global `backend` | **229 erreurs dans 77 fichiers** | Principalement des incompatibilités de types dans des tests/fixtures ; le contrôle CI actuellement configuré est plus ciblé |
+| Format Ruff global | **209 fichiers à reformater**, 669 déjà formatés | Dette de formatage préexistante hors périmètre de ce micro-lot |
 | Format Ruff des fichiers du dernier lot | Réussi | Fichiers touchés par #106 correctement formatés |
 | Frontend | Typecheck, lint, 119 tests, build réussis | Validation locale et CI récentes vertes |
 
@@ -80,4 +82,4 @@ Les recettes VPS, staging et production, Docker local, ClamAV/EICAR, HTTPS réel
 
 ## Conclusion opérationnelle
 
-Le dépôt possède désormais une série de petits ports et adaptateurs pour plusieurs parcours Enterprise, pricing et membership, avec une CI GitHub post-merge verte jusqu’à la PR #106. Le projet n’est pas déclaré entièrement vendable sur cette seule base : la dette d’architecture diminue, mais la couverture locale partielle, les erreurs mypy globales de tests, le formatage historique et plusieurs capacités métier/externe restent à traiter séparément.
+Le dépôt possède désormais une série de petits ports et adaptateurs pour plusieurs parcours Enterprise, pricing et membership, avec une CI GitHub post-merge verte jusqu’à la PR #108. Le projet n’est pas déclaré entièrement vendable sur cette seule base : la dette d’architecture diminue, mais la couverture locale partielle, les erreurs mypy globales de tests, le formatage historique et plusieurs capacités métier/externe restent à traiter séparément.
