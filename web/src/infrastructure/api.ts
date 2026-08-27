@@ -65,6 +65,8 @@ import type {
   DceContractRiskSignalPage,
   RegisterStructuredRiskInput,
   StructuredRiskRegistrationResponse,
+  DecisionCctpPricingCrossingResponse,
+  DecisionDocumentContradictionsResponse,
 } from "../shared/types";
 
 const makeId = () => crypto.randomUUID();
@@ -402,6 +404,14 @@ export function createApiClient(
             ...input,
           }),
         },
+      ),
+    crossCctpPricing: (caseId: string, limit = 25) =>
+      request<DecisionCctpPricingCrossingResponse>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/cctp-pricing-crossing?limit=${limit}`,
+      ),
+    listDocumentContradictions: (caseId: string, limit = 25) =>
+      request<DecisionDocumentContradictionsResponse>(
+        `/api/v1/patron/cases/${encodeURIComponent(caseId)}/document-contradictions?limit=${limit}`,
       ),
     listDecisionRiskRequirementLinks: (
       caseId: string,
