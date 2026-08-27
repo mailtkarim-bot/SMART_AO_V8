@@ -21,7 +21,6 @@ NOW = datetime(2026, 8, 18, 12, 0, tzinfo=UTC)
 @pytest.fixture
 def pricing_service(session_factory: sessionmaker[Session]) -> PricingScenarioService:
     return PricingScenarioService(
-        session_factory=session_factory,
         reader=SqlAlchemyPricingScenarioReader(session_factory),
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
