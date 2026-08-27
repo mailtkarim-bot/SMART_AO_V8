@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import uuid4
 
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from app.modules.pricing.application.import_commands import CommitPricingImportCommand
 from app.modules.pricing.infrastructure.models import (
@@ -37,11 +37,9 @@ class PricingImportService:
     def __init__(
         self,
         *,
-        session_factory: sessionmaker[Session],
         dispatcher: CommandDispatcher,
         policy: AuthorizationPolicyPort,
     ) -> None:
-        self._session_factory = session_factory
         self._dispatcher = dispatcher
         self._policy = policy
 

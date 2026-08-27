@@ -85,7 +85,6 @@ def _batch_and_rows(actor, case_id):
 
 def _service(session_factory):
     return PricingImportService(
-        session_factory=session_factory,
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
             handlers=pricing_import_handlers(),
@@ -300,7 +299,6 @@ def test_commit_does_not_cross_tenant_boundaries(session_factory):
             command=_command(case_id, report_id, batch.id),
             now=NOW,
         )
-
 
 
 def test_pricing_import_read_http_contract_is_tenant_scoped(session_factory):
