@@ -199,14 +199,12 @@ from app.modules.enterprise.application.enterprise_upload import (
     EnterprisePrivateUploadService,
     enterprise_upload_handlers,
 )
+from app.modules.enterprise.application.ports import CompanyRegistryPort
 from app.modules.enterprise.application.registry_lookup import EnterpriseRegistryLookupService
 from app.modules.enterprise.infrastructure.capability_context_reader import (
     SqlAlchemyEnterpriseCapabilityContextReader,
 )
-from app.modules.enterprise.infrastructure.insee_registry import (
-    CompanyRegistryPort,
-    InseeSireneRegistry,
-)
+from app.modules.enterprise.infrastructure.insee_registry import InseeSireneRegistry
 from app.modules.knowledge.application.service import KnowledgeRetrievalService
 from app.modules.market_watch.application.ports import PublicNoticeSearchPort
 from app.modules.market_watch.application.service import PublicNoticeSearchService
