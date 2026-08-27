@@ -13,6 +13,7 @@ export function MfaPanel({ api, setMessage }: MfaPanelProps) {
   const [enrollment, setEnrollment] = useState<TotpEnrollment | null>(null);
   const [enrollmentCode, setEnrollmentCode] = useState("");
   const [disableCode, setDisableCode] = useState("");
+  const [stepUpCode, setStepUpCode] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function beginEnrollment() {
@@ -38,6 +39,21 @@ export function MfaPanel({ api, setMessage }: MfaPanelProps) {
       setMessage({ tone: "success", text: "MFA TOTP activée pour cette identité." });
     } catch (error) {
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Le code TOTP est invalide." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function stepUp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!stepUpCode.trim()) return;
+    setBusy(true);
+    try {
+      await api.stepUpTotp(stepUpCode.trim());
+      setStepUpCode("");
+      setMessage({ tone: "success", text: "Step-up MFA validé pour les actions sensibles pendant la fenêtre de session." });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Le step-up MFA a échoué." });
     } finally {
       setBusy(false);
     }
@@ -92,6 +108,16 @@ export function MfaPanel({ api, setMessage }: MfaPanelProps) {
           )}
         </div>
         <div className="detail-panel">
+          <div className="panel-heading">
+            <div>
+              <h3>Autoriser une action sensible</h3>
+              <p>Validez un code TOTP récent avant une finalisation GO/NO-GO ou une demande de signature.</p>
+            </div>
+          </div>
+          <form className="mfa-form" onSubmit={stepUp}>
+            <label><span>Code TOTP de step-up</span><input required inputMode="numeric" autoComplete="one-time-code" value={stepUpCode} onChange={(event) => setStepUpCode(event.target.value)} placeholder="123456" /></label>
+            <button className="primary-button" type="submit" disabled={busy}>Valider le step-up</button>
+          </form>
           <div className="panel-heading">
             <div>
               <h3>Désactiver TOTP</h3>
