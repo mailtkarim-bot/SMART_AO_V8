@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from app.modules.enterprise.infrastructure.insee_registry import (
-    CompanyRegistryPort,
-    RegisteredCompany,
-)
+from app.modules.enterprise.application.ports import CompanyRegistryPort, RegisteredCompany
 
 
 class EnterpriseRegistryLookupService:

@@ -2,23 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
+
+from app.modules.enterprise.application.ports import CompanyRegistryPort, RegisteredCompany
 
 SIRENE_BASE_URL = "https://api.insee.fr/api-sirene/3.11"
-
-
-@dataclass(frozen=True, slots=True)
-class RegisteredCompany:
-    siren: str
-    legal_name: str | None
-    active: bool | None
-    activity_code: str | None
-    source: str = "INSEE_SIRENE"
-
-
-class CompanyRegistryPort(Protocol):
-    def find_by_siren(self, *, siren: str) -> RegisteredCompany | None: ...
 
 
 class ExternalRegistryUnavailable(RuntimeError):
