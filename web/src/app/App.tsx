@@ -10,7 +10,9 @@ import { useCollaboratorWizard } from "../features/wizard/useCollaboratorWizard"
 import { PatronCockpitPanel } from "../features/cockpit/PatronCockpitPanel";
 import { PatronDecisionPanel } from "../features/decision/PatronDecisionPanel";
 import { DecisionRiskRequirementsPanel } from "../features/decision/DecisionRiskRequirementsPanel";
+import { DecisionRisksPanel } from "../features/decision/DecisionRisksPanel";
 import { useDecisionRiskRequirements } from "../features/decision/useDecisionRiskRequirements";
+import { useDecisionRisks } from "../features/decision/useDecisionRisks";
 import { usePatronCockpit } from "../features/cockpit/usePatronCockpit";
 import { BoampOpportunityPanel } from "../features/opportunities/BoampOpportunityPanel";
 import { useBoampOpportunities } from "../features/opportunities/useBoampOpportunities";
@@ -36,6 +38,8 @@ import type {
   ResolveDecisionConditionRequest,
   FinalizeGoNoGoDecisionRequest,
   PricingScenario,
+  StructuredRiskProjection,
+  TransitionStructuredRiskTreatmentInput,
   CreateCaseInput,
 } from "../shared/types";
 import "./styles.css";
@@ -180,6 +184,12 @@ function App() {
     api,
     setMessage,
     isPatron ? selectedCaseId : "",
+  );
+  const decisionRisks = useDecisionRisks(
+    api,
+    setMessage,
+    isPatron ? selectedCaseId : "",
+    decisionDossier?.sources ?? [],
   );
   const {
     assignments,
@@ -356,6 +366,14 @@ function App() {
         text: error instanceof Error ? error.message : "Impossible de résoudre la condition.",
       });
     }
+  }
+
+  async function transitionDecisionRisk(
+    risk: StructuredRiskProjection,
+    input: Omit<TransitionStructuredRiskTreatmentInput, "expected_revision">,
+  ) {
+    if (currentActor?.actor_kind !== "PATRON_ADMIN") return;
+    await decisionRisks.transitionRisk(risk, input);
   }
 
   async function finalizeDecision(input: FinalizeGoNoGoDecisionRequest) {
@@ -627,6 +645,18 @@ function App() {
               void resolveDecisionCondition(conditionId, input)
             }
             onFinalize={(input) => void finalizeDecision(input)}
+          />
+        )}
+
+        {isPatron && (
+          <DecisionRisksPanel
+            caseId={selectedCaseId}
+            risks={decisionRisks.risks}
+            loading={decisionRisks.loading}
+            transitioningRiskId={decisionRisks.transitioningRiskId}
+            canManage={currentActor?.actor_kind === "PATRON_ADMIN"}
+            onRefresh={() => void decisionRisks.refresh()}
+            onTransition={(risk, input) => void transitionDecisionRisk(risk, input)}
           />
         )}
 

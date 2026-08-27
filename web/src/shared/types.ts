@@ -253,6 +253,48 @@ export type PatronDecisionDossier = {
   context_fingerprint: string | null;
 };
 
+export type StructuredRiskTreatment = "OPEN" | "ACCEPTED" | "MITIGATED";
+export type StructuredRiskSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type StructuredRiskLikelihood = "RARE" | "POSSIBLE" | "LIKELY" | "ALMOST_CERTAIN";
+
+export type StructuredRiskProjection = {
+  risk_id: string;
+  case_id: string;
+  dce_version_id: string;
+  risk_code: string;
+  category: "CCAP" | "CCTP";
+  title: string;
+  severity: StructuredRiskSeverity;
+  likelihood: StructuredRiskLikelihood;
+  treatment: StructuredRiskTreatment;
+  revision: number;
+  due_at: string | null;
+  latest_treatment_evidence: {
+    locator: Record<string, unknown>;
+    start_byte_offset: number;
+    end_byte_offset: number;
+    excerpt: string;
+    rationale: string;
+  } | null;
+};
+
+export type TransitionStructuredRiskTreatmentInput = {
+  expected_revision: number;
+  to_treatment: Exclude<StructuredRiskTreatment, "OPEN">;
+  evidence_excerpt: string;
+  evidence_locator: Record<string, unknown>;
+  evidence_start_byte_offset: number;
+  evidence_end_byte_offset: number;
+  rationale: string;
+};
+
+export type StructuredRiskCommandResponse = CommandReceipt & {
+  result_code: "DECISION_RISK_TREATMENT_TRANSITIONED";
+  risk_id: string;
+  version: number;
+  treatment: Exclude<StructuredRiskTreatment, "OPEN">;
+};
+
 export type DecisionRiskRequirementLink = {
   link_id: string;
   case_id: string;
