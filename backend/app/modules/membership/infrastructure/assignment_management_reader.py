@@ -27,6 +27,12 @@ _ACTION_BY_COMMAND = {
     "AcknowledgeAssignment": Capability.ASSIGNMENT_ACKNOWLEDGE,
     "RequestAssignmentClarification": Capability.ASSIGNMENT_CLARIFY,
     "ReportAssignmentUnavailability": Capability.ASSIGNMENT_UNAVAILABILITY,
+    "CreateCaseAssignment": Capability.ASSIGNMENT_MANAGE,
+    "AmendCaseAssignmentScope": Capability.ASSIGNMENT_MANAGE,
+    "SuspendCaseAssignment": Capability.ASSIGNMENT_MANAGE,
+    "ReactivateCaseAssignment": Capability.ASSIGNMENT_MANAGE,
+    "EndCaseAssignment": Capability.ASSIGNMENT_MANAGE,
+    "ValidateAssignmentInteraction": Capability.ASSIGNMENT_MANAGE,
 }
 
 

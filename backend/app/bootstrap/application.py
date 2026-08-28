@@ -957,7 +957,6 @@ def create_app(
             policy=security_policy,
         )
         patron_assignment_management_service = PatronAssignmentManagementService(
-            session_factory=runtime.session_factory,
             reader=SqlAlchemyAssignmentManagementReader(runtime.session_factory),
             dispatcher=runtime.dispatcher,
             policy=security_policy,
