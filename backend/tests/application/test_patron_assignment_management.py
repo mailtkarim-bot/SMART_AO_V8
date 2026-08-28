@@ -157,7 +157,6 @@ def _seed_case_and_memberships(
 
 def _service(session_factory: sessionmaker[Session]) -> PatronAssignmentManagementService:
     return PatronAssignmentManagementService(
-        session_factory=session_factory,
         reader=SqlAlchemyAssignmentManagementReader(session_factory),
         dispatcher=CommandDispatcher(
             session_factory=session_factory,
